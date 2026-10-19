@@ -11,6 +11,7 @@ import '../atomic/account_store.dart';
 import '../atomic/atomic_client.dart';
 import '../atomic/settings_backend.dart';
 import '../theme.dart';
+import 'account_link_dialog.dart';
 
 /// The person's initial in a circle: the way into the agent and sync screen.
 class AgentAvatar extends StatelessWidget {
@@ -128,6 +129,33 @@ class _SyncScreenState extends State<SyncScreen> {
     ]);
   }
 
+  /// Where an account can be linked: the portal a known server reports for
+  /// itself (the active one first). A self-hosted server names none, so a
+  /// person who never used a hosted account is never offered one.
+  Future<String?> _findPortal() async {
+    final servers = _backend.servers;
+    if (servers == null) return null;
+    try {
+      final active = await servers.activeServer();
+      final known = await servers.knownServers();
+      final order = [
+        if (active != null) active,
+        ...known.where((k) => k != active),
+      ];
+      final infos = await Future.wait([
+        for (final url in order)
+          servers
+              .serverInfo(url)
+              .timeout(const Duration(seconds: 6))
+              .then<String?>((i) => i.managed ? i.portalUrl : null)
+              .catchError((Object _) => null),
+      ]);
+      return infos.whereType<String>().firstOrNull;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _loadAccount() async {
     AccountSummary? account;
     String? accountError;
@@ -138,16 +166,7 @@ class _SyncScreenState extends State<SyncScreen> {
     } catch (e) {
       accountError = '$e';
     }
-    if (account == null) {
-      try {
-        final servers = _backend.servers;
-        final active = await servers?.activeServer();
-        if (active != null) {
-          final info = await servers!.serverInfo(active);
-          if (info.managed) portal = info.portalUrl;
-        }
-      } catch (_) {}
-    }
+    if (account == null) portal = await _findPortal();
     if (!mounted) return;
     setState(() {
       _account = account;
@@ -271,18 +290,15 @@ class _SyncScreenState extends State<SyncScreen> {
       if (widget.linkAccount != null) {
         await widget.linkAccount!(context, portal);
       } else {
-        await shared.AtomicAccountLinkDialog.show(
-          context,
-          client: shared.AtomicAccountClient(portal),
-          deviceName: _deviceName.isEmpty ? 'atomic.place' : _deviceName,
-          openUrl: (uri) async => _openPortal(uri),
-          install: (identity, session) async {
-            if (identity.subject != _agent?.subject) {
-              throw StateError(
-                  'This account belongs to another identity than this device');
-            }
-            await AccountStore.save(session);
-          },
+        await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AccountLinkDialog(
+            client: shared.AtomicAccountClient(portal),
+            deviceName: _deviceName.isEmpty ? 'atomic.place' : _deviceName,
+            save: AccountStore.save,
+            openInApp: _openPortal,
+          ),
         );
       }
       await _loadAccount();

@@ -90,18 +90,14 @@ void main() {
           (id: 'p#2', role: 'assistant', text: 'Lisbon.', createdAt: 2),
         ],
       );
-      await tester.pumpWidget(
-        app(ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})),
-      );
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
       await tester.pumpAndSettle();
 
       expect(find.text('Trip plan'), findsOneWidget);
-      expect(find.text('Untitled chat'), findsOneWidget);
-      // Grouped under small labels instead of a time per chat.
       expect(find.text('Today'), findsOneWidget);
       expect(find.text('Earlier'), findsOneWidget);
-      expect(find.text('just now'), findsNothing);
-      expect(find.byIcon(Icons.chat_bubble_outline), findsNothing);
+      expect(find.text('Untitled chat'), findsOneWidget);
 
       await tester.tap(find.text('Trip plan'));
       await tester.pumpAndSettle();
@@ -111,31 +107,21 @@ void main() {
     });
 
     testWidgets('says so when there are no chats', (tester) async {
-      await tester.pumpWidget(
-        app(
-          ChatsScreen(
-            drive: 'did:ad:drive',
-            api: FakeApi(),
-            onOpenGallery: () {},
-          ),
-        ),
-      );
+      await tester.pumpWidget(app(ChatsScreen(
+          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
       await tester.pumpAndSettle();
       expect(find.text('No chats yet'), findsOneWidget);
     });
 
     testWidgets('reaches the canvas gallery and the search', (tester) async {
       var gallery = 0;
-      await tester.pumpWidget(
-        app(
-          ChatsScreen(
+      await tester.pumpWidget(app(
+        ChatsScreen(
             drive: 'did:ad:drive',
             api: FakeApi(),
-            onOpenGallery: () => gallery++,
-          ),
-          brightness: Brightness.dark,
-        ),
-      );
+            onOpenGallery: () => gallery++),
+        brightness: Brightness.dark,
+      ));
       await tester.pumpAndSettle();
 
       await tester.tap(find.byTooltip('Canvases'));
@@ -163,8 +149,7 @@ void main() {
         ],
       );
       await tester.pumpWidget(
-        app(ChatsScreen(drive: 'did:ad:a', api: api, onOpenGallery: () {})),
-      );
+          app(ChatsScreen(drive: 'did:ad:a', api: api, onOpenGallery: () {})));
       await tester.pumpAndSettle();
 
       expect(find.text('Any drive chat'), findsOneWidget);
@@ -177,18 +162,10 @@ void main() {
       expect(find.text('Any drive chat'), findsOneWidget);
     });
 
-    testWidgets('the agent avatar is the way to agent and sync', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        app(
-          ChatsScreen(
-            drive: 'did:ad:drive',
-            api: FakeApi(),
-            onOpenGallery: () {},
-          ),
-        ),
-      );
+    testWidgets('the agent avatar is the way to agent and sync',
+        (tester) async {
+      await tester.pumpWidget(app(ChatsScreen(
+          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
       await tester.pumpAndSettle();
       expect(find.text('J'), findsOneWidget);
       expect(find.byTooltip('Your agent and sync'), findsOneWidget);
@@ -196,26 +173,21 @@ void main() {
     });
 
     testWidgets('opens on the drive it is given', (tester) async {
-      final api = FakeApi(
-        driveList: [
-          (subject: 'did:ad:a', name: 'Alpha'),
-          (subject: 'did:ad:b', name: 'Beta'),
-        ],
-      );
+      final api = FakeApi(driveList: [
+        (subject: 'did:ad:a', name: 'Alpha'),
+        (subject: 'did:ad:b', name: 'Beta'),
+      ]);
       await tester.pumpWidget(
-        app(ChatsScreen(drive: 'did:ad:b', api: api, onOpenGallery: () {})),
-      );
+          app(ChatsScreen(drive: 'did:ad:b', api: api, onOpenGallery: () {})));
       await tester.pumpAndSettle();
       expect(find.text('Search in Beta'), findsOneWidget);
     });
 
-    testWidgets('shows the error when the chats cannot be read', (
-      tester,
-    ) async {
+    testWidgets('shows the error when the chats cannot be read',
+        (tester) async {
       final api = _Failing();
-      await tester.pumpWidget(
-        app(ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})),
-      );
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
       await tester.pumpAndSettle();
       expect(find.textContaining('No active drive'), findsOneWidget);
     });
@@ -223,19 +195,11 @@ void main() {
 
   group('SearchScreen', () {
     testWidgets('searches as you type, once per pause', (tester) async {
-      final api = FakeApi(
-        hits: [
-          (
-            subject: 'did:ad:9',
-            title: 'Zebra',
-            className: 'Folder',
-            score: 1.5,
-          ),
-        ],
-      );
-      await tester.pumpWidget(
-        app(SearchScreen(drive: 'did:ad:drive', api: api)),
-      );
+      final api = FakeApi(hits: [
+        (subject: 'did:ad:9', title: 'Zebra', className: 'Folder', score: 1.5),
+      ]);
+      await tester
+          .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: api)));
 
       await tester.enterText(find.byType(TextField), 'ze');
       await tester.pump(const Duration(milliseconds: 50));
@@ -252,22 +216,13 @@ void main() {
       expect(find.text('Zebra'), findsNothing);
     });
 
-    testWidgets('opening a hit is remembered as recently opened', (
-      tester,
-    ) async {
-      final api = FakeApi(
-        hits: [
-          (
-            subject: 'did:ad:9',
-            title: 'Zebra',
-            className: 'Folder',
-            score: 1.5,
-          ),
-        ],
-      );
-      await tester.pumpWidget(
-        app(SearchScreen(drive: 'did:ad:drive', api: api)),
-      );
+    testWidgets('opening a hit is remembered as recently opened',
+        (tester) async {
+      final api = FakeApi(hits: [
+        (subject: 'did:ad:9', title: 'Zebra', className: 'Folder', score: 1.5),
+      ]);
+      await tester
+          .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: api)));
       await tester.enterText(find.byType(TextField), 'zebr');
       await tester.pump(const Duration(milliseconds: 250));
       await tester.pumpAndSettle();
@@ -279,18 +234,16 @@ void main() {
   });
 
   group('ChatScreen with an AI', () {
-    HostedAi ai({
-      bool consent = true,
-      List<String> answer = const ['Ho', 'i!'],
-    }) => HostedAi(
-      status: {'enabled': true, 'consent': consent, 'model': 'm'},
-      stream: (messages, model) => Stream.fromIterable(answer),
-      enable: () async => {'enabled': true, 'consent': true, 'model': 'm'},
-    );
+    HostedAi ai(
+            {bool consent = true, List<String> answer = const ['Ho', 'i!']}) =>
+        HostedAi(
+          status: {'enabled': true, 'consent': consent, 'model': 'm'},
+          stream: (messages, model) => Stream.fromIterable(answer),
+          enable: () async => {'enabled': true, 'consent': true, 'model': 'm'},
+        );
 
-    testWidgets('writes, streams the answer and keeps both messages', (
-      tester,
-    ) async {
+    testWidgets('writes, streams the answer and keeps both messages',
+        (tester) async {
       final api = FakeApi(ai: ai());
       await tester.pumpWidget(app(ChatScreen(api: api)));
       await tester.pumpAndSettle();
@@ -327,15 +280,10 @@ void main() {
     });
 
     testWidgets('a new chat can be started from the home', (tester) async {
-      await tester.pumpWidget(
-        app(
-          ChatsScreen(
-            drive: 'did:ad:drive',
-            api: FakeApi(ai: ai()),
-            onOpenGallery: () {},
-          ),
-        ),
-      );
+      await tester.pumpWidget(app(ChatsScreen(
+          drive: 'did:ad:drive',
+          api: FakeApi(ai: ai()),
+          onOpenGallery: () {})));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('New chat'));
@@ -345,39 +293,82 @@ void main() {
     });
   });
 
+  group('groupChatsByAge', () {
+    final now = DateTime(2026, 10, 19, 15);
+    int ago(Duration d) => now.subtract(d).millisecondsSinceEpoch;
+    ChatSummary chat(String name, int at) =>
+        (subject: name, name: name, lastActivity: at);
+
+    test('groups by day, keeps the order, skips empty groups', () {
+      final groups = groupChatsByAge([
+        chat('a', ago(const Duration(hours: 2))),
+        chat('b', ago(const Duration(hours: 20))),
+        chat('c', ago(const Duration(days: 3))),
+        chat('d', ago(const Duration(days: 4))),
+        chat('e', ago(const Duration(days: 40))),
+        chat('f', 0),
+      ], now: now);
+      expect(groups.map((g) => g.$1).toList(),
+          ['Today', 'Yesterday', 'This week', 'Earlier']);
+      expect(groups.map((g) => g.$2.map((c) => c.name).join()).toList(),
+          ['a', 'b', 'cd', 'ef']);
+    });
+
+    test('nothing, no groups', () {
+      expect(groupChatsByAge([], now: now), isEmpty);
+    });
+
+    testWidgets('the home shows the headings and no chat icons',
+        (tester) async {
+      final api = FakeApi(chatList: [
+        chat('Fresh chat', DateTime.now().millisecondsSinceEpoch),
+        chat(
+            'Old chat',
+            DateTime.now()
+                .subtract(const Duration(days: 90))
+                .millisecondsSinceEpoch),
+      ]);
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      expect(find.text('Today'), findsOneWidget);
+      expect(find.text('Earlier'), findsOneWidget);
+      expect(find.text('Recent chats'), findsNothing);
+      expect(find.byIcon(Icons.chat_bubble_outline), findsNothing);
+    });
+  });
+
   group('AtomicClient parsing', () {
     test('keeps the text parts of user and assistant entries only', () {
-      final messages = AtomicClient.parseChatMessages(
-        jsonEncode([
-          {
-            'id': 'p#1',
-            'role': 'user',
-            'c': 5,
-            'parts': [
-              {'type': 'text', 'text': 'Hi'},
-            ],
-          },
-          {
-            'id': 'p#2',
-            'role': 'assistant',
-            'c': 6,
-            'parts': [
-              {'type': 'reasoning', 'text': 'thinking'},
-              {'type': 'tool-search', 'toolCallId': 'x'},
-              {'type': 'text', 'text': 'One'},
-              {'type': 'text', 'text': 'Two'},
-            ],
-          },
-          {'id': 'p#3', 'role': 'assistant', 'parts': []},
-          {
-            'id': 'p#4',
-            'role': 'summary',
-            'parts': [
-              {'type': 'text', 'text': 'older'},
-            ],
-          },
-        ]),
-      );
+      final messages = AtomicClient.parseChatMessages(jsonEncode([
+        {
+          'id': 'p#1',
+          'role': 'user',
+          'c': 5,
+          'parts': [
+            {'type': 'text', 'text': 'Hi'}
+          ],
+        },
+        {
+          'id': 'p#2',
+          'role': 'assistant',
+          'c': 6,
+          'parts': [
+            {'type': 'reasoning', 'text': 'thinking'},
+            {'type': 'tool-search', 'toolCallId': 'x'},
+            {'type': 'text', 'text': 'One'},
+            {'type': 'text', 'text': 'Two'},
+          ],
+        },
+        {'id': 'p#3', 'role': 'assistant', 'parts': []},
+        {
+          'id': 'p#4',
+          'role': 'summary',
+          'parts': [
+            {'type': 'text', 'text': 'older'}
+          ],
+        },
+      ]));
       expect(messages.map((m) => (m.id, m.role, m.text)), [
         ('p#1', 'user', 'Hi'),
         ('p#2', 'assistant', 'One\n\nTwo'),
@@ -387,22 +378,17 @@ void main() {
 
     test('reads chats and hits', () {
       final chats = AtomicClient.parseChats(
-        '[{"subject":"did:ad:1","name":"A","last_activity":7}]',
-      );
+          '[{"subject":"did:ad:1","name":"A","last_activity":7}]');
       expect(chats.single.lastActivity, 7);
       final hits = AtomicClient.parseHits(
-        '[{"subject":"did:ad:1","title":"T","class_name":"C","score":0.5}]',
-      );
-      expect(
-        (hits.single.title, hits.single.className, hits.single.score),
-        ('T', 'C', 0.5),
-      );
+          '[{"subject":"did:ad:1","title":"T","class_name":"C","score":0.5}]');
+      expect((hits.single.title, hits.single.className, hits.single.score),
+          ('T', 'C', 0.5));
     });
 
     test('reads recently opened resources', () {
       final recent = AtomicClient.parseRecentResources(
-        '[{"subject":"did:ad:1","title":"T","class_name":"C","opened_at":9}]',
-      );
+          '[{"subject":"did:ad:1","title":"T","class_name":"C","opened_at":9}]');
       expect((recent.single.title, recent.single.openedAt), ('T', 9));
     });
 
@@ -414,11 +400,8 @@ void main() {
         (subject: 'did:ad:CCC', name: 'Team'),
         (subject: 'did:ad:DDD', name: ''),
       ], active: 'atomic:DDD');
-      expect(shown.map((d) => d.subject), [
-        'did:ad:AAA',
-        'did:ad:CCC',
-        'did:ad:DDD',
-      ]);
+      expect(shown.map((d) => d.subject),
+          ['did:ad:AAA', 'did:ad:CCC', 'did:ad:DDD']);
     });
 
     test('timeAgo', () {
@@ -428,20 +411,6 @@ void main() {
       expect(timeAgo(ago(const Duration(hours: 3)), now: now), '3 h ago');
       expect(timeAgo(ago(const Duration(days: 2)), now: now), '2 d ago');
       expect(timeAgo(ago(const Duration(days: 30)), now: now), '2026-09-18');
-    });
-
-    test('chats group by local calendar day', () {
-      final now = DateTime(2026, 10, 19, 9);
-      int at(DateTime t) => t.millisecondsSinceEpoch;
-      expect(chatGroup(at(DateTime(2026, 10, 19, 0, 5)), now: now), 'Today');
-      expect(
-        chatGroup(at(DateTime(2026, 10, 18, 23, 50)), now: now),
-        'Yesterday',
-      );
-      expect(chatGroup(at(DateTime(2026, 10, 14)), now: now), 'This week');
-      expect(chatGroup(at(DateTime(2026, 10, 1)), now: now), 'This month');
-      expect(chatGroup(at(DateTime(2026, 8, 1)), now: now), 'Earlier');
-      expect(chatGroup(0, now: now), 'Earlier');
     });
   });
 }

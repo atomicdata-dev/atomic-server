@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../theme.dart';
 
-/// One line of a list of resources: icon, title, a line of detail.
+/// One line of a list of resources: an icon if it has one, a title, a line of
+/// detail.
 class ResourceRow extends StatelessWidget {
   final IconData? icon;
   final String title;
@@ -19,9 +20,14 @@ class ResourceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListTile(
-    leading: icon == null ? null : Icon(icon, color: context.appColors.main),
-    title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-    subtitle: detail == null || detail!.isEmpty ? null : Text(detail!),
-    onTap: onTap,
-  );
+        leading:
+            icon == null ? null : Icon(icon, color: context.appColors.main),
+        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: detail == null || detail!.isEmpty ? null : Text(detail!),
+        // A plain list of titles reads better tight.
+        visualDensity: detail == null && icon == null
+            ? VisualDensity.compact
+            : VisualDensity.standard,
+        onTap: onTap,
+      );
 }
