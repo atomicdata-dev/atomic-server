@@ -1,4 +1,4 @@
-name: atomiccanvas_flutter
+name: atomic_app
 description: atomic.place
 
 publish_to: 'none'
@@ -17,7 +17,7 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   path_provider: ^2.1.5
-  rust_lib_atomiccanvas_flutter:
+  atomic_flutter_rust:
     path: rust_builder
   flutter_rust_bridge: ^2.12.0
   http: ^1.3.0

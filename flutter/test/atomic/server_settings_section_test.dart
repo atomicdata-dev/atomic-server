@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:atomiccanvas_flutter/atomic/widgets/server_settings_section.dart';
+import 'package:atomic_app/atomic/widgets/server_settings_section.dart';
 
 /// Dead ports: the section must render from stored state alone. Pointing these
 /// at a real server would make the suite depend on one being up.

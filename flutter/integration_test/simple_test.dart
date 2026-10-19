@@ -1,7 +1,7 @@
 import 'dart:io';
-import 'package:atomiccanvas_flutter/atomic/atomic_client.dart';
-import 'package:atomiccanvas_flutter/atomic/settings_backend.dart';
-import 'package:atomiccanvas_flutter/src/rust/frb_generated.dart';
+import 'package:atomic_app/atomic/atomic_client.dart';
+import 'package:atomic_app/atomic/settings_backend.dart';
+import 'package:atomic_app/src/rust/frb_generated.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 

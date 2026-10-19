@@ -14,46 +14,35 @@ Change a sync screen here → change its twin there, and update that doc.
 
 ## What This Is
 
-A cross-platform infinite drawing canvas app, migrated from a Kotlin/Android + Jetpack Compose app at `../atomiccanvas`. The Flutter version targets Android, iOS, and Web from a single codebase.
-
-## Why Flutter
-
-The original Kotlin app is feature-complete (CRDT-backed canvas, undo/redo with branches, lasso selection, transforms, gallery with folders). The migration was chosen because iOS and web support are needed. Flutter's `CustomPainter` maps well to Compose's `Canvas` API, and `flutter_rust_bridge` enables reusing the Rust/Loro CRDT code across platforms.
+The Atomic app: a cross-platform (Android, iOS, Web) Flutter client for Atomic
+Data. Documents, chats and the other resources are shown through the web app's
+embed views; native screens handle sign-in, servers, pairing, sync and the
+chat/assistant. The Dart package is `atomic_app`.
 
 ## Architecture Decisions
 
-### Storage: atomic-server (not local files)
+### Storage: local-first with atomic_lib
 
-The Kotlin app stores Loro snapshots as local files. The Flutter app uses **atomic-server** as the backend via REST API, with `atomic_lib` (Rust crate) wrapped through `flutter_rust_bridge`. Authentication uses Ed25519 keypairs (agents). This is a deliberate shift toward cloud-synced storage.
+The app keeps its data in a local `atomic_lib` database and syncs with an
+Atomic Server (WebSocket) and with other devices (Iroh, QR pairing). Auth uses
+Ed25519 keypairs (agents).
 
 ### Rust Integration: flutter_rust_bridge v2
 
 - **Mobile (Android/iOS)**: FFI via `flutter_rust_bridge` — works with `dart:ffi`
 - **Web**: WASM compilation — `flutter_rust_bridge` handles this, but `dart:ffi` is unavailable on web, so the bridge generates WASM bindings automatically
-- Rust source lives in `/rust/src/`. Keep it thin: logic that another host
+- Rust source lives in `/rust/src/` (crate `atomic_flutter_rust`). Keep it thin: logic that another host
   (Tauri, a native shell, the CLI) could use goes in `atomic_lib::host`
   (`lib/src/host/`: lists, chats, conversations, recents, embed dispatcher) with
   its tests; the bridge binds it to the global store (`rust/src/host.rs`).
 - `atomic_lib` is referenced as a local path dependency: `../../../atomicdata-dev/atomic-server/lib`
 
-### Loro CRDT: Not Yet Integrated in Flutter
+### Package and identifier names
 
-The Kotlin app has full Loro CRDT integration (via JNI). The Flutter app currently stores strokes as plain JSON strings to atomic-server. Loro integration is the biggest remaining gap — it needs to be added as a Rust dependency and exposed through `flutter_rust_bridge` for proper offline-first CRDT sync and persistent history.
-
-### Canvas Coordinate System
-
-`screenPos = canvasPos * scale + offset` — same convention as the Kotlin app. The `CanvasPainter` applies `translate(offset) + scale(scale)` before drawing. All stroke points are stored in canvas space.
-
-### Gesture Model
-
-- **Stylus** → draw
-- **Single finger** → draw (pen tool) or pan (select tool)
-- **Two fingers** → pinch zoom + pan (always, regardless of tool)
-- The Kotlin app also supports 2-finger tap = undo, 3-finger tap = redo — not yet ported
-
-### History System
-
-Uses sealed `HistoryAction` classes (`StrokeAdded`, `StrokesDeleted`, `StrokesReplaced`). Undo/redo works by reversing/replaying actions. The Kotlin app also has `DiscardedBranch` — when you undo and then draw, the discarded future is preserved as a branch you can restore. This is partially ported (model exists) but not fully wired up.
+The Dart package is `atomic_app` and the Rust crate `atomic_flutter_rust`. The
+Android `applicationId`/namespace (`com.ontola.atomiccanvas_flutter`, with the
+matching Kotlin directory) and the iOS bundle identifier are legacy names kept
+on purpose: changing them would orphan the installed app's keys and data.
 
 ## File Structure
 
@@ -66,69 +55,14 @@ lib/
 ├── rust_init.dart               # Platform-conditional Rust init
 ├── atomic/
 │   ├── atomic_client.dart       # FFI wrapper (conditional import)
-│   └── session.dart             # Auth persistence (SharedPreferences)
-├── canvas/
-│   ├── infinite_canvas.dart     # Main canvas widget (651 lines)
-│   ├── canvas_painter.dart      # CustomPainter for strokes
-│   ├── fan_helpers.dart         # Color/width fan picker math
-│   └── thumbnail.dart           # Thumbnail generation
-├── gallery/
-│   ├── gallery_screen.dart      # Canvas list + folder management
-│   └── canvas_store.dart        # CRUD + state for canvases
-├── models/
-│   ├── stroke_data.dart         # StrokeData + HistoryAction
-│   └── canvas_entry.dart        # Canvas metadata model
+│   ├── session.dart             # Auth persistence (SharedPreferences)
+│   └── widgets/                 # Sync + settings widgets
 ├── screens/
-│   └── login_screen.dart        # Agent auth screen
-├── widgets/
-│   ├── toolbar.dart             # Left-side tool palette
-│   ├── bottom_toolbar.dart      # Bottom button bar
-│   ├── fan_overlay.dart         # Color/width fan CustomPainter
-│   └── history_scrubber.dart    # Undo timeline slider
+│   ├── login_screen.dart        # Agent auth screen
+│   ├── pair_screen.dart         # QR pairing
+│   └── sync_screen.dart         # Sync and servers
 └── src/rust/                    # Auto-generated flutter_rust_bridge
 ```
-
-## What's Done (~35%)
-
-- Core canvas with drawing, pan, zoom
-- Stroke rendering with bezier smoothing (CustomPainter)
-- Pen tool with color fan (8 hues x 4 shades) and 7 width options
-- In-memory undo/redo with action replay
-- Gallery with folder organization (local only)
-- atomic-server integration (agents, drives, canvas CRUD)
-- flutter_rust_bridge setup with atomic_lib bindings
-- Login/auth screen
-- Theme system (Material 3)
-
-## What's Missing (~65%)
-
-### Critical (must-have for parity)
-1. **Loro CRDT integration** — add loro crate to Rust, expose through bridge. Needed for offline-first sync, persistent history, and conflict resolution
-2. **Selection + Transform tools** — lasso selection, bounding box handles, scale/rotate/translate strokes
-3. **Eraser tool** — stroke deletion by tap/drag
-4. **Image import** — background images on canvas
-5. **Auto-save** — periodic + on-background save
-6. **Thumbnail generation** — PNG thumbnails for gallery (use `dart:ui` Picture recorder)
-
-### Important (UX parity)
-7. **Multi-finger gestures** — 2-finger tap undo, 3-finger tap redo
-8. **Stylus hover preview** — show cursor/brush preview on hover
-9. **Zoom scrubber** — fine-grained zoom control widget
-10. **Fit content** — zoom to fit all strokes with padding
-11. **Discarded branches UI** — show/restore abandoned history branches
-12. **History persistence** — save/restore undo history across sessions
-
-### Nice-to-have
-13. **Folder sync** to atomic-server (currently local-only)
-14. **Pressure sensitivity** — vary stroke width by pressure
-15. **Tests** — port GeometryTest and CanvasUiTest
-
-## Reference: Kotlin Source
-
-The original app lives at `../atomiccanvas`. Key files:
-- `app/src/main/java/com/ontola/atomiccanvas/MainActivity.kt` — 2,558 lines, contains everything
-- `app/src/main/java/com/ontola/atomiccanvas/LoroManager.kt` — 87 lines, Loro JNI wrapper
-- `app/src/main/rust/src/lib.rs` — 197 lines, JNI bindings for Loro
 
 ## Dev Environment
 
@@ -140,7 +74,6 @@ The original app lives at `../atomiccanvas`. Key files:
 ## Gotchas
 
 - `flutter_rust_bridge` auto-generates files in `lib/src/rust/` — don't edit those manually
+- After `flutter_rust_bridge_codegen generate`, reset `pubspec.yaml`/`pubspec.lock`/`rust/Cargo.*` to HEAD and keep the `flutter_rust_bridge` version the repo pins (the codegen rewrites the version header in the generated files)
 - `atomic_lib` path dependency means you need `atomicdata-dev` checked out alongside this repo
-- The Kotlin app uses `android.graphics.Color.HSVToColor` for the color fan — Flutter uses `HSVColor.toColor()` instead
 - On web, `dart:ffi` is unavailable — the bridge handles this but any new Rust bindings must be tested on web too
-- The Kotlin app is a single 2,558-line file. The Flutter version is already better structured — keep it that way

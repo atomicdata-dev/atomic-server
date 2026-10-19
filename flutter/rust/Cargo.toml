@@ -1,5 +1,5 @@
 [package]
-name = "rust_lib_atomiccanvas_flutter"
+name = "atomic_flutter_rust"
 version = "0.1.0"
 edition = "2021"
 

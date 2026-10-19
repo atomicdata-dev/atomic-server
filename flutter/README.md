@@ -1,24 +1,6 @@
-# atomic.place
+# Atomic
 
-- An android app note taking / infinite canvas drawing / vector app with pen & draw support
-- Extremely snappy, no-nonsense
-- Uses a CRDT (Loro) to sync notes and brush strokes. Full history playback and versioning.
-- Uses modern android standards and APIs. research conventions.
-- Easy & fast management with folders
-- Smart gestures, controls, pen support
-  - if using a pencil, fingers pan (single finger drag) & undo (double finger tap) & select (single finger hold)
-  - if using fingers, fingers pan, but user can quickly toggle draw mode
-  - Manu items have hold & drag interactions for fast gestures
-- Simple, clean, minimal UI, a couple of buttons at the buttom:
-  - Tutorial (starts tutorial, shows UX)
-  - Color selector (drag, a fan pops up, let go to select color. Tap to go back to previous color)
-  - Size adjust (same UX: drag & hold to select, tap to go to previous)
-  - History scrubber. Tap to undo, scrub to navigate history. You can even open "forgotten" branches of undo history, so nothing is ever lost
-  - New canvas button
-  - Gallery / back
-  - Eraser
-  - Reset view /zoom scrubber (tap to fit all content, or tap again to go back to previous view)
-  - Place image
+The Atomic app for Android, iOS and the web: a local-first Flutter client for Atomic Data that signs in, syncs with an Atomic Server and pairs with other devices.
 
 ## Development
 
@@ -76,19 +58,10 @@ Devices sync via [Iroh](https://iroh.computer) (QUIC peer-to-peer, works through
 
 NodeIDs are persistent (stored in the local DB), so a QR code stays valid across app restarts.
 
-### Zoom / pan
-
-| Input | Action |
-|---|---|
-| Trackpad pinch | Zoom |
-| Ctrl + scroll | Zoom |
-| Two-finger scroll | Pan |
-| Middle mouse drag | Pan |
-
-### Stylus / pen input
-
-When a stylus or pen is detected, **finger touches pan the canvas** instead of drawing. This matches the behaviour of the Kotlin version: use the pen to draw, fingers to navigate.
-
 ## Architecture
 
-The Dart client code in `lib/atomic/` (`AtomicClient`, `session.dart`, FRB bridge) is not canvas-specific — it's a general-purpose Atomic Data SDK wrapping `atomic_lib` via `flutter_rust_bridge`. Once the API stabilizes, it should be extracted to `atomic-server/dart/` (or `sdk/dart/`) as a reusable Dart package, keeping this app as a thin UI layer on top.
+The Dart client code in `lib/atomic/` (`AtomicClient`, `session.dart`, FRB bridge) is a general-purpose Atomic Data SDK wrapping `atomic_lib` via `flutter_rust_bridge`. Once the API stabilizes, it should be extracted to `atomic-server/dart/` (or `sdk/dart/`) as a reusable Dart package, keeping this app as a thin UI layer on top.
+
+## Names that look old but are intentional
+
+The Dart package is `atomic_app` and the Rust crate `atomic_flutter_rust`, but the Android `applicationId`/namespace (`com.ontola.atomiccanvas_flutter`, including the Kotlin package directory) and the iOS bundle identifier (`com.ontola.atomiccanvasFlutter`) keep their original names on purpose. Renaming them would make the OS treat the app as a different one and orphan the installed app's keys and data.
