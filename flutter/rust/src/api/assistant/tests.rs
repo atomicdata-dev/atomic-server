@@ -357,6 +357,7 @@ async fn a_document_created_here_is_in_the_drive_and_found_by_search() {
 
 #[tokio::test]
 async fn the_inbox_is_listed_and_a_notification_marked_read_through_the_bridge() {
+    let _one_at_a_time = crate::api::simple::tests::PRIVATE_DRIVE.lock().await;
     let drive = shared_drive().await;
     let store = db().unwrap();
     let inbox = store
