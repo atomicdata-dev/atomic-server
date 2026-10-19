@@ -10,6 +10,8 @@ import 'models.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'ai_tools.dart';
+import 'attachments.dart';
+import 'resource_row.dart';
 import 'chat_parts.dart';
 import 'markdown_view.dart';
 import 'tool_step.dart';
@@ -26,12 +28,7 @@ import 'list_and_field.dart';
 const voiceLocaleKey = 'voice_locale';
 
 /// A resource the person attached to a new chat as context.
-typedef _Attached = ({
-  String subject,
-  String title,
-  String className,
-  String? emoji
-});
+typedef _Attached = ContextResource;
 
 /// Most characters of one attached resource, and of all of them, sent to the AI.
 const _maxItemChars = 4000;
@@ -72,6 +69,9 @@ class ChatScreen extends StatefulWidget {
   /// A spoken chat: listen, send, speak the answer, listen again.
   final bool voiceMode;
 
+  /// Gets photos and files to attach; [defaultAttachmentPicker] when null.
+  final AttachmentPicker? attachmentPicker;
+
   /// The tools the model may call; the assistant's read-only tools
   /// ([assistantTools]) when null. Only an AI that reports tool calls gets
   /// them.
@@ -88,6 +88,7 @@ class ChatScreen extends StatefulWidget {
     this.accountLanguageHints = hostedLanguageHintSupported,
     this.voiceMode = false,
     this.tools,
+    this.attachmentPicker,
   });
 
   @override
@@ -119,6 +120,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// with every message of this screen, never stored in the chat.
   final List<_Attached> _attached = [];
   final Map<String, String> _attachedText = {};
+
+  /// Resources added with the attach button (not one of the pills): their
+  /// chips show also on a chat that is still empty.
+  final Set<String> _fromDrive = {};
+
+  /// Photos and files to go with the next message.
+  final List<FilePart> _files = [];
 
   /// What the picker offers, once read.
   List<DriveInfo>? _drives;
@@ -687,7 +695,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _send() async {
     final text = _input.text.trim();
     final ai = _ai;
-    if (text.isEmpty || ai == null || _sending || _transcribing) return;
+    if ((text.isEmpty && _files.isEmpty) ||
+        ai == null ||
+        _sending ||
+        _transcribing) {
+      return;
+    }
     // A recording for the account is dropped, not sent along.
     _cancelHosted();
     _stopListening();
@@ -696,13 +709,21 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final sw = Stopwatch()..start();
     void lap(String what) =>
         debugPrint('[chat] +${sw.elapsedMilliseconds}ms $what');
-    final userParts = <ChatPart>[TextPart(text)];
+    final userParts = <ChatPart>[
+      if (text.isNotEmpty) TextPart(text),
+      ..._files,
+    ];
+    _files.clear();
     final userMessage = ChatEntry(
       id: 'local-${_localId++}',
       role: 'user',
       createdAt: DateTime.now().millisecondsSinceEpoch,
       parts: userParts,
+      context: List.of(_attached),
     );
+    final name = text.isNotEmpty
+        ? text
+        : (userParts.whereType<FilePart>().first.filename ?? 'Attachment');
     final asked = [..._messages, userMessage];
     setState(() {
       _sending = true;
@@ -718,7 +739,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _persist('user message', () async {
       final isNew = _chat == null;
       final chat = _chat ??= await widget.api.newChat(
-        text.length > 40 ? '${text.substring(0, 40)}…' : text,
+        name.length > 40 ? '${name.substring(0, 40)}…' : name,
       );
       if (isNew) _noLongerNew();
       await widget.api.addEntry(chat, 'user', userParts);
@@ -845,6 +866,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// An attached image, large.
+  void _showImage(FilePart p) {
+    final bytes = p.bytes;
+    if (bytes == null) return;
+    showDialog<void>(
+      context: context,
+      builder: (context) => Dialog(
+        clipBehavior: Clip.antiAlias,
+        child: InteractiveViewer(child: Image.memory(bytes)),
+      ),
+    );
+  }
+
   /// Opens a link of a message: a resource in the app, anything else
   /// outside it.
   void _openLink(String url) {
@@ -940,6 +974,44 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
     final titles = toolTitles(m.parts);
     final children = <Widget>[];
+    final images = [
+      for (final p in m.parts)
+        if (p is FilePart && p.isImage) p,
+    ];
+    final others = [
+      for (final p in m.parts)
+        if (p is FilePart && !p.isImage)
+          AttachmentChip(
+            icon: Icons.description_outlined,
+            label: p.filename ?? 'Attached file',
+            onMine: mine,
+          ),
+      for (final r in m.context)
+        AttachmentChip(
+          icon: iconForClass(r.className),
+          emoji: r.emoji,
+          label: r.title.isEmpty ? 'Resource' : r.title,
+          onMine: mine,
+          onTap: () => _openLink(r.subject),
+        ),
+    ];
+    if (images.isNotEmpty) {
+      children.add(Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          for (final p in images)
+            GestureDetector(
+              onTap: () => _showImage(p),
+              child: AttachmentThumb(p, size: images.length == 1 ? 160 : 96),
+            ),
+        ],
+      ));
+    }
+    if (others.isNotEmpty) {
+      if (children.isNotEmpty) children.add(const SizedBox(height: 6));
+      children.add(Wrap(spacing: 6, runSpacing: 4, children: others));
+    }
     for (var i = 0; i < m.parts.length; i++) {
       final p = m.parts[i];
       final last = i == m.parts.length - 1;
@@ -977,7 +1049,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
     if (children.length == 1) return children.single;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment:
+          mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: children,
     );
@@ -1064,17 +1137,44 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
-  /// The attached resources, each removable.
-  Widget _chips() => Align(
+  /// What goes with the next message: photos and files, and the attached
+  /// resources; each removable.
+  Widget _chips(AppColors c) => Align(
         alignment: Alignment.centerLeft,
         child: Padding(
           padding: const EdgeInsets.only(bottom: 6),
           child: Wrap(
             spacing: 6,
             runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              for (final f in _files)
+                if (f.isImage)
+                  Stack(
+                    key: ValueKey(f),
+                    clipBehavior: Clip.none,
+                    children: [
+                      AttachmentThumb(f, size: 48),
+                      Positioned(
+                        top: -6,
+                        right: -6,
+                        child: _removeDot(
+                            c, f.filename ?? 'image', () => _removeFile(f)),
+                      ),
+                    ],
+                  )
+                else
+                  AttachmentChip(
+                    key: ValueKey(f),
+                    icon: Icons.description_outlined,
+                    label: f.filename ?? 'File',
+                    onRemove: () => _removeFile(f),
+                  ),
               for (final a in _attached)
                 Chip(
+                  avatar: a.emoji == null
+                      ? Icon(iconForClass(a.className), size: 16)
+                      : Text(a.emoji!),
                   label: Text(a.title, overflow: TextOverflow.ellipsis),
                   visualDensity: VisualDensity.compact,
                   onDeleted: () => _toggle(a),
@@ -1084,6 +1184,74 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           ),
         ),
       );
+
+  Widget _removeDot(AppColors c, String name, VoidCallback onTap) => Material(
+        color: c.bg2,
+        shape: const CircleBorder(),
+        child: InkResponse(
+          onTap: onTap,
+          radius: 14,
+          child: Padding(
+            padding: const EdgeInsets.all(3),
+            child: Icon(Icons.close,
+                size: 12, color: c.textPrimary, semanticLabel: 'Remove $name'),
+          ),
+        ),
+      );
+
+  void _removeFile(FilePart f) => setState(() => _files.remove(f));
+
+  /// The attach button: photos, the camera, a file, or a resource.
+  Future<void> _attach() async {
+    final ai = _ai;
+    if (ai == null) return;
+    final picker = widget.attachmentPicker ?? defaultAttachmentPicker;
+    final choice = await showAttachSheet(context,
+        picker: picker, images: ai.acceptsImages);
+    if (choice == null || !mounted) return;
+    if (choice == AttachChoice.drive) {
+      await _readPicker();
+      if (!mounted) return;
+      final r = await showDrivePicker(context, api: widget.api, recent: [
+        for (final (_, r) in _recent ?? const <(String, RecentResource)>[]) r
+      ]);
+      if (r == null || !mounted) return;
+      setState(() {
+        _fromDrive.add(r.subject);
+        if (!_attached.any((a) => a.subject == r.subject)) _attached.add(r);
+      });
+      return;
+    }
+    if (picker == null) return;
+    List<PickedFile> files;
+    try {
+      files = switch (choice) {
+        AttachChoice.photos => await picker.pickImages(),
+        AttachChoice.camera => [
+            if (await picker.takePhoto() case final f?) f,
+          ],
+        _ => await picker.pickFiles(),
+      };
+    } catch (e) {
+      if (mounted) setState(() => _error = "Couldn't attach: $e");
+      return;
+    }
+    String? problem;
+    final parts = <FilePart>[];
+    for (final f in files) {
+      final p = attachmentProblem(f, images: ai.acceptsImages);
+      if (p != null) {
+        problem = p;
+        continue;
+      }
+      parts.add(await attachmentPart(f));
+    }
+    if (!mounted) return;
+    setState(() {
+      _files.addAll(parts);
+      _error = problem;
+    });
+  }
 
   /// Looked up, and there is no AI to write to (no account on the device).
   bool get _noAi => _aiLooked && _ai == null;
@@ -1184,11 +1352,21 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   style: TextStyle(color: c.alert, fontSize: 12),
                 ),
               ),
-            if (_attached.isNotEmpty && _messages.isNotEmpty) _chips(),
+            if (_files.isNotEmpty ||
+                (_attached.isNotEmpty &&
+                    (_messages.isNotEmpty ||
+                        _attached.any((a) => _fromDrive.contains(a.subject)))))
+              _chips(c),
             if (widget.voiceMode) _voiceBar(c),
             if (_listening) _Waveform(levels: _levels),
             Row(
               children: [
+                IconButton(
+                  key: const Key('chat-attach'),
+                  tooltip: 'Attach',
+                  onPressed: ai == null || _transcribing ? null : _attach,
+                  icon: const Icon(Icons.add_circle_outline),
+                ),
                 Expanded(
                   child: TextField(
                     controller: _input,
@@ -1233,8 +1411,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 else
                   IconButton.filled(
                     tooltip: 'Send',
-                    onPressed:
-                        _transcribing || ai == null || !_hadText ? null : _send,
+                    onPressed: _transcribing ||
+                            ai == null ||
+                            !(_hadText || _files.isNotEmpty)
+                        ? null
+                        : _send,
                     icon: const Icon(Icons.arrow_upward),
                   ),
               ],

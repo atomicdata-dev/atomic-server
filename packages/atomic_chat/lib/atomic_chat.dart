@@ -45,5 +45,6 @@ export 'src/hosted_voice.dart';
 export 'src/fading_text.dart';
 export 'src/markdown_view.dart';
 export 'src/tool_step.dart';
+export 'src/attachments.dart';
 export 'src/list_and_field.dart';
 export 'src/atomic_place_mark.dart';
