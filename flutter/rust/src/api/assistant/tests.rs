@@ -500,6 +500,7 @@ async fn home_lists_do_not_decode_snapshots_per_row() {
         drives.len()
     );
     assert!(rows >= 30);
+}
 
 /// A resource as the server's sync delivers it: a Loro state with a parent but
 /// no `drive` property of its own.
