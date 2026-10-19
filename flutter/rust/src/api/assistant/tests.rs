@@ -328,3 +328,29 @@ async fn a_conversation_is_read_listed_and_written_through_the_bridge() {
     assert_eq!(list[0]["title"], "Alice");
     assert_eq!(list[0]["last_message"], "Hallo Alice");
 }
+
+#[tokio::test]
+async fn a_document_created_here_is_in_the_drive_and_found_by_search() {
+    let drive = shared_drive().await;
+    let subject = create_resource_of_class(
+        drive.to_string(),
+        urls::DOCUMENT_V2.into(),
+        "Narwhal bridge document".into(),
+    )
+    .await
+    .unwrap();
+    let r = db()
+        .unwrap()
+        .get_resource(&subject.as_str().into())
+        .await
+        .unwrap();
+    assert_eq!(r.get(urls::PARENT).unwrap().to_string(), drive);
+    assert_eq!(
+        r.get(urls::NAME).unwrap().to_string(),
+        "Narwhal bridge document"
+    );
+    let hits = search(Some(drive.to_string()), "narwhal".into(), 5)
+        .await
+        .unwrap();
+    assert!(hits.contains(&subject), "{hits}");
+}

@@ -181,3 +181,22 @@ pub async fn append_chat_entry(
         .await
         .map_err(err)
 }
+
+/// Create a resource of `class_url` named `name` ("Untitled" when empty)
+/// under `drive`, signed by this device's agent, and push it like every other
+/// local write. Returns its subject.
+pub async fn create_resource_of_class(
+    drive: String,
+    class_url: String,
+    name: String,
+) -> Result<String, String> {
+    atomic_lib::host::create::create_resource_of_class(
+        &node()?,
+        pusher().as_ref(),
+        &drive,
+        &class_url,
+        &name,
+    )
+    .await
+    .map_err(err)
+}

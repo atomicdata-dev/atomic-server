@@ -56,6 +56,10 @@ abstract class AssistantApi {
   /// Starts an AI chat named [name]; returns its subject.
   Future<String> newChat(String name);
 
+  /// Creates a resource of [classUrl] named [name] (`Untitled` when empty)
+  /// directly in [drive], as this device's agent; returns its subject.
+  Future<String> createResource(String drive, String classUrl, String name);
+
   /// Adds a text message by [role] (`user` or `assistant`) to [chat].
   Future<void> addMessage(String chat, String role, String text);
 

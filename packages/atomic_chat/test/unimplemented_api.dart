@@ -45,6 +45,9 @@ class UnimplementedApi extends AssistantApi {
   @override
   Future<String> newChat(String name) => _no('newChat');
   @override
+  Future<String> createResource(String drive, String classUrl, String name) =>
+      _no('createResource');
+  @override
   Future<void> addMessage(String chat, String role, String text) =>
       _no('addMessage');
   @override

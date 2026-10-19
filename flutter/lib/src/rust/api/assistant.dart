@@ -6,11 +6,6 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `agent_spellings`, `cache_message`, `cached_message`, `chat_entries`, `class_name_of`, `conversation_message_subjects`, `conversation_title`, `emoji_of`, `fetch_agent_name`, `fetched_agent_name`, `first_class`, `keyring_of`, `member_name`, `members_of`, `name_from_json_ad`, `name_of`, `of`, `open_keyring`, `open_message`, `own_commit_opts`, `private_drive_list`, `resource_row`, `row_resource`, `same_agent`, `vault_proof`, `with_emoji`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `DriveCache`, `OpenedMessage`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`
-// These functions are ignored (category: IgnoreBecauseOwnerTyShouldIgnore): `default`
-
 /// The emojis of `subjects` as JSON `{subject: emoji}`, only for those that
 /// have one. For rows that do not carry their icon themselves (the activity
 /// feed), read from the stored propvals like the other rows.
@@ -119,6 +114,16 @@ Future<String> appendChatEntry(
         required String partsJson}) =>
     RustLib.instance.api.crateApiAssistantAppendChatEntry(
         chat: chat, role: role, partsJson: partsJson);
+
+/// Create a resource of `class_url` named `name` ("Untitled" when empty)
+/// under `drive`, signed by this device's agent, and push it like every other
+/// local write. Returns its subject.
+Future<String> createResourceOfClass(
+        {required String drive,
+        required String classUrl,
+        required String name}) =>
+    RustLib.instance.api.crateApiAssistantCreateResourceOfClass(
+        drive: drive, classUrl: classUrl, name: name);
 
 /// One line of the activity feed.
 class ActivityEntry {

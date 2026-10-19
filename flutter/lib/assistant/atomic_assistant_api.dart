@@ -62,6 +62,9 @@ class AtomicAssistantApi extends AssistantApi {
   @override
   Future<String> newChat(String name) => AtomicClient.createAiChat(name);
   @override
+  Future<String> createResource(String drive, String classUrl, String name) =>
+      AtomicClient.createResourceOfClass(drive, classUrl, name);
+  @override
   Future<void> addMessage(String chat, String role, String text) =>
       AtomicClient.appendChatEntry(chat, role, text);
   @override

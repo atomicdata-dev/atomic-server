@@ -164,6 +164,14 @@ class AtomicClient {
   static Future<String> createAiChat(String name) =>
       assistant.createAiChat(name: name);
 
+  /// Creates a resource of [classUrl] named [name] ("Untitled" when empty)
+  /// in [drive], signed here and synced like any other edit; returns its
+  /// subject.
+  static Future<String> createResourceOfClass(
+          String drive, String classUrl, String name) =>
+      assistant.createResourceOfClass(
+          drive: drive, classUrl: classUrl, name: name);
+
   /// Adds a text message by [role] (`user` or `assistant`) to [chat]; returns
   /// the entry's id. Signed here and synced like any other edit.
   static Future<String> appendChatEntry(
