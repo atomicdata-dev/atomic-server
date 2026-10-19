@@ -268,8 +268,29 @@ Developer.
   (50 GiB, against 100 MB for free Cloud Vault), and quoting it on the vault
   row reads as the vault's own limit. The bar returns at 90% of the quota even
   when included. Cloud Vault adds a **Manage storage**
-  action in its row actions (subtle, like Restore and Turn off) that opens the
-  breakdown inside the row. Cloud Server, once on, shows
+  action in its row actions (subtle, like Restore and Turn off) that opens a
+  **dialog** (`VaultStorage`), not a nested card: one stacked bar (Snapshots,
+  Change history, Files and images, Other) sized by bytes, a legend with count
+  and size per item ("Snapshots · 3 · 21 MB"), and, when the control plane sends
+  the optional `history` field, a short list of why change history remains
+  (newest change pack of each device, changes no snapshot covers yet, the undo
+  window, and what can be freed now). A snapshot counts `checkpoint` objects;
+  `checkpoint_image` objects are chunks of a snapshot and only add to its size.
+  Actions: one primary **Compress history** (fresh snapshot, then free what it
+  covers) and a separate destructive **Discard history…** behind a confirmation.
+  The dialog also lets a person manage storage by hand, each part only when the
+  control plane sends it (old servers keep the dialog above, without these):
+  a **Snapshots** list (date, size, **Delete**; the latest says "Always kept"
+  and has no button; with only the latest it says older snapshots are removed
+  automatically) from `snapshots`, and a **Devices** list from
+  `history.devices` (first 8 characters of the device key, "This device" when
+  it matches, size, last activity, **Remove history…**). Removing a device's
+  history is confirmed and says that edits only that device made and never
+  synced elsewhere are lost, and that the workspace is not touched. Compress and
+  Discard cannot free another device's history, because a snapshot only covers
+  the devices its author imported; the device rows are the way to remove it.
+  The Flutter app has no storage view yet (no vault code exists there), so it
+  has no twin for this dialog. Cloud Server, once on, shows
   `CloudServerDetails`: the usage meter with "(see where space goes)", a line
   "N resources · Synced <ago>", and the drive's web address
   (`DriveAddress`, backed by `helpers/managed/aliases.ts` against the portal's

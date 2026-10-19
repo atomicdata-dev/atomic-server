@@ -1,3 +1,5 @@
+// First, so the catalog download starts before the rest of the app evaluates.
+import './helpers/preloadLocale';
 import { reactErrorHandler } from '@sentry/react';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

@@ -31,6 +31,13 @@ const StyledDiv = styled.div`
     visibility: hidden;
   }
 
+  /* Nothing hovers on touch, so the comment bubble is always there. */
+  @media (hover: none) {
+    & [data-row-affordance] {
+      visibility: visible;
+    }
+  }
+
   &:hover [data-row-affordance],
   &:focus-within [data-row-affordance],
   & [data-row-affordance][data-persistent] {

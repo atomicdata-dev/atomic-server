@@ -21,6 +21,31 @@ struct DriveUsageResponse {
     resource_count: u64,
     blob_bytes: u64,
     loro_bytes: u64,
+    /// Whether this node currently admits the drive under its sync policy. On
+    /// a managed node that is "the control plane has the drive on its
+    /// allowlist"; on a self-hosted node it is whether the node hosts the
+    /// drive (an open node hosts everything). Data can outlive enrollment, so
+    /// `resourceCount > 0` alone does not say this. Over-quota still counts as
+    /// enrolled: the drive is hosted, just full.
+    enrolled: bool,
+    /// Display name of the account that manages this drive, as the payer chose
+    /// it. Only present when the drive is enrolled and the node was told one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    managed_by: Option<String>,
+}
+
+/// Longest manager label we pass on, in characters.
+const MAX_MANAGER_LABEL_CHARS: usize = 80;
+
+/// Trim and cap a label from the policy; empty becomes `None`.
+fn clean_manager_label(label: Option<String>) -> Option<String> {
+    let trimmed = label?
+        .trim()
+        .chars()
+        .take(MAX_MANAGER_LABEL_CHARS)
+        .collect::<String>();
+    let trimmed = trimmed.trim();
+    (!trimmed.is_empty()).then(|| trimmed.to_string())
 }
 
 /// `GET /drive-usage?subject=<drive>` — per-drive storage (resource count, blob
@@ -55,7 +80,19 @@ pub async fn handle_drive_usage(
         .next()
         .ok_or_else(|| format!("No usage found for drive {subject}"))?;
 
+    // `drive_is_allowed`, not `admit_decision`: the latter starts a bootstrap
+    // grace clock for unknown drives, and a stat must not change state.
+    let enrolled = store.sync_policy().drive_is_allowed(&subject);
+
+    let managed_by = if enrolled {
+        clean_manager_label(store.sync_policy().drive_manager_label(&subject))
+    } else {
+        None
+    };
+
     Ok(HttpResponse::Ok().json(DriveUsageResponse {
+        enrolled,
+        managed_by,
         name: row.name,
         resource_count: row.resource_count,
         blob_bytes: row.blob_bytes,
@@ -95,4 +132,21 @@ pub async fn handle_drive_usage_breakdown(
             "blobBytes": r.blob_bytes,
         })).collect::<Vec<_>>(),
     })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::clean_manager_label;
+
+    #[test]
+    fn manager_label_is_trimmed_and_capped() {
+        assert_eq!(clean_manager_label(None), None);
+        assert_eq!(clean_manager_label(Some("   ".into())), None);
+        assert_eq!(
+            clean_manager_label(Some("  Acme  ".into())).as_deref(),
+            Some("Acme")
+        );
+        let long = "é".repeat(200);
+        assert_eq!(clean_manager_label(Some(long)).unwrap().chars().count(), 80);
+    }
 }

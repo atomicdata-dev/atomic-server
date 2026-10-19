@@ -53,15 +53,11 @@ export function useCommentCount(subject: string): {
     void (async () => {
       const old = [];
 
-      for (let i = 0; i < collection.totalMembers; i++) {
-        const id = await collection.getMemberWithIndex(i);
-
-        if (id) {
-          old.push({
-            id,
-            at: (await store.getResource(id)).getCreatedAt() ?? 0,
-          });
-        }
+      for await (const id of collection) {
+        old.push({
+          id,
+          at: (await store.getResource(id)).getCreatedAt() ?? 0,
+        });
       }
 
       if (!cancelled) setStale(hideMigrated(old, keys).hidden);

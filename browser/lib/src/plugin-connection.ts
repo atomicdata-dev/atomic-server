@@ -36,13 +36,14 @@ async function post<T>(
   const agent = store.getAgent();
   if (!agent) throw new Error('sign in before changing a plugin connection');
   const url = `${store.getServerUrl()}${path}`;
+  const payload = JSON.stringify(body);
   const response = await transport(url, {
     method: 'POST',
     headers: {
-      ...(await signRequest(url, agent, {})),
+      ...(await signRequest(url, agent, {}, { method: 'POST', body: payload })),
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(body),
+    body: payload,
   });
   if (!response.ok) throw new Error(await response.text());
 

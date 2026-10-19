@@ -390,7 +390,7 @@ async fn entries_survive_a_property_edit_by_a_writer() {
 }
 
 #[tokio::test]
-async fn entry_commits_leave_last_commit_at_the_genesis_value() {
+async fn entry_commits_serve_the_newest_envelope_as_last_commit() {
     let w = world("chat_log_last_commit").await;
     let (page, _) = create_page(&w, &w.bob, &[entry(&w.bob, "first")])
         .await
@@ -410,7 +410,15 @@ async fn entry_commits_leave_last_commit_at_the_genesis_value() {
     .await
     .unwrap();
 
+    // `lastCommit` is derived from the newest envelope; the page document
+    // holds no stamp and no server-written change, so entries cost only the
+    // author's own change.
     let now = w.db.get_resource(&page).await.unwrap();
-    assert_eq!(now.get(urls::LAST_COMMIT).unwrap().to_string(), stamp);
-    assert_eq!(now.build_state_doc().unwrap().list_entries().len(), 3);
+    let newest = atomic_lib::envelopes::latest_envelope(&w.db, page.as_str()).unwrap();
+    let served = now.get(urls::LAST_COMMIT).unwrap().to_string();
+    assert_eq!(served, newest.commit_id());
+    assert_ne!(served, stamp);
+    let doc = now.build_state_doc().unwrap();
+    assert_eq!(doc.list_entries().len(), 3);
+    assert!(!doc.get_all_properties().contains_key(urls::LAST_COMMIT));
 }

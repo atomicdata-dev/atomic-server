@@ -61,8 +61,7 @@ pub async fn handle_mint_view_token(
 ) -> AtomicServerResult<HttpResponse> {
     // Raw bytes rather than `web::Json`, so a version 2 request signature can
     // cover exactly the body acted on.
-    let body: MintTokenBody = serde_json::from_slice(&raw)
-        .map_err(|e| AtomicServerError::bad_request(format!("Invalid JSON body: {e}")))?;
+    let body: MintTokenBody = crate::helpers::parse_json(&raw)?;
     if !is_subject(&body.plugin) {
         return Err(AtomicServerError::bad_request(
             "Only a plugin stored in the drive needs a token",
@@ -72,18 +71,7 @@ pub async fn handle_mint_view_token(
     let store = &appstate.store;
     let resource = store.get_resource(&body.plugin.as_str().into()).await?;
 
-    let path_and_query = req
-        .head()
-        .uri
-        .path_and_query()
-        .ok_or("Path must be given")?
-        .to_string();
-    let signed_subject =
-        atomic_lib::Subject::from_raw(&path_and_query, None).resolve(&context.origin);
-
-    let agent =
-        crate::helpers::get_client_agent_for_request(&req, &raw, &appstate, &signed_subject)
-            .await?;
+    let agent = crate::helpers::authenticate(&req, &appstate, &context, &raw).await?;
     check_read(store, &resource, &agent).await?;
 
     let now = atomic_lib::utils::now();

@@ -549,7 +549,14 @@ pub async fn export_vault_segment(
                 let stored = if full && policy.history == HistoryKeep::CurrentStateOnly {
                     Vec::new()
                 } else {
-                    crate::envelopes::envelopes(store, subject_str)
+                    let found = crate::envelopes::envelopes_checked(store, subject_str);
+                    if found.unreadable > 0 {
+                        tracing::warn!(
+                            "Vault pack: {subject_str} has {} kept commit row(s) that could not be read; the pack ships without them",
+                            found.unreadable
+                        );
+                    }
+                    found.rows
                 };
                 // `>=`, not `>`: two commits can share a millisecond, and
                 // re-shipping one envelope is cheaper than losing one.
@@ -2257,7 +2264,7 @@ mod tests {
         let restored = target.get_resource(&kept).await.unwrap();
         assert_eq!(
             crate::history::versions(&restored).unwrap().len(),
-            5,
+            4,
             "the newest checkpoint must carry the whole version history on its own"
         );
         assert_eq!(
@@ -2506,9 +2513,23 @@ mod tests {
                 .is_err(),
             "a deleted resource stays deleted"
         );
+        // `lastCommit` is derived from the envelopes a node holds; a
+        // current-state checkpoint carries none, so it is left out.
+        let without_last_commit = |contents: Vec<(String, String)>| {
+            contents
+                .into_iter()
+                .map(|(subject, props)| {
+                    let props: Vec<&str> = props
+                        .split('|')
+                        .filter(|p| !p.contains("/lastCommit="))
+                        .collect();
+                    (subject, props.join("|"))
+                })
+                .collect::<Vec<_>>()
+        };
         assert_eq!(
-            drive_contents(&target, &drive_subject).await,
-            drive_contents(&source, &drive_subject).await,
+            without_last_commit(drive_contents(&target, &drive_subject).await),
+            without_last_commit(drive_contents(&source, &drive_subject).await),
             "the materialized drive is identical"
         );
 

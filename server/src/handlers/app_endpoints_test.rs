@@ -703,12 +703,13 @@ async fn v2_signatures_bind_the_body() {
 
 /// An endpoint that does not bind method and body yet refuses a v2
 /// signature outright instead of checking it as v1, and an unknown version
-/// is refused everywhere.
+/// is refused everywhere. `/upload` is the one that stays on v1: it streams a
+/// multipart body, so there is nothing buffered to hash.
 #[actix_rt::test]
 async fn v2_is_never_downgraded_to_v1() {
     use actix_web::http::Method;
 
-    let (fixture, app) = app_fixture("app_v2_downgrade").await;
+    let (fixture, _app) = app_fixture("app_v2_downgrade").await;
     let service = test::init_service(
         App::new()
             .app_data(Data::new(fixture.appstate.clone()))
@@ -716,17 +717,13 @@ async fn v2_is_never_downgraded_to_v1() {
     )
     .await;
 
-    let payload = create_payload(&fixture, &app, "v2");
+    let path = format!("/upload?parent={}", urlencoding::encode(&fixture.drive));
+    let multipart = "--b\r\nContent-Disposition: form-data; name=\"f\"; filename=\"a.txt\"\r\n\r\nhi\r\n--b--\r\n";
     let unbound = test::call_service(
         &service,
-        signed_v2(
-            "/app-write",
-            &fixture.appstate,
-            Method::POST,
-            &payload,
-            &payload,
-        )
-        .to_request(),
+        signed_v2(&path, &fixture.appstate, Method::POST, multipart, multipart)
+            .insert_header(("Content-Type", "multipart/form-data; boundary=b"))
+            .to_request(),
     )
     .await;
     assert_eq!(unbound.status(), 401);
@@ -763,4 +760,92 @@ async fn v2_is_never_downgraded_to_v1() {
     )
     .await;
     assert_eq!(relabelled.status(), 401);
+}
+
+/// A plugin write route that takes a JSON body (`/plugin-schedule`) accepts a
+/// version 2 signature and checks the body with it: the same headers on a
+/// different body are refused, which is the replay a version 1 proof allows.
+/// Version 1 keeps working.
+#[actix_rt::test]
+async fn plugin_routes_bind_the_body_with_v2() {
+    use actix_web::http::Method;
+
+    let (fixture, _app) = app_fixture("plugin_v2_signatures").await;
+    let service = test::init_service(
+        App::new()
+            .app_data(Data::new(fixture.appstate.clone()))
+            .configure(crate::routes::config_routes),
+    )
+    .await;
+    let body = |interval: &str| {
+        format!(
+            r#"{{"drive":{:?},"plugin":{:?},"intervalSeconds":{interval}}}"#,
+            fixture.drive, fixture.plugin,
+        )
+    };
+    let stop = body("null");
+
+    let ok = test::call_service(
+        &service,
+        signed_v2(
+            "/plugin-schedule",
+            &fixture.appstate,
+            Method::POST,
+            &stop,
+            &stop,
+        )
+        .to_request(),
+    )
+    .await;
+    assert_eq!(ok.status(), 200, "{}", body_of(ok));
+
+    // Signed for "stop", sent as "every 60 seconds": refused, and nothing set.
+    let swapped = test::call_service(
+        &service,
+        signed_v2(
+            "/plugin-schedule",
+            &fixture.appstate,
+            Method::POST,
+            &stop,
+            &body("60"),
+        )
+        .to_request(),
+    )
+    .await;
+    assert_eq!(swapped.status(), 401, "a different body than was signed");
+    assert!(body_of(swapped).contains("version 2"));
+    let key =
+        atomic_lib::db::plugin_schedule::PluginScheduleKey::new(&fixture.drive, &fixture.plugin);
+    assert!(fixture
+        .appstate
+        .store
+        .get_plugin_schedule(&key)
+        .unwrap()
+        .is_none());
+
+    let v1 = test::call_service(
+        &service,
+        signed("/plugin-schedule", &fixture.appstate)
+            .method(Method::POST)
+            .insert_header(("Content-Type", "application/json"))
+            .set_payload(stop.clone())
+            .to_request(),
+    )
+    .await;
+    assert_eq!(v1.status(), 200, "{}", body_of(v1));
+
+    // A body that is not JSON is a 400, not a crash.
+    let garbled = test::call_service(
+        &service,
+        signed_v2(
+            "/plugin-schedule",
+            &fixture.appstate,
+            Method::POST,
+            "{",
+            "{",
+        )
+        .to_request(),
+    )
+    .await;
+    assert_eq!(garbled.status(), 400);
 }

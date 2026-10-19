@@ -62,7 +62,7 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
     id: 'issue-tracker',
     title: 'Issue Tracker',
     description:
-      'Status, Assignee and Priority, plus a kanban board and an Issues view.',
+      'Status, Assignee and Priority, on a kanban board or in a table.',
     rowName: 'Issue',
     icon: FaBug,
     spec: {
@@ -97,7 +97,6 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           groupByColumn: 'Status',
           default: true,
         },
-        { name: 'Issues', kind: 'issues', groupByColumn: 'Status' },
         { name: 'All issues', kind: 'table' },
       ],
     },
@@ -178,11 +177,6 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           propertySubject: workSchema.properties.project,
         },
         {
-          name: 'Person',
-          type: 'relation',
-          propertySubject: workSchema.properties.person,
-        },
-        {
           name: 'Billable',
           type: 'checkbox',
           propertySubject: workSchema.properties.billable,
@@ -202,8 +196,8 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           derivedColumns: [
             {
               name: 'Duration',
-              kind: 'elapsed',
-              args: { from: 'Start', until: 'End' },
+              formula: 'coalesce(end, now()) - start',
+              valueKind: 'duration',
             },
           ],
           default: true,
@@ -311,8 +305,8 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           derivedColumns: [
             {
               name: 'Days since contact',
-              kind: 'daysSince',
-              args: { from: 'Last contact' },
+              formula: 'days(now() - last_contact)',
+              valueKind: 'days',
             },
           ],
           aggregates: [{ function: 'sum', column: 'Amount' }],
@@ -378,8 +372,8 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           derivedColumns: [
             {
               name: 'Waiting',
-              kind: 'daysSince',
-              args: { from: 'Applied on' },
+              formula: 'days(now() - applied_on)',
+              valueKind: 'days',
             },
           ],
           breakdownColumn: 'Stage',
@@ -438,57 +432,24 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
   {
     id: 'grocery-list',
     title: 'Grocery list',
-    description: 'Grouped by aisle, with the basket priced up.',
+    description: 'Quick add, tick off what you bought.',
     rowName: 'Item',
     icon: FaCartShopping,
     spec: {
       columns: [
         { name: 'Quantity', type: 'number' },
-        {
-          name: 'Aisle',
-          type: 'select',
-          options: [
-            'Produce',
-            'Bakery',
-            'Dairy',
-            'Meat & fish',
-            'Frozen',
-            'Pantry',
-            'Drinks',
-            'Household',
-          ],
-        },
         { name: 'Price', type: 'decimal', description: 'Per item' },
         { name: 'Bought', type: 'checkbox' },
       ],
       views: [
         {
-          name: 'By aisle',
-          kind: 'kanban',
-          groupByColumn: 'Aisle',
-          default: true,
-        },
-        {
           name: 'List',
           kind: 'table',
-          derivedColumns: [
-            {
-              name: 'Line total',
-              kind: 'product',
-              args: { a: 'Quantity', b: 'Price' },
-            },
-          ],
-          aggregates: [{ function: 'sum', column: 'Quantity' }],
-          breakdownColumn: 'Aisle',
-          breakdownGranularity: 'exact',
-          columnOrder: [
-            'Name',
-            'Quantity',
-            'Price',
-            'Line total',
-            'Aisle',
-            'Bought',
-          ],
+          default: true,
+          // One tap: the tick is the first, always visible control (a narrow
+          // column, so it stays on screen on a phone). Bought, Price stay as columns.
+          columns: ['Name', 'Quantity'],
+          columnOrder: ['Got it', 'Name', 'Quantity'],
           rowActions: [{ label: 'Got it', kind: 'toggle', column: 'Bought' }],
           // The bar you actually use a shopping list through.
           quickAdd: {
@@ -519,8 +480,6 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
             'Overhead press',
             'Row',
             'Pull-up',
-            'Run',
-            'Cycle',
           ],
         },
         { name: 'Sets', type: 'number' },
@@ -536,8 +495,7 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           derivedColumns: [
             {
               name: 'Total reps',
-              kind: 'product',
-              args: { a: 'Sets', b: 'Reps' },
+              formula: 'sets * reps',
             },
           ],
           aggregates: [
@@ -605,13 +563,13 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           derivedColumns: [
             {
               name: 'Thirsty for',
-              kind: 'daysSince',
-              args: { from: 'Last watered' },
+              formula: 'days(now() - last_watered)',
+              valueKind: 'days',
             },
             {
               name: 'Next water',
-              kind: 'offset',
-              args: { from: 'Last watered', days: 'Water every' },
+              formula: 'addDays(last_watered, water_every)',
+              valueKind: 'date',
             },
           ],
           columnOrder: [
@@ -634,7 +592,6 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           },
           default: true,
         },
-        { name: 'By room', kind: 'kanban', groupByColumn: 'Location' },
       ],
     },
   },
@@ -670,8 +627,7 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           derivedColumns: [
             {
               name: 'Value',
-              kind: 'product',
-              args: { a: 'Quantity', b: 'Unit price' },
+              formula: 'quantity * unit_price',
             },
           ],
           aggregates: [{ function: 'sum', column: 'Quantity' }],
@@ -765,14 +721,7 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
         {
           name: 'Kind',
           type: 'select',
-          options: [
-            'Article',
-            'Tool',
-            'Video',
-            'Documentation',
-            'Inspiration',
-            'To read',
-          ],
+          options: ['Article', 'Tool', 'Video', 'Documentation', 'Inspiration'],
         },
         { name: 'Added', type: 'date' },
         { name: 'Notes', type: 'markdown' },
@@ -787,7 +736,6 @@ export const TABLE_TEMPLATES: TableTemplate[] = [
           breakdownGranularity: 'exact',
           default: true,
         },
-        { name: 'By kind', kind: 'kanban', groupByColumn: 'Kind' },
       ],
     },
   },

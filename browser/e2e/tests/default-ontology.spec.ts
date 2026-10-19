@@ -28,7 +28,7 @@ test.describe('default ontology', () => {
       0,
     );
 
-    // The drive page's Resources grid hides it as well, but it is still the
+    // The drive page's Resources list hides it as well, but it is still the
     // drive's "Default Ontology" setting. Read its subject from there and open it.
     await page.getByTestId('sidebar-drive-open').click();
     const settings = await openDriveSettings(page);

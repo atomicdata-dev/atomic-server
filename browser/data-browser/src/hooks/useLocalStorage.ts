@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const listeners = new Map<
   string,
@@ -33,6 +33,10 @@ export function useLocalStorage<T>(
     }
   });
 
+  // The latest value, kept in a ref so `setValue` keeps one identity. A setter
+  // that changed after every write made effects depending on it loop (#2212).
+  const valueRef = useRef(storedValue);
+
   // Return a wrapped version of useState's setter function that
   // persists the new value to localStorage.
   const setValue = useCallback(
@@ -40,7 +44,7 @@ export function useLocalStorage<T>(
       try {
         // Allow value to be a function so we have same API as useState
         const valueToStore =
-          value instanceof Function ? value(storedValue) : value;
+          value instanceof Function ? value(valueRef.current) : value;
 
         // Save state
         for (const listener of listeners.get(key) || []) {
@@ -54,7 +58,7 @@ export function useLocalStorage<T>(
         console.error(error);
       }
     },
-    [storedValue, key, storage],
+    [key, storage],
   );
 
   useEffect(() => {
@@ -62,10 +66,15 @@ export function useLocalStorage<T>(
       listeners.set(key, new Set());
     }
 
-    listeners.get(key)?.add(setStoredValue as (value: unknown) => void);
+    const listener = (value: unknown) => {
+      valueRef.current = value as T;
+      setStoredValue(value as T);
+    };
+
+    listeners.get(key)?.add(listener);
 
     return () => {
-      listeners.get(key)?.delete(setStoredValue as (value: unknown) => void);
+      listeners.get(key)?.delete(listener);
     };
   }, [key]);
 

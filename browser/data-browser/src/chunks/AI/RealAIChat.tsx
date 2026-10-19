@@ -156,6 +156,7 @@ const RealAIChatInner: React.FC<React.PropsWithChildren<RealAIChatProps>> = ({
     openRouterApiKey,
     showTokenUsage,
     ollamaUrl,
+    ollamaEndpoint,
     isProviderAvailable,
     hostedAI,
     enableIncludedAI,
@@ -184,13 +185,13 @@ const RealAIChatInner: React.FC<React.PropsWithChildren<RealAIChatProps>> = ({
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
 
   useEffect(() => {
-    if (!ollamaUrl) {
+    if (!ollamaEndpoint) {
       setOllamaModels([]);
 
       return;
     }
 
-    return effectFetch(`${ollamaUrl}/api/tags`, {
+    return effectFetch(`${ollamaEndpoint}/api/tags`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -204,7 +205,7 @@ const RealAIChatInner: React.FC<React.PropsWithChildren<RealAIChatProps>> = ({
         setOllamaModels([]);
       },
     );
-  }, [ollamaUrl]);
+  }, [ollamaEndpoint]);
 
   const currencyFormatter = useRef(
     new Intl.NumberFormat('en-US', {
@@ -417,7 +418,7 @@ const RealAIChatInner: React.FC<React.PropsWithChildren<RealAIChatProps>> = ({
   const transport = useClientOnlyTransport({
     openRouterAPIKey: openRouterApiKey,
     openRouterZdr,
-    ollamaURL: ollamaUrl,
+    ollamaURL: ollamaEndpoint,
     selectedAgent,
     model: activeModel,
     additionalSystemPrompt: selectedAgent.skillsEnabled

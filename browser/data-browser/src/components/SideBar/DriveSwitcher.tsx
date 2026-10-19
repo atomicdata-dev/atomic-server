@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { driveDisplayName } from '../../helpers/driveDisplayName';
 import { canonicalizeScheme } from '@tomic/lib';
 import styled from 'styled-components';
@@ -17,6 +18,7 @@ import { LuChevronsUpDown } from 'react-icons/lu';
 import { useSettings } from '../../helpers/AppSettings';
 import { constructOpenURL } from '../../helpers/navigation';
 import { useDriveHistory } from '../../hooks/useDriveHistory';
+import { useDriveVisits } from '../../hooks/useDriveVisits';
 import { useSavedDrives } from '../../hooks/useSavedDrives';
 import { usePrivateDrive } from '../../hooks/usePrivateDrive';
 import { paths } from '../../routes/paths';
@@ -25,6 +27,8 @@ import { buildDefaultTrigger } from '../Dropdown/DefaultTrigger';
 import type { DropdownTriggerComponent } from '../Dropdown/DropdownTrigger';
 import { useNewResourceUI } from '../forms/NewForm/useNewResourceUI';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
+
+const MAX_SHOWN_DRIVES = 10;
 
 const DefaultTrigger = buildDefaultTrigger(<FaCaretDown />, 'Switch Drive');
 
@@ -42,8 +46,8 @@ function getTitle(resource: Resource): string {
 }
 
 /**
- * Quick-switch between the user's drives: private drive, My drives,
- * recently visited. Managing the lists lives on the User Settings page.
+ * Quick-switch between the user's drives: private drive plus the 10 most recently
+ * visited drives. The full lists live on the User Settings page.
  */
 export function DriveSwitcher({
   Trigger = DefaultTrigger,
@@ -78,12 +82,34 @@ export function DriveSwitcher({
       !myDrives.some(mine => same(subject, mine)),
   );
 
-  const myDrivesMap = useResources(savedDrives);
-  const recentDrivesMap = useResources(recentDrives);
+  const [driveVisits, recordVisit] = useDriveVisits();
+
+  // Record a visit whenever the active drive changes (also via links).
+  useEffect(() => {
+    if (drive) recordVisit(drive);
+  }, [drive, recordVisit]);
+
+  // One list: saved + recent drives, deduped, most recently visited first,
+  // never visited ones after in their original order.
+  const merged: string[] = [];
+
+  for (const subject of [...myDrives, ...recentDrives]) {
+    if (!merged.some(m => same(subject, m))) merged.push(subject);
+  }
+
+  const visitTime = (subject: string) =>
+    driveVisits[canonicalizeScheme(subject)] ?? 0;
+  // Array.prototype.sort is stable, so ties keep their original order.
+  const shownDrives = merged
+    .sort((a, b) => visitTime(b) - visitTime(a))
+    .slice(0, MAX_SHOWN_DRIVES);
+
+  const shownDrivesMap = useResources(shownDrives);
 
   const switchTo = (subject: string) => {
     setDrive(subject);
     addToHistory(subject);
+    recordVisit(subject);
     navigate(constructOpenURL(subject));
   };
 
@@ -104,8 +130,8 @@ export function DriveSwitcher({
           },
         ]
       : []),
-    ...myDrives.map(subject => {
-      const resource = myDrivesMap.get(subject);
+    ...shownDrives.map(subject => {
+      const resource = shownDrivesMap.get(subject);
       const label =
         resource && !resource.error
           ? getTitle(resource)
@@ -122,6 +148,7 @@ export function DriveSwitcher({
         icon: subject === drive ? <FaSquareCheck /> : <FaRegCircle />,
       };
     }),
+    DIVIDER,
     {
       id: 'new-drive',
       label: 'New Drive',
@@ -131,17 +158,15 @@ export function DriveSwitcher({
         createNewResource(server.classes.drive, agent?.subject ?? ''),
       disabled: !agent,
     },
-    DIVIDER,
-    ...Array.from(recentDrivesMap.entries()).map(([subject, resource]) => ({
-      label: getTitle(resource),
-      id: subject,
-      suffix: badge(subject),
-      helper: `Switch to ${getTitle(resource)}`,
-      icon: subject === drive ? <FaSquareCheck /> : <FaRegCircle />,
-      onClick: (): void => switchTo(subject),
-      disabled: false,
-    })),
-    DIVIDER,
+    {
+      id: 'manage-drives',
+      label: 'View all drives',
+      icon: <FaGear />,
+      helper: 'View and organize all your drives.',
+      onClick: (): void => {
+        void navigate(paths.agentSettings);
+      },
+    },
     {
       id: 'drive-hosting',
       label: 'Storage and hosting',
@@ -150,15 +175,6 @@ export function DriveSwitcher({
         'Local stays on your devices. Vault is encrypted backup. Server hosts a readable copy. Remote is another connected server.',
       onClick: () =>
         navigate(`/app/sync?drive=${encodeURIComponent(drive ?? '')}`),
-    },
-    {
-      id: 'manage-drives',
-      label: 'Manage drives',
-      icon: <FaGear />,
-      helper: 'View and organize all your drives.',
-      onClick: (): void => {
-        void navigate(paths.agentSettings);
-      },
     },
   ];
 

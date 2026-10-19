@@ -43,6 +43,11 @@ impl RequestContext {
 
         Self { origin }
     }
+
+    /// The URL a client signs for `req`; see [crate::helpers::signed_subject].
+    pub fn signed_subject(&self, req: &HttpRequest) -> crate::errors::AtomicServerResult<String> {
+        crate::helpers::signed_subject(req, &self.origin)
+    }
 }
 
 /// Whether `host` (as sent in `Host` / `X-Forwarded-Host`, port included) is a

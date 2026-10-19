@@ -122,8 +122,10 @@ export function MessageNotifier(): null {
   const { privateDrive } = usePrivateDrive();
   const [sharedWithMe] = usePrivateDriveList(core.properties.sharedWithMe);
 
-  // Toasts on screen, so opening the meeting panel can take them away.
-  const shown = useRef(new Set<string>());
+  // Toasts on screen by target, so a newer message replaces the older bubble
+  // and opening the meeting panel can take them away.
+  const shown = useRef(new Map<string, string>());
+  const bubbleCount = useRef(0);
   const meetingPanelOpen = activePanel === 'followSession';
 
   useEffect(() => {
@@ -326,7 +328,14 @@ export function MessageNotifier(): null {
         // open; a bubble over its message box is noise. Still in the Inbox.
         if (meetingPanelOpen) return;
 
-        shown.current.add(bubbleId(n.target));
+        // A fresh id each time: react-hot-toast keeps a re-used id's `dismissed`
+        // flag and removes the id a second after its last dismissal, so a
+        // message right after the previous bubble closed vanished at once.
+        const previous = shown.current.get(n.target);
+        if (previous) toast.dismiss(previous);
+
+        const id = [bubbleId(n.target), bubbleCount.current++].join(':');
+        shown.current.set(n.target, id);
         toast.custom(
           t => (
             <ToastCard
@@ -343,7 +352,7 @@ export function MessageNotifier(): null {
               </ToastBody>
             </ToastCard>
           ),
-          { duration: 6000, id: bubbleId(n.target) },
+          { duration: 6000, id },
         );
 
         return;

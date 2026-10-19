@@ -72,6 +72,18 @@ export function encodeCommitOkSlim(
   return encodeCommitOk(requestId, commitId);
 }
 
+/** COMMIT_OK, paced slim form:
+ *  `[0x14] [request_id: u16] [commit_id_utf8] 0x00 [pace_ms: decimal]`. What
+ *  a server sends a client whose HELLO listed `commit-ok-slim` and
+ *  `commit-pace`. */
+export function encodeCommitOkPaced(
+  requestId: number,
+  commitId: string,
+  paceMs: number,
+): Uint8Array {
+  return encodeCommitOk(requestId, `${commitId}\0${paceMs}`);
+}
+
 /** CHALLENGE: `[0x42] [nonce_utf8]`. */
 export function encodeChallenge(nonce: string): Uint8Array {
   const payload = encoder.encode(nonce);

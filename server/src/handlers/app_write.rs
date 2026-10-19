@@ -19,13 +19,12 @@
 use std::collections::HashMap;
 
 use actix_web::{web, HttpResponse};
-use atomic_lib::{hierarchy::check_write, Storelike, Subject};
+use atomic_lib::{hierarchy::check_write, Storelike};
 use serde_json::Value as Json;
 
 use crate::{
     appstate::AppState,
     errors::{AtomicServerError, AtomicServerResult},
-    helpers::get_client_agent,
     plugins::apply::{ApplyHost, CreateRequest},
     plugins::store_host::StoreApplyHost,
 };
@@ -55,13 +54,14 @@ pub struct AppWriteResult {
     pub subject: String,
 }
 
-#[tracing::instrument(skip(appstate, body, req))]
+#[tracing::instrument(skip(appstate, raw, req))]
 pub async fn handle_app_write(
     appstate: web::Data<AppState>,
-    body: web::Json<AppWriteBody>,
+    raw: web::Bytes,
     req: actix_web::HttpRequest,
     context: crate::context::RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
+    let body: AppWriteBody = crate::helpers::parse_json(&raw)?;
     let store = &appstate.store;
 
     // Write rights on the app, which is what sharing one already means: read
@@ -75,15 +75,7 @@ pub async fn handle_app_write(
     // own subtree.
     let app_resource = store.get_resource(&body.app.as_str().into()).await?;
 
-    let path_and_query = req
-        .head()
-        .uri
-        .path_and_query()
-        .ok_or("Path must be given")?
-        .to_string();
-    let signed_subject = Subject::from_raw(&path_and_query, None).resolve(&context.origin);
-
-    let agent = get_client_agent(req.headers(), &appstate, &signed_subject).await?;
+    let agent = crate::helpers::authenticate(&req, &appstate, &context, &raw).await?;
     check_write(store, &app_resource, &agent).await?;
 
     let mut host = StoreApplyHost::for_installation(store, &body.drive, &body.app, agent)
@@ -100,8 +92,6 @@ pub async fn handle_app_write(
             "This app has no key of its own; connect an identity before writing",
         ));
     }
-
-    let body = body.into_inner();
 
     let subject = match body.op.as_str() {
         "create" => {

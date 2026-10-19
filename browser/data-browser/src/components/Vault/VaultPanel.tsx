@@ -223,6 +223,7 @@ export function VaultPanel({
                 busy={busy}
                 suspended={suspended}
                 onCompact={vault.compact}
+                currentDevice={vault.devicePubkey}
               />
             )}
           </>
@@ -279,7 +280,7 @@ export function VaultPanel({
             <Button
               data-testid='vault-manage-storage'
               subtle
-              onClick={() => setStorageOpen(open => !open)}
+              onClick={() => setStorageOpen(true)}
               disabled={busy}
             >
               Manage storage

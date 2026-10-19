@@ -138,6 +138,7 @@ describe('setCookieAuthentication', () => {
 
     const before = Date.now();
     await setCookieAuthentication('https://example.com', agent);
+    const after = Date.now();
 
     // Skipping the `Max-Age=-…` writes, which delete the over-broad cookies
     // an older build left behind rather than install this one.
@@ -151,9 +152,12 @@ describe('setCookieAuthentication', () => {
 
     // It used to be a day, which is what let a five-minute proof be presented
     // for hours.
-    const lifetime = Date.parse(expires!) - before;
-    expect(lifetime).toBeGreaterThan(0);
-    expect(lifetime).toBeLessThanOrEqual(AUTH_PROOF_MAX_AGE_MS);
+    // The cookie is stamped somewhere between `before` and `after`, so
+    // compare against `after`: with `before` the signing time alone can push
+    // the lifetime over the maximum.
+    const expiresAt = Date.parse(expires!);
+    expect(expiresAt).toBeGreaterThan(before);
+    expect(expiresAt).toBeLessThanOrEqual(after + AUTH_PROOF_MAX_AGE_MS);
   });
 
   it('installs a proof the freshness check immediately accepts', async () => {

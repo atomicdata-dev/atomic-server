@@ -408,12 +408,18 @@ async function writeAsApp(
   if (!agent) throw new Error('Sign in to use this app');
 
   const url = `${store.getServerUrl()}/app-write`;
-  const headers = await signRequest(url, agent, {});
+  const payload = JSON.stringify({ drive, app, ...request });
+  const headers = await signRequest(
+    url,
+    agent,
+    {},
+    { method: 'POST', body: payload },
+  );
 
   const response = await fetch(url, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ drive, app, ...request }),
+    body: payload,
   });
 
   if (!response.ok) {

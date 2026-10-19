@@ -260,34 +260,67 @@ pub async fn get_client_agent(
 /// schedule, trigger or secret to set, and what lets them spend the plugin's
 /// secrets unattended.
 ///
-/// The client signs the request URL, so that is what the signature is checked
-/// against. Passing the plugin subject here made every signed request fail
+/// The client signs the request URL (and, with a version 2 signature, the
+/// method and `body`), so that is what the signature is checked against.
+/// Passing the plugin subject here made every signed request fail
 /// verification; the rights check is what decides whether this agent may touch
-/// this plugin.
+/// this plugin. Pass `&[]` for a request without a body.
 pub(crate) async fn authorize_plugin_write(
     appstate: &AppState,
     req: &actix_web::HttpRequest,
     context: &crate::context::RequestContext,
+    body: &[u8],
     plugin: &str,
 ) -> AtomicServerResult<ForAgent> {
     use atomic_lib::Storelike;
     let store = &appstate.store;
     let resource = store.get_resource(&plugin.into()).await?;
 
+    let agent = authenticate(req, appstate, context, body).await?;
+    atomic_lib::hierarchy::check_write(store, &resource, &agent).await?;
+
+    Ok(agent)
+}
+
+/// The URL a client signs for `req`: its path and query, resolved against
+/// `origin`.
+pub(crate) fn signed_subject(
+    req: &actix_web::HttpRequest,
+    origin: &str,
+) -> AtomicServerResult<String> {
     let path_and_query = req
         .head()
         .uri
         .path_and_query()
         .ok_or("Path must be given")?
         .to_string();
-    let signed_subject =
-        atomic_lib::Subject::from_raw(&path_and_query, None).resolve(&context.origin);
-
-    let agent = get_client_agent(req.headers(), appstate, &signed_subject).await?;
-    atomic_lib::hierarchy::check_write(store, &resource, &agent).await?;
-
-    Ok(agent)
+    Ok(atomic_lib::Subject::from_raw(&path_and_query, None).resolve(origin))
 }
+
+/// Who signed `req`, checked against the request URL, its method and `body`
+/// (a version 2 signature covers the latter two; version 1 only the URL and
+/// is still accepted). Pass `&[]` for a request without a body. Every handler
+/// that authenticates a request should come through here.
+pub(crate) async fn authenticate(
+    req: &actix_web::HttpRequest,
+    appstate: &AppState,
+    context: &crate::context::RequestContext,
+    body: &[u8],
+) -> AtomicServerResult<ForAgent> {
+    let subject = context.signed_subject(req)?;
+    get_client_agent_for_request(req, body, appstate, &subject).await
+}
+
+/// Parse a JSON request body that was read as raw bytes, so the same bytes can
+/// be handed to [authenticate]. A parse error is a 400.
+pub(crate) fn parse_json<T: serde::de::DeserializeOwned>(body: &[u8]) -> AtomicServerResult<T> {
+    serde_json::from_slice(body)
+        .map_err(|e| AtomicServerError::bad_request(format!("Invalid JSON body: {e}")))
+}
+
+/// The body limit for routes that read JSON as `web::Bytes`; it is what
+/// actix's `JsonConfig` allowed before (2 MiB).
+pub(crate) const JSON_BODY_LIMIT: usize = 2_097_152;
 
 /// [get_client_agent] for a handler that knows the body it acts on, so it
 /// also accepts a version 2 request signature (`x-atomic-signature-version:

@@ -84,8 +84,8 @@ jobs:
       # Fires when the deploy step fails too, not only the health check.
       #
       # The remote script replaces `~/atomic-server` as its FIRST action and
-      # only then stops the unit, exports, and starts it again. So a failure
-      # anywhere after that `mv` — a failed export, a unit that will not start,
+      # only then stops the unit, copies the store, and starts it again. So a failure
+      # anywhere after that `mv` — a failed store backup, a unit that will not start,
       # a non-zero `systemctl status` — leaves the new binary installed AND the
       # service stopped, which is the outage this rollback exists to end. Gating
       # on the health check alone missed every one of those: a skipped step has
@@ -98,11 +98,8 @@ jobs:
       #
       # Deliberately does NOT touch the store. If the new binary migrated it on
       # boot, an older binary may not read it back, and a rollback that silently
-      # mangles data is worse than an outage. That case needs the export taken
-      # during deploy, and a human. Note this is now MORE likely to matter: a
-      # deploy that failed in `atomic-server export` has already opened the
-      # store with the new binary. The rollback still only swaps the binary —
-      # if the service does not come back, that is the case to look at first.
+      # mangles data is worse than an outage. That case needs the store copy taken
+      # during deploy (~/atomic-store-*.redb), and a human.
       - name: Roll back to the previous binary
         if: failure() && (steps.health.outcome == 'failure' || steps.deploy.outcome == 'failure')
         env:

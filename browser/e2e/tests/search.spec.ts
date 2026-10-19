@@ -128,6 +128,14 @@ test.describe('search', async () => {
   });
 
   test('scoped search', async ({ page }) => {
+    // Two folders and two documents made through the UI, two index waits and a
+    // reload: about 10 s of body alone, 29 s at four workers (plus 16 s for
+    // the drive hook), with no step over 2.7 s, so the cost is the length of
+    // the chain and not a step. That leaves 60 s with little room on a busy
+    // runner, where it timed out on every attempt (batch runs for #2296,
+    // #2298 and #2301). A hung step still fails at its own budget.
+    test.slow();
+
     const driveSubject = await getCurrentSubject(page);
 
     // Create folder called 'Salad folder'

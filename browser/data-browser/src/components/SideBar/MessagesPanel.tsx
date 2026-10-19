@@ -1,9 +1,13 @@
 import { useResource } from '@tomic/react';
-import type { JSX } from 'react';
-import { FaLock, FaPlus } from 'react-icons/fa6';
+import { useEffect, useState, type JSX } from 'react';
+import { FaMagnifyingGlass, FaPlus } from 'react-icons/fa6';
 import { styled } from 'styled-components';
 import { useConversations } from '../../helpers/conversations/useConversations';
-import { ConversationTitle } from '../../views/Conversation/ConversationTitle';
+import { ConversationIcon } from '../../views/Conversation/ConversationIcon';
+import {
+  ConversationTitle,
+  useMemberNames,
+} from '../../views/Conversation/ConversationTitle';
 import { NewMessageDialogBody } from '../../views/Conversation/NewMessageDialog';
 import { Dialog, useDialog } from '../Dialog';
 import { IconButton } from '../IconButton/IconButton';
@@ -14,7 +18,7 @@ import {
   SideBarMenuRowLabel,
 } from './SideBarMenuItem';
 import { SideBarPanel } from './SideBarPanel';
-import { Panel } from './usePanelList';
+import { Panel, panelTitle } from './usePanelList';
 
 interface MessagesPanelProps {
   onItemClick: () => void;
@@ -26,37 +30,87 @@ export function MessagesPanel({
 }: MessagesPanelProps): JSX.Element {
   const conversations = useConversations();
   const [dialogProps, show, close, isOpen] = useDialog();
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState('');
+  // Which conversations match the query, reported by their links.
+  const [matches, setMatches] = useState<Record<string, boolean>>({});
+  const filtering = searching && query.trim() !== '';
+  const noMatches =
+    filtering && conversations.every(subject => matches[subject] === false);
+
+  const closeSearch = () => {
+    setSearching(false);
+    setQuery('');
+  };
 
   return (
     <>
       <SideBarPanel
-        title='Messages'
+        title={panelTitle(Panel.Messages)}
         panel={Panel.Messages}
         heightStorageKey='messagesPanelHeight'
         initialHeight={200}
         data-testid='messages-panel'
         actions={
-          <IconButton
-            title='New message'
-            size='small'
-            color='textLight'
-            onClick={() => show()}
-            data-testid='new-message'
-          >
-            <FaPlus />
-          </IconButton>
+          <>
+            {conversations.length > 0 && (
+              <IconButton
+                title='Search messages'
+                size='small'
+                color='textLight'
+                onClick={() => (searching ? closeSearch() : setSearching(true))}
+                data-testid='search-messages'
+              >
+                <FaMagnifyingGlass />
+              </IconButton>
+            )}
+            <IconButton
+              title='New message'
+              size='small'
+              color='textLight'
+              onClick={() => show()}
+              data-testid='new-message'
+            >
+              <FaPlus />
+            </IconButton>
+          </>
         }
       >
         {conversations.length === 0 ? (
           <Empty>No messages yet</Empty>
         ) : (
-          conversations.map(subject => (
-            <ConversationLink
-              key={subject}
-              subject={subject}
-              onClick={onItemClick}
-            />
-          ))
+          <>
+            {searching && (
+              <SearchInput
+                autoFocus
+                type='search'
+                aria-label='Search messages'
+                placeholder='Search by name'
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Escape') closeSearch();
+                }}
+                data-testid='search-messages-input'
+              />
+            )}
+            {noMatches && <Empty>No matches</Empty>}
+            {conversations.map(subject => (
+              <ConversationLink
+                key={subject}
+                subject={subject}
+                query={searching ? query : ''}
+                onMatch={match =>
+                  setMatches(prev =>
+                    prev[subject] === match
+                      ? prev
+                      : { ...prev, [subject]: match },
+                  )
+                }
+                onClick={onItemClick}
+              />
+            ))}
+          </>
         )}
       </SideBarPanel>
       <Dialog {...dialogProps} width='30rem'>
@@ -66,14 +120,28 @@ export function MessagesPanel({
   );
 }
 
-function ConversationLink({
+/** One conversation as a menu row, titled with who is in it. */
+export function ConversationLink({
   subject,
+  query = '',
+  onMatch,
   onClick,
 }: {
   subject: string;
-  onClick: () => void;
-}): JSX.Element {
+  /** Only conversations with a member whose name contains this show. */
+  query?: string;
+  onMatch?: (match: boolean) => void;
+  onClick?: () => void;
+}): JSX.Element | null {
   const resource = useResource(subject);
+  const names = useMemberNames(resource);
+  const needle = query.trim().toLowerCase();
+  const match =
+    needle === '' || names.some(name => name.toLowerCase().includes(needle));
+
+  useEffect(() => onMatch?.(match), [match, onMatch]);
+
+  if (!match) return null;
 
   return (
     <SideBarMenuItemLink
@@ -83,7 +151,7 @@ function ConversationLink({
     >
       <SideBarMenuRow onClick={onClick}>
         <SideBarMenuRowIcon>
-          <FaLock />
+          <ConversationIcon resource={resource} size='1.4rem' />
         </SideBarMenuRowIcon>
         <SideBarMenuRowLabel>
           <ConversationTitle resource={resource} />
@@ -92,6 +160,23 @@ function ConversationLink({
     </SideBarMenuItemLink>
   );
 }
+
+const SearchInput = styled.input`
+  box-sizing: border-box;
+  width: calc(100% - 1rem);
+  margin: 0.25rem 0.5rem;
+  padding: 0.3rem 0.5rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: ${p => p.theme.colors.text};
+  background: ${p => p.theme.colors.bg};
+  border: 1px solid ${p => p.theme.colors.bg2};
+  border-radius: ${p => p.theme.radius};
+
+  &:focus-visible {
+    outline: 2px solid ${p => p.theme.colors.main};
+  }
+`;
 
 const Empty = styled.p`
   margin: 0;

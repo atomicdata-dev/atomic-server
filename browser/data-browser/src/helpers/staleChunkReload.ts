@@ -22,14 +22,17 @@ function claimReload(storage: () => Storage = () => sessionStorage): boolean {
  * A tab that stays open across a deploy asks for a chunk the new build no
  * longer ships, and Vite raises `vite:preloadError`. Reload once per session
  * to pick up the new build. A second failure falls through, so a real outage
- * still shows up.
+ * still shows up. Offline, a chunk fails because there is no network, not
+ * because it is stale, and a reload would replace the running app with the
+ * browser's "No internet" page, so the error falls through then too.
  */
 export function handleStaleChunk(
   event: Pick<Event, 'preventDefault'>,
   reload: () => void = () => window.location.reload(),
   storage?: () => Storage,
+  online: () => boolean = () => navigator.onLine !== false,
 ): void {
-  if (!claimReload(storage)) return;
+  if (!online() || !claimReload(storage)) return;
 
   event.preventDefault();
   reload();

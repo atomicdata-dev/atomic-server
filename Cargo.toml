@@ -19,6 +19,7 @@ members = [
   # shares the lockfile; the server loads the artifact rather than linking it.
   "plugin-runtime",
   "tools/cargo-bin",
+  "tools/loadtest",
 ]
 exclude = ["flutter/rust"]
 

@@ -310,6 +310,7 @@ pub async fn query_sorted_indexed(
 
     let base_domain = store.get_base_domain();
     let rights_cache = std::sync::Mutex::new(crate::hierarchy::RightsCache::default());
+    let trash = crate::trash::filter_for_query(store, q).map(std::sync::Mutex::new);
 
     let limit = q.limit.unwrap_or(usize::MAX);
 
@@ -341,8 +342,14 @@ pub async fn query_sorted_indexed(
         if in_selection {
             if !q.include_external && !subject.is_local() {
                 should_count = false;
-            } else if q.for_agent != crate::agents::ForAgent::Sudo || q.include_nested {
-                match store.resolve_query_member(&subject, q, &rights_cache).await {
+            } else if q.for_agent != crate::agents::ForAgent::Sudo
+                || q.include_nested
+                || trash.is_some()
+            {
+                match store
+                    .resolve_query_member(&subject, q, &rights_cache, trash.as_ref())
+                    .await
+                {
                     Some(body) => {
                         subjects.push(subject);
                         if let Some(resource) = body {

@@ -412,6 +412,22 @@ server's results, and a pasted URL is still selected directly. The server search
 is mocked. There is no E2E. A class the store has not fetched (after a reload,
 say) is only reachable by its URL.
 
+## Trash (Rust)
+
+`lib/src/trash/tests.rs` (`cargo test -p atomic_lib --features db-redb --lib -- trash::`)
+covers `trash` / `restore` / `is_trashed` against a real `Db`: reparent plus
+`trashedFrom`, restore, the no-op cases (trash folder, drive, already trashed),
+the property-subject refusal, restore falling back to the drive when the old
+parent was destroyed or never recorded, a stale trash pointer being replaced,
+deep versus direct `is_trashed` and parent cycles, and collections hiding
+trashed members (direct and under a trashed folder, Sudo and a normal agent)
+unless `include_trashed` or the query lists the Trash itself.
+`lib/src/search/tests.rs` covers search hiding the same by default, with
+`include_trashed`, scoped to the Trash, and the filter-only path. Not covered:
+the `include_trashed` HTTP query param on `/search` and collections (no server
+integration test), the Flutter `delete_canvas` move-to-trash (the bridge crate
+has no trash test), and concurrent first-use creating two Trash folders.
+
 ## Pre-commit lint gate
 
 `node --test scripts/pre-commit.test.mjs` exercises real Git commits with Oxlint
@@ -551,6 +567,7 @@ Two things worth knowing about the runners:
 | Iroh accept side refuses any frame before `AUTH` (ERROR + closed stream), binds `AUTH.requestedSubject` to the handshake drive | `peer.rs` (`accept_gate_tests`, raw QUIC stream) |
 | Rejected `SYNC_PUSH` answers `ERROR SYNC_REJECTED`, never `SYNC_OK` | `peer.rs` (`accept_gate_tests`), `server/tests/it/ws_auth_gate.rs` |
 | WS: writes and identity-bearing subscriptions need `AUTH`; anonymous `SUB` on a public drive still works; unreadable subscriptions answer `ERROR UNAUTHORIZED_READ` | `server/tests/it/ws_auth_gate.rs` |
+| Write-load signal (2026-10): `pace_ms` rides on `COMMIT_OK` only for a client listing `commit-ok-slim` + `commit-pace` (legacy and slim forms stay byte-identical), `BUSY (12)` above the hard limit before any work, HTTP `503` + `Retry-After` and `X-Atomic-Pace-Ms`, the WS rate limit answers `BUSY` not `UNKNOWN`, `--commit-hard-limit 0` switches it off; the TS outbox paces a subject to `max(debounce, pace_ms)`, waits out `BUSY`/429/503 without counting a failure or falling back to HTTP, and never drops an edit. Not covered: the real browser under load (no e2e), pace decay over a long quiet period in a live app, and `atomic-loadtest commit --edit-rate` is a manual measurement, not a test | `write_load.rs` (unit: pace formula, retry-after, guard), `lib/src/sync/protocol.rs` (`wire_vectors`), `server/tests/it/commit_pacing.rs`, `browser/lib/src/local-outbox.test.ts`, `store-commit-fallback.test.ts`, `client-commit-pace.test.ts`, `websockets.test.ts`, `ws-v2.test.ts` |
 | Rejected cross-drive sync entry leaves no snapshot; later valid import cannot inherit rejected properties | `engine.rs` (`rejected_sync_entry_does_not_persist_snapshot`) |
 | Legacy `set`/`push`/`remove` commit rejection is on the parsed commit's properties: a signed commit carrying `set` is refused under hub and peer policy, a value quoting the deprecated URLs applies, a commit *on* the `set` Property reaches the ownership gate | `lib/src/sync/tests.rs` (`ingest_commit_rejects_legacy_field_commits`, `ingest_commit_accepts_values_that_mention_legacy_fields`) |
 | A fresh server store gets the core models without `--initialize` (`Db` open seeds them) | `server/src/tests.rs` (`fresh_store_gets_core_models_without_initialize`) |
@@ -2744,3 +2761,7 @@ Host ABI, first slice (2026-10-14, `planning/host-abi.md` step 1): `server/src/p
 Server modules (2026-10-16, class extenders on the host ABI): `server/src/plugins/host_abi/module_tests.rs` installs `plugin-examples/host-abi-module` (prebuilt into `testdata/host-abi/module.wasm`) through the zip install path and checks that a `before-commit` hook refuses a create and an update (a warning does not), that `on-get` extends what a reader gets without storing it, that a module's `calls` reach an app export through the node's registry (and are `forbidden` without write on the drive, or without `uses`), and that the module reads and writes only as far as its Installation's agent may: without `full-drive-access` the read is `forbidden` and the write `proposed` with nothing stored, with it the read is `ok` and the write is `committed` and signed by the module's agent. `browser/e2e/tests/fixtures/test-plugin.zip` (rebuilt for the new world, see `plugin-examples/test-plugin/README.md`) still drives the install tests in `plugin.rs` and `plugin_release_test.rs` and the Playwright `plugin.spec.ts`. Not covered: `after-commit` and a module's own commits not re-triggering it, `net.fetch` of a `write` operation from a module, a global module (the operator's folder) and the `storage` folder, a hook that traps or runs out of fuel, and the Playwright suite against the rebuilt zip (not run here).
 
 Installation scopes (2026-10-16, host ABI step 2): `server/src/plugins/host_abi/tests.rs` (`a_read_scope_limits_reads_to_its_subtree`, `a_write_scope_limits_writes_to_its_subtree`, `a_call_scope_limits_the_interfaces_an_app_may_call`, `a_scope_must_name_something_that_exists`) installs the counter and caller apps with `readScope` / `writeScope` / `callScope` and checks that activation puts the agent on the subtree, that reads and writes inside it work and outside it are `forbidden` / `proposed` even when the agent was shared the outside resource by hand, that queries drop out-of-scope rows, and that a scope naming a missing resource refuses the Installation before anything is installed. `installation.rs` unit-tests `Scopes::of` (`full-drive-access` is the drive, nothing set limits nothing). Not covered: a scope outside the drive or one the installer may not write (needs a second drive and a second signer), a module or run plugin under a scope (same `Grant`, no own test), class scopes (not built), a shrinking scope, and the data browser's install dialog.
+
+## Agent page
+
+`browser/e2e/tests/agent-page.spec.ts` (full suite, not `@smoke`) opens another agent's page: the conversation started from its Send message button is listed, a private note typed there survives a reload and is not on the other agent's own page, and a resource that agent created in a shared folder shows under Created (as a resource row), and favoriting the agent from its page menu lists it in the sidebar Favorites. Your own agent page has no messages and no notes. `hasMember` is unit tested in `conversations.test.ts`. Not covered: the Created list is by creator, not by last editor (no index of who edited what, see `planning/auditability-loro-history.md` "Secondary indexes"), and the note's `PlainText` also shows in the private drive's resource list.

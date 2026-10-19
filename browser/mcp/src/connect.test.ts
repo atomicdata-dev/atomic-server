@@ -232,10 +232,16 @@ describe('bridge', () => {
       new Bridge(node.origin),
     );
 
-    expect(out[0].result.instructions).toMatch(/connect/);
-    expect(out[1].result.tools[0].name).toBe('connect_atomic');
-    expect(out[2].result.isError).toBe(true);
-    expect(out[2].result.content[0].text).toMatch(/npx -y @tomic\/mcp connect/);
+    // The bridge answers each message as soon as it can, so the replies come
+    // back in whatever order the three config reads happen to finish.
+    const answer = (id: number) => out.find(reply => reply.id === id)!;
+
+    expect(answer(1).result.instructions).toMatch(/connect/);
+    expect(answer(2).result.tools[0].name).toBe('connect_atomic');
+    expect(answer(3).result.isError).toBe(true);
+    expect(answer(3).result.content[0].text).toMatch(
+      /npx -y @tomic\/mcp connect/,
+    );
     // Nothing reached the node.
     expect(node.requests.filter(r => r.path === '/mcp')).toHaveLength(0);
   });

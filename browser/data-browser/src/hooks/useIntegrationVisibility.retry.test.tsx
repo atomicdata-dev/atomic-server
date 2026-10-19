@@ -39,15 +39,24 @@ afterEach(() => {
 it('becomes ready after a read that failed, without a reload', async () => {
   // One timed-out read of the private drive used to settle this panel as not
   // ready for as long as the tab stayed open, with the checkboxes unusable.
+  // The retry follows the failure by 150 ms. Holding its answer back keeps the
+  // error on screen until this test has looked at it, however slowly a loaded
+  // host gets around to polling.
+  let release!: () => void;
+  const retryMayAnswer = new Promise<void>(resolve => (release = resolve));
   vi.mocked(findSchema)
     .mockRejectedValueOnce(
       new Error(`Async Request for subject ${DRIVE} timed out after 10000ms`),
     )
-    .mockResolvedValue({
-      properties: {
-        'show-api-plugins': 'atomic:api',
-        'show-experimental-plugins': 'atomic:experimental',
-      },
+    .mockImplementation(async () => {
+      await retryMayAnswer;
+
+      return {
+        properties: {
+          'show-api-plugins': 'atomic:api',
+          'show-experimental-plugins': 'atomic:experimental',
+        },
+      };
     });
 
   const { result } = renderHook(() => useIntegrationVisibility());
@@ -57,8 +66,8 @@ it('becomes ready after a read that failed, without a reload', async () => {
   });
   expect(result.current.ready).toBe(false);
 
-  // The first retry comes after a short backoff. A loaded CI host can take
-  // longer than waitFor's default one second to run it.
+  release();
+  // A loaded CI host can take longer than waitFor's default one second.
   await waitFor(() => expect(result.current.ready).toBe(true), {
     timeout: 5_000,
   });

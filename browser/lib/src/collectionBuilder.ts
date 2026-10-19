@@ -122,6 +122,13 @@ export class CollectionBuilder {
     return this;
   }
 
+  /** List members that sit in the Trash too (hidden by default). */
+  public setIncludeTrashed(include = true): CollectionBuilder {
+    this.params.include_trashed = include;
+
+    return this;
+  }
+
   public setAggregation(aggregation: Aggregation): CollectionBuilder {
     this.params.aggregation = aggregation;
 

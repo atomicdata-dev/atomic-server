@@ -4,10 +4,13 @@ import {
   isUnauthorized,
   useDrivePresence,
   useResource,
-  useResources,
   useTitle,
+  useResources,
+  useStore,
+  type Store,
 } from '@tomic/react';
-import { memo, useMemo, useState, type JSX } from 'react';
+import { canonicalizeScheme } from '@tomic/lib';
+import { useMemo, useState, type JSX } from 'react';
 import {
   FaComment,
   FaFileLines,
@@ -18,18 +21,28 @@ import {
 } from 'react-icons/fa6';
 import type { IconType } from 'react-icons';
 import { styled } from 'styled-components';
-import { AtomicLink } from '@components/AtomicLink';
-import { ResourceGlyph } from '@components/ResourceGlyph';
+import { Button } from '@components/Button';
+import { Row } from '@components/Row';
+import { ResourceRow, ResourceRowDescription } from '@views/ResourceRow';
 import { PresenceAvatarMenu } from '@components/Presence/PresenceAvatarMenu';
+import { AgentAvatar } from '@components/Presence/AgentAvatar';
+import { useLastEditor } from '@hooks/useLastEditor';
+import { useRightPanel } from '@components/RightPanel/RightPanelContext';
 import { useNewResourceUI } from '@components/forms/NewForm/useNewResourceUI';
 import { getRecentResources } from '@helpers/recentResources';
 import { useNewRoute } from '@helpers/useNewRoute';
-import { toRelativeDateTime } from '@helpers/dates/relativeDate';
+import {
+  toRelativeDateTime,
+  toShortRelativeTime,
+} from '@helpers/dates/relativeDate';
+import { isHiddenFromChildLists } from '@helpers/hiddenFromChildLists';
+import { useHiddenDriveSubjects } from '@hooks/useVisibleDriveChildren';
+import { useRecentComments } from '@hooks/useRecentComments';
 import { lastEditedAt } from './lastEditedAt';
+import { mergeActivity, type ActivityRow } from './commentActivity';
 
 export { lastEditedAt };
 
-const MAX_RECENT = 6;
 const MAX_PEOPLE = 6;
 const ACTIVITY_VISIBLE = 10;
 
@@ -58,33 +71,26 @@ const QUICK_CREATE: { label: string; classSubject: string; Icon: IconType }[] =
     },
   ];
 
-/** Larger labelled shortcuts for the classes people create most. */
+/** Shortcuts for the classes people create most. */
 export function QuickCreateCards({ parent }: { parent: string }): JSX.Element {
   const createNewResource = useNewResourceUI();
   const navigateToNewRoute = useNewRoute(parent);
 
   return (
-    <CardRow aria-label='Create'>
-      <CreateCard
-        $primary
-        type='button'
-        data-testid='drive-new-button'
-        onClick={navigateToNewRoute}
-      >
-        <FaPlus />
-        <span>New</span>
-      </CreateCard>
+    <Row wrapItems gap='0.5rem' aria-label='Create'>
+      <Button data-testid='drive-new-button' onClick={navigateToNewRoute}>
+        <FaPlus /> <span>New</span>
+      </Button>
       {QUICK_CREATE.map(({ label, classSubject, Icon }) => (
-        <CreateCard
+        <Button
           key={classSubject}
-          type='button'
+          subtle
           onClick={() => createNewResource(classSubject, parent)}
         >
-          <Icon />
-          <span>{label}</span>
-        </CreateCard>
+          <Icon /> {label}
+        </Button>
       ))}
-    </CardRow>
+    </Row>
   );
 }
 
@@ -98,69 +104,152 @@ export function DrivePeople(): JSX.Element | null {
   }
 
   return (
-    <People aria-label='Currently on this drive'>
+    <Row center gap='0.25rem' aria-label='Currently on this drive'>
       {agents.slice(0, MAX_PEOPLE).map(agent => (
         <PresenceAvatarMenu key={agent} agentSubject={agent} size='1.9rem' />
       ))}
-      {agents.length > MAX_PEOPLE && <More>+{agents.length - MAX_PEOPLE}</More>}
-    </People>
+      {agents.length > MAX_PEOPLE && (
+        <small>+{agents.length - MAX_PEOPLE}</small>
+      )}
+    </Row>
   );
 }
 
-/** Resources opened recently on this drive, newest first. Renders nothing when there are none. */
-export function RecentlyOpened({
-  drive,
-}: {
-  drive: string;
-}): JSX.Element | null {
-  const [recent] = useState(() =>
-    getRecentResources(drive).slice(0, MAX_RECENT),
-  );
-
-  if (recent.length === 0) {
-    return null;
-  }
+/**
+ * One full-width line per resource, with an optional quiet edit time. A
+ * commented row shows who wrote the comment and opens the Comments panel on
+ * the resource it leads to, so the comment is one click away.
+ */
+function ResourceLines({ items }: { items: ActivityRow[] }): JSX.Element {
+  const { setPanelOpen } = useRightPanel();
 
   return (
-    <section>
-      <SectionTitle>Recently opened</SectionTitle>
-      <Tiles>
-        {recent.map(subject => (
-          <ResourceTile key={subject} subject={subject} />
-        ))}
-      </Tiles>
-    </section>
+    <Lines>
+      {items.map(({ subject, at, kind, by }) => {
+        const label = at
+          ? `${kind === 'commented' ? 'Commented' : 'Edited'} ${toRelativeDateTime(new Date(at), true)}`
+          : undefined;
+
+        return (
+          <li
+            key={subject}
+            onClickCapture={
+              kind === 'commented'
+                ? () => setPanelOpen('comments', true)
+                : undefined
+            }
+          >
+            <ResourceRow
+              clickable
+              tabbable
+              subject={subject}
+              trailing={
+                at ? (
+                  <ActivityWho
+                    subject={subject}
+                    at={at}
+                    kind={kind}
+                    by={by}
+                    label={label}
+                  />
+                ) : undefined
+              }
+            />
+          </li>
+        );
+      })}
+    </Lines>
   );
 }
 
-export function ResourceTiles({
+/**
+ * Who did it and when, at the right end of an Activity row: avatar, a short
+ * name and the short time. The comment author is known from the comment; an
+ * edit's author comes from the history attribution, so the avatar appears a
+ * moment later. The full name and "Edited ..." text are in the tooltip.
+ */
+function ActivityWho({
+  subject,
+  at,
+  kind,
+  by,
+  label,
+}: {
+  subject: string;
+  at: number;
+  kind: ActivityRow['kind'];
+  by?: string;
+  label?: string;
+}): JSX.Element {
+  const editor = useLastEditor(subject, at, kind !== 'commented' && !by);
+  const agent = by ?? editor;
+  const agentResource = useResource(agent);
+  const [name] = useTitle(agentResource);
+
+  return (
+    <Who center gap='0.4rem'>
+      {agent && <AgentAvatar agentSubject={agent} size='1.2rem' />}
+      {agent && name && <WhoName title={name}>{name}</WhoName>}
+      <ResourceRowDescription
+        as='time'
+        dateTime={new Date(at).toISOString()}
+        title={label}
+        aria-label={label}
+      >
+        {toShortRelativeTime(new Date(at))}
+      </ResourceRowDescription>
+    </Who>
+  );
+}
+
+const Who = styled(Row)`
+  flex-shrink: 0;
+  font-size: 0.85em;
+  color: ${p => p.theme.colors.textLight};
+`;
+
+/** Only the first part of a long name, so the title keeps its room. */
+const WhoName = styled.span`
+  max-width: 9ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @media (max-width: 480px) {
+    max-width: 6ch;
+  }
+`;
+
+export function ResourceList({
   subjects,
 }: {
   subjects: string[];
 }): JSX.Element {
-  return (
-    <Tiles>
-      {subjects.map(subject => (
-        <ResourceTile key={subject} subject={subject} />
-      ))}
-    </Tiles>
-  );
+  return <ResourceLines items={subjects.map(subject => ({ subject }))} />;
 }
 
-function ResourceTile({ subject }: { subject: string }): JSX.Element {
-  const resource = useResource(subject, { allowIncomplete: true });
-  const [title] = useTitle(resource);
+/**
+ * Whether `subject` sits inside `drive`, judged from what is already in
+ * memory (the root of its parent chain), so it costs no fetch. A chain that
+ * ends at a resource we have not loaded is given the benefit of the doubt;
+ * one that ends at a loaded, different root (another drive, an ontology's
+ * Property or Class) is not part of this drive.
+ */
+export function belongsToDrive(
+  store: Pick<Store, 'driveOfSubject' | 'resources'>,
+  subject: string,
+  drive: string,
+): boolean {
+  const root = store.driveOfSubject(subject);
 
-  return (
-    <Tile subject={subject} clean>
-      <TileGlyph>
-        <ResourceGlyph resource={resource} />
-      </TileGlyph>
-      <TileText>
-        <TileTitle>{title}</TileTitle>
-      </TileText>
-    </Tile>
-  );
+  // `atomic:` and legacy `did:ad:` spell the same drive.
+  if (
+    canonicalizeScheme(root) === canonicalizeScheme(store.driveOfSubject(drive))
+  ) {
+    return true;
+  }
+
+  return !store.resources.has(root);
 }
 
 /**
@@ -176,29 +265,65 @@ export function ActivityFeed({
   subjects: string[];
   drive: string;
 }): JSX.Element {
-  const [recent] = useState(() => getRecentResources(drive));
+  const store = useStore();
+  const recent = useMemo(() => getRecentResources(drive), [drive]);
+  const children = useMemo(() => new Set(subjects), [subjects]);
+  const commented = useRecentComments(drive);
+  const hidden = useHiddenDriveSubjects(drive);
+  // Resources that were commented on are candidates too, unless the drive
+  // keeps them out of sight (Comments folder, Trash, ...).
   const candidates = useMemo(
-    () => Array.from(new Set([...subjects, ...recent])),
-    [subjects, recent],
+    () =>
+      Array.from(
+        new Set([
+          ...subjects,
+          ...recent,
+          ...Array.from(commented.keys()).filter(
+            subject => !hidden.has(canonicalizeScheme(subject)),
+          ),
+        ]),
+      ),
+    [subjects, recent, commented, hidden],
   );
   const resources = useResources(candidates, { allowIncomplete: true });
   const items = useMemo(() => {
-    const out: { subject: string; at: number }[] = [];
+    const edits: { subject: string; at?: number }[] = [];
 
     for (const [subject, resource] of resources) {
-      const at = lastEditedAt(resource);
-
-      if (
-        at &&
-        !isUnauthorized(resource.error) &&
-        !isNotFound(resource.error)
-      ) {
-        out.push({ subject, at });
+      // Only the drive's own children and recents that sit inside it. Recents
+      // are recorded per current drive, but also hold whatever was opened
+      // from elsewhere (other drives, ontology Properties and Classes).
+      if (!children.has(subject) && !belongsToDrive(store, subject, drive)) {
+        continue;
       }
+
+      // AI chats, meetings and agent notes are reached elsewhere.
+      if (
+        isHiddenFromChildLists(
+          resource.getClasses(),
+          resource.get(dataBrowser.properties.about) as string | undefined,
+        )
+      ) {
+        continue;
+      }
+
+      // Unreadable resources drop out here, and with them any comment on
+      // them: their title never reaches the list.
+      if (
+        resource.loading ||
+        isUnauthorized(resource.error) ||
+        isNotFound(resource.error)
+      ) {
+        continue;
+      }
+
+      edits.push({ subject, at: lastEditedAt(resource) });
     }
 
-    return out.sort((a, b) => b.at - a.at);
-  }, [resources]);
+    // Unknown edit time (legacy resource never edited here): listed after the
+    // dated rows, without a made-up "Edited ..." caption.
+    return mergeActivity(edits, commented);
+  }, [resources, children, store, drive, commented]);
   const [showAll, setShowAll] = useState(false);
   const shown = showAll ? items : items.slice(0, ACTIVITY_VISIBLE);
 
@@ -206,49 +331,20 @@ export function ActivityFeed({
     <section aria-label='Activity'>
       <SectionTitle>Activity</SectionTitle>
       {items.length === 0 ? (
-        <ActivityHint>Activity will show up here</ActivityHint>
+        <p>Activity will show up here</p>
       ) : (
         <>
-          <ActivityList>
-            {shown.map(item => (
-              <ActivityRow key={item.subject} {...item} />
-            ))}
-          </ActivityList>
+          <ResourceLines items={shown} />
           {items.length > ACTIVITY_VISIBLE && (
-            <ShowAll type='button' onClick={() => setShowAll(!showAll)}>
+            <Button subtle onClick={() => setShowAll(!showAll)}>
               {showAll ? 'Show less' : 'Show all'}
-            </ShowAll>
+            </Button>
           )}
         </>
       )}
     </section>
   );
 }
-
-const ActivityRow = memo(function ActivityRow({
-  subject,
-  at,
-}: {
-  subject: string;
-  at: number;
-}): JSX.Element {
-  const resource = useResource(subject, { allowIncomplete: true });
-  const [title] = useTitle(resource);
-
-  return (
-    <ActivityItem>
-      <ActivityText>
-        <ActivityChip subject={subject} clean>
-          <ResourceGlyph resource={resource} />
-          <span>{title}</span>
-        </ActivityChip>
-      </ActivityText>
-      <ActivityTime dateTime={new Date(at).toISOString()}>
-        Edited {toRelativeDateTime(new Date(at), true)}
-      </ActivityTime>
-    </ActivityItem>
-  );
-});
 
 export const SectionTitle = styled.h2`
   font-size: 0.85rem;
@@ -259,189 +355,14 @@ export const SectionTitle = styled.h2`
   margin: 0 0 0.75rem;
 `;
 
-const CardRow = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr));
-  gap: 0.75rem;
-`;
-
-const CreateCard = styled.button<{ $primary?: boolean }>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 1rem 0.5rem;
-  font: inherit;
-  font-size: 0.9rem;
-  cursor: pointer;
-  color: ${p => (p.$primary ? p.theme.colors.bg : p.theme.colors.text1)};
-  background: ${p => (p.$primary ? p.theme.colors.main : p.theme.colors.bg)};
-  border: 1px ${p => (p.$primary ? 'solid' : 'dashed')}
-    ${p => (p.$primary ? p.theme.colors.main : p.theme.colors.bg2)};
-  font-weight: ${p => (p.$primary ? 600 : 400)};
-  border-radius: ${p => p.theme.radius};
-  transition:
-    border-color 0.1s,
-    color 0.1s,
-    background-color 0.1s;
-
-  svg {
-    font-size: 1.4rem;
-    color: ${p => (p.$primary ? p.theme.colors.bg : p.theme.colors.main)};
-  }
-
-  &:hover,
-  &:focus-visible {
-    border-style: solid;
-    border-color: ${p => p.theme.colors.main};
-    background: ${p =>
-      p.$primary ? p.theme.colors.mainDark : p.theme.colors.mainSelectedBg};
-    color: ${p => (p.$primary ? p.theme.colors.bg : p.theme.colors.main)};
-
-    svg {
-      color: ${p => (p.$primary ? p.theme.colors.bg : p.theme.colors.main)};
-    }
-  }
-`;
-
-const Tiles = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-  gap: 0.75rem;
-
-  @media (max-width: 480px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const Tile = styled(AtomicLink)`
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  min-width: 0;
-  padding: 0.85rem 1rem;
-  background: ${p => p.theme.colors.bg1};
-  border: 1px solid ${p => p.theme.colors.bg2};
-  border-radius: ${p => p.theme.radius};
-  color: ${p => p.theme.colors.text1};
-  text-decoration: none;
-  transition:
-    border-color 0.1s,
-    box-shadow 0.1s;
-
-  &:hover,
-  &:focus-visible {
-    border-color: ${p => p.theme.colors.main};
-    box-shadow: 0 0 0 1px ${p => p.theme.colors.main};
-    color: ${p => p.theme.colors.text1};
-  }
-`;
-
-const TileGlyph = styled.span`
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 2.5rem;
-  height: 2.5rem;
-  font-size: 1.25rem;
-  color: ${p => p.theme.colors.main};
-  background: ${p => p.theme.colors.mainSelectedBg};
-  border-radius: ${p => p.theme.radius};
-`;
-
-const TileText = styled.span`
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-`;
-
-const TileTitle = styled.span`
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-
-const People = styled.span`
-  display: inline-flex;
-  align-items: center;
-
-  & > *:not(:first-child) {
-    margin-left: -0.4rem;
-  }
-`;
-
-const More = styled.span`
-  font-size: 0.8rem;
-  color: ${p => p.theme.colors.textLight};
-  margin-left: 0.3rem;
-`;
-
-const ActivityHint = styled.p`
-  margin: 0;
-  color: ${p => p.theme.colors.textLight};
-`;
-
-const ActivityList = styled.ul`
+const Lines = styled.ul`
   list-style: none;
   margin: 0;
   padding: 0;
-`;
 
-const ActivityItem = styled.li`
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.4rem 0;
-  min-width: 0;
-`;
-
-const ActivityText = styled.span`
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-`;
-
-const ActivityChip = styled(AtomicLink)`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  max-width: 100%;
-  vertical-align: middle;
-  padding: 0.1rem 0.5rem;
-  background: ${p => p.theme.colors.bg1};
-  border: 1px solid ${p => p.theme.colors.bg2};
-  border-radius: 999px;
-  color: ${p => p.theme.colors.text1};
-  text-decoration: none;
-
-  svg {
-    color: ${p => p.theme.colors.main};
-    flex-shrink: 0;
+  li {
+    list-style: none;
+    margin: 0;
+    padding: 0.4rem 0;
   }
-
-  &:hover,
-  &:focus-visible {
-    border-color: ${p => p.theme.colors.main};
-    color: ${p => p.theme.colors.main};
-  }
-`;
-
-const ActivityTime = styled.time`
-  flex-shrink: 0;
-  font-size: 0.8rem;
-  color: ${p => p.theme.colors.textLight};
-  white-space: nowrap;
-`;
-
-const ShowAll = styled.button`
-  margin-top: 0.5rem;
-  padding: 0;
-  font: inherit;
-  font-size: 0.85rem;
-  color: ${p => p.theme.colors.main};
-  background: none;
-  border: none;
-  cursor: pointer;
 `;

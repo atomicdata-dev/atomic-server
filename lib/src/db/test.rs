@@ -266,6 +266,7 @@ async fn destroy_clears_parent_index_count() {
         sort_by: None,
         sort_desc: false,
         include_external: true,
+        exclude_trashed: false,
         include_nested: false,
         for_agent: ForAgent::Sudo,
         drive: None,
@@ -350,6 +351,7 @@ async fn unauthorized_query_count_matches_subjects() {
         sort_by: None,
         sort_desc: false,
         include_external: true,
+        exclude_trashed: false,
         include_nested: false,
         // Public agent: no ACL grants read access to the children we
         // just created, so `get_resource_extended` will fail auth on
@@ -405,6 +407,7 @@ fn parent_query(parent: &Subject, limit: Option<usize>, for_agent: ForAgent) -> 
         sort_by: None,
         sort_desc: false,
         include_external: true,
+        exclude_trashed: false,
         include_nested: false,
         for_agent,
         drive: None,
@@ -638,6 +641,7 @@ async fn queries() {
         sort_by: None,
         sort_desc: false,
         include_external: true,
+        exclude_trashed: false,
         include_nested: false,
         for_agent: ForAgent::Sudo,
         drive: None,
@@ -783,6 +787,7 @@ async fn query_include_external() {
         sort_by: None,
         sort_desc: false,
         include_external: true,
+        exclude_trashed: false,
         include_nested: false,
         for_agent: ForAgent::Sudo,
         drive: None,
@@ -934,6 +939,7 @@ async fn test_collection_update_value(
         sort_by: Some(property_url.into()),
         sort_desc: false,
         include_external: true,
+        exclude_trashed: false,
         include_nested: true,
         for_agent: ForAgent::Sudo,
         drive: Some(Subject::from("internal:/")),
@@ -1001,6 +1007,33 @@ async fn test_collection_update_value(
     );
 }
 
+/// sled holds its directory lock until its background threads have let go of
+/// the handle, which is a moment after `drop`. Opening the same directory right
+/// away fails with "could not acquire lock" on a slow host (develop run 5385,
+/// `test_migration_v2_to_v3`), so wait for the lock, bounded, and let any other
+/// error through at once.
+#[cfg(feature = "db-sled")]
+async fn open_when_unlocked<T, F, Fut>(mut open: F) -> T
+where
+    F: FnMut() -> Fut,
+    Fut: std::future::Future<Output = crate::errors::AtomicResult<T>>,
+{
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+
+    loop {
+        match open().await {
+            Ok(opened) => return opened,
+            Err(error)
+                if error.to_string().contains("could not acquire lock")
+                    && std::time::Instant::now() < deadline =>
+            {
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+            Err(error) => panic!("{error}"),
+        }
+    }
+}
+
 #[cfg(feature = "db-sled")]
 #[tokio::test]
 async fn test_migration_v2_to_v3() {
@@ -1034,8 +1067,10 @@ async fn test_migration_v2_to_v3() {
     // Manually insert into resources_v2 using raw sled access
     // Drop the Db first so we can open the sled database directly
     drop(store);
-    let sled_store =
-        super::sled_store::SledStore::open(std::path::Path::new(tmp_dir_path)).unwrap();
+    let sled_store = open_when_unlocked(|| async {
+        super::sled_store::SledStore::open(std::path::Path::new(tmp_dir_path))
+    })
+    .await;
     {
         let v2_tree = sled_store.raw_db().open_tree("resources_v2").unwrap();
         v2_tree
@@ -1052,12 +1087,13 @@ async fn test_migration_v2_to_v3() {
     drop(sled_store);
 
     // Re-open the Db to pick up the migrated data
-    let store = crate::Db::init(
-        std::path::Path::new(&tmp_dir_path),
-        Some(server_url.to_string()),
-    )
-    .await
-    .unwrap();
+    let store = open_when_unlocked(|| {
+        crate::Db::init(
+            std::path::Path::new(&tmp_dir_path),
+            Some(server_url.to_string()),
+        )
+    })
+    .await;
 
     // Verify results in v3
     let resource = store
@@ -1086,8 +1122,10 @@ async fn test_migration_v2_to_v3() {
 
     // Verify it is NOT in resources_v2 anymore (it should have been dropped)
     drop(store);
-    let sled_store2 =
-        super::sled_store::SledStore::open(std::path::Path::new(tmp_dir_path)).unwrap();
+    let sled_store2 = open_when_unlocked(|| async {
+        super::sled_store::SledStore::open(std::path::Path::new(tmp_dir_path))
+    })
+    .await;
     assert!(!sled_store2
         .raw_db()
         .tree_names()
@@ -5798,4 +5836,81 @@ async fn a_proposal_whose_event_is_gone_is_cleared_at_startup() {
         .get(Tree::PluginMeta, b"plugin-event/v1/00000000000000000001")
         .unwrap()
         .is_none());
+}
+
+/// Stored bytes of a retained envelope after small edits, measured through
+/// the compressed KV the way the row is written to disk.
+#[tokio::test]
+async fn stored_envelope_bytes_per_small_edit_stay_small() {
+    use crate::envelopes::EnvelopeRetention;
+    const EDITS: usize = 20;
+    let store = Db::init_temp("envelope_bytes").await.unwrap();
+    store.set_envelope_retention(EnvelopeRetention::All);
+    let (_agent, drive) = store.setup("Alice").await.unwrap();
+    let subject = store
+        .create_resource(
+            urls::CLASS,
+            &drive,
+            "Doc",
+            Some(vec![
+                (urls::DESCRIPTION, Value::String("d".into())),
+                (urls::SHORTNAME, Value::Slug("doc".into())),
+            ]),
+        )
+        .await
+        .unwrap();
+    let subject = Subject::from_raw(&subject, None);
+    for i in 0..EDITS {
+        let mut resource = store.get_resource(&subject).await.unwrap();
+        resource
+            .set(
+                urls::NAME.into(),
+                Value::String(format!("edit {i}")),
+                &store,
+            )
+            .await
+            .unwrap();
+        resource.save_locally(&store).await.unwrap();
+    }
+    let stored = super::compressed_kv::CompressedKv::new(store.kv.clone());
+    let mut prefix = subject.pure_id().into_bytes();
+    prefix.push(0);
+    let mut sizes: Vec<usize> = Vec::new();
+    let mut plain: Vec<usize> = Vec::new();
+    let mut compact = 0;
+    for kv in store.kv.scan_prefix(Tree::Envelopes, &prefix) {
+        let (key, val) = kv.unwrap();
+        sizes.push(stored.encoded(Tree::Envelopes, &key, &val, &[]).len());
+        plain.push(val.len());
+        compact += usize::from(val.first() == Some(&1));
+    }
+    let edits: Vec<usize> = sizes.iter().rev().take(EDITS).cloned().collect();
+    let mut sorted = edits.clone();
+    sorted.sort();
+    println!(
+        "ENVELOPE BYTES rows={} edits={} median={} total={} plain_total={}",
+        sizes.len(),
+        edits.len(),
+        sorted[sorted.len() / 2],
+        edits.iter().sum::<usize>(),
+        plain.iter().rev().take(EDITS).sum::<usize>()
+    );
+    assert_eq!(edits.len(), EDITS);
+    assert_eq!(
+        compact, EDITS,
+        "every small edit is stored as a compact row"
+    );
+    // Measured: median 342 B, 6,848 B for 20 edits (develop's full JSON rows:
+    // 663 B and 13,568 B). The signed `loroUpdate` bytes are kept as signed,
+    // so this is what the proof costs.
+    assert!(
+        sorted[sorted.len() / 2] <= 360,
+        "median {} bytes per envelope",
+        sorted[sorted.len() / 2]
+    );
+    assert!(
+        edits.iter().sum::<usize>() <= 7_200,
+        "{} bytes for {EDITS} edits",
+        edits.iter().sum::<usize>()
+    );
 }

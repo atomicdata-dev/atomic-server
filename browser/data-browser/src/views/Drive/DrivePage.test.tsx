@@ -81,8 +81,7 @@ vi.mock('./DriveHome', () => ({
   ActivityFeed: () => <div />,
   DrivePeople: () => <div />,
   QuickCreateCards: () => <div />,
-  RecentlyOpened: () => <div />,
-  ResourceTiles: () => <div />,
+  ResourceList: () => <div />,
   SectionTitle: ({ children }: { children: React.ReactNode }) => (
     <h2>{children}</h2>
   ),

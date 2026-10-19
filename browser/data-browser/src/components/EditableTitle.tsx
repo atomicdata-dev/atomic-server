@@ -19,6 +19,7 @@ import { useInlineTitleAffordances } from '../hooks/useInlineTitleAffordances';
 import { Flex } from './Row';
 import {
   AffordanceRow,
+  IconPickerDialog,
   TitleDecorationAffordances,
   TitleIcon,
 } from './ResourceDecorations';
@@ -77,6 +78,9 @@ export function EditableTitle({
 
   const [text, setText] = useTitle(resource, Infinity, opts);
   const [isEditing, setIsEditing] = useState(false);
+  // Lives here, outside the title, which swaps between two trees (viewing and
+  // editing) and would take the picker's state with it. Mounted on first use.
+  const [iconPickerOpen, setIconPickerOpen] = useState<boolean>();
   const innerRef = useRef<HTMLTextAreaElement>(null);
   const ref = parentRef || innerRef;
 
@@ -194,9 +198,11 @@ export function EditableTitle({
     }
   };
 
+  const pickIcon = () => setIconPickerOpen(true);
+
   const titleElement = isEditing ? (
     <EditingRow>
-      <TitleIcon resource={resource} />
+      <TitleIcon resource={resource} onPickIcon={pickIcon} />
       <TitleInput
         ref={ref}
         data-testid='editable-title'
@@ -231,24 +237,38 @@ export function EditableTitle({
       className={className}
     >
       <>
-        <TitleIcon resource={resource} />
+        <TitleIcon resource={resource} onPickIcon={pickIcon} />
         <TitleText data-title-text>{text || placeholder}</TitleText>
         {canEdit && <Icon />}
       </>
     </Title>
   );
 
-  if (!withDecorations || !inlineAffordances) {
-    return titleElement;
-  }
-
   return (
-    <TitleWrapper>
-      {titleElement}
-      {/* Hidden while editing: the input's width differs from the rendered
-          title, which would make these buttons jump around. */}
-      {!isEditing && <TitleDecorationAffordances resource={resource} />}
-    </TitleWrapper>
+    <>
+      {withDecorations && inlineAffordances ? (
+        <TitleWrapper>
+          {titleElement}
+          {/* Hidden while editing: the input's width differs from the rendered
+              title, which would make these buttons jump around. */}
+          {!isEditing && (
+            <TitleDecorationAffordances
+              resource={resource}
+              onPickIcon={pickIcon}
+            />
+          )}
+        </TitleWrapper>
+      ) : (
+        titleElement
+      )}
+      {iconPickerOpen !== undefined && (
+        <IconPickerDialog
+          resource={resource}
+          show={iconPickerOpen}
+          onShowChange={setIconPickerOpen}
+        />
+      )}
+    </>
   );
 }
 

@@ -48,6 +48,7 @@ These components help with rendering resources in different contexts.
   - `src/views/Card/ResourceCardTitle.tsx` - Shared card title row with class icon, resource link, title transition, and optional actions.
 - `src/views/ResourcePage.tsx` - Full-page resource view dispatcher that picks the best page component for a resource class and falls back to `ResourcePageDefault`.
 - `src/components/EditableTitle.tsx` - Displays the title of a resource as h1 heading with support for editing. Useful on resource pages.
+- `src/views/ResourcePageDefault.tsx` exports `EditResourceButton`, the "Edit" button that opens a resource's edit form (renders nothing without write rights).
 
 ## Dialogs, Popovers, And Menus
 

@@ -133,20 +133,6 @@ describe('agent key storage', () => {
   });
 });
 
-it('persists folder identities through non-extractable key restoration and keypair updates', async () => {
-  const secret = await makeSecret();
-  const expected = await Agent.aiChatsFoldersFromSecret(secret);
-  await saveAgentToIDB(secret);
-  const restored = await getAgentFromIDB();
-  expect(restored?.aiChatsFolders).toEqual(expected);
-  const stored = store.get(AGENT_IDB_KEY) as {
-    keyPair: CryptoKeyPair;
-    subject: string;
-  };
-  await saveAgentToIDB(stored.keyPair, stored.subject);
-  expect((await getAgentFromIDB())?.aiChatsFolders).toEqual(expected);
-});
-
 describe('keeping a replaced identity', () => {
   beforeEach(() => store.clear());
 
@@ -188,5 +174,42 @@ describe('keeping a replaced identity', () => {
 
   it('refuses when the device holds no key for the identity', async () => {
     await expect(archiveStoredAgent('did:ad:agent:missing')).rejects.toThrow();
+  });
+});
+
+describe('getAgentFromIDB with the read started by index.html', () => {
+  const fakeWindow = {} as Window;
+
+  beforeEach(() => {
+    vi.stubGlobal('window', fakeWindow);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    store.clear();
+  });
+
+  it('uses the early read once, then reads the database again', async () => {
+    const secret = await makeSecret();
+    await saveAgentToIDB(secret, { adoptOnDevice: false });
+    const record = store.get(AGENT_IDB_KEY);
+    store.delete(AGENT_IDB_KEY);
+
+    // The early read saw the agent; the database no longer has it.
+    fakeWindow.__atomicAgentRead = Promise.resolve({ agent: record as never });
+    expect(await getAgentFromIDB()).toBeDefined();
+    expect(fakeWindow.__atomicAgentRead).toBeUndefined();
+    expect(await getAgentFromIDB()).toBeUndefined();
+  });
+
+  it('reads as before when the early read failed', async () => {
+    const secret = await makeSecret();
+    await saveAgentToIDB(secret, { adoptOnDevice: false });
+
+    fakeWindow.__atomicAgentRead = Promise.reject(new Error('blocked'));
+    expect(await getAgentFromIDB()).toBeDefined();
+
+    fakeWindow.__atomicAgentRead = Promise.resolve(undefined);
+    expect(await getAgentFromIDB()).toBeDefined();
   });
 });

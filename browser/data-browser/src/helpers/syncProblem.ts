@@ -9,11 +9,11 @@ export type SyncProblemAction =
   | 'storage';
 
 /**
- * Something that stops this workspace from syncing, in words for the person.
+ * Something that stops this drive from syncing, in words for the person.
  *
  * `cause` decides the voice. `ours` is a failure nothing the person did can
  * explain, so it says we have been told and offers Try again. `you` is
- * something only they can change (a workspace the server does not hold, no
+ * something only they can change (a drive the server does not hold, no
  * write access, a full plan), so it names the remedy instead.
  */
 export type SyncProblem = {
@@ -25,12 +25,6 @@ export type SyncProblem = {
   actions: SyncProblemAction[];
   /** The raw message, for a person who wants to quote it. */
   detail?: string;
-  /**
-   * The workspace the problem is about, when it is not the one being viewed.
-   * The banner's "turn off server sync" would act on the viewed workspace, so
-   * a problem with another one does not offer it.
-   */
-  otherDrive?: string;
   /**
    * Sentry already has this one: the outbox reports a commit that keeps
    * failing by itself, so reporting it again would count it twice.
@@ -49,9 +43,9 @@ export type SyncProblemInput = {
   >[];
   /** The server in use, as a person reads it: `atomicserver.eu`. */
   serverName: string;
-  /** `store.driveOfSubject`: the workspace an outbox entry belongs to. */
+  /** `store.driveOfSubject`: the drive an outbox entry belongs to. */
   driveOf?: (subject: string) => string | undefined;
-  /** The workspace's name, or undefined while it cannot be loaded. */
+  /** The drive's name, or undefined while it cannot be loaded. */
   driveTitle?: (drive: string) => string | undefined;
 };
 
@@ -73,38 +67,12 @@ function firstEntry(
   return entries.find(e => keep(e) && e.lastAttemptError);
 }
 
-/** The workspace a "not enrolled" refusal names, in any spelling. */
-function driveInMessage(message: string): string | undefined {
-  return /Drive (\S+) is not enrolled/.exec(message)?.[1];
-}
-
-/**
- * Which workspace a problem is about, when it is not the viewed one.
- * The server's message names it; failing that, the entry that was refused.
- */
-function otherDriveOf(
-  input: SyncProblemInput,
-  message: string,
-  entry: Entry | undefined,
-): string | undefined {
+/** Whether an outbox entry belongs to the drive in view (or to none known). */
+function isViewed(input: SyncProblemInput, entry: Entry): boolean {
   const viewed = input.status.drive && canonicalizeScheme(input.status.drive);
-  const named = driveInMessage(message);
-  const drive = named ?? (entry ? input.driveOf?.(entry.subject) : undefined);
+  const drive = input.driveOf?.(entry.subject);
 
-  if (!drive || !viewed) return undefined;
-
-  const canonical = canonicalizeScheme(drive);
-
-  return canonical === viewed ? undefined : canonical;
-}
-
-/** Title for a refusal about another workspace, named when its title is known. */
-export function notHostedTitle(name?: string | null): string {
-  const trimmed = name?.trim();
-
-  return trimmed
-    ? `This server does not have “${trimmed}”`
-    : 'This server does not have another workspace on this device';
+  return !viewed || !drive || canonicalizeScheme(drive) === viewed;
 }
 
 /** Name the remedy for an error message that retrying cannot fix, or null. */
@@ -112,12 +80,10 @@ function fromMessage(
   input: SyncProblemInput,
   message: string,
   reported: boolean,
-  entry?: Entry,
 ): SyncProblem | null {
   const { serverName } = input;
 
   if (NOT_ENROLLED.test(message) || MISSING_PARENT.test(message)) {
-    const other = otherDriveOf(input, message, entry);
     const shared = {
       key: 'not-hosted',
       cause: 'you',
@@ -125,20 +91,10 @@ function fromMessage(
       reported,
     } as const;
 
-    if (other) {
-      return {
-        ...shared,
-        title: notHostedTitle(input.driveTitle?.(other)),
-        body: `That is not the workspace you are viewing. ${serverName} refuses changes to it, so they stay on this device for now. Connect a device that has it, or open that workspace and turn off server sync there.`,
-        actions: ['connect-device'],
-        otherDrive: other,
-      };
-    }
-
     return {
       ...shared,
-      title: 'This server does not have this workspace',
-      body: `${serverName} refuses changes to it, so they stay on this device for now. Connect a device that has this workspace, or turn off server sync for it to keep working here.`,
+      title: 'This server does not have this drive',
+      body: `${serverName} refuses changes to it, so they stay on this device for now. Connect a device that has this drive, or turn off server sync for it to keep working here.`,
       actions: ['connect-device', 'review-sync'],
     };
   }
@@ -159,7 +115,7 @@ function fromMessage(
     return {
       key: 'no-access',
       cause: 'you',
-      title: 'You can’t change this workspace on the server',
+      title: 'You can’t change this drive on the server',
       body: 'Your account has no write access there. Your changes stay on this device. Ask the owner to give you access.',
       actions: [],
       detail: message,
@@ -188,18 +144,20 @@ function ours(
 }
 
 /**
- * The one thing most worth telling the person about why this workspace is not
+ * The one thing most worth telling the person about why this drive is not
  * syncing, or null when nothing is wrong.
  *
  * Reads the same facts as the sidebar's warning icon (parked changes, changes
  * that keep failing) and adds the ones the icon cannot show: a server that
- * refuses the workspace, a refused sync and a lost connection. Most urgent
+ * refuses the drive, a refused sync and a lost connection. Most urgent
  * first.
  */
 export function describeSyncProblem(
   input: SyncProblemInput,
 ): SyncProblem | null {
-  const { status, refusedByServer, entries, serverName } = input;
+  const { status, refusedByServer, serverName } = input;
+  // Only this drive: problems of others show once you open them.
+  const entries = input.entries.filter(e => isViewed(input, e));
 
   if (refusedByServer) {
     const refused = fromMessage(
@@ -233,17 +191,18 @@ export function describeSyncProblem(
   if (driveError) {
     return (
       fromMessage(input, driveError, false) ??
-      ours('drive-sync', 'This workspace could not sync', driveError, false)
+      ours('drive-sync', 'This drive could not sync', driveError, false)
     );
   }
 
   const blocked = entries.filter(e => e.blocked);
 
-  if (status.blockedCount > 0 || blocked.length > 0) {
+  // Without a way to tell drives apart, the status count is all there is.
+  if (blocked.length > 0 || (!input.driveOf && status.blockedCount > 0)) {
     const entry = firstEntry(entries, e => !!e.blocked);
     const message = entry?.lastAttemptError;
     // Parked after the outbox reported them, so Sentry has these already.
-    const known = message ? fromMessage(input, message, true, entry) : null;
+    const known = message ? fromMessage(input, message, true) : null;
 
     return (
       known ?? ours('blocked', 'Some changes could not sync', message, true)
@@ -259,7 +218,7 @@ export function describeSyncProblem(
     const message = entry?.lastAttemptError;
 
     return (
-      (message ? fromMessage(input, message, true, entry) : null) ??
+      (message ? fromMessage(input, message, true) : null) ??
       ours('failing', 'Some changes keep failing to sync', message, true)
     );
   }

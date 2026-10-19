@@ -1028,9 +1028,10 @@ export const TableResource: React.FC<TableResourceProps> = ({
         await row.save();
         store.notifyResourceManuallyCreated(row);
         incrementMemberCount();
-        // Refresh so the server-authoritative order (and the new member's
-        // position at index + 1) lands promptly.
-        await invalidateCollection();
+        // No refresh here: `notifyResourceManuallyCreated` already put the row
+        // in the collection at its sort position, index + 1. A refresh clears
+        // the pages and re-reads them, and the grid redraws under the cursor
+        // while the person is typing into the row they just inserted.
       };
 
       insert().catch(error => {
@@ -1052,7 +1053,6 @@ export const TableResource: React.FC<TableResourceProps> = ({
       resource.subject,
       tableClass.subject,
       incrementMemberCount,
-      invalidateCollection,
     ],
   );
 

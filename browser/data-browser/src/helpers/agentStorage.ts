@@ -15,7 +15,7 @@ import {
   type SignInCredentials,
 } from './localDbKey';
 
-const AGENT_IDB_KEY = 'atomic.agent';
+export const AGENT_IDB_KEY = 'atomic.agent';
 
 interface StoredAgent {
   keyPair: CryptoKeyPair;
@@ -38,7 +38,6 @@ interface StoredAgent {
    * still readable.
    */
   privateDrive?: string;
-  aiChatsFolders?: Record<string, string>;
   /**
    * The agent's Cloud Vault proof (see `Agent.vaultProof`). Stored for the
    * same reason as `privateDrive`: WebKit's WebCrypto signs the fixed proof
@@ -63,12 +62,11 @@ interface StoredAgentFallback {
   initialDrive?: string;
   /** See {@link StoredAgent}. */
   privateDrive?: string;
-  aiChatsFolders?: Record<string, string>;
   /** See {@link StoredAgent}. */
   vaultProof?: string;
 }
 
-const AGENT_FALLBACK_KEY = 'atomic.agent.fallback';
+export const AGENT_FALLBACK_KEY = 'atomic.agent.fallback';
 
 function hasSubtleCrypto(): boolean {
   try {
@@ -81,10 +79,51 @@ function hasSubtleCrypto(): boolean {
   }
 }
 
+/** What the inline script in index.html read, when it ran (see there). */
+interface PrereadAgent {
+  agent?: StoredAgent;
+  fallback?: StoredAgentFallback;
+}
+
+declare global {
+  interface Window {
+    __atomicAgentRead?: Promise<PrereadAgent | undefined>;
+  }
+}
+
+/**
+ * Take the IndexedDB read that index.html started before the app's JavaScript
+ * had loaded. Consumed once: a later call (after a sign-in or sign-out) must
+ * read the database again. Undefined when the script did not run or its read
+ * failed, and the caller then reads as it always did.
+ */
+async function takePreread(): Promise<PrereadAgent | undefined> {
+  if (typeof window === 'undefined') return undefined;
+
+  const pending = window.__atomicAgentRead;
+  window.__atomicAgentRead = undefined;
+
+  try {
+    return await pending;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function getAgentFromIDB(): Promise<Agent | undefined> {
+  const preread = await takePreread();
+  const readAgent = async () =>
+    (preread ? preread.agent : await get(AGENT_IDB_KEY)) as
+      | StoredAgent
+      | undefined;
+  const readFallback = async () =>
+    (preread ? preread.fallback : await get(AGENT_FALLBACK_KEY)) as
+      | StoredAgentFallback
+      | undefined;
+
   // Try SubtleCrypto first (secure context)
   if (hasSubtleCrypto()) {
-    const storedAgent = (await get(AGENT_IDB_KEY)) as StoredAgent | undefined;
+    const storedAgent = await readAgent();
 
     if (storedAgent) {
       try {
@@ -100,7 +139,6 @@ export async function getAgentFromIDB(): Promise<Agent | undefined> {
         );
         agent.legacySubject = storedAgent.legacySubject;
         agent.privateDrive = storedAgent.privateDrive;
-        agent.aiChatsFolders = storedAgent.aiChatsFolders ?? {};
         agent.vaultProof = storedAgent.vaultProof;
 
         // Heal installs written while the readable key was saved
@@ -119,9 +157,7 @@ export async function getAgentFromIDB(): Promise<Agent | undefined> {
   }
 
   // Fallback: load from plaintext private key (insecure context)
-  const fallback = (await get(AGENT_FALLBACK_KEY)) as
-    | StoredAgentFallback
-    | undefined;
+  const fallback = await readFallback();
 
   if (fallback) {
     try {
@@ -132,7 +168,6 @@ export async function getAgentFromIDB(): Promise<Agent | undefined> {
       );
       agent.legacySubject = fallback.legacySubject;
       agent.privateDrive = fallback.privateDrive;
-      agent.aiChatsFolders = fallback.aiChatsFolders ?? {};
       agent.vaultProof = fallback.vaultProof;
 
       return agent;
@@ -221,8 +256,6 @@ export async function saveAgentToIDB(
       previous?.subject === subject ? previous.initialDrive : undefined,
     privateDrive:
       previous?.subject === subject ? previous.privateDrive : undefined,
-    aiChatsFolders:
-      previous?.subject === subject ? previous.aiChatsFolders : undefined,
     vaultProof: previous?.subject === subject ? previous.vaultProof : undefined,
   } satisfies StoredAgent);
 }
@@ -251,7 +284,6 @@ async function storeSecret(secret: string): Promise<void> {
   // reproduce it. See `StoredAgent.privateDrive`.
   const privateDrive = await Agent.privateDriveSubjectFromSecret(secret);
   const vaultProof = await Agent.vaultProofFromSecret(secret);
-  const aiChatsFolders = await Agent.aiChatsFoldersFromSecret(secret);
 
   {
     // Prefer the non-extractable keypair. Once stored this way the private key
@@ -267,7 +299,6 @@ async function storeSecret(secret: string): Promise<void> {
           legacySubject: legacySubjectFromSecret(secret),
           initialDrive: decoded.initialDrive,
           privateDrive,
-          aiChatsFolders,
           vaultProof,
         } satisfies StoredAgent);
         await del(AGENT_FALLBACK_KEY);
@@ -293,7 +324,6 @@ async function storeSecret(secret: string): Promise<void> {
       legacySubject: legacySubjectFromSecret(secret),
       initialDrive: decoded.initialDrive,
       privateDrive,
-      aiChatsFolders,
       vaultProof,
     } satisfies StoredAgentFallback);
     // Drop a keypair from a previous account, so it can't be loaded instead.

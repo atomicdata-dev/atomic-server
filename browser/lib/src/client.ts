@@ -8,7 +8,13 @@ import {
   signRequest,
   legacyAgentForRequest,
 } from './authentication.js';
-import { AtomicError, ErrorType } from './error.js';
+import {
+  AtomicError,
+  ErrorType,
+  isTransportError,
+  NOT_AVAILABLE_LOCALLY_MESSAGE,
+} from './error.js';
+import { busyRetryAfterMs, DEFAULT_BUSY_RETRY_MS, ErrorCode } from './ws-v2.js';
 import { pageRequestSignal } from './page-request-signal.js';
 // Import directly from the modules to avoid a circular dep through `./index.js`
 // — under some bundlers the re-exported binding lands as `undefined` at runtime
@@ -82,8 +88,81 @@ interface HTTPResourceResult {
 }
 
 /** Contains a `fetch` instance, provides methods to GET and POST several types */
+/** Response header of `POST /commit`: the node's write-load hint in ms. */
+const PACE_HEADER = 'X-Atomic-Pace-Ms';
+const RETRY_AFTER_MS_HEADER = 'X-Atomic-Retry-After-Ms';
+
+/** The delay a 429/503 asks for: the precise millisecond header, else the
+ *  standard `Retry-After` (seconds), else the hint in the body, else a
+ *  default. */
+function retryAfterMsOf(response: Response, message: string): number {
+  const exact = Number(response.headers?.get(RETRY_AFTER_MS_HEADER));
+
+  if (response.headers?.get(RETRY_AFTER_MS_HEADER) && Number.isFinite(exact)) {
+    return exact;
+  }
+
+  const secs = Number(response.headers?.get('Retry-After'));
+
+  if (response.headers?.get('Retry-After') && Number.isFinite(secs)) {
+    return secs * 1000;
+  }
+
+  return busyRetryAfterMs(message, ErrorCode.BUSY) ?? DEFAULT_BUSY_RETRY_MS;
+}
+
+/** Origins whose unreachability was already reported. */
+const warnedUnreachable = new Set<string>();
+
+/** Forget which origins were reported (tests). */
+export function resetUnreachableWarnings(): void {
+  warnedUnreachable.clear();
+}
+
+/**
+ * An unreachable server fails every resource it hosts, and a page that lists
+ * many of them (the sync page, one row per drive) would print a stack trace
+ * for each. That is not a bug in the app: say it once per origin, in one line,
+ * and leave the per-resource state to the UI. Other failures stay loud.
+ */
+function logFetchFailure(subject: string, e: unknown): void {
+  const message = e instanceof Error ? e.message : String(e);
+  const unreachable =
+    isTransportError(e as Error) ||
+    // The own server's `/path` proxy answers 502 when the origin it was asked
+    // to fetch is down; its message carries the server's marker (see
+    // UPSTREAM_UNREACHABLE_MARKER in atomic_lib), possibly behind a prefix.
+    (e instanceof AtomicError &&
+      e.type === ErrorType.Server &&
+      message.includes('Upstream unreachable: '));
+
+  if (!unreachable) {
+    console.error(subject, e);
+
+    return;
+  }
+
+  let origin = subject;
+
+  try {
+    origin = new URL(subject).origin;
+  } catch {
+    // Not a URL (a DID): key on the subject itself.
+  }
+
+  if (warnedUnreachable.has(origin)) return;
+
+  warnedUnreachable.add(origin);
+  console.warn(
+    `[atomic] ${origin} is unreachable; not logging further failures for it.`,
+  );
+}
+
 export class Client {
   private __fetchOverride?: typeof fetch;
+  /** Called with the `X-Atomic-Pace-Ms` hint of every acknowledged
+   *  `POST /commit`. The store points it at the outbox. */
+  public paceListener?: (paceMs: number) => void;
 
   public constructor(fetchOverride?: typeof fetch) {
     if (fetchOverride) {
@@ -329,6 +408,17 @@ export class Client {
       const body = await response.text();
 
       if (response.status === 200) {
+        // An origin that runs no node (a portal, a static host) answers every
+        // path with its index.html. For an identifier that means "nothing
+        // here", not "a broken resource": say so, so the UI can offer the
+        // vault instead of a JSON parse error.
+        if (isAtomicIdentifier(subject) && /^\s*</.test(body)) {
+          throw new AtomicError(
+            NOT_AVAILABLE_LOCALLY_MESSAGE,
+            ErrorType.Transport,
+          );
+        }
+
         try {
           const json = JSON.parse(body);
 
@@ -385,7 +475,7 @@ export class Client {
         return { resource, createdResources: [], cancelled: true };
       resource.setError(e);
       createdResources = [resource];
-      console.error(subject, e);
+      logFetchFailure(subject, e);
     }
 
     resource.loading = false;
@@ -420,10 +510,25 @@ export class Client {
     const body = await response.text();
 
     if (response.status !== 200) {
+      learnServerClock(body);
+
+      // 429 (write rate limit) and 503 (node overloaded) both mean "nothing
+      // was attempted, wait this long". Not worth the error logs below.
+      if (response.status === 429 || response.status === 503) {
+        const error = new AtomicError(body, ErrorType.Server, ErrorCode.BUSY);
+        error.retryAfterMs = retryAfterMsOf(response, error.message);
+        throw error;
+      }
+
       console.error('[postCommit] Server error body:', body);
       console.error('[postCommit] Commit sent:', serialized);
-      learnServerClock(body);
       throw new AtomicError(body, ErrorType.Server);
+    }
+
+    const pace = Number(response.headers?.get(PACE_HEADER));
+
+    if (response.headers?.get(PACE_HEADER) && Number.isFinite(pace)) {
+      this.paceListener?.(pace);
     }
 
     return parseCommitJSON(body);

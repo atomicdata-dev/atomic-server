@@ -3,6 +3,7 @@ import {
   isOriginWithoutNode,
   originMayLackNode,
   probeOriginForNode,
+  recallOriginProbe,
   rememberOriginWithoutNode,
 } from './originNode';
 import { serverProps } from './serverOntology';
@@ -91,6 +92,58 @@ describe('probeOriginForNode', () => {
     await probeOriginForNode(ORIGIN);
 
     expect(isOriginWithoutNode(ORIGIN)).toBe(false);
+  });
+});
+
+describe('recallOriginProbe', () => {
+  beforeEach(() => {
+    rememberOriginWithoutNode(undefined);
+    const data = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => void data.set(k, v),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('knows nothing on a first visit', () => {
+    expect(recallOriginProbe(ORIGIN)).toBe(false);
+    expect(isOriginWithoutNode(ORIGIN)).toBe(false);
+  });
+
+  it('uses the last answer at once, and the probe corrects it', async () => {
+    vi.stubGlobal('fetch', respond(404, ''));
+    await probeOriginForNode(ORIGIN);
+
+    rememberOriginWithoutNode(undefined);
+    expect(recallOriginProbe(ORIGIN)).toBe(true);
+    expect(isOriginWithoutNode(ORIGIN)).toBe(true);
+
+    // The origin became a node since: the background probe says so.
+    vi.stubGlobal(
+      'fetch',
+      respond(200, JSON.stringify({ [serverProps.version]: '0.41.0' })),
+    );
+    await probeOriginForNode(ORIGIN);
+    expect(isOriginWithoutNode(ORIGIN)).toBe(false);
+
+    rememberOriginWithoutNode(undefined);
+    expect(recallOriginProbe(ORIGIN)).toBe(true);
+    expect(isOriginWithoutNode(ORIGIN)).toBe(false);
+  });
+
+  it('a probe without an answer keeps the memo', async () => {
+    vi.stubGlobal('fetch', respond(404, ''));
+    await probeOriginForNode(ORIGIN);
+    vi.stubGlobal('fetch', respond(502, ''));
+    await probeOriginForNode(ORIGIN);
+    rememberOriginWithoutNode(undefined);
+
+    expect(recallOriginProbe(ORIGIN)).toBe(true);
+    expect(isOriginWithoutNode(ORIGIN)).toBe(true);
   });
 });
 

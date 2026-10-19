@@ -276,7 +276,16 @@ async function request(
   if (!agent) return { ok: false, error: 'Not signed in' };
 
   try {
-    const headers = await signRequest(url, agent, {});
+    // A request with a body is signed over its method and exact body, so a
+    // captured header cannot be replayed with another body.
+    const headers = await signRequest(
+      url,
+      agent,
+      {},
+      typeof init.body === 'string'
+        ? { method: init.method ?? 'POST', body: init.body }
+        : undefined,
+    );
     const response = await fetch(url, {
       ...init,
       headers: { ...headers, 'Content-Type': 'application/json' },

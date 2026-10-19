@@ -1038,6 +1038,7 @@ pub async fn collect_drive_subjects(
                 sort_by: None,
                 sort_desc: false,
                 include_external: true,
+                exclude_trashed: false,
                 include_nested: false,
                 // Sudo: sync needs to enumerate every subject the
                 // drive actually contains. Per-agent ACL filtering

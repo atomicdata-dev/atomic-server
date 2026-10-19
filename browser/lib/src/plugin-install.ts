@@ -377,13 +377,22 @@ export async function publishZipRelease(
   url.searchParams.set('drive', drive);
   if (options.world) url.searchParams.set('world', options.world);
   if (options.public) url.searchParams.set('public', 'true');
+  const bytes = await file.arrayBuffer();
   const response = await transport(url.toString(), {
     method: 'POST',
     headers: {
-      ...(await signRequest(url.toString(), agent, {})),
+      ...(await signRequest(
+        url.toString(),
+        agent,
+        {},
+        {
+          method: 'POST',
+          body: bytes,
+        },
+      )),
       'Content-Type': 'application/zip',
     },
-    body: await file.arrayBuffer(),
+    body: bytes,
   });
   if (!response.ok) throw new Error(await response.text());
 

@@ -117,6 +117,9 @@ pub mod tag {
 ///   frames `LORO_SYNC_UPDATE` / `LORO_EPHEMERAL_UPDATE` / `PRESENCE_UPDATE`.
 /// - `get-many`: answers `GET_MANY` (0x15) with one `GET_MANY_RESULT` (0x16),
 ///   so a client can fetch a whole list of subjects in one round trip.
+/// - `commit-pace`: appends a write-load hint to the slim `COMMIT_OK` of a
+///   client whose `HELLO` lists `commit-pace` (see [`encode_commit_ok_paced`])
+///   and may refuse commits with `error_code::BUSY` when overloaded.
 pub const CAPABILITIES: &[&str] = &[
     "auth-max-age",
     "keepalive",
@@ -132,6 +135,7 @@ pub const CAPABILITIES: &[&str] = &[
     "get-many",
     "canonical-scheme",
     "sparse-sync",
+    "commit-pace",
 ];
 
 /// Server capability: understands a `SYNC` whose JSON carries `hv: 2` and, in
@@ -147,7 +151,14 @@ pub const CAP_SPARSE_SYNC: &str = "sparse-sync";
 /// - `commit-ok-slim`: the client decodes a `COMMIT_OK` whose payload is a
 ///   bare commit id, so the responder need not ship the full commit JSON
 ///   back to the agent that just signed it.
-pub const CLIENT_CAPABILITIES: &[&str] = &["commit-ok-slim", "canonical-scheme"];
+/// - `commit-pace`: the client decodes the `pace_ms` suffix of a slim
+///   `COMMIT_OK` (needs `commit-ok-slim` too) and understands
+///   `error_code::BUSY`.
+pub const CLIENT_CAPABILITIES: &[&str] = &["commit-ok-slim", "canonical-scheme", "commit-pace"];
+
+/// The client capability a responder consults before appending `pace_ms` to a
+/// slim `COMMIT_OK`.
+pub const CAP_COMMIT_PACE: &str = "commit-pace";
 
 /// The name of the client capability a responder consults before sending a
 /// slim `COMMIT_OK`.
@@ -287,6 +298,28 @@ pub mod error_code {
     /// A new Loro write lost against stored state. Preserve the local edit,
     /// but stop sending the same stale update until it is rebased.
     pub const CAUSALITY_CONFLICT: u16 = 11;
+    /// The node is overloaded with writes (in-flight commits above its hard
+    /// limit) or this agent spent its write rate budget. The commit was
+    /// refused **before** any work was done and nothing landed. Not a failure
+    /// of the commit: keep the local state, wait `retry_after_ms=<n>` (see
+    /// [`retry_after_ms_from_message`](super::retry_after_ms_from_message)),
+    /// then send one merged delta. Do not count it as a failed attempt and
+    /// do not retry it over another transport. A client that predates this
+    /// code sees an unknown code and retries generically.
+    pub const BUSY: u16 = 12;
+}
+
+/// Pull the `retry_after_ms=<n>` hint out of a `BUSY` error message (or an
+/// HTTP error description). `None` when the message carries none.
+pub fn retry_after_ms_from_message(message: &str) -> Option<u64> {
+    let rest = &message[message.find("retry_after_ms=")? + "retry_after_ms=".len()..];
+    let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+    digits.parse().ok()
+}
+
+/// The message text of a `BUSY` refusal for a retry delay in milliseconds.
+pub fn busy_message(retry_after_ms: u64) -> String {
+    format!("Server busy; retry_after_ms={retry_after_ms}")
 }
 
 /// Decode the payload of an `ERROR` frame (slice *after* the tag byte):
@@ -320,6 +353,13 @@ pub struct DecodedError {
 /// `isTerminalCommitErrorMessage` / `isUnrecoverableCommitErrorMessage`
 /// patterns — update both sides together if you add a case.
 pub fn classify_commit_error(message: &str) -> u16 {
+    // Load shedding and the write rate limiter both mean "wait, then resend".
+    if message.starts_with("Server busy; retry_after_ms=")
+        || message.starts_with("Too many writes; retry after ")
+    {
+        return error_code::BUSY;
+    }
+
     // A stale Loro write cannot win by resending the same update. Preserve it
     // client-side for review/rebase instead of retrying indefinitely.
     if message.contains("Commit's Loro update produced no state changes") {
@@ -648,6 +688,21 @@ pub fn encode_commit_ok_slim(request_id: u16, commit_id: &str) -> Vec<u8> {
     buf
 }
 
+/// Encode a slim COMMIT_OK that also carries the node's write-load hint:
+/// `[0x14] [request_id: u16] [commit_id_utf8] 0x00 [pace_ms: decimal ascii]`.
+///
+/// Sent only to a client that listed both `commit-ok-slim` and
+/// `commit-pace`. A commit id never contains a NUL, so [`decode_commit_ok`]
+/// splits unambiguously and still reads the plain slim form. `pace_ms` is how
+/// long the client should leave between commits of one resource (0 = no
+/// load).
+pub fn encode_commit_ok_paced(request_id: u16, commit_id: &str, pace_ms: u32) -> Vec<u8> {
+    let mut buf = encode_commit_ok_slim(request_id, commit_id);
+    buf.push(0);
+    buf.extend_from_slice(pace_ms.to_string().as_bytes());
+    buf
+}
+
 /// A decoded COMMIT_OK, whichever form it came in.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DecodedCommitOk {
@@ -656,6 +711,8 @@ pub struct DecodedCommitOk {
     pub commit_id: String,
     /// The full commit JSON-AD, present only for the legacy full form.
     pub commit_json: Option<String>,
+    /// The write-load hint of a paced slim form; `None` when the frame had none.
+    pub pace_ms: Option<u32>,
 }
 
 /// Decode a COMMIT_OK payload (slice *after* the tag byte) in either form:
@@ -675,12 +732,18 @@ pub fn decode_commit_ok(data: &[u8]) -> Option<DecodedCommitOk> {
             request_id: decoded.request_id,
             commit_id: id,
             commit_json: Some(decoded.commit_json.to_string()),
+            pace_ms: None,
         });
     }
+    let (id, pace_ms) = match body.split_once('\0') {
+        Some((id, pace)) => (id, pace.trim().parse().ok()),
+        None => (body, None),
+    };
     Some(DecodedCommitOk {
         request_id: decoded.request_id,
-        commit_id: body.to_string(),
+        commit_id: id.to_string(),
         commit_json: None,
+        pace_ms,
     })
 }
 
@@ -2254,6 +2317,14 @@ mod wire_vectors {
                 "commit_ok_slim",
                 encode_commit_ok_slim(9, "did:ad:commit:abc"),
             ),
+            (
+                "commit_ok_paced",
+                encode_commit_ok_paced(9, "did:ad:commit:abc", 2500),
+            ),
+            (
+                "error_busy",
+                encode_error(9, error_code::BUSY, &busy_message(1730)),
+            ),
             ("challenge", encode_challenge("0badf00d")),
             ("sub", encode_sub("did:ad:d")),
             ("unsub", encode_unsub("did:ad:d")),
@@ -2394,6 +2465,15 @@ mod wire_vectors {
         let slim = decode_commit_ok(&hex_of("commit_ok_slim")[1..]).unwrap();
         assert_eq!(slim.request_id, 9);
         assert_eq!(slim.commit_id, "did:ad:commit:abc");
+        assert_eq!(slim.pace_ms, None);
+        let paced = decode_commit_ok(&hex_of("commit_ok_paced")[1..]).unwrap();
+        assert_eq!(paced.commit_id, "did:ad:commit:abc");
+        assert_eq!(paced.pace_ms, Some(2500));
+        assert_eq!(paced.commit_json, None);
+        let busy = decode_error(&hex_of("error_busy")[1..]).unwrap();
+        assert_eq!(busy.code, error_code::BUSY);
+        assert_eq!(retry_after_ms_from_message(&busy.message), Some(1730));
+        assert_eq!(classify_commit_error(&busy.message), error_code::BUSY);
         assert!(slim.commit_json.is_none());
         assert_eq!(
             decode_challenge(&hex_of("challenge")[1..]),

@@ -578,11 +578,17 @@ async function mintViewToken(
   const url = `${store.getServerUrl()}/plugin-view-token`;
 
   try {
-    const headers = await signRequest(url, agent, {});
+    const payload = JSON.stringify({ drive, plugin });
+    const headers = await signRequest(
+      url,
+      agent,
+      {},
+      { method: 'POST', body: payload },
+    );
     const response = await fetch(url, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ drive, plugin }),
+      body: payload,
     });
 
     if (!response.ok) {

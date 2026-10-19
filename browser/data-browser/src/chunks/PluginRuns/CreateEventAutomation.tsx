@@ -66,20 +66,29 @@ export function CreateEventAutomation({
       await script.set(dataBrowser.properties.emoji, '⚡');
       await script.save();
       const url = `${store.getServerUrl()}/plugin-trigger`;
+      const payload = JSON.stringify({
+        drive,
+        plugin: subject,
+        filters: selected.filters,
+        onEnter: true,
+        onLeave: false,
+        autoApply: false,
+      });
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          ...(await signRequest(url, store.getAgent()!, {})),
+          ...(await signRequest(
+            url,
+            store.getAgent()!,
+            {},
+            {
+              method: 'POST',
+              body: payload,
+            },
+          )),
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          drive,
-          plugin: subject,
-          filters: selected.filters,
-          onEnter: true,
-          onLeave: false,
-          autoApply: false,
-        }),
+        body: payload,
       });
       if (!response.ok) throw new Error(await response.text());
       navigate(constructOpenURL(subject));

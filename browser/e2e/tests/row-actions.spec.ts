@@ -139,11 +139,11 @@ test.describe('row actions', () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1800, height: 900 });
-    // Grocery list has a checkbox column, which is what `toggle` writes. Its
-    // board is the default view, so open the list.
-    await createFromTemplate(page, /Grocery list/, 'Shopping', 'List');
+    // Grocery list has a checkbox column, which is what `toggle` writes, and
+    // opens straight on its List view.
+    await createFromTemplate(page, /Grocery list/, 'Shopping');
 
-    await setCell(page, 2, 2, 'Milk');
+    await setCell(page, 2, 3, 'Milk');
     await reloadGrid(page);
 
     // The template already ships one toggle; add a second, different action
@@ -184,9 +184,9 @@ test.describe('row actions', () => {
 
   test('the template toggle flips a checkbox on and off', async ({ page }) => {
     await page.setViewportSize({ width: 1800, height: 900 });
-    await createFromTemplate(page, /Grocery list/, 'Shopping toggles', 'List');
+    await createFromTemplate(page, /Grocery list/, 'Shopping toggles');
 
-    await setCell(page, 2, 2, 'Bread');
+    await setCell(page, 2, 3, 'Bread');
     await reloadGrid(page);
 
     const bread = row(page, 'Bread');
