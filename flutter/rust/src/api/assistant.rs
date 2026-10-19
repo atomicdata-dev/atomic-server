@@ -30,6 +30,18 @@ pub(crate) fn name_of(resource: &Resource) -> String {
         .unwrap_or_default()
 }
 
+/// A resource for a list row: the stored propvals only (`get_resource_shallow`),
+/// which skips decoding the whole Loro history that `get_resource` does per
+/// call. Rows need a title and a class, which the last commit materialized, so
+/// this can only lag a Loro import that has not materialized yet. Falls back to
+/// the full read when there is no stored row.
+pub(crate) async fn row_resource(store: &atomic_lib::Db, subject: &Subject) -> Option<Resource> {
+    match store.get_resource_shallow(subject) {
+        Ok(r) => Some(r),
+        Err(_) => store.get_resource(subject).await.ok(),
+    }
+}
+
 /// The name of a resource's first class, its subject when the class has none.
 pub(crate) async fn class_name_of(resource: &Resource) -> String {
     let class = match resource.get(urls::IS_A).map(|v| v.to_subjects(None)) {
@@ -37,8 +49,8 @@ pub(crate) async fn class_name_of(resource: &Resource) -> String {
         _ => String::new(),
     };
     let Ok(store) = db() else { return class };
-    match store.get_resource(&Subject::from(class.as_str())).await {
-        Ok(c) if !name_of(&c).is_empty() => name_of(&c),
+    match row_resource(&store, &Subject::from(class.as_str())).await {
+        Some(c) if !name_of(&c).is_empty() => name_of(&c),
         _ => class,
     }
 }
@@ -134,10 +146,10 @@ pub async fn list_activity(limit: u32) -> Result<Vec<ActivityEntry>, String> {
             Some(agent) => match names.get(agent) {
                 Some(name) => name.clone(),
                 None => {
-                    let name = match store.get_resource(&Subject::from(agent.as_str())).await {
-                        Ok(r) => Some(name_of(&r)).filter(|n| !n.is_empty()),
-                        Err(_) => None,
-                    };
+                    let name = row_resource(&store, &Subject::from(agent.as_str()))
+                        .await
+                        .map(|r| name_of(&r))
+                        .filter(|n| !n.is_empty());
                     names.insert(agent.clone(), name.clone());
                     name
                 }
@@ -175,12 +187,9 @@ pub async fn list_recent_resources(drive: String, limit: u32) -> Result<String, 
         if out.len() >= limit as usize {
             break;
         }
-        let resource = match store.get_resource(&Subject::from(subject.as_str())).await {
-            Ok(resource) => resource,
-            Err(e) => {
-                tracing::warn!("[recents] {subject} not readable: {e}");
-                continue;
-            }
+        let Some(resource) = row_resource(&store, &Subject::from(subject.as_str())).await else {
+            tracing::warn!("[recents] {subject} not readable");
+            continue;
         };
         out.push(resource_row(&subject, &resource, ("opened_at", json!(opened_at))).await);
     }
@@ -196,7 +205,7 @@ pub(crate) const FAVORITES: &str = "https://atomicdata.dev/properties/favorites"
 async fn private_drive_list(property: &str) -> Result<Vec<String>, String> {
     let store = db()?;
     let home = store.private_drive_subject().map_err(err)?;
-    let Ok(drive) = store.get_resource(&Subject::from(home.as_str())).await else {
+    let Some(drive) = row_resource(&store, &Subject::from(home.as_str())).await else {
         return Ok(Vec::new());
     };
     Ok(drive
@@ -217,7 +226,7 @@ pub async fn list_favorites(limit: u32) -> Result<String, String> {
         if out.len() >= limit as usize {
             break;
         }
-        let Ok(resource) = store.get_resource(&Subject::from(subject.as_str())).await else {
+        let Some(resource) = row_resource(&store, &Subject::from(subject.as_str())).await else {
             continue;
         };
         out.push(resource_row(&subject, &resource, ("opened_at", json!(0))).await);
@@ -307,7 +316,8 @@ pub async fn list_conversations(limit: u32) -> Result<String, String> {
         if out.len() >= limit as usize {
             break;
         }
-        let Ok(conversation) = store.get_resource(&Subject::from(subject.as_str())).await else {
+        let Some(conversation) = row_resource(&store, &Subject::from(subject.as_str())).await
+        else {
             continue;
         };
         let members = conversation
@@ -317,9 +327,9 @@ pub async fn list_conversations(limit: u32) -> Result<String, String> {
             .unwrap_or_default();
         let others: Vec<&String> = members.iter().filter(|m| **m != me).collect();
         let names = futures::future::join_all(others.into_iter().map(|member| async {
-            let local = match store.get_resource(&Subject::from(member.as_str())).await {
-                Ok(agent) => name_of(&agent),
-                Err(_) => String::new(),
+            let local = match row_resource(&store, &Subject::from(member.as_str())).await {
+                Some(agent) => name_of(&agent),
+                None => String::new(),
             };
             if !local.is_empty() {
                 return local;
@@ -371,7 +381,7 @@ pub async fn search(drive: String, query: String, limit: u32) -> Result<String, 
 
     let mut out = Vec::new();
     for hit in hits {
-        let Ok(resource) = store.get_resource(&hit.subject).await else {
+        let Some(resource) = row_resource(&store, &hit.subject).await else {
             continue;
         };
         out.push(

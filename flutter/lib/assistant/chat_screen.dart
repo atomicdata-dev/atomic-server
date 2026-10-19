@@ -491,7 +491,11 @@ class _ChatScreenState extends State<ChatScreen> {
                     minLines: 1,
                     maxLines: 5,
                     textInputAction: TextInputAction.send,
-                    enabled: !_sending && ai != null,
+                    // Stays enabled while a reply streams (`_send` ignores a
+                    // second send), and submitting keeps focus: the keyboard
+                    // stays open for the next message.
+                    enabled: ai != null,
+                    onEditingComplete: () {},
                     onSubmitted: (_) => _send(),
                     decoration: InputDecoration(
                       hintText: 'Message',
