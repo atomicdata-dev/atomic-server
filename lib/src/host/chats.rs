@@ -95,16 +95,28 @@ pub async fn append_chat_entry(
     role: &str,
     parts_json: &str,
 ) -> AtomicResult<String> {
-    let store = node.db();
-    let agent = store.get_default_agent()?;
-    let author = agent.subject.to_string();
+    let author = node.db().get_default_agent()?.subject.to_string();
     let mut entry = Entry::new(author, "", crate::utils::now());
     entry.extra.insert("role".into(), role.into());
     entry.extra.insert("parts".into(), parts_json.into());
+    append_entry(node, pusher, chat, &entry).await
+}
+
+/// Add `entry` to the log of `chat`: on the newest `ChatLog` page with room
+/// (the same rule as the web app, so both fill one page), or on a new page.
+/// Returns the entry's id (`<page>#<key>`).
+pub async fn append_entry(
+    node: &AtomicNode,
+    pusher: &dyn LocalWritePusher,
+    chat: &str,
+    entry: &Entry,
+) -> AtomicResult<String> {
+    let store = node.db();
+    let agent = store.get_default_agent()?;
 
     if let Some(subject) = crate::chat_log::page_with_room(store, chat).await? {
         let mut page = store.get_resource(&subject).await?;
-        let key = page.add_chat_entry(&entry)?;
+        let key = page.add_chat_entry(entry)?;
         let response = node.save_locally(&mut page).await?;
         pusher.push(&response).await;
         return Ok(format!("{subject}#{key}"));
@@ -112,7 +124,7 @@ pub async fn append_chat_entry(
 
     // A first page.
     let doc = AtomicLoroDoc::new();
-    let key = doc.add_entry(&entry)?;
+    let key = doc.add_entry(entry)?;
     let is_a = Value::ResourceArray(vec![urls::CHAT_LOG.to_string().into()]);
     let parent = Value::AtomicUrl(chat.into());
     doc.set_property(urls::IS_A, &is_a)?;

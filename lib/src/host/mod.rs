@@ -15,6 +15,7 @@
 //! - [`lists`]: the home lists (AI chats, favorites, recently opened, activity),
 //!   icons and full-text search across drives.
 //! - [`chats`]: AI chats stored as `ChatLog` pages: read, start, append.
+//! - [`chat_rooms`]: the chat of a meeting or chat room (`ChatLog` entries): read, send.
 //! - [`conversations`]: end-to-end encrypted conversations: list, read, send.
 //! - [`context`]: a resource as plain text, to hand to an AI.
 //! - [`create`]: a new resource of a class in a drive (the "New" buttons).
@@ -37,6 +38,7 @@
 //!
 //! Native only: hosts run a tokio runtime; the browser has its own store.
 
+pub mod chat_rooms;
 pub mod chats;
 pub mod context;
 pub mod conversations;

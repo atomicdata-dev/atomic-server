@@ -34,6 +34,24 @@ pub fn name_from_json_ad(body: &str) -> Option<String> {
         .map(str::to_string)
 }
 
+/// The display name of an agent: the agent resource when this device holds
+/// it, else the cached name of a background lookup, else [`UNKNOWN_MEMBER`].
+/// Never waits on the network.
+pub(crate) async fn agent_name(store: &Db, profiles: &AgentProfiles, agent: &str) -> String {
+    let local = match row_resource(store, &Subject::from(agent)).await {
+        Some(resource) => name_of(&resource),
+        None => String::new(),
+    };
+    if !local.is_empty() {
+        return local;
+    }
+    // A missing profile is looked up in the background, so the next refresh
+    // has the name.
+    profiles
+        .name_or_prefetch(agent)
+        .unwrap_or_else(|| UNKNOWN_MEMBER.to_string())
+}
+
 /// A sealed message after opening.
 #[derive(Clone)]
 struct OpenedMessage {
@@ -60,22 +78,9 @@ impl Conversations {
         }
     }
 
-    /// The display name of a conversation member: the agent resource when
-    /// this device holds it, else the cached name of a background lookup,
-    /// else [`UNKNOWN_MEMBER`]. Never waits on the network.
+    /// The display name of a conversation member: see [`agent_name`].
     async fn member_name(&self, store: &Db, member: &str) -> String {
-        let local = match row_resource(store, &Subject::from(member)).await {
-            Some(agent) => name_of(&agent),
-            None => String::new(),
-        };
-        if !local.is_empty() {
-            return local;
-        }
-        // Never waits on the network: a missing profile is looked up in the
-        // background, so the next refresh has the name.
-        self.profiles
-            .name_or_prefetch(member)
-            .unwrap_or_else(|| UNKNOWN_MEMBER.to_string())
+        agent_name(store, &self.profiles, member).await
     }
 
     /// A conversation has no name of its own: its title is who else is in it
