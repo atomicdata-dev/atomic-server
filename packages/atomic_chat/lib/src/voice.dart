@@ -52,6 +52,7 @@ double normaliseSoundLevel(double db) {
 
 /// Text to speech.
 abstract class SpeechOutput {
+  /// Speaks [text]; completes when it has been spoken or was stopped.
   Future<void> speak(String text);
 
   Future<void> stop();
@@ -183,10 +184,16 @@ class PluginSpeechInput implements SpeechInput {
 /// [SpeechOutput] on the `flutter_tts` plugin, in the device's language.
 class PluginSpeechOutput implements SpeechOutput {
   final FlutterTts _tts = FlutterTts();
+  bool _awaits = false;
 
+  /// Completes when the text has been spoken (or speaking was stopped).
   @override
   Future<void> speak(String text) async {
     try {
+      if (!_awaits) {
+        await _tts.awaitSpeakCompletion(true);
+        _awaits = true;
+      }
       await _tts.speak(text);
     } catch (_) {}
   }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models.dart';
+import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'fading_text.dart';
 import 'hosted_ai.dart';
@@ -37,6 +38,12 @@ const _maxPills = 5;
 /// A chat: the text of each message, newest at the bottom, and, when an AI is
 /// available, a field to write to it. A chat without a [subject] is new: it is
 /// created with the first message.
+///
+/// In [voiceMode] the chat is spoken, turn by turn: it listens as soon as the
+/// AI is there (with the chosen speech engine), sends what was heard when the
+/// speaker pauses, reads the answer aloud (whatever the read-aloud setting)
+/// and listens again when it is done. Stop ends the loop; leaving the screen
+/// or the app does too, and so does an error (which is shown).
 class ChatScreen extends StatefulWidget {
   final AssistantApi api;
   final String? subject;
@@ -54,6 +61,9 @@ class ChatScreen extends StatefulWidget {
   /// Whether the language sheet lists languages for the account engine.
   final bool accountLanguageHints;
 
+  /// A spoken chat: listen, send, speak the answer, listen again.
+  final bool voiceMode;
+
   const ChatScreen({
     super.key,
     required this.api,
@@ -63,6 +73,7 @@ class ChatScreen extends StatefulWidget {
     this.speechOutput,
     this.hostedSpeechInput,
     this.accountLanguageHints = hostedLanguageHintSupported,
+    this.voiceMode = false,
   });
 
   @override
@@ -132,6 +143,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// Listening ended without any words: a gentle hint instead of silence.
   bool _noSpeechHint = false;
 
+  /// Voice mode's turn-by-turn loop is running.
+  bool _voiceLoop = false;
+
+  /// The answer is being read aloud by the voice loop.
+  bool _speaking = false;
+
+  /// The listen session whose end the voice loop handled already.
+  int _voiceHandled = -1;
+
   @override
   void initState() {
     super.initState();
@@ -140,7 +160,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _hostedInst = widget.hostedSpeechInput;
     _input.addListener(_inputChanged);
     _outputInst = widget.speechOutput;
-    _loadReadAloud();
+    // Voice mode reads aloud, whatever the saved setting.
+    if (widget.voiceMode) {
+      _readAloud = true;
+    } else {
+      _loadReadAloud();
+    }
     _chat = widget.subject;
     _readMessages();
     _lookUpAi();
@@ -176,7 +201,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed && !_starting) _stopListening();
+    if (state == AppLifecycleState.resumed || _starting) return;
+    // The voice loop ends with the app in the background: nothing is sent.
+    if (_voiceLoop || _speaking) return _stopVoice();
+    _stopListening();
   }
 
   Future<void> _loadReadAloud() async {
@@ -191,6 +219,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final on = !_readAloud;
     setState(() => _readAloud = on);
     if (!on) _outputInst?.stop();
+    // Voice mode's reading aloud is for this chat only.
+    if (widget.voiceMode) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_readAloudKey, on);
@@ -276,6 +306,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _toggleListening() async {
     if (_listening) {
       _stopListening();
+      // In the voice loop, stopping means "done talking": the device's words
+      // are sent now (the account's once transcribed).
+      if (_voiceLoop && !_hostedActive) _voiceTurnEnded(_listenSession);
       return;
     }
     if (_transcribing) return;
@@ -350,6 +383,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             _level = 0;
             _noSpeechHint = !_heard;
           });
+          if (_voiceLoop) _voiceTurnEnded(session);
         } else if (_noSpeechHint) {
           setState(() => _noSpeechHint = false);
         }
@@ -369,6 +403,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             _noSpeechHint = true;
           }
         });
+        if (!_voiceLoop) return;
+        if (message != null) {
+          // An error ends the loop; the message stays.
+          setState(() => _voiceLoop = false);
+        } else {
+          _voiceTurnEnded(session);
+        }
       },
       onLevel: (level) {
         if (!mounted || session != _listenSession || !_listening) return;
@@ -388,10 +429,62 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       setState(() {
         _listening = false;
         _level = 0;
+        _voiceLoop = false;
         _error = 'Voice input is not available. Allow the microphone in '
             'system settings.';
       });
     }
+  }
+
+  /// Voice mode: starts (or resumes) the loop with a listen.
+  void _startVoice() {
+    if (!mounted || _listening || _transcribing || _sending) return;
+    setState(() {
+      _voiceLoop = true;
+      _error = null;
+    });
+    _toggleListening();
+  }
+
+  /// Voice mode: a listen ended. What was heard is sent; nothing heard pauses
+  /// the loop (the hint says so, Talk resumes it).
+  void _voiceTurnEnded(int session) {
+    if (_voiceHandled == session || !_voiceLoop || !mounted) return;
+    _voiceHandled = session;
+    if (_input.text.trim().isNotEmpty) {
+      _send();
+    } else {
+      setState(() => _voiceLoop = false);
+    }
+  }
+
+  /// Voice mode: reads [answer] aloud, then listens again.
+  Future<void> _speakThenListen(String answer) async {
+    if (answer.trim().isNotEmpty) {
+      setState(() => _speaking = true);
+      try {
+        await (_outputInst ??= PluginSpeechOutput()).speak(answer);
+      } catch (_) {}
+      if (!mounted) return;
+      setState(() => _speaking = false);
+    }
+    if (_voiceLoop) _toggleListening();
+  }
+
+  /// Ends the voice loop: listening is dropped (nothing is sent) and reading
+  /// aloud stops.
+  void _stopVoice() {
+    _listenSession++;
+    if (_hostedActive && (_listening || _transcribing)) _hosted.cancel();
+    if (_listening && !_hostedActive) _inputInst?.stop();
+    _outputInst?.stop();
+    _voiceLoop = false;
+    _speaking = false;
+    _listening = false;
+    _starting = false;
+    _transcribing = false;
+    _level = 0;
+    if (mounted) setState(() {});
   }
 
   /// Long-press on the mic: pick the engine and its language.
@@ -532,7 +625,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           _ai = ai;
           _aiLooked = true;
         });
-        _focusInput();
+        if (widget.voiceMode) {
+          if (ai != null && ai.available && ai.consent) _startVoice();
+        } else {
+          _focusInput();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -549,7 +646,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       await _ai!.enable();
       if (mounted) {
         setState(() => _error = null);
-        _focusInput();
+        widget.voiceMode ? _startVoice() : _focusInput();
       }
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -575,11 +672,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _messages = asked;
       _partial = [];
     });
+    String? spoken;
     try {
       // The chat exists from the first message on, named after it.
+      final isNew = _chat == null;
       final chat = _chat ??= await widget.api.newChat(
         text.length > 40 ? '${text.substring(0, 40)}…' : text,
       );
+      if (isNew) _noLongerNew();
       await widget.api.addMessage(chat, 'user', text);
       var answer = '';
       final context = await _contextText();
@@ -593,11 +693,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         await widget.api.addMessage(chat, 'assistant', answer);
       }
       await _readMessages();
-      if (_readAloud && mounted && answer.trim().isNotEmpty) {
+      if (_voiceLoop) {
+        spoken = answer;
+      } else if (_readAloud && mounted && answer.trim().isNotEmpty) {
         (_outputInst ??= PluginSpeechOutput()).speak(answer);
       }
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      if (mounted) {
+        setState(() {
+          _error = '$e';
+          _voiceLoop = false;
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -606,6 +713,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         });
       }
     }
+    if (spoken != null && mounted && _voiceLoop) await _speakThenListen(spoken);
+  }
+
+  /// The chat exists now: in the shell this page is no longer the bar's
+  /// "new chat", and New opens another.
+  void _noLongerNew() {
+    if (!mounted) return;
+    final route = ModalRoute.of(context);
+    if (route != null) ShellScope.maybeOf(context)?.setKind(route, null);
   }
 
   @override
@@ -617,7 +733,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         backgroundColor: c.bgBody,
         title: Text(
           widget.title.isEmpty
-              ? (_chat == null ? 'New chat' : 'Untitled chat')
+              ? (_chat == null
+                  ? (widget.voiceMode ? 'Voice chat' : 'New chat')
+                  : 'Untitled chat')
               : widget.title,
         ),
         actions: [
@@ -854,6 +972,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ),
               ),
             if (_attached.isNotEmpty && _messages.isNotEmpty) _chips(),
+            if (widget.voiceMode) _voiceBar(c),
             if (_listening) _Waveform(levels: _levels),
             Row(
               children: [
@@ -922,6 +1041,47 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Voice mode: what the loop is doing, and Stop (or Talk to resume).
+  Widget _voiceBar(AppColors c) {
+    final status = _speaking
+        ? 'Speaking…'
+        : _sending
+            ? 'Thinking…'
+            : _transcribing
+                ? 'Transcribing…'
+                : _listening
+                    ? 'Listening…'
+                    : 'Voice paused';
+    final running = _voiceLoop || _speaking;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              status,
+              key: const Key('voice-status'),
+              style: TextStyle(color: c.textSecondary, fontSize: 13),
+            ),
+          ),
+          running
+              ? FilledButton.tonalIcon(
+                  key: const Key('voice-stop'),
+                  onPressed: _stopVoice,
+                  icon: const Icon(Icons.stop),
+                  label: const Text('Stop'),
+                )
+              : FilledButton.icon(
+                  key: const Key('voice-talk'),
+                  onPressed: _ai == null || _sending ? null : _startVoice,
+                  icon: const Icon(Icons.mic),
+                  label: const Text('Talk'),
+                ),
+        ],
       ),
     );
   }
