@@ -53,6 +53,19 @@ class _ChatsScreenState extends State<ChatsScreen> {
   Future<List<DriveInfo>> _loadDrives() async {
     var drives = await widget.api.drives();
     if (drives.isEmpty) drives = [(subject: widget.drive, name: '')];
+    // A page per drive that has something to show: swiping to an empty one
+    // only reads as broken. The drive it opened on always stays.
+    final used = await Future.wait([
+      for (final d in drives)
+        widget.api
+            .recentResources(d.subject)
+            .then((r) => r.isNotEmpty)
+            .catchError((Object _) => false),
+    ]);
+    drives = [
+      for (var i = 0; i < drives.length; i++)
+        if (used[i] || drives[i].subject == widget.drive) drives[i],
+    ];
     final first = drives.indexWhere((d) => d.subject == widget.drive);
     if (_pages == null) {
       _page = first < 0 ? 0 : first;
@@ -170,8 +183,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
                                       title: chat?.name ?? '',
                                     )),
                                   ),
-                                  if (drives.length > 1)
-                                    _Dots(count: drives.length, current: _page),
                                 ]),
                               ),
                             ],
@@ -184,6 +195,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
                                 key: ValueKey(drives[i].subject),
                                 api: widget.api,
                                 drive: drives[i].subject,
+                                driveName: drives[i].name,
+                                index: i,
+                                count: drives.length,
                                 generation: _generation,
                                 onOpen: _push,
                               ),
@@ -295,6 +309,12 @@ class _Dots extends StatelessWidget {
 class _OpenedPage extends StatefulWidget {
   final AssistantApi api;
   final String drive;
+
+  /// Which page of how many this is: the heading says which drive, and with
+  /// several, shows where in the swipe it is.
+  final String driveName;
+  final int index;
+  final int count;
   final int generation;
   final Future<void> Function(Widget) onOpen;
 
@@ -302,6 +322,9 @@ class _OpenedPage extends StatefulWidget {
     super.key,
     required this.api,
     required this.drive,
+    required this.driveName,
+    required this.index,
+    required this.count,
     required this.generation,
     required this.onOpen,
   });
@@ -344,7 +367,20 @@ class _OpenedPageState extends State<_OpenedPage>
         }
         return ListView(
           children: [
-            _Heading('Recently opened', c),
+            Row(children: [
+              Expanded(
+                child: _Heading(
+                    widget.count > 1 && widget.driveName.isNotEmpty
+                        ? 'Recently opened · ${widget.driveName}'
+                        : 'Recently opened',
+                    c),
+              ),
+              if (widget.count > 1)
+                Padding(
+                  padding: const EdgeInsets.only(right: 16, top: 12),
+                  child: _Dots(count: widget.count, current: widget.index),
+                ),
+            ]),
             if (recent.isEmpty) _Empty('Nothing opened yet', c),
             for (final r in recent)
               ResourceRow(

@@ -215,11 +215,26 @@ void main() {
       final api = FakeApi(driveList: [
         (subject: 'did:ad:a', name: 'Alpha'),
         (subject: 'did:ad:b', name: 'Beta'),
+      ], recent: [
+        (subject: 'r', title: 'Doc', className: 'Document', openedAt: 1),
       ]);
       await tester.pumpWidget(
           app(ChatsScreen(drive: 'did:ad:b', api: api, onOpenGallery: () {})));
       await tester.pumpAndSettle();
       expect(find.text('Search in Beta'), findsOneWidget);
+    });
+
+    testWidgets('a drive with nothing opened gets no page', (tester) async {
+      final api = FakeApi(driveList: [
+        (subject: 'did:ad:a', name: 'Alpha'),
+        (subject: 'did:ad:b', name: 'Beta'),
+      ]);
+      await tester.pumpWidget(
+          app(ChatsScreen(drive: 'did:ad:a', api: api, onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      // Only the drive it opened on: no swipe, no dots, no drive name.
+      expect(find.text('Search'), findsOneWidget);
+      expect(find.text('Recently opened'), findsOneWidget);
     });
 
     testWidgets('shows the error when the chats cannot be read',
