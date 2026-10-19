@@ -10,18 +10,22 @@ import 'chat_screen.dart';
 import 'resource_row.dart';
 import 'resource_view.dart';
 
-/// Chats shown on the home; the rest is one tap away in a chat list later.
-const _homeChats = 8;
+/// Items per section on the home; the rest is behind "Show all".
+const _homeItems = 4;
 
-/// Home screen. AI chats belong to the person, so the search field and the
-/// newest chats sit on top whatever drive is showing. Below, one page per
-/// drive, swiped sideways, lists the resources opened lately; the search
-/// field looks in the drive of the visible page. The neighbouring pages are
-/// built ahead so a swipe lands on a filled page.
+/// Most items the merged recents list holds.
+const _maxRecents = 100;
+
+typedef _Recent = ({String drive, RecentResource resource});
+
+/// Home screen: one scrollable page of small sections (Drives, Recents, AI
+/// Chats), each with its newest few items and a "Show all" for the rest. A
+/// section is one [_Section]; adding another is one more entry in the list.
+/// Every section shows as soon as its own data arrives.
 class ChatsScreen extends StatefulWidget {
   final AssistantApi api;
 
-  /// The drive the home opens on.
+  /// The drive the home opens on; the search looks in it.
   final String drive;
   final VoidCallback onOpenGallery;
   final VoidCallback? onSignOut;
@@ -41,49 +45,40 @@ class ChatsScreen extends StatefulWidget {
 class _ChatsScreenState extends State<ChatsScreen> {
   late Future<List<DriveInfo>> _drives = _loadDrives();
   late Future<List<ChatSummary>> _chats = widget.api.chats();
+  late Future<List<_Recent>> _recents = _loadRecents();
   late Future<String?> _agentName = widget.api.agentName();
-  PageController? _pages;
-  int _page = 0;
 
-  /// Bumped when the user comes back from another screen, so the pages read
-  /// again.
-  int _generation = 0;
+  /// The most recent drive: the one the home opened on, else the first.
+  String _drive = '';
 
   /// The agent's drives; when there are none (not synced yet) just the one
   /// the app opened on.
   Future<List<DriveInfo>> _loadDrives() async {
     var drives = await widget.api.drives();
     if (drives.isEmpty) drives = [(subject: widget.drive, name: '')];
-    // A page per drive that has something to show: swiping to an empty one
-    // only reads as broken. The drive it opened on always stays.
-    final used = await Future.wait([
-      for (final d in drives)
-        widget.api
-            .recentResources(d.subject)
-            .then((r) => r.isNotEmpty)
-            .catchError((Object _) => false),
-    ]);
-    drives = [
-      for (var i = 0; i < drives.length; i++)
-        if (used[i] || drives[i].subject == widget.drive) drives[i],
-    ];
-    final first = drives.indexWhere((d) => d.subject == widget.drive);
-    if (_pages == null) {
-      _page = first < 0 ? 0 : first;
-      _pages = PageController(initialPage: _page);
-    }
+    _drive = drives.any((d) => d.subject == widget.drive)
+        ? widget.drive
+        : drives.first.subject;
     return drives;
   }
 
-  @override
-  void dispose() {
-    _pages?.dispose();
-    super.dispose();
+  /// What was opened lately in every drive, newest first.
+  Future<List<_Recent>> _loadRecents() async {
+    final drives = await _drives;
+    final lists = await Future.wait([
+      for (final d in drives)
+        widget.api.recentResources(d.subject).then(
+              (list) => [for (final r in list) (drive: d.subject, resource: r)],
+              onError: (Object _) => <_Recent>[],
+            ),
+    ]);
+    return [for (final l in lists) ...l]
+      ..sort((a, b) => b.resource.openedAt.compareTo(a.resource.openedAt));
   }
 
   void _reload() => setState(() {
-        _generation++;
         _chats = widget.api.chats();
+        _recents = _loadRecents();
       });
 
   Future<void> _push(Widget screen) async {
@@ -108,6 +103,33 @@ class _ChatsScreenState extends State<ChatsScreen> {
     }
   }
 
+  void _openChat(ChatSummary? chat) => _push(ChatScreen(
+        api: widget.api,
+        subject: chat?.subject,
+        title: chat?.name ?? '',
+      ));
+
+  void _openResource(String drive, RecentResource r) {
+    widget.api.noteOpened(drive, r.subject);
+    _push(ResourceView(
+        api: widget.api, drive: drive, subject: r.subject, title: r.title));
+  }
+
+  Widget _driveRow(DriveInfo d) => ResourceRow(
+        icon: Icons.folder_outlined,
+        title: d.name.isEmpty ? 'Untitled drive' : d.name,
+        onTap: () => _push(_DriveRecentsPage(
+            api: widget.api, drive: d, onOpen: _openResource)),
+      );
+
+  Widget _chatRow(ChatSummary chat) => ResourceRow(
+        title: chat.name.isEmpty ? 'Untitled chat' : chat.name,
+        onTap: () => _openChat(chat),
+      );
+
+  Widget _recentRow(_Recent r) =>
+      _resourceRow(r.resource, _openResource, r.drive);
+
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
@@ -115,14 +137,16 @@ class _ChatsScreenState extends State<ChatsScreen> {
       future: _drives,
       builder: (context, snapshot) {
         final drives = snapshot.data;
-        final drive = drives == null || drives.isEmpty
-            ? null
-            : drives[_page.clamp(0, drives.length - 1)];
+        final several = drives != null && drives.length > 1;
+        final name = drives
+            ?.where((d) => d.subject == _drive)
+            .map((d) => d.name)
+            .firstOrNull;
         return Scaffold(
           backgroundColor: c.bgBody,
           appBar: AppBar(
             backgroundColor: c.bgBody,
-            title: const Text('Chats'),
+            title: const Text('Home'),
             actions: [
               IconButton(
                 tooltip: 'Canvases',
@@ -139,86 +163,106 @@ class _ChatsScreenState extends State<ChatsScreen> {
               ),
             ],
           ),
-          bottomNavigationBar: drives == null || drive == null
+          bottomNavigationBar: drives == null
               ? null
               : AppBottomBar(
                   api: widget.api,
-                  drive: drive.subject,
-                  hint:
-                      drives.length > 1 ? 'Search in ${drive.name}' : 'Search',
+                  drive: _drive,
+                  hint: several && name != null && name.isNotEmpty
+                      ? 'Search in $name'
+                      : 'Search',
                   onPush: _push,
                 ),
-          body: snapshot.hasError
-              ? Center(
-                  child: Text('${snapshot.error}',
-                      style: TextStyle(color: c.alert)),
-                )
-              : drives == null || drive == null
-                  ? const Center(child: CircularProgressIndicator())
-                  : Column(
-                      children: [
-                        // The chats scroll away above the drive pages, so
-                        // the pages always get the screen's height to swipe
-                        // and scroll in, however many chats there are.
-                        Expanded(
-                          child: NestedScrollView(
-                            headerSliverBuilder: (_, __) => [
-                              SliverToBoxAdapter(
-                                child: Column(children: [
-                                  _ChatsSection(
-                                    chats: _chats,
-                                    onOpen: (chat) => _push(ChatScreen(
-                                      api: widget.api,
-                                      subject: chat?.subject,
-                                      title: chat?.name ?? '',
-                                    )),
-                                  ),
-                                ]),
-                              ),
-                            ],
-                            body: PageView.builder(
-                              controller: _pages,
-                              allowImplicitScrolling: true,
-                              itemCount: drives.length,
-                              onPageChanged: (i) => setState(() => _page = i),
-                              itemBuilder: (_, i) => _OpenedPage(
-                                key: ValueKey(drives[i].subject),
-                                api: widget.api,
-                                drive: drives[i].subject,
-                                driveName: drives[i].name,
-                                index: i,
-                                count: drives.length,
-                                generation: _generation,
-                                onOpen: _push,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+          body: ListView(
+            children: [
+              _Section<DriveInfo>(
+                title: 'Drives',
+                future: _drives,
+                empty: 'No drives yet',
+                rows: (list) => [for (final d in list) _driveRow(d)],
+                onShowAll: (list) => _push(_ListPage(
+                    title: 'Drives',
+                    children: [for (final d in list) _driveRow(d)])),
+              ),
+              _Section<_Recent>(
+                title: 'Recents',
+                future: _recents,
+                empty: 'Nothing opened yet',
+                rows: (list) => [for (final r in list) _recentRow(r)],
+                onShowAll: (list) =>
+                    _push(_ListPage(title: 'Recents', children: [
+                  for (final r in list.take(_maxRecents)) _recentRow(r),
+                ])),
+              ),
+              _Section<ChatSummary>(
+                title: 'AI Chats',
+                future: _chats,
+                empty: 'No chats yet',
+                rows: (list) => [for (final chat in list) _chatRow(chat)],
+                onShowAll: (list) =>
+                    _push(_ListPage(title: 'AI Chats', children: [
+                  for (final (label, group) in groupChatsByAge(list)) ...[
+                    _Heading(label, c),
+                    for (final chat in group) _chatRow(chat),
+                  ],
+                ])),
+              ),
+            ],
+          ),
         );
       },
     );
   }
 }
 
-/// The person's newest chats, whatever drive they were started in.
-class _ChatsSection extends StatelessWidget {
-  final Future<List<ChatSummary>> chats;
-  final void Function(ChatSummary?) onOpen;
+ResourceRow _resourceRow(RecentResource r,
+        void Function(String drive, RecentResource) onOpen, String drive) =>
+    ResourceRow(
+      icon: Icons.description_outlined,
+      title: r.title.isEmpty ? r.subject : r.title,
+      detail: [r.className, timeAgo(r.openedAt)]
+          .where((t) => t.isNotEmpty)
+          .join(' · '),
+      onTap: () => onOpen(drive, r),
+    );
 
-  const _ChatsSection({required this.chats, required this.onOpen});
+/// One home section: a header with "Show all" (only when there are more than
+/// [_homeItems]), the first few rows, and the loading, error or empty state
+/// while there is nothing to list.
+class _Section<T> extends StatelessWidget {
+  final String title;
+  final Future<List<T>> future;
+  final String empty;
+  final List<Widget> Function(List<T>) rows;
+  final void Function(List<T>) onShowAll;
+
+  const _Section({
+    required this.title,
+    required this.future,
+    required this.empty,
+    required this.rows,
+    required this.onShowAll,
+  });
 
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    return FutureBuilder<List<ChatSummary>>(
-      future: chats,
+    return FutureBuilder<List<T>>(
+      future: future,
       builder: (context, snapshot) {
         final list = snapshot.data;
+        final more = list != null && list.length > _homeItems;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(children: [
+              Expanded(child: _Heading(title, c)),
+              if (more)
+                TextButton(
+                  onPressed: () => onShowAll(list),
+                  child: const Text('Show all'),
+                ),
+            ]),
             if (snapshot.hasError)
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -231,17 +275,9 @@ class _ChatsSection extends StatelessWidget {
                 child: Center(child: CircularProgressIndicator()),
               )
             else if (list.isEmpty)
-              _Empty('No chats yet', c)
+              _Empty(empty, c)
             else
-              for (final (label, group)
-                  in groupChatsByAge(list.take(_homeChats).toList())) ...[
-                _Heading(label, c),
-                for (final chat in group)
-                  ResourceRow(
-                    title: chat.name.isEmpty ? 'Untitled chat' : chat.name,
-                    onTap: () => onOpen(chat),
-                  ),
-              ],
+              ...rows(list.take(_homeItems).toList()),
           ],
         );
       },
@@ -249,144 +285,74 @@ class _ChatsSection extends StatelessWidget {
   }
 }
 
-/// Search and a new chat, fixed at the bottom where the thumb is: one row.
-class _Dots extends StatelessWidget {
-  final int count;
-  final int current;
+/// A full-height page listing everything of one section.
+class _ListPage extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
 
-  const _Dots({required this.count, required this.current});
+  const _ListPage({required this.title, required this.children});
 
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    // Dots only while they fit; with many drives, a count.
-    if (count > 8) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: Center(
-          child: Text('${current + 1} / $count',
-              style: TextStyle(color: c.textSecondary, fontSize: 12)),
-        ),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          for (var i = 0; i < count; i++)
-            Container(
-              width: 6,
-              height: 6,
-              margin: const EdgeInsets.symmetric(horizontal: 2),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: i == current ? c.main : c.border,
-              ),
-            ),
-        ],
-      ),
+    return Scaffold(
+      backgroundColor: c.bgBody,
+      appBar: AppBar(backgroundColor: c.bgBody, title: Text(title)),
+      body: ListView(children: children),
     );
   }
 }
 
-/// One drive: the resources opened lately. Kept alive so a page swiped away
-/// and back is not read again.
-class _OpenedPage extends StatefulWidget {
+/// One drive: the resources opened lately in it.
+class _DriveRecentsPage extends StatefulWidget {
   final AssistantApi api;
-  final String drive;
+  final DriveInfo drive;
+  final void Function(String drive, RecentResource) onOpen;
 
-  /// Which page of how many this is: the heading says which drive, and with
-  /// several, shows where in the swipe it is.
-  final String driveName;
-  final int index;
-  final int count;
-  final int generation;
-  final Future<void> Function(Widget) onOpen;
-
-  const _OpenedPage({
-    super.key,
+  const _DriveRecentsPage({
     required this.api,
     required this.drive,
-    required this.driveName,
-    required this.index,
-    required this.count,
-    required this.generation,
     required this.onOpen,
   });
 
   @override
-  State<_OpenedPage> createState() => _OpenedPageState();
+  State<_DriveRecentsPage> createState() => _DriveRecentsPageState();
 }
 
-class _OpenedPageState extends State<_OpenedPage>
-    with AutomaticKeepAliveClientMixin {
-  late Future<List<RecentResource>> _recent =
-      widget.api.recentResources(widget.drive);
-
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  void didUpdateWidget(_OpenedPage old) {
-    super.didUpdateWidget(old);
-    if (old.generation != widget.generation) {
-      _recent = widget.api.recentResources(widget.drive);
-    }
-  }
+class _DriveRecentsPageState extends State<_DriveRecentsPage> {
+  late final Future<List<RecentResource>> _recent =
+      widget.api.recentResources(widget.drive.subject);
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
     final c = context.appColors;
-    return FutureBuilder<List<RecentResource>>(
-      future: _recent,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(
-            child: Text('${snapshot.error}', style: TextStyle(color: c.alert)),
-          );
-        }
-        final recent = snapshot.data;
-        if (recent == null) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        return ListView(
-          children: [
-            Row(children: [
-              Expanded(
-                child: _Heading(
-                    widget.count > 1 && widget.driveName.isNotEmpty
-                        ? 'Recently opened · ${widget.driveName}'
-                        : 'Recently opened',
-                    c),
-              ),
-              if (widget.count > 1)
-                Padding(
-                  padding: const EdgeInsets.only(right: 16, top: 12),
-                  child: _Dots(count: widget.count, current: widget.index),
-                ),
-            ]),
-            if (recent.isEmpty) _Empty('Nothing opened yet', c),
+    return Scaffold(
+      backgroundColor: c.bgBody,
+      appBar: AppBar(
+        backgroundColor: c.bgBody,
+        title: Text(
+            widget.drive.name.isEmpty ? 'Untitled drive' : widget.drive.name),
+      ),
+      body: FutureBuilder<List<RecentResource>>(
+        future: _recent,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child:
+                  Text('${snapshot.error}', style: TextStyle(color: c.alert)),
+            );
+          }
+          final recent = snapshot.data;
+          if (recent == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (recent.isEmpty) return _Empty('Nothing opened yet', c);
+          return ListView(children: [
             for (final r in recent)
-              ResourceRow(
-                icon: Icons.description_outlined,
-                title: r.title.isEmpty ? r.subject : r.title,
-                detail: [r.className, timeAgo(r.openedAt)]
-                    .where((t) => t.isNotEmpty)
-                    .join(' · '),
-                onTap: () {
-                  widget.api.noteOpened(widget.drive, r.subject);
-                  widget.onOpen(ResourceView(
-                      api: widget.api,
-                      drive: widget.drive,
-                      subject: r.subject,
-                      title: r.title));
-                },
-              ),
-          ],
-        );
-      },
+              _resourceRow(r, widget.onOpen, widget.drive.subject),
+          ]);
+        },
+      ),
     );
   }
 }

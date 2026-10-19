@@ -97,8 +97,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Trip plan'), findsOneWidget);
-      expect(find.text('Today'), findsOneWidget);
-      expect(find.text('Earlier'), findsOneWidget);
       expect(find.text('Untitled chat'), findsOneWidget);
 
       await tester.tap(find.text('Trip plan'));
@@ -134,73 +132,93 @@ void main() {
       expect(find.byType(SearchScreen), findsOneWidget);
     });
 
-    testWidgets('chats stay put while the drives swipe', (tester) async {
+    testWidgets('sections come in order: Drives, Recents, AI Chats',
+        (tester) async {
       final api = FakeApi(
-        driveList: [
-          (subject: 'did:ad:a', name: 'Alpha'),
-          (subject: 'did:ad:b', name: 'Beta'),
-        ],
-        chatList: [(subject: 'c1', name: 'Any drive chat', lastActivity: 0)],
+        chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
         recent: [
-          (
-            subject: 'r1',
-            title: 'Opened doc',
-            className: 'Document',
-            openedAt: DateTime.now().millisecondsSinceEpoch,
-          ),
+          (subject: 'r1', title: 'A doc', className: 'Document', openedAt: 1),
         ],
       );
-      await tester.pumpWidget(
-          app(ChatsScreen(drive: 'did:ad:a', api: api, onOpenGallery: () {})));
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
       await tester.pumpAndSettle();
-
-      expect(find.text('Any drive chat'), findsOneWidget);
-      expect(find.text('Opened doc'), findsOneWidget);
-      expect(find.text('Search in Alpha'), findsOneWidget);
-
-      await tester.fling(find.text('Opened doc'), const Offset(-600, 0), 2000);
-      await tester.pumpAndSettle();
-      expect(find.text('Search in Beta'), findsOneWidget);
-      expect(find.text('Any drive chat'), findsOneWidget);
+      double y(String t) => tester.getTopLeft(find.text(t)).dy;
+      expect(y('Drives'), lessThan(y('Recents')));
+      expect(y('Recents'), lessThan(y('AI Chats')));
+      expect(find.text('Show all'), findsNothing);
     });
 
-    testWidgets('on a phone with five chats, the drives still swipe and scroll',
+    testWidgets('a section shows at most 4, Show all lists the rest',
         (tester) async {
-      tester.view.physicalSize = const Size(1080, 1920);
-      tester.view.devicePixelRatio = 3; // 360 x 640
-      addTearDown(tester.view.reset);
       final now = DateTime.now().millisecondsSinceEpoch;
-      final api = FakeApi(
+      final api = FakeApi(chatList: [
+        for (var i = 0; i < 6; i++)
+          (subject: 'c$i', name: 'Chat $i', lastActivity: now),
+      ]);
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      expect(find.text('Chat 3'), findsOneWidget);
+      expect(find.text('Chat 4'), findsNothing);
+      expect(find.text('Show all'), findsOneWidget);
+
+      await tester.tap(find.text('Show all'));
+      await tester.pumpAndSettle();
+      expect(find.text('Chat 5'), findsOneWidget);
+      expect(find.text('Today'), findsOneWidget);
+    });
+
+    testWidgets('recents merge all drives, newest first', (tester) async {
+      final api = _PerDrive(
         driveList: [
           (subject: 'did:ad:a', name: 'Alpha'),
           (subject: 'did:ad:b', name: 'Beta'),
         ],
-        chatList: [
-          for (var i = 0; i < 5; i++)
-            (subject: 'c$i', name: 'Chat $i', lastActivity: now),
-        ],
-        recent: [
-          for (var i = 0; i < 20; i++)
-            (
-              subject: 'r$i',
-              title: 'Doc $i',
-              className: 'Document',
-              openedAt: now,
-            ),
-        ],
+        byDrive: {
+          'did:ad:a': [
+            (subject: 'a1', title: 'Old a', className: '', openedAt: 10),
+            (subject: 'a2', title: 'Newest a', className: '', openedAt: 50),
+          ],
+          'did:ad:b': [
+            (subject: 'b1', title: 'Mid b', className: '', openedAt: 30),
+            (subject: 'b2', title: 'Oldest b', className: '', openedAt: 5),
+            (subject: 'b3', title: 'Second b', className: '', openedAt: 40),
+          ],
+        },
       );
       await tester.pumpWidget(
           app(ChatsScreen(drive: 'did:ad:a', api: api, onOpenGallery: () {})));
       await tester.pumpAndSettle();
+      double y(String t) => tester.getTopLeft(find.text(t)).dy;
+      expect(y('Newest a'), lessThan(y('Second b')));
+      expect(y('Second b'), lessThan(y('Mid b')));
+      expect(y('Mid b'), lessThan(y('Old a')));
+      expect(find.text('Oldest b'), findsNothing);
+      expect(find.text('Search in Alpha'), findsOneWidget);
 
-      // Scrolling up moves the chats away and reaches the last opened doc.
-      await tester.dragUntilVisible(find.text('Doc 19'),
-          find.byType(NestedScrollView), const Offset(0, -300));
-      expect(find.text('Doc 19'), findsOneWidget);
+      ResourceView.serverFactory = () async => throw 'no server in a test';
+      await tester.tap(find.text('Second b'));
+      await tester.pump();
+      expect(api.opened, ['b3']);
+    });
 
-      await tester.fling(find.text('Doc 19'), const Offset(-300, 0), 2000);
+    testWidgets('a drive opens its recently opened resources', (tester) async {
+      final api = _PerDrive(
+        driveList: [(subject: 'did:ad:a', name: 'Alpha')],
+        byDrive: {
+          'did:ad:a': [
+            for (var i = 0; i < 6; i++)
+              (subject: 'a$i', title: 'Doc $i', className: '', openedAt: i),
+          ],
+        },
+      );
+      await tester.pumpWidget(
+          app(ChatsScreen(drive: 'did:ad:a', api: api, onOpenGallery: () {})));
       await tester.pumpAndSettle();
-      expect(find.text('Search in Beta'), findsOneWidget);
+      await tester.tap(find.text('Alpha'));
+      await tester.pumpAndSettle();
+      expect(find.text('Doc 0'), findsOneWidget);
     });
 
     testWidgets('the agent avatar is the way to agent and sync',
@@ -236,19 +254,6 @@ void main() {
       final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
       expect(search.dy, greaterThan(screen.height * 0.7));
       expect((search.dy - add.dy).abs(), lessThan(24));
-    });
-
-    testWidgets('a drive with nothing opened gets no page', (tester) async {
-      final api = FakeApi(driveList: [
-        (subject: 'did:ad:a', name: 'Alpha'),
-        (subject: 'did:ad:b', name: 'Beta'),
-      ]);
-      await tester.pumpWidget(
-          app(ChatsScreen(drive: 'did:ad:a', api: api, onOpenGallery: () {})));
-      await tester.pumpAndSettle();
-      // Only the drive it opened on: no swipe, no dots, no drive name.
-      expect(find.text('Search'), findsOneWidget);
-      expect(find.text('Recently opened'), findsOneWidget);
     });
 
     testWidgets('shows the error when the chats cannot be read',
@@ -474,22 +479,23 @@ void main() {
       expect(groupChatsByAge([], now: now), isEmpty);
     });
 
-    testWidgets('the home shows the headings and no chat icons',
+    testWidgets('the full chat list has the headings and no chat icons',
         (tester) async {
+      final now = DateTime.now();
       final api = FakeApi(chatList: [
-        chat('Fresh chat', DateTime.now().millisecondsSinceEpoch),
-        chat(
-            'Old chat',
-            DateTime.now()
-                .subtract(const Duration(days: 90))
-                .millisecondsSinceEpoch),
+        for (var i = 0; i < 4; i++)
+          chat('Fresh $i', now.millisecondsSinceEpoch),
+        chat('Old chat',
+            now.subtract(const Duration(days: 90)).millisecondsSinceEpoch),
       ]);
       await tester.pumpWidget(app(
           ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
       await tester.pumpAndSettle();
+      expect(find.text('Today'), findsNothing);
+      await tester.tap(find.text('Show all'));
+      await tester.pumpAndSettle();
       expect(find.text('Today'), findsOneWidget);
       expect(find.text('Earlier'), findsOneWidget);
-      expect(find.text('Recent chats'), findsNothing);
       expect(find.byIcon(Icons.chat_bubble_outline), findsNothing);
     });
   });
@@ -577,6 +583,15 @@ class _SlowAi extends FakeApi {
 
   @override
   Future<HostedAi?> hostedAi() => lookup;
+}
+
+class _PerDrive extends FakeApi {
+  final Map<String, List<RecentResource>> byDrive;
+  _PerDrive({required super.driveList, required this.byDrive});
+
+  @override
+  Future<List<RecentResource>> recentResources(String drive) async =>
+      byDrive[drive] ?? [];
 }
 
 class _Failing extends FakeApi {
