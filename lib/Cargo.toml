@@ -101,6 +101,11 @@ version = "0.32"
 # Android has no HTTPS trust setup for rustls-platform-verifier (it needs JNI
 # initialisation from the host app, and panics without it), so reqwest is given
 # the system's CA certificates directly. See `client::helpers`.
+# The host layer's recents listener (`host::recents`) waits on events with a
+# timeout. Native only: the WASM build has no tokio timer.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1.52.3", features = ["time"] }
+
 [target.'cfg(target_os = "android")'.dependencies]
 rustls-native-certs = "0.8"
 

@@ -93,6 +93,9 @@ pub mod expression;
 pub mod genesis;
 pub mod hierarchy;
 pub mod history;
+/// Host logic for app shells around a local store (`host/mod.rs`).
+#[cfg(all(feature = "db", not(target_arch = "wasm32")))]
+pub mod host;
 pub mod identifiers;
 pub mod import_identity;
 pub mod loro;
