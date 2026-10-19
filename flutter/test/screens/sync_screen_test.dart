@@ -1,4 +1,5 @@
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
+import 'package:atomiccanvas_flutter/assistant/resource_web_view.dart';
 import 'package:atomiccanvas_flutter/atomic/account_store.dart';
 import 'package:atomiccanvas_flutter/screens/sync_screen.dart';
 import 'package:atomiccanvas_flutter/theme.dart';
@@ -174,5 +175,49 @@ void main() {
     await tester.tap(find.text('Team'));
     await tester.pumpAndSettle();
     expect(backend.switched, ['did:ad:b']);
+  });
+
+  Future<ResourceWebView?> openPortal(
+      WidgetTester tester, Future<String?> Function(Uri) cookie) async {
+    ResourceWebView? opened;
+    await tester.pumpWidget(_app(SyncScreen(
+      backend: _Backend(servers: _Servers(managed: true)),
+      loadAccount: (_) async => AccountSummary(
+        address: 'joep@example.org',
+        portal: Uri.parse('https://portal.example'),
+      ),
+      portalCookie: cookie,
+      portalPage: (page) {
+        opened = page;
+        return const Scaffold(body: Text('portal page'));
+      },
+    )));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Manage in the portal'), 300);
+    await tester.tap(find.text('Manage in the portal'));
+    await tester.pumpAndSettle();
+    return opened;
+  }
+
+  testWidgets('the portal opens signed in with the agent cookie',
+      (tester) async {
+    Uri? asked;
+    final page = await openPortal(tester, (portal) async {
+      asked = portal;
+      return 'abc123';
+    });
+    expect(asked, Uri.parse('https://portal.example'));
+    expect(find.text('portal page'), findsOneWidget);
+    expect(page!.cookies, hasLength(1));
+    expect(page.cookies.single.name, 'session_token');
+    expect(page.cookies.single.value, 'abc123');
+    expect(page.cookies.single.domain, 'portal.example');
+    expect(page.keepOnHost, isTrue);
+  });
+
+  testWidgets('without a cookie the portal still opens', (tester) async {
+    final page = await openPortal(tester, (_) async => null);
+    expect(find.text('portal page'), findsOneWidget);
+    expect(page!.cookies, isEmpty);
   });
 }

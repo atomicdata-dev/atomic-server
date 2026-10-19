@@ -76,6 +76,47 @@ class AccountStore {
     }
   }
 
+  /// The `session_token` cookie that signs a web view in to [portal] as the
+  /// active agent, or null when it cannot (no agent, not an account identity,
+  /// unreachable). Reuses the saved session when it is a cookie one for this
+  /// portal; otherwise does a fresh agent sign-in, because a bearer token from
+  /// the link flow cannot become a cookie. Never throws, and never saves the
+  /// result as the app's session.
+  static Future<String?> portalCookie(Uri portal) async {
+    try {
+      final origin = shared.AtomicAccountClient.providerOrigin(
+          portal.replace(path: '', query: null, fragment: null).toString());
+      final saved = await read();
+      if (saved != null) {
+        try {
+          final client = shared.AtomicAccountClient(origin.toString());
+          try {
+            client.restoreSession(saved);
+            final cookie = client.sessionCookie;
+            if (cookie != null) return cookie;
+          } finally {
+            client.close();
+          }
+        } catch (_) {
+          // Another portal or a bearer token: sign in afresh below.
+        }
+      }
+      final info = await AtomicClient.getActiveAgent();
+      if (info == null) return null;
+      final agent = AtomicAgent.fromSecret(info.secret);
+      final client = shared.AtomicAccountClient(origin.toString());
+      try {
+        final ok = await client.signInWithAgent(agent.subject,
+            (message) async => signMessage(message, agent.privateKeyB64));
+        return ok ? client.sessionCookie : null;
+      } finally {
+        client.close();
+      }
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// The linked account's state for [drive]; null when no account is linked.
   /// Throws when it is linked but the portal cannot be read, so a failed read
   /// is not shown as "not linked".

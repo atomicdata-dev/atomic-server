@@ -193,6 +193,7 @@ void main() {
       );
       expect(await client.signInWithAgent('did:ad:agent:x', fakeSign), isTrue);
       expect(client.linked, isTrue);
+      expect(client.sessionCookie, 'abc123');
       final body = jsonDecode(seen[1].body) as Map;
       expect(seen[1].url.query, 'if_linked=true');
       expect(body['nonce'], 'n1');
@@ -214,6 +215,7 @@ void main() {
       );
       expect(await client.signInWithAgent('did:ad:agent:x', fakeSign), isFalse);
       expect(client.linked, isFalse);
+      expect(client.sessionCookie, isNull);
       await expectLater(client.aiStatus(), throwsStateError);
     });
   });

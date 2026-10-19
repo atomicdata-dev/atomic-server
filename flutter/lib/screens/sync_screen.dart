@@ -4,6 +4,7 @@ import 'package:atomic_flutter/atomic_flutter.dart' as shared;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart' show WebViewCookie;
 
 import '../assistant/assistant_api.dart';
 import '../assistant/chats_screen.dart' show timeAgo;
@@ -50,11 +51,21 @@ class SyncScreen extends StatefulWidget {
   final Future<AccountSummary?> Function(String? drive)? loadAccount;
   final Future<void> Function(BuildContext context, String portal)? linkAccount;
 
+  /// The portal sign-in cookie for the web view; [AccountStore.portalCookie]
+  /// by default.
+  final Future<String?> Function(Uri portal)? portalCookie;
+
+  /// Test seam for the page the portal opens in.
+  @visibleForTesting
+  final Widget Function(ResourceWebView page)? portalPage;
+
   const SyncScreen({
     super.key,
     this.backend,
     this.loadAccount,
     this.linkAccount,
+    this.portalCookie,
+    this.portalPage,
   });
 
   @override
@@ -276,15 +287,36 @@ class _SyncScreenState extends State<SyncScreen> {
     }
   }
 
-  void _openPortal(Uri url) =>
-      Navigator.of(context).push(MaterialPageRoute<void>(
-        builder: (_) => ResourceWebView(
-          api: const AssistantApi(),
-          subject: url.toString(),
-          url: url.toString(),
-          title: url.host,
-        ),
-      ));
+  bool _openingPortal = false;
+
+  /// Opens the portal already signed in as the agent, so the person does not
+  /// meet a second login; without a cookie it opens as it always did.
+  Future<void> _openPortal(Uri url) async {
+    if (_openingPortal) return;
+    setState(() => _openingPortal = true);
+    String? cookie;
+    try {
+      cookie = await (widget.portalCookie ?? AccountStore.portalCookie)(url);
+    } catch (_) {
+      cookie = null;
+    }
+    if (!mounted) return;
+    setState(() => _openingPortal = false);
+    final page = ResourceWebView(
+      api: const AssistantApi(),
+      subject: url.toString(),
+      url: url.toString(),
+      title: url.host,
+      keepOnHost: true,
+      cookies: [
+        if (cookie != null && cookie.isNotEmpty)
+          WebViewCookie(name: 'session_token', value: cookie, domain: url.host),
+      ],
+    );
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => widget.portalPage?.call(page) ?? page,
+    ));
+  }
 
   /// In the system browser: it is where the emailed sign-in link will open,
   /// and where a passkey lives.
@@ -506,6 +538,12 @@ class _SyncScreenState extends State<SyncScreen> {
       ListTile(
         leading: Icon(Icons.open_in_new, color: c.main),
         title: const Text('Manage in the portal'),
+        trailing: _openingPortal
+            ? const SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : null,
         onTap: () => _openPortal(account.portal),
       ),
       ListTile(

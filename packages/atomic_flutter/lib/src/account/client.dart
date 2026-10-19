@@ -18,6 +18,10 @@ class AtomicAccountClient {
   String? _cookie;
   bool get linked => _token != null || _cookie != null;
 
+  /// The `session_token` cookie value when the session is a cookie one (an
+  /// agent sign-in), for putting it in a web view; null for a bearer token.
+  String? get sessionCookie => _cookie;
+
   static Uri providerOrigin(String input) {
     final uri = Uri.tryParse(input);
     if (uri == null ||
