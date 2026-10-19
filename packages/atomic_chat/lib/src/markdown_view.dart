@@ -74,7 +74,8 @@ class _MarkdownViewState extends State<MarkdownView> {
       _built.clear();
       _builtFor = key;
     }
-    final r = _Renderer(c, base, widget.onLink);
+    final r = _Renderer(c, base, widget.onLink,
+        scale: MediaQuery.textScalerOf(context).scale(1));
     Widget body;
     if (widget.inline) {
       body = _Inline(
@@ -114,7 +115,10 @@ class _Renderer {
   final TextStyle base;
   final MarkdownLinkHandler? onLink;
 
-  _Renderer(this.c, this.base, this.onLink);
+  /// The text scale: room for list numbers grows with the text.
+  final double scale;
+
+  _Renderer(this.c, this.base, this.onLink, {this.scale = 1});
 
   double get _size => base.fontSize ?? 14;
 
@@ -165,6 +169,7 @@ class _Renderer {
                 c,
                 base.copyWith(color: c.textSecondary),
                 onLink,
+                scale: scale,
               ).blocks(children),
             ),
           ),
@@ -185,7 +190,7 @@ class _Renderer {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(
-                  width: list.ordered ? _size * 1.9 : _size * 1.3,
+                  width: (list.ordered ? _size * 1.9 : _size * 1.3) * scale,
                   child: Text(
                     list.ordered
                         ? '${list.start + i}.'
