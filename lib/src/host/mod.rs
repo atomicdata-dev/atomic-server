@@ -20,6 +20,7 @@
 //! - [`context`]: a resource as plain text, to hand to an AI.
 //! - [`create`]: a new resource of a class in a drive (the "New" buttons).
 //! - [`notifications`]: the Inbox of the private drive: list, mark read.
+//! - [`own_profile`]: this device's agent's profile: read, edit.
 //! - [`recents`]: the event-driven, persisted index behind the home lists.
 //! - [`embed`]: the dispatcher the embedded web renderer's `NativeClientDb`
 //!   talks to, with its signing policy.
@@ -46,6 +47,7 @@ pub mod create;
 pub mod embed;
 pub mod lists;
 pub mod notifications;
+pub mod own_profile;
 pub mod profiles;
 pub mod recents;
 pub mod rows;

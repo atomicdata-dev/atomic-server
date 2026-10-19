@@ -6,8 +6,6 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `children_titles`, `document_text`, `property_label`, `readable`, `truncate`
-
 /// Readable text for the resource `subject` from the local store: title, class,
 /// description, simple properties, the titles of the children of a folder or
 /// drive, and the text of a document. At most `max_chars` characters.

@@ -307,6 +307,36 @@ pub fn agent_from_secret(secret: String) -> Result<AgentInfo, String> {
     })
 }
 
+/// The profile of this device's agent as JSON `{subject, name, description,
+/// emoji?, imageUrl?}`: what the store holds, else what the connected server
+/// has (`atomic_lib::host::own_profile`).
+pub async fn get_own_profile() -> Result<String, String> {
+    let profile = atomic_lib::host::own_profile::own_profile(db()?, &crate::host::profiles())
+        .await
+        .map_err(err)?;
+    crate::host::to_json(&profile)
+}
+
+/// Save this device's agent's profile: a commit by the agent on its own
+/// resource, stored here and synced like any other edit. An empty
+/// `description` removes it; `icon` is the subject of a File for the picture
+/// (empty removes it, `None` leaves it as it is).
+pub async fn set_agent_profile(
+    name: String,
+    description: String,
+    icon: Option<String>,
+) -> Result<(), String> {
+    atomic_lib::host::own_profile::set_own_profile(
+        &node()?,
+        crate::host::pusher().as_ref(),
+        &name,
+        &description,
+        icon.as_deref(),
+    )
+    .await
+    .map_err(err)
+}
+
 // ── 3. Drive ───────────────────────────────────────────────────────────────
 
 /// Create a new drive. Returns the drive subject.

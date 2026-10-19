@@ -29,3 +29,34 @@ pub(crate) async fn shared_drive() -> &'static str {
         .await
         .as_str()
 }
+
+/// The profile editor's save, through the bridge: the agent's name is in the
+/// store, in the agent the app shows, and in what the page reads.
+#[tokio::test]
+async fn the_agent_profile_is_saved_and_read_back() {
+    shared_drive().await;
+    set_agent_profile("Pelican".into(), "Likes fish".into(), None)
+        .await
+        .unwrap();
+
+    let profile: serde_json::Value =
+        serde_json::from_str(&get_own_profile().await.unwrap()).unwrap();
+    assert_eq!(profile["name"], "Pelican");
+    assert_eq!(profile["description"], "Likes fish");
+    let agent = get_active_agent().await.unwrap().unwrap();
+    assert_eq!(agent.name.as_deref(), Some("Pelican"));
+    assert!(node().unwrap().outbox().has_pending(&agent.subject));
+
+    let rows: serde_json::Value = serde_json::from_str(
+        &crate::embed::call(
+            "getResourcesWithSnapshots",
+            &serde_json::json!([[agent.subject]]).to_string(),
+        )
+        .await
+        .unwrap(),
+    )
+    .unwrap();
+    assert!(rows[0]["jsonAd"].as_str().unwrap().contains("Likes fish"));
+
+    assert!(set_agent_profile(" ".into(), String::new(), None).await.is_err());
+}

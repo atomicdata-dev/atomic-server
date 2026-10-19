@@ -51,6 +51,21 @@ AgentInfo createAgent({required String name}) =>
 AgentInfo agentFromSecret({required String secret}) =>
     RustLib.instance.api.crateApiSimpleAgentFromSecret(secret: secret);
 
+/// The profile of this device's agent as JSON `{subject, name, description,
+/// emoji?, imageUrl?}`: what the store holds, else what the connected server
+/// has (`atomic_lib::host::own_profile`).
+Future<String> getOwnProfile() =>
+    RustLib.instance.api.crateApiSimpleGetOwnProfile();
+
+/// Save this device's agent's profile: a commit by the agent on its own
+/// resource, stored here and synced like any other edit. An empty
+/// `description` removes it; `icon` is the subject of a File for the picture
+/// (empty removes it, `None` leaves it as it is).
+Future<void> setAgentProfile(
+        {required String name, required String description, String? icon}) =>
+    RustLib.instance.api.crateApiSimpleSetAgentProfile(
+        name: name, description: description, icon: icon);
+
 /// Create a new drive. Returns the drive subject.
 Future<String> createDrive({required String name}) =>
     RustLib.instance.api.crateApiSimpleCreateDrive(name: name);
