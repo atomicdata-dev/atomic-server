@@ -17,8 +17,8 @@ makes the embed cheaper to run.
    believes it is connected (`scheduleOutboxDrain`, `Resource.save` offline path).
    The embed has no server by design, so edits stayed in the page and were lost
    when the web view was destroyed. Flipping `serverConnected` is not an option: it
-   changes read paths. *Being fixed:* a commit transport on the Store
-   (`store.canCommit`), plus a flush before the page leaves.
+   changes read paths. *Fixed:* a commit transport on the Store
+   (`store.canCommit`), plus a flush before the page leaves (step 1).
 2. **Hacks instead of a contract.** `hideGlobalChrome` is switched on by an
    `isEmbedded()` flag; `env(safe-area-inset-*)` is rewritten by patching
    `CSSStyleSheet.insertRule` and a `MutationObserver`; the action routes are
@@ -35,9 +35,19 @@ makes the embed cheaper to run.
 
 Each step ships on its own and has a test that fails without it.
 
-- [ ] **1. Commit transport and flush.** Store option `commitTransport`,
+- [x] **1. Commit transport and flush.** Store option `commitTransport`,
   `canCommit` for write-side checks, `atomicEmbed.flush()` and the Dart handshake
-  before leaving a page. *(in progress)*
+  before leaving a page. A keystroke now travels: loro-prosemirror commits the
+  doc → the resource's Loro subscriber marks it dirty (`canCommit`) → the
+  outbox drain signs one commit (`sign` on the host) → `commitTransport` →
+  `applyCommit` (Rust adds the `@id`, applies with `LocalCache`, queues it, and
+  pushes it on in the background). Leaving: back / swipe back / a page pushed
+  over / app paused call `flush`, which runs the debounced saves
+  (`store.flushScheduledSaves`), drains and waits for `pendingDirtyCount === 0`
+  (3 s cap); Dart waits for the `flushed` message (2 s cap). `signBytes` now
+  signs genesis certificates of the device's agent, so "New resource" can mint
+  a DID. Tests: `commit-transport.test.ts`, `resource_view_test.dart`, the
+  `embed.rs` document-edit round trip. Not yet seen on a phone.
 - [ ] **2. One host module.** Move the embed's special cases into
   `browser/data-browser/src/embed/host.ts` with a documented `EmbedHost` surface:
   `{ channel, insets, panels, routes }`. The web app sees one typed object:
@@ -70,5 +80,6 @@ Each step ships on its own and has a test that fails without it.
 
 - Running the web app's own router or sidebar in the embed.
 - A second store or a WebSocket inside the page.
-- Raw signing for the page: only commits of the device's own agent are signed
-  (`sign` in `flutter/rust/src/embed.rs`).
+- Raw signing for the page: only commits of the device's own agent (`sign`) and
+  genesis certificates naming it (`signBytes`) are signed
+  (`flutter/rust/src/embed.rs`).
