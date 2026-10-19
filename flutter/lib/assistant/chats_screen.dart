@@ -134,11 +134,11 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   Future<void> _settings() async {
-    final signedOut =
-        await Navigator.of(context, rootNavigator: true).push<bool>(
-              MaterialPageRoute<bool>(builder: (_) => const SyncScreen()),
-            ) ??
-            false;
+    // In the shell's navigator, so the bottom bar stays under it.
+    final signedOut = await Navigator.of(context).push<bool>(
+          SlideBackRoute<bool>(builder: (_) => const SyncScreen()),
+        ) ??
+        false;
     if (signedOut) {
       widget.onSignOut?.call();
     } else {

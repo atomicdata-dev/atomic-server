@@ -67,10 +67,8 @@ class AppBottomBar extends StatelessWidget {
                     ),
                     IconButton(
                       tooltip: 'Profile',
-                      onPressed: shell.onUser ??
-                          () => Navigator.of(context, rootNavigator: true).push(
-                              MaterialPageRoute<bool>(
-                                  builder: (_) => const SyncScreen())),
+                      onPressed:
+                          shell.onUser ?? () => _push(const SyncScreen()),
                       icon: const Icon(Icons.person_outline),
                     ),
                     // The only button that changes with the page.
