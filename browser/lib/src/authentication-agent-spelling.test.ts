@@ -41,6 +41,17 @@ describe('agent spelling in auth proofs', () => {
     expect(agent.subject).toBe(`atomic:agent:${publicKey}`);
   });
 
+  it('lets a caller choose the spelling, as browser peers do', async ({
+    expect,
+  }) => {
+    const { agent } = await makeAgent();
+    const proof = await createAuthentication('did:ad:drive#c', agent, {
+      agentSubject: agent.subject,
+    });
+
+    expect(proof[AUTH_AGENT]).toBe(agent.subject);
+  });
+
   it('sends did:ad:agent: in version 1 request headers', async ({ expect }) => {
     const { agent, publicKey } = await makeAgent();
     const headers = await signRequest(

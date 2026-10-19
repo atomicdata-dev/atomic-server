@@ -40,8 +40,19 @@ export function agentSubjectForAuth(agentSubject: string): string {
   return toLegacyScheme(agentSubject);
 }
 
-/** Returns a JSON-AD resource of an Authentication */
-export async function createAuthentication(subject: string, agent: Agent) {
+/**
+ * Returns a JSON-AD resource of an Authentication.
+ *
+ * `options.agentSubject` overrides the spelling of the `auth/agent` field (the
+ * default is {@link agentSubjectForAuth}). Browser peers pass the canonical
+ * `agent.subject`: both ends are current, and the Rust peer session compares
+ * the field to the pinned issuer and to ephemeral frames by string.
+ */
+export async function createAuthentication(
+  subject: string,
+  agent: Agent,
+  options: { agentSubject?: string } = {},
+) {
   const timestamp = getTimestampNow();
 
   if (!agent.subject) {
@@ -49,9 +60,8 @@ export async function createAuthentication(subject: string, agent: Agent) {
   }
 
   const object = {
-    'https://atomicdata.dev/properties/auth/agent': agentSubjectForAuth(
-      agent.subject,
-    ),
+    'https://atomicdata.dev/properties/auth/agent':
+      options.agentSubject ?? agentSubjectForAuth(agent.subject),
     'https://atomicdata.dev/properties/auth/requestedSubject': subject,
     'https://atomicdata.dev/properties/auth/publicKey':
       await agent.getPublicKey(),
