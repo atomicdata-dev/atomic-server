@@ -36,6 +36,18 @@ class AtomicAccountClient {
     return uri.replace(path: '', query: null, fragment: null);
   }
 
+  /// Where the portal manages drives. ASSUMED route: the web app only ever
+  /// links `<portal>/dashboard` (AccountRecoveryCard) and `?embed=1` (cloudSync
+  /// sign-in); neither a Drives route nor a chrome-less mode is confirmed in
+  /// this repo (the portal lives in atomic-saas). Change [drivesPath] when it
+  /// differs; the query stays harmless when the portal ignores it.
+  static const drivesPath = '/dashboard/drives';
+
+  /// The portal's Drives page, minimal (no nav bar) where the portal supports
+  /// `embed=1`. [portal] must be an HTTPS origin.
+  static Uri portalDrivesUrl(Uri portal) => providerOrigin(portal.toString())
+      .replace(path: drivesPath, queryParameters: {'embed': '1'});
+
   /// The portal a saved session belongs to.
   static Uri sessionOrigin(String saved) => providerOrigin(
       (jsonDecode(saved) as Map<String, dynamic>)['origin'] as String);
@@ -267,6 +279,16 @@ class AtomicAccountClient {
     return _object(response);
   }
 
+  /// The account's AI credits, from the same `ai/status` the web Sync page
+  /// reads. Null when the portal offers none (404/401) or AI is off for the
+  /// account. Throws when the portal cannot be reached.
+  Future<AtomicAiCredits?> aiCredits() async {
+    final status = await aiStatus();
+    if (status == null) return null;
+    final credits = AtomicAiCredits.fromJson(status);
+    return credits.enabled ? credits : null;
+  }
+
   /// Accept the included-AI terms for this account.
   Future<Map<String, dynamic>> aiConsent() async =>
       _object(await _request('POST', 'ai/consent', body: {'accepted': true}));
@@ -469,4 +491,46 @@ class AtomicRecoveredIdentity {
       this.drive});
   final String subject, secret, address;
   final String? drive;
+}
+
+/// The account's included-AI credits, as the portal's `ai/status` reports
+/// them. Amounts are micros; one credit is 1000 micros.
+class AtomicAiCredits {
+  const AtomicAiCredits({
+    required this.enabled,
+    required this.allowanceMicros,
+    required this.remainingMicros,
+    this.purchasedMicros = 0,
+    this.purchasesEnabled = false,
+    this.resetsAt,
+  });
+
+  factory AtomicAiCredits.fromJson(Map<String, dynamic> json) {
+    int n(String key) => (json[key] as num?)?.toInt() ?? 0;
+    final resets = (json['resets_at'] as num?)?.toInt();
+    return AtomicAiCredits(
+      enabled: json['enabled'] == true,
+      allowanceMicros: n('allowance_micros'),
+      remainingMicros: n('remaining_micros'),
+      purchasedMicros: n('purchased_remaining_micros'),
+      purchasesEnabled: json['purchases_enabled'] == true,
+      resetsAt: resets == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(resets * 1000, isUtc: true),
+    );
+  }
+
+  final bool enabled;
+  final int allowanceMicros;
+
+  /// Monthly and purchased credits together.
+  final int remainingMicros;
+  final int purchasedMicros;
+  final bool purchasesEnabled;
+  final DateTime? resetsAt;
+
+  /// Whole credits left, as the web app shows them.
+  int get remaining => remainingMicros ~/ 1000;
+  int get allowance => allowanceMicros ~/ 1000;
+  int get purchased => purchasedMicros ~/ 1000;
 }

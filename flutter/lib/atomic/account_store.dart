@@ -117,6 +117,22 @@ class AccountStore {
     }
   }
 
+  /// The linked account's AI credits; null when no account is linked or the
+  /// portal offers no included AI. Throws when the portal cannot be reached,
+  /// so the caller can keep showing the last known balance.
+  static Future<shared.AtomicAiCredits?> aiCredits() async {
+    final saved = await _secure.read(key: _key);
+    if (saved == null) return null;
+    final origin = shared.AtomicAccountClient.sessionOrigin(saved);
+    final client = shared.AtomicAccountClient(origin.toString())
+      ..restoreSession(saved);
+    try {
+      return await client.aiCredits();
+    } finally {
+      client.close();
+    }
+  }
+
   /// The linked account's state for [drive]; null when no account is linked.
   /// Throws when it is linked but the portal cannot be read, so a failed read
   /// is not shown as "not linked".

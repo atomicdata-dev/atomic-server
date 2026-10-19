@@ -112,6 +112,7 @@ void main() {
       (tester) async {
     await tester.pumpWidget(_app(SyncScreen(
       backend: _Backend(servers: _Servers(managed: true)),
+      loadCredits: () async => null,
       loadAccount: (drive) async => AccountSummary(
         address: 'joep@example.org',
         portal: Uri.parse('https://portal.example'),
@@ -186,6 +187,7 @@ void main() {
         address: 'joep@example.org',
         portal: Uri.parse('https://portal.example'),
       ),
+      loadCredits: () async => null,
       portalCookie: cookie,
       portalPage: (page) {
         opened = page;
@@ -206,9 +208,10 @@ void main() {
       asked = portal;
       return 'abc123';
     });
-    expect(asked, Uri.parse('https://portal.example'));
+    expect(asked!.origin, 'https://portal.example');
+    expect(page!.url, 'https://portal.example/dashboard/drives?embed=1');
     expect(find.text('portal page'), findsOneWidget);
-    expect(page!.cookies, hasLength(1));
+    expect(page.cookies, hasLength(1));
     expect(page.cookies.single.name, 'session_token');
     expect(page.cookies.single.value, 'abc123');
     expect(page.cookies.single.domain, 'portal.example');
@@ -219,5 +222,60 @@ void main() {
     final page = await openPortal(tester, (_) async => null);
     expect(find.text('portal page'), findsOneWidget);
     expect(page!.cookies, isEmpty);
+  });
+
+  group('AI credits', () {
+    Widget app(Future<shared.AtomicAiCredits?> Function() load) =>
+        _app(SyncScreen(
+          backend: _Backend(servers: _Servers(managed: true)),
+          loadAccount: (_) async => AccountSummary(
+            address: 'joep@example.org',
+            portal: Uri.parse('https://portal.example'),
+          ),
+          loadCredits: load,
+        ));
+
+    testWidgets('shows the balance and refreshes on demand', (tester) async {
+      var remaining = 5000;
+      await tester.pumpWidget(app(() async => shared.AtomicAiCredits(
+            enabled: true,
+            allowanceMicros: 10000,
+            remainingMicros: remaining,
+            purchasedMicros: 2000,
+            purchasesEnabled: true,
+          )));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('AI credits'), 300);
+      expect(find.text('5 of 10 this month · 2 purchased'), findsOneWidget);
+      expect(find.text('Get more credits'), findsOneWidget);
+      remaining = 3000;
+      await tester.tap(find.byTooltip('Refresh AI credits'));
+      await tester.pumpAndSettle();
+      expect(find.text('3 of 10 this month · 2 purchased'), findsOneWidget);
+    });
+
+    testWidgets('offline keeps the last known balance', (tester) async {
+      var fail = false;
+      await tester.pumpWidget(app(() async {
+        if (fail) throw StateError('offline');
+        return const shared.AtomicAiCredits(
+            enabled: true, allowanceMicros: 10000, remainingMicros: 4000);
+      }));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('AI credits'), 300);
+      fail = true;
+      await tester.tap(find.byTooltip('Refresh AI credits'));
+      await tester.pumpAndSettle();
+      expect(find.text('4 of 10 this month · offline, last known'),
+          findsOneWidget);
+      expect(find.text('Get more credits'), findsNothing);
+    });
+
+    testWidgets('shows a dash before anything is known', (tester) async {
+      await tester.pumpWidget(app(() async => null));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('AI credits'), 300);
+      expect(find.text('—'), findsOneWidget);
+    });
   });
 }

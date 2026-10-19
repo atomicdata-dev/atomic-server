@@ -219,4 +219,60 @@ void main() {
       await expectLater(client.aiStatus(), throwsStateError);
     });
   });
+
+  group('AI credits', () {
+    AtomicAccountClient linked(
+            int status, Object body, List<http.Request> seen) =>
+        AtomicAccountClient('https://provider.example',
+            client: MockClient((request) async {
+          seen.add(request);
+          return http.Response(jsonEncode(body), status);
+        }))
+          ..restoreSession(jsonEncode(
+              {'origin': 'https://provider.example/', 'token': 't'}));
+
+    test('reads ai/status in whole credits', () async {
+      final seen = <http.Request>[];
+      final credits = await linked(
+              200,
+              {
+                'enabled': true,
+                'allowance_micros': 10000,
+                'remaining_micros': 7500,
+                'purchased_remaining_micros': 2000,
+                'purchases_enabled': true,
+                'resets_at': 1800000000,
+              },
+              seen)
+          .aiCredits();
+      expect(seen.single.url.path, '/api/ai/status');
+      expect(seen.single.headers['Authorization'], 'Bearer t');
+      expect(credits!.remaining, 7);
+      expect(credits.allowance, 10);
+      expect(credits.purchased, 2);
+      expect(credits.purchasesEnabled, isTrue);
+      expect(credits.resetsAt!.millisecondsSinceEpoch, 1800000000000);
+    });
+
+    test('null when AI is off, missing or the session is invalid', () async {
+      expect(await linked(200, {'enabled': false}, []).aiCredits(), isNull);
+      expect(await linked(404, {}, []).aiCredits(), isNull);
+      expect(await linked(401, {}, []).aiCredits(), isNull);
+    });
+
+    test('a server error throws so callers keep the last known value',
+        () async {
+      await expectLater(linked(500, {}, []).aiCredits(), throwsStateError);
+    });
+  });
+
+  test('portalDrivesUrl targets the portal Drives page in embed mode', () {
+    expect(
+        AtomicAccountClient.portalDrivesUrl(Uri.parse('https://atomic.place/'))
+            .toString(),
+        'https://atomic.place/dashboard/drives?embed=1');
+    expect(
+        () => AtomicAccountClient.portalDrivesUrl(Uri.parse('http://x.test')),
+        throwsArgumentError);
+  });
 }

@@ -6,7 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart' show WebViewCookie;
 
-import 'package:atomic_chat/atomic_chat.dart' show AppTopBar, ResourceWebView, timeAgo;
+import 'package:atomic_chat/atomic_chat.dart'
+    show AppTopBar, ResourceWebView, timeAgo;
 
 import '../assistant/atomic_assistant_api.dart';
 import '../atomic/account_store.dart';
@@ -51,6 +52,9 @@ class SyncScreen extends StatefulWidget {
   final Future<AccountSummary?> Function(String? drive)? loadAccount;
   final Future<void> Function(BuildContext context, String portal)? linkAccount;
 
+  /// The account's AI credits; [AccountStore.aiCredits] by default.
+  final Future<shared.AtomicAiCredits?> Function()? loadCredits;
+
   /// The portal sign-in cookie for the web view; [AccountStore.portalCookie]
   /// by default.
   final Future<String?> Function(Uri portal)? portalCookie;
@@ -64,6 +68,7 @@ class SyncScreen extends StatefulWidget {
     this.backend,
     this.loadAccount,
     this.linkAccount,
+    this.loadCredits,
     this.portalCookie,
     this.portalPage,
   });
@@ -85,6 +90,11 @@ class _SyncScreenState extends State<SyncScreen> {
   Map<String, String> _drives = {};
   AccountSummary? _account;
   String? _accountError;
+
+  /// Last known AI credits, kept when a refresh fails (offline).
+  shared.AtomicAiCredits? _credits;
+  bool _creditsLoading = false;
+  bool _creditsFailed = false;
 
   /// Where the active server is administered, when it is a managed one: the
   /// only place an account can be linked from.
@@ -185,6 +195,38 @@ class _SyncScreenState extends State<SyncScreen> {
       _accountError = accountError;
       _portal = portal;
     });
+    if (account != null) unawaited(_loadCredits());
+  }
+
+  Future<void> _loadCredits() async {
+    if (_creditsLoading) return;
+    setState(() => _creditsLoading = true);
+    var failed = false;
+    shared.AtomicAiCredits? credits = _credits;
+    try {
+      credits = await (widget.loadCredits ?? AccountStore.aiCredits)();
+    } catch (_) {
+      failed = true;
+    }
+    if (!mounted) return;
+    setState(() {
+      _credits = credits;
+      _creditsLoading = false;
+      _creditsFailed = failed;
+    });
+  }
+
+  String _creditsLine() {
+    final credits = _credits;
+    if (credits == null) return _creditsFailed ? 'Could not load' : '—';
+    return [
+      if (credits.allowance > 0)
+        '${credits.remaining} of ${credits.allowance} this month'
+      else
+        '${credits.remaining} left',
+      if (credits.purchased > 0) '${credits.purchased} purchased',
+      if (_creditsFailed) 'offline, last known',
+    ].join(' · ');
   }
 
   void _copy(String text, String what) {
@@ -291,7 +333,8 @@ class _SyncScreenState extends State<SyncScreen> {
 
   /// Opens the portal already signed in as the agent, so the person does not
   /// meet a second login; without a cookie it opens as it always did.
-  Future<void> _openPortal(Uri url) async {
+  Future<void> _openPortal(Uri portal) async {
+    final url = shared.AtomicAccountClient.portalDrivesUrl(portal);
     if (_openingPortal) return;
     setState(() => _openingPortal = true);
     String? cookie;
@@ -316,6 +359,8 @@ class _SyncScreenState extends State<SyncScreen> {
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => widget.portalPage?.call(page) ?? page,
     ));
+    // Credits may have been bought or used while away.
+    if (mounted) unawaited(_loadCredits());
   }
 
   /// In the system browser: it is where the emailed sign-in link will open,
@@ -535,6 +580,27 @@ class _SyncScreenState extends State<SyncScreen> {
             ? 'Off for ${_driveLabel(_activeDrive ?? '')}'
             : _serverLine(server)),
       ),
+      ListTile(
+        leading: Icon(Icons.auto_awesome_outlined, color: c.main),
+        title: const Text('AI credits'),
+        subtitle: Text(_creditsLine()),
+        trailing: _creditsLoading
+            ? const SizedBox.square(
+                dimension: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : IconButton(
+                tooltip: 'Refresh AI credits',
+                icon: const Icon(Icons.refresh),
+                onPressed: _loadCredits),
+      ),
+      if (_credits?.purchasesEnabled == true)
+        ListTile(
+          leading: Icon(Icons.add_card_outlined, color: c.main),
+          title: const Text('Get more credits'),
+          onTap: () => _openInBrowser(account.portal
+              .replace(path: '/dashboard', query: null, fragment: null)),
+        ),
       ListTile(
         leading: Icon(Icons.open_in_new, color: c.main),
         title: const Text('Manage in the portal'),
