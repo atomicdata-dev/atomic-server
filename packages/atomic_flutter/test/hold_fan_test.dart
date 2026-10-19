@@ -101,6 +101,48 @@ void main() {
     expect(find.text('AI voice'), findsNothing);
   });
 
+  testWidgets('a menu near the top stays out of the status bar',
+      (tester) async {
+    tester.view.padding = const FakeViewPadding(top: 120);
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(400, 800);
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(extensions: const [AppColors.light]),
+      home: Scaffold(
+        appBar: AppBar(title: const Text('Home')),
+        body: Align(
+          alignment: Alignment.topLeft,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 100),
+            child: HoldFan<String>(
+              width: double.infinity,
+              size: 40,
+              layout: HoldFanLayout.list,
+              defaultIndex: null,
+              onSelected: picked.add,
+              items: const [
+                HoldFanItem('One', '1'),
+                HoldFanItem('Two', '2'),
+                HoldFanItem('Three', '3'),
+              ],
+              child: const Text('Heading'),
+            ),
+          ),
+        ),
+      ),
+    ));
+    final g = await tester.startGesture(tester.getCenter(find.text('Heading')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 200));
+    for (var i = 0; i < 3; i++) {
+      final r = tester.getRect(find.byKey(ValueKey('hold-fan-item-$i')));
+      expect(r.top, greaterThanOrEqualTo(120), reason: 'pill $i');
+    }
+    await g.up();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('a wide target opens its list over the finger', (tester) async {
     await tester.pumpWidget(MaterialApp(
       theme: ThemeData(extensions: const [AppColors.light]),

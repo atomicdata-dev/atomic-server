@@ -280,7 +280,10 @@ class _HoldFanState<T> extends State<HoldFan<T>>
     _downAt = details.globalPosition;
     _wandered = false;
     _sticky = false;
-    final media = MediaQuery.of(context);
+    // The overlay's, not the button's: inside a Scaffold body the top
+    // padding is already taken off, and a menu then went under the status
+    // bar.
+    final media = MediaQuery.of(overlay.context);
     final scaler = MediaQuery.textScalerOf(context);
     // The overlay's Material styles the pill text with the theme's body
     // style, so measure with that same style or the pills come out too
