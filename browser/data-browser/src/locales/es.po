@@ -854,6 +854,7 @@ msgstr "Recurso Inválido"
 
 #: src/chunks/AI/formatAIChatReport.ts
 #: src/components/SideBar/AIPanel.tsx
+#: src/components/SideBar/AIPanel.tsx
 #: src/routes/Search/ChatMatchRow.tsx
 msgid "Untitled Chat"
 msgstr "Chat sin título"
@@ -12988,14 +12989,14 @@ msgid "Upgrade to Cloud Server from {0}"
 msgstr ""
 
 #: src/components/SideBar/MessagesPanel.tsx
-#: src/components/SideBar/MessagesPanel.tsx
 msgid "Search messages"
 msgstr ""
 
-#: src/components/SideBar/MessagesPanel.tsx
+#: src/components/SideBar/SidebarSearch.tsx
 msgid "Search by name"
 msgstr ""
 
+#: src/components/SideBar/AIPanel.tsx
 #: src/components/SideBar/MessagesPanel.tsx
 msgid "No matches"
 msgstr ""
@@ -13209,4 +13210,8 @@ msgstr ""
 
 #: src/components/Vault/VaultStorage.tsx
 msgid "The next backup from that browser or app adds them"
+msgstr ""
+
+#: src/components/SideBar/AIPanel.tsx
+msgid "Search chats"
 msgstr ""
