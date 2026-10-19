@@ -190,8 +190,7 @@ pub async fn open_db(path: String) -> Result<(), String> {
     #[cfg(not(target_arch = "wasm32"))]
     {
         catch_up_search_index(db()?.clone()).await;
-        crate::recents::load(std::path::Path::new(&path));
-        crate::recents::spawn_listener(db()?.clone());
+        crate::host::start_recents(std::path::Path::new(&path), db()?.clone());
     }
     Ok(())
 }
@@ -369,8 +368,9 @@ pub async fn list_drives_with_names() -> Result<String, String> {
             let Some(subject) = row["subject"].as_str() else {
                 continue;
             };
-            if let Some(drive) = super::assistant::row_resource(&store, &subject.into()).await {
-                *row = super::assistant::with_emoji(row.take(), &drive);
+            if let Some(drive) = atomic_lib::host::rows::row_resource(store, &subject.into()).await
+            {
+                *row = atomic_lib::host::rows::with_emoji(row.take(), &drive);
             }
         }
     }

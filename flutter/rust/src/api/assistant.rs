@@ -1,169 +1,34 @@
-//! Read-only access for the assistant screens: AI chats, chat entries, search.
+//! The assistant and home screens: AI chats, conversations, the home lists and
+//! search, as JSON for the Dart side.
 //!
-//! Generic on purpose: everything works on resources of the drive it is given and
-//! returns JSON, with no canvas logic. Chat messages are `ChatLog` entries, as
-//! the web app stores them (`planning/chat-log.md`, "Step 3: AI chat").
+//! The logic is `atomic_lib::host` (lists, chats, conversations, recents);
+//! these functions bind it to the store `open_db` opened, push what they write
+//! like every other local write of this app, and keep the Dart-facing names
+//! and shapes.
 
 #[cfg(test)]
 mod tests;
 
-use super::simple::state::{connected_server, db, err};
-use crate::recents;
-use atomic_lib::{
-    chat_log::Entry,
-    commit::{CommitBuilder, CommitOpts},
-    loro::AtomicLoroDoc,
-    storelike::Query,
-    urls, Commit, Resource, Storelike, Subject, Value,
-};
+use super::simple::state::{connected_server, db, err, node};
+use crate::host::{conversations, pusher, recents, to_json};
+use atomic_lib::host::{chats, lists};
 use flutter_rust_bridge::frb;
-use serde_json::{json, Value as Json};
-
-/// `ai.classes.aiChat` (`browser/lib/src/ontologies/ai.ts`).
-pub(crate) const AI_CHAT: &str = "https://atomicdata.dev/01jtjxtsa9syxmfca2zx5gcnmj/class/ai-chat";
-
-pub(crate) fn name_of(resource: &Resource) -> String {
-    resource
-        .get(urls::NAME)
-        .or_else(|_| resource.get(urls::SHORTNAME))
-        .map(|v| v.to_string())
-        .unwrap_or_default()
-}
-
-/// A resource for a list row: the stored propvals only (`get_resource_shallow`),
-/// which skips decoding the whole Loro history that `get_resource` does per
-/// call. Rows need a title and a class, which the last commit materialized, so
-/// this can only lag a Loro import that has not materialized yet. Falls back to
-/// the full read when there is a stored resource without a row, and to nothing
-/// when this device does not hold the resource at all.
-pub(crate) async fn row_resource(store: &atomic_lib::Db, subject: &Subject) -> Option<Resource> {
-    match store.get_resource_shallow(subject) {
-        Ok(r) => Some(r),
-        // The full read is for a stored resource whose row is not materialized
-        // yet. For anything this device does not hold it would go and fetch
-        // it over the network, one subject after the other: with dozens of
-        // listed drives that is the app waiting seconds on every start.
-        Err(_) if store.has_stored_resource(subject) => store.get_resource(subject).await.ok(),
-        Err(_) => None,
-    }
-}
-
-/// The name of a resource's first class, its subject when the class has none.
-pub(crate) async fn class_name_of(resource: &Resource) -> String {
-    let class = match resource.get(urls::IS_A).map(|v| v.to_subjects(None)) {
-        Ok(Ok(classes)) => classes.into_iter().next().unwrap_or_default(),
-        _ => String::new(),
-    };
-    let Ok(store) = db() else { return class };
-    match row_resource(&store, &Subject::from(class.as_str())).await {
-        Some(c) if !name_of(&c).is_empty() => name_of(&c),
-        _ => class,
-    }
-}
-
-/// Every entry of the `ChatLog` pages under `chat`, oldest first (by `c`, then
-/// key), as the entry's own fields plus `id` (`<page>#<key>`). `parts` is
-/// stored as a JSON string and comes out parsed. An entry key that sits on two
-/// pages is listed once.
-pub(crate) async fn chat_entries(chat: &str) -> Result<Vec<(i64, Json)>, String> {
-    let store = db()?;
-    let pages = store
-        .query(&Query::new_prop_val(urls::PARENT, chat))
-        .await
-        .map_err(err)?;
-    let mut seen = std::collections::HashSet::new();
-    let mut out: Vec<(i64, String, Json)> = Vec::new();
-    for subject in &pages.subjects {
-        let Ok(page) = store.get_resource(subject).await else {
-            continue;
-        };
-        if !atomic_lib::hierarchy::is_chat_log(&page) {
-            continue;
-        }
-        let Ok(doc) = page.build_state_doc() else {
-            continue;
-        };
-        for (key, entry) in doc.entries() {
-            if !seen.insert(key.clone()) {
-                continue;
-            }
-            let Ok(Json::Object(mut fields)) = serde_json::to_value(&entry) else {
-                continue;
-            };
-            if let Some(Json::String(raw)) = fields.get("parts") {
-                let parsed = serde_json::from_str(raw).unwrap_or_else(|_| json!([]));
-                fields.insert("parts".into(), parsed);
-            }
-            fields.insert("id".into(), json!(format!("{}#{key}", page.get_subject())));
-            let c = atomic_lib::chat_log::entry_created_at(&entry).unwrap_or(0);
-            out.push((c, key, Json::Object(fields)));
-        }
-    }
-    out.sort_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));
-    Ok(out.into_iter().map(|(c, _, json)| (c, json)).collect())
-}
-
-/// The resource's own icon: the emoji the web app's "Add icon" stores. Empty
-/// when it has none.
-pub(crate) fn emoji_of(resource: &Resource) -> String {
-    resource
-        .get(urls::EMOJI)
-        .map(|v| v.to_string())
-        .unwrap_or_default()
-        .trim()
-        .to_string()
-}
-
-/// Add `emoji` to a row when the resource has one (absent otherwise).
-pub(crate) fn with_emoji(mut row: Json, resource: &Resource) -> Json {
-    let emoji = emoji_of(resource);
-    if !emoji.is_empty() {
-        row["emoji"] = json!(emoji);
-    }
-    row
-}
-
-/// A `{subject, title, class_name, <extra>, emoji?}` row of the resource lists.
-async fn resource_row(subject: &str, resource: &Resource, extra: (&str, Json)) -> Json {
-    with_emoji(
-        json!({
-            "subject": subject,
-            "title": name_of(resource),
-            "class_name": class_name_of(resource).await,
-            extra.0: extra.1,
-        }),
-        resource,
-    )
-}
 
 /// The emojis of `subjects` as JSON `{subject: emoji}`, only for those that
 /// have one. For rows that do not carry their icon themselves (the activity
 /// feed), read from the stored propvals like the other rows.
 pub async fn resource_icons(subjects: Vec<String>) -> Result<String, String> {
-    let store = db()?;
-    let mut out = serde_json::Map::new();
-    for subject in subjects {
-        let Some(resource) = row_resource(&store, &Subject::from(subject.as_str())).await else {
-            continue;
-        };
-        let emoji = emoji_of(&resource);
-        if !emoji.is_empty() {
-            out.insert(subject, json!(emoji));
-        }
-    }
-    serde_json::to_string(&out).map_err(|e| e.to_string())
+    to_json(&lists::resource_icons(db()?, subjects).await)
 }
 
 /// The newest `limit` AI chats of the person (all drives), newest activity first, as JSON
 /// `[{subject, name, last_activity}]` (`last_activity` in ms, 0 when empty).
 /// Read from the recents index, not rebuilt from the chats' pages.
 pub async fn list_ai_chats(limit: u32) -> Result<String, String> {
-    let chats = recents::recent_chats(limit as usize).await?;
-    let list: Vec<Json> = chats
-        .into_iter()
-        .map(|(subject, name, last)| json!({ "subject": subject, "name": name, "last_activity": last }))
-        .collect();
-    serde_json::to_string(&list).map_err(|e| e.to_string())
+    let list = lists::list_ai_chats(db()?, recents(), limit as usize)
+        .await
+        .map_err(err)?;
+    to_json(&list)
 }
 
 /// One line of the activity feed.
@@ -184,394 +49,44 @@ pub struct ActivityEntry {
 /// What changed lately in every drive, newest first, by whom. Read from the
 /// recents index, which the store's change events keep.
 pub async fn list_activity(limit: u32) -> Result<Vec<ActivityEntry>, String> {
-    let store = db()?;
-    let mut names: std::collections::HashMap<String, Option<String>> = Default::default();
-    let mut out = Vec::new();
-    for a in recents::activity(limit as usize) {
-        let actor = match &a.actor {
-            None => None,
-            Some(agent) => match names.get(agent) {
-                Some(name) => name.clone(),
-                None => {
-                    let name = row_resource(&store, &Subject::from(agent.as_str()))
-                        .await
-                        .map(|r| name_of(&r))
-                        .filter(|n| !n.is_empty());
-                    names.insert(agent.clone(), name.clone());
-                    name
-                }
-            },
-        };
-        out.push(ActivityEntry {
+    let rows = lists::list_activity(db()?, recents(), limit as usize).await;
+    Ok(rows
+        .into_iter()
+        .map(|a| ActivityEntry {
             subject: a.subject,
             drive: a.drive,
             kind: a.kind.as_str().to_string(),
             at: a.at,
-            actor,
+            actor: a.actor,
             name: a.name,
             class_name: a.class_name,
-        });
-    }
-    Ok(out)
+        })
+        .collect())
 }
 
 /// Record that this device opened `subject` in `drive`. Local to the device:
 /// nothing is committed or synced.
 #[frb(sync)]
 pub fn note_resource_opened(drive: String, subject: String) {
-    recents::note_opened(&drive, &subject, super::simple::state::now_ms());
+    recents().note_opened(&drive, &subject, super::simple::state::now_ms());
 }
 
 /// The `limit` resources of `drive` this device opened last, newest first, as
 /// JSON `[{subject, title, class_name, opened_at}]`. Resources that are gone
 /// are left out.
 pub async fn list_recent_resources(drive: String, limit: u32) -> Result<String, String> {
-    let store = db()?;
-    let mut out = Vec::new();
-    let opened = recents::opened(&drive, limit as usize * 2);
-    tracing::info!("[recents] {} opened in {drive}", opened.len());
-    for (subject, opened_at) in opened {
-        if out.len() >= limit as usize {
-            break;
-        }
-        let Some(resource) = row_resource(&store, &Subject::from(subject.as_str())).await else {
-            tracing::warn!("[recents] {subject} not readable");
-            continue;
-        };
-        out.push(resource_row(&subject, &resource, ("opened_at", json!(opened_at))).await);
-    }
-    serde_json::to_string(&out).map_err(|e| e.to_string())
-}
-
-/// `favorites` on the private drive: what the web app's Favorites panel lists.
-pub(crate) const FAVORITES: &str = "https://atomicdata.dev/properties/favorites";
-
-/// The subjects in a list property of the agent's private drive (the web
-/// app's "home index"), in stored order; empty when there is no such drive or
-/// list yet.
-async fn private_drive_list(property: &str) -> Result<Vec<String>, String> {
-    let store = db()?;
-    let home = store.private_drive_subject().map_err(err)?;
-    // One full read: the list property must be the merged CRDT state.
-    let Ok(drive) = store.get_resource(&Subject::from(home.as_str())).await else {
-        return Ok(Vec::new());
-    };
-    Ok(drive
-        .get(property)
-        .ok()
-        .and_then(|v| v.to_subjects(None).ok())
-        .unwrap_or_default())
+    to_json(&lists::list_recent_resources(db()?, recents(), &drive, limit as usize).await)
 }
 
 /// The person's favorites (all drives), newest added first, as JSON
 /// `[{subject, title, class_name, opened_at}]` (`opened_at` is always 0).
 /// Favorites that are gone or unreadable are left out.
 pub async fn list_favorites(limit: u32) -> Result<String, String> {
-    let store = db()?;
-    let mut out = Vec::new();
-    // The web app appends, so the last one listed is the newest.
-    for subject in private_drive_list(FAVORITES).await?.into_iter().rev() {
-        if out.len() >= limit as usize {
-            break;
-        }
-        let Some(resource) = row_resource(&store, &Subject::from(subject.as_str())).await else {
-            continue;
-        };
-        out.push(resource_row(&subject, &resource, ("opened_at", json!(0))).await);
-    }
-    serde_json::to_string(&out).map_err(|e| e.to_string())
-}
-
-/// Shown for a conversation member whose name is not known (yet), instead of
-/// the raw agent id.
-pub(crate) const UNKNOWN_MEMBER: &str = "Unknown member";
-
-/// How long a background lookup of one agent's name may take.
-const AGENT_NAME_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
-/// How long a failed lookup is not repeated, so a slow or offline server does
-/// not delay every refresh of the home screen.
-const AGENT_NAME_RETRY: std::time::Duration = std::time::Duration::from_secs(60);
-
-/// Names fetched so far (`Ok`) and lookups that failed and when (`Err`).
-static AGENT_NAMES: std::sync::Mutex<
-    Option<std::collections::HashMap<String, Result<String, std::time::Instant>>>,
-> = std::sync::Mutex::new(None);
-
-/// The name of an agent this device does not hold, from the cache. Never
-/// waits on the network: when the name is not cached (and no lookup ran in the
-/// last minute) a lookup starts in the background and this returns empty, so
-/// the next refresh of the list has the name. The lookup goes to the connected
-/// server with the library's HTTP client (which carries the Android TLS setup).
-fn fetched_agent_name(member: &str) -> String {
-    if let Some(known) = AGENT_NAMES
-        .lock()
-        .ok()
-        .and_then(|g| g.as_ref().and_then(|m| m.get(member).cloned()))
-    {
-        match known {
-            Ok(name) => return name,
-            Err(at) if at.elapsed() < AGENT_NAME_RETRY => return String::new(),
-            Err(_) => {}
-        }
-    }
-    // Mark the lookup as tried now, so concurrent refreshes do not start more.
-    if let Ok(mut guard) = AGENT_NAMES.lock() {
-        guard
-            .get_or_insert_with(Default::default)
-            .insert(member.to_string(), Err(std::time::Instant::now()));
-    }
-    let member = member.to_string();
-    tokio::spawn(async move {
-        if let Some(name) = fetch_agent_name(&member).await {
-            if let Ok(mut guard) = AGENT_NAMES.lock() {
-                guard
-                    .get_or_insert_with(Default::default)
-                    .insert(member, Ok(name));
-            }
-        }
-    });
-    String::new()
-}
-
-async fn fetch_agent_name(member: &str) -> Option<String> {
-    let origin = connected_server()?;
-    let agent = db().ok()?.get_default_agent().ok();
-    let url = format!("{origin}/{member}");
-    let body = tokio::time::timeout(
-        AGENT_NAME_TIMEOUT,
-        atomic_lib::client::fetch_body(&url, atomic_lib::parse::JSON_AD_MIME, agent.as_ref()),
+    to_json(
+        &lists::list_favorites(db()?, limit as usize)
+            .await
+            .map_err(err)?,
     )
-    .await
-    .ok()?
-    .ok()?;
-    name_from_json_ad(&body)
-}
-
-/// The name in a JSON-AD body: one resource or an array whose first is it.
-fn name_from_json_ad(body: &str) -> Option<String> {
-    let json: Json = serde_json::from_str(body).ok()?;
-    let resource = json.as_array().and_then(|a| a.first()).unwrap_or(&json);
-    [urls::NAME, urls::SHORTNAME]
-        .iter()
-        .find_map(|p| resource.get(*p).and_then(|v| v.as_str()))
-        .filter(|n| !n.is_empty())
-        .map(str::to_string)
-}
-
-/// The display name of a conversation member: the agent resource when this
-/// device holds it, else the cached name of a background lookup, else
-/// [`UNKNOWN_MEMBER`]. Never waits on the network.
-async fn member_name(store: &atomic_lib::Db, member: &str) -> String {
-    let local = match row_resource(store, &Subject::from(member)).await {
-        Some(agent) => name_of(&agent),
-        None => String::new(),
-    };
-    if !local.is_empty() {
-        return local;
-    }
-    let fetched = fetched_agent_name(member);
-    if fetched.is_empty() {
-        UNKNOWN_MEMBER.to_string()
-    } else {
-        fetched
-    }
-}
-
-/// The members of a conversation: its `read` list.
-fn members_of(conversation: &Resource) -> Vec<String> {
-    conversation
-        .get(urls::READ)
-        .ok()
-        .and_then(|v| v.to_subjects(None).ok())
-        .unwrap_or_default()
-}
-
-/// Whether two spellings name the same agent (`did:ad:agent:X`, `atomic:agent:X`).
-fn same_agent(a: &str, b: &str) -> bool {
-    use atomic_lib::identifiers::agent_public_key;
-    a == b || matches!((agent_public_key(a), agent_public_key(b)), (Some(x), Some(y)) if x == y)
-}
-
-/// A conversation has no name of its own: its title is who else is in it (its
-/// `read` list minus this agent), as the web app shows it.
-async fn conversation_title(store: &atomic_lib::Db, conversation: &Resource, me: &str) -> String {
-    let members = members_of(conversation);
-    let others = members.iter().filter(|m| !same_agent(m, me));
-    let names = futures::future::join_all(others.map(|member| member_name(store, member))).await;
-    if names.is_empty() {
-        "Only you".to_string()
-    } else {
-        names.join(", ")
-    }
-}
-
-/// `vault_proof` of an agent: its signature over the fixed vault message, the
-/// key material of its conversation keys (the web app derives the same).
-fn vault_proof(agent: &atomic_lib::agents::Agent) -> Result<Vec<u8>, String> {
-    let secret = agent
-        .private_key
-        .as_ref()
-        .ok_or("This device has no agent key to read messages with")?;
-    let signature = atomic_lib::agents::sign_message(
-        atomic_lib::vault::secret_envelope::AGENT_VAULT_PROOF_MESSAGE,
-        secret,
-    )
-    .map_err(err)?;
-    atomic_lib::agents::decode_base64(&signature).map_err(err)
-}
-
-/// The spellings the keyring may know `agent` by.
-fn agent_spellings(agent: &str) -> Vec<String> {
-    let mut out = vec![agent.to_string()];
-    for other in [
-        atomic_lib::identifiers::canonicalize_scheme(agent),
-        atomic_lib::identifiers::to_legacy_scheme(agent),
-    ] {
-        if !out.contains(&other) {
-            out.push(other);
-        }
-    }
-    out
-}
-
-/// The epoch keys of `keyring` that `agent` can open (oldest first); empty
-/// when this agent is not in it.
-fn open_keyring(
-    keyring: &str,
-    agent: &str,
-    proof: &[u8],
-) -> Vec<atomic_lib::conversation::ConversationKey> {
-    let Ok(keyring) = atomic_lib::conversation::Keyring::from_json(keyring) else {
-        return Vec::new();
-    };
-    for spelling in agent_spellings(agent) {
-        if let Ok(keys) = keyring.open(&spelling, proof) {
-            if !keys.is_empty() {
-                return keys;
-            }
-        }
-    }
-    Vec::new()
-}
-
-/// A sealed message after opening, cached for good: a message is sealed once.
-#[derive(Clone)]
-struct OpenedMessage {
-    author: String,
-    text: Option<String>,
-    created_at: i64,
-    reply_to: Option<String>,
-}
-
-static OPENED_MESSAGES: std::sync::Mutex<Option<std::collections::HashMap<String, OpenedMessage>>> =
-    std::sync::Mutex::new(None);
-
-fn cached_message(key: &str) -> Option<OpenedMessage> {
-    OPENED_MESSAGES
-        .lock()
-        .ok()
-        .and_then(|g| g.as_ref().and_then(|m| m.get(key).cloned()))
-}
-
-fn cache_message(key: String, message: &OpenedMessage) {
-    if let Ok(mut guard) = OPENED_MESSAGES.lock() {
-        guard
-            .get_or_insert_with(Default::default)
-            .insert(key, message.clone());
-    }
-}
-
-/// The subjects of the messages in a conversation (children of it), oldest
-/// first by creation time; the newest `limit` only (still oldest first) when
-/// given.
-async fn conversation_message_subjects(
-    store: &atomic_lib::Db,
-    conversation: &str,
-    limit: Option<usize>,
-) -> Result<Vec<Subject>, String> {
-    let mut query = Query::new_prop_val(urls::PARENT, conversation);
-    // A conversation is a drive of its own, and its messages live in it.
-    query.drive = Some(Subject::from(conversation));
-    query.sort_by = Some(urls::CREATED_AT.to_string());
-    query.sort_desc = limit.is_some();
-    query.limit = limit;
-    let mut subjects = store.query(&query).await.map_err(err)?.subjects;
-    if limit.is_some() {
-        subjects.reverse();
-    }
-    Ok(subjects)
-}
-
-/// Open one sealed message: from the cache, else decrypted with `keys`. `None`
-/// when `subject` is not a sealed message (this device has not got it, or it is
-/// something else). A message this reader cannot open has `text: None`.
-async fn open_message(
-    store: &atomic_lib::Db,
-    me: &str,
-    conversation: &str,
-    keys: &[atomic_lib::conversation::ConversationKey],
-    subject: &Subject,
-) -> Option<OpenedMessage> {
-    let cache_key = format!("{me}|{subject}");
-    if let Some(known) = cached_message(&cache_key) {
-        return Some(known);
-    }
-    let mut resource = row_resource(store, subject).await?;
-    if resource.get(urls::SEALED).is_err() {
-        resource = store.get_resource(subject).await.ok()?;
-    }
-    let sealed = resource.get(urls::SEALED).ok()?.to_string();
-    let author = resource
-        .get(urls::CREATED_BY)
-        .map(|v| v.to_string())
-        .ok()
-        .or_else(|| resource.genesis_signer())
-        .or_else(|| {
-            resource
-                .get(urls::WRITE)
-                .ok()
-                .and_then(|v| v.to_subjects(None).ok())
-                .and_then(|w| w.into_iter().next())
-        })
-        .unwrap_or_default();
-    let created_at = resource
-        .get(urls::CREATED_AT)
-        .ok()
-        .and_then(|v| v.to_int().ok())
-        .unwrap_or(0);
-    let payload = atomic_lib::conversation::open_message(keys, conversation, &sealed)
-        .ok()
-        .and_then(|bytes| serde_json::from_slice::<Json>(&bytes).ok());
-    let text = payload
-        .as_ref()
-        .and_then(|p| p.get("text"))
-        .and_then(|t| t.as_str())
-        .map(str::to_string);
-    let reply_to = payload
-        .as_ref()
-        .and_then(|p| p.get("replyTo"))
-        .and_then(|t| t.as_str())
-        .map(str::to_string);
-    let opened = OpenedMessage {
-        author,
-        text,
-        created_at,
-        reply_to,
-    };
-    // A message that failed to open may open after the keyring grows: only
-    // successes are remembered.
-    if opened.text.is_some() {
-        cache_message(cache_key, &opened);
-    }
-    Some(opened)
-}
-
-/// The conversation's keyring.
-fn keyring_of(conversation: &Resource) -> String {
-    conversation
-        .get(urls::CONVERSATION_KEYS)
-        .map(|v| v.to_string())
-        .unwrap_or_default()
 }
 
 /// The person's conversations (DMs and group chats), as JSON
@@ -583,50 +98,12 @@ fn keyring_of(conversation: &Resource) -> String {
 /// message ("" when there is none or it cannot be opened). `class_name` is
 /// `conversation`, which the app opens natively.
 pub async fn list_conversations(limit: u32) -> Result<String, String> {
-    let store = db()?;
-    let agent = store.get_default_agent().map_err(err)?;
-    let me = agent.subject.to_string();
-    let proof = vault_proof(&agent).ok();
-    let mut out: Vec<(i64, Json)> = Vec::new();
-    for subject in private_drive_list(urls::CONVERSATIONS).await? {
-        if out.len() >= limit as usize {
-            break;
-        }
-        let Some(conversation) = row_resource(&store, &Subject::from(subject.as_str())).await
-        else {
-            continue;
-        };
-        let title = conversation_title(&store, &conversation, &me).await;
-        let (mut last_at, mut last_text) = (0, String::new());
-        if let Some(proof) = &proof {
-            let keys = open_keyring(&keyring_of(&conversation), &me, proof);
-            if let Ok(newest) = conversation_message_subjects(&store, &subject, Some(1)).await {
-                if let Some(message) = newest.first() {
-                    if let Some(m) = open_message(&store, &me, &subject, &keys, message).await {
-                        last_at = m.created_at;
-                        last_text = m.text.unwrap_or_default();
-                    }
-                }
-            }
-        }
-        out.push((
-            last_at,
-            with_emoji(
-                json!({
-                    "subject": subject,
-                    "title": title,
-                    "class_name": "conversation",
-                    "opened_at": last_at,
-                    "last_message": last_text,
-                }),
-                &conversation,
-            ),
-        ));
-    }
-    // Stable: conversations without activity keep the drive's order.
-    out.sort_by(|a, b| b.0.cmp(&a.0));
-    let list: Vec<Json> = out.into_iter().map(|(_, row)| row).collect();
-    serde_json::to_string(&list).map_err(|e| e.to_string())
+    to_json(
+        &conversations()
+            .list(db()?, limit as usize)
+            .await
+            .map_err(err)?,
+    )
 }
 
 /// The messages of a conversation, oldest first, as JSON `[{id, author,
@@ -637,42 +114,7 @@ pub async fn list_conversations(limit: u32) -> Result<String, String> {
 /// agent cannot open it) and `c` its time in ms. Read from the local store;
 /// see [`follow_conversation`] to get the conversation onto this device.
 pub async fn read_conversation(subject: String) -> Result<String, String> {
-    let store = db()?;
-    let agent = store.get_default_agent().map_err(err)?;
-    let me = agent.subject.to_string();
-    let proof = vault_proof(&agent)?;
-    let conversation = row_resource(&store, &Subject::from(subject.as_str()))
-        .await
-        .ok_or("This conversation is not on this device yet")?;
-    let keys = open_keyring(&keyring_of(&conversation), &me, &proof);
-    let mut messages: Vec<(i64, String, OpenedMessage)> = Vec::new();
-    for message in conversation_message_subjects(&store, &subject, None).await? {
-        if let Some(m) = open_message(&store, &me, &subject, &keys, &message).await {
-            messages.push((m.created_at, message.to_string(), m));
-        }
-    }
-    messages.sort_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));
-    let mut names: std::collections::HashMap<String, String> = Default::default();
-    let mut out = Vec::new();
-    for (_, id, m) in messages {
-        if !names.contains_key(&m.author) {
-            let name = member_name(&store, &m.author).await;
-            names.insert(m.author.clone(), name);
-        }
-        let mut row = json!({
-            "id": id,
-            "author": m.author,
-            "author_name": names[&m.author],
-            "mine": same_agent(&m.author, &me),
-            "text": m.text,
-            "c": m.created_at,
-        });
-        if let Some(reply) = m.reply_to {
-            row["reply_to"] = json!(reply);
-        }
-        out.push(row);
-    }
-    serde_json::to_string(&out).map_err(|e| e.to_string())
+    to_json(&conversations().read(db()?, &subject).await.map_err(err)?)
 }
 
 /// Post `text` in a conversation as this device's agent: sealed with the
@@ -680,47 +122,9 @@ pub async fn read_conversation(subject: String) -> Result<String, String> {
 /// only the author may write (as the web app does), and synced like any
 /// other edit. Returns the message's subject.
 pub async fn send_conversation_message(subject: String, text: String) -> Result<String, String> {
-    let store = db()?;
-    let agent = store.get_default_agent().map_err(err)?;
-    let me = agent.subject.to_string();
-    let proof = vault_proof(&agent)?;
-    let conversation = store
-        .get_resource(&Subject::from(subject.as_str()))
+    atomic_lib::host::conversations::send_message(&node()?, pusher().as_ref(), &subject, &text)
         .await
-        .map_err(|_| "This conversation is not on this device yet".to_string())?;
-    let keys = open_keyring(&keyring_of(&conversation), &me, &proof);
-    let current = keys
-        .into_iter()
-        .max_by_key(|k| k.epoch)
-        .ok_or("You are not a member of this conversation's current keys")?;
-    let sealed = atomic_lib::conversation::seal_message(
-        &current,
-        &subject,
-        json!({ "text": text }).to_string().as_bytes(),
-    )
-    .map_err(err)?;
-
-    let mut builder = CommitBuilder::new("placeholder".into());
-    builder.set(
-        urls::IS_A.into(),
-        Value::ResourceArray(vec![urls::SEALED_MESSAGE.into()]),
-    );
-    builder.set(
-        urls::PARENT.into(),
-        Value::AtomicUrl(subject.as_str().into()),
-    );
-    builder.set(urls::SEALED.into(), Value::String(sealed));
-    builder.set(
-        urls::WRITE.into(),
-        Value::ResourceArray(vec![me.as_str().into()]),
-    );
-    let commit = Commit::create_did(builder, &agent, store.as_ref())
-        .await
-        .map_err(err)?;
-    let message = commit.subject.to_string();
-    let response = super::simple::node_apply_local(commit, &own_commit_opts()).await?;
-    super::simple::push_local_write(&response, store.as_ref()).await;
-    Ok(message)
+        .map_err(err)
 }
 
 /// Get a conversation onto this device and follow it: fetched from the
@@ -734,12 +138,7 @@ pub async fn follow_conversation(subject: String) -> Result<(), String> {
 /// The entries of a chat, oldest first, as a JSON array of the fields the web
 /// app stores: `id`, `a`, `c`, `role`, `parts` (array) and the rest as is.
 pub async fn read_chat(subject: String) -> Result<String, String> {
-    let entries: Vec<Json> = chat_entries(&subject)
-        .await?
-        .into_iter()
-        .map(|(_, json)| json)
-        .collect();
-    serde_json::to_string(&entries).map_err(|e| e.to_string())
+    to_json(&chats::read_chat(db()?, &subject).await.map_err(err)?)
 }
 
 /// Full-text search (type-ahead on the last word) across every drive of this
@@ -747,94 +146,7 @@ pub async fn read_chat(subject: String) -> Result<String, String> {
 /// `[{subject, title, class_name, drive, score}]`, best first; `drive` is the
 /// drive the hit lives in ("" when unknown).
 pub async fn search(drive: Option<String>, query: String, limit: u32) -> Result<String, String> {
-    let store = db()?;
-    let opts = atomic_lib::client::search::SearchOpts {
-        limit: Some(limit),
-        parents: drive.filter(|d| !d.is_empty()).map(|d| vec![d]),
-        ..Default::default()
-    };
-    let hits = atomic_lib::search::query(store.as_ref(), query.trim(), &opts).map_err(err)?;
-
-    // Local propvals only, and each parent / class is looked up once per
-    // query: a search never waits on the network and never decodes a Loro doc.
-    let mut drives = DriveCache::default();
-    let mut classes: std::collections::HashMap<String, String> = Default::default();
-    let mut out = Vec::new();
-    for hit in hits.into_iter().take(limit as usize) {
-        let Ok(resource) = store.get_resource_shallow(&hit.subject) else {
-            continue;
-        };
-        let class = first_class(&resource);
-        let class_name = match classes.get(&class) {
-            Some(name) => name.clone(),
-            None => {
-                let name = match store.get_resource_shallow(&Subject::from(class.as_str())) {
-                    Ok(c) if !name_of(&c).is_empty() => name_of(&c),
-                    _ => class.clone(),
-                };
-                classes.insert(class, name.clone());
-                name
-            }
-        };
-        out.push(with_emoji(
-            json!({
-                "subject": hit.subject.to_string(),
-                "title": name_of(&resource),
-                "class_name": class_name,
-                "score": hit.score,
-                "drive": drives.of(store.as_ref(), &resource),
-            }),
-            &resource,
-        ));
-    }
-    serde_json::to_string(&out).map_err(|e| e.to_string())
-}
-
-/// The subject of a resource's first class, "" when it has none.
-fn first_class(resource: &Resource) -> String {
-    match resource.get(urls::IS_A).map(|v| v.to_subjects(None)) {
-        Ok(Ok(classes)) => classes.into_iter().next().unwrap_or_default(),
-        _ => String::new(),
-    }
-}
-
-/// The drive of resources found by a search: their `drive` property, else the
-/// one found by walking up the parents through local propvals only. Every
-/// resource on a walked chain is remembered, so siblings cost one lookup.
-#[derive(Default)]
-#[frb(ignore)]
-struct DriveCache(std::collections::HashMap<String, String>);
-
-impl DriveCache {
-    fn of(&mut self, store: &atomic_lib::Db, resource: &Resource) -> String {
-        let mut chain: Vec<String> = Vec::new();
-        let mut current = resource.clone();
-        let mut found = String::new();
-        for _ in 0..32 {
-            if let Some(drive) = current.get_drive() {
-                found = drive.to_string();
-                break;
-            }
-            let Ok(parent) = current.get(urls::PARENT).map(|v| v.to_string()) else {
-                break;
-            };
-            if let Some(known) = self.0.get(&parent) {
-                found = known.clone();
-                break;
-            }
-            let Ok(next) = store.get_resource_shallow(&Subject::from(parent.as_str())) else {
-                // Not local: unknown, and remembered so it is asked once.
-                self.0.insert(parent, String::new());
-                break;
-            };
-            chain.push(parent);
-            current = next;
-        }
-        for subject in chain {
-            self.0.insert(subject, found.clone());
-        }
-        found
-    }
+    to_json(&lists::search(db()?, drive.as_deref(), &query, limit as usize).map_err(err)?)
 }
 
 /// The URL that shows `subject` in the data-browser of the connected server,
@@ -848,38 +160,12 @@ pub fn resource_web_url(subject: String) -> Result<String, String> {
     ))
 }
 
-/// The options of a commit this device signs for its own agent.
-fn own_commit_opts() -> CommitOpts {
-    CommitOpts {
-        validate_signature: true,
-        validate_timestamp: false,
-        validate_rights: false,
-        update_index: true,
-        ..CommitOpts::no_validations_no_index()
-    }
-}
-
 /// Start an AI chat named `name` in the agent's private drive, as the web
 /// app's AI sidebar does. Returns the chat's subject.
 pub async fn create_ai_chat(name: String) -> Result<String, String> {
-    let store = db()?;
-    let agent = store.get_default_agent().map_err(err)?;
-    let home = store.ensure_private_drive().await.map_err(err)?;
-
-    let mut builder = CommitBuilder::new("placeholder".into());
-    builder.set(
-        urls::IS_A.into(),
-        Value::ResourceArray(vec![AI_CHAT.into()]),
-    );
-    builder.set(urls::NAME.into(), Value::String(name));
-    builder.set(urls::PARENT.into(), Value::AtomicUrl(home.as_str().into()));
-    let commit = Commit::create_did(builder, &agent, store.as_ref())
+    chats::create_ai_chat(&node()?, pusher().as_ref(), &name)
         .await
-        .map_err(err)?;
-    let subject = commit.subject.to_string();
-    let response = super::simple::node_apply_local(commit, &own_commit_opts()).await?;
-    super::simple::push_local_write(&response, store.as_ref()).await;
-    Ok(subject)
+        .map_err(err)
 }
 
 /// Add a message to a chat: `role` is `user` or `assistant`, `parts_json` the
@@ -891,44 +177,7 @@ pub async fn append_chat_entry(
     role: String,
     parts_json: String,
 ) -> Result<String, String> {
-    let store = db()?;
-    let agent = store.get_default_agent().map_err(err)?;
-    let author = agent.subject.to_string();
-    let mut entry = Entry::new(author, "", super::simple::state::now_ms());
-    entry.extra.insert("role".into(), role.as_str().into());
-    entry
-        .extra
-        .insert("parts".into(), parts_json.as_str().into());
-
-    if let Some(subject) = atomic_lib::chat_log::page_with_room(store.as_ref(), &chat)
+    chats::append_chat_entry(&node()?, pusher().as_ref(), &chat, &role, &parts_json)
         .await
-        .map_err(err)?
-    {
-        let mut page = store.get_resource(&subject).await.map_err(err)?;
-        let key = page.add_chat_entry(&entry).map_err(err)?;
-        let response = super::simple::state::node()?
-            .save_locally(&mut page)
-            .await
-            .map_err(err)?;
-        super::simple::push_local_write(&response, store.as_ref()).await;
-        return Ok(format!("{subject}#{key}"));
-    }
-
-    // A first page.
-    let doc = AtomicLoroDoc::new();
-    let key = doc.add_entry(&entry).map_err(err)?;
-    let is_a = Value::ResourceArray(vec![urls::CHAT_LOG.to_string().into()]);
-    let parent = Value::AtomicUrl(chat.as_str().into());
-    doc.set_property(urls::IS_A, &is_a).map_err(err)?;
-    doc.set_property(urls::PARENT, &parent).map_err(err)?;
-    let mut builder = CommitBuilder::new("placeholder".into());
-    builder.set(urls::PARENT.into(), parent);
-    builder.set_loro_update(doc.export_snapshot());
-    let commit = Commit::create_did(builder, &agent, store.as_ref())
-        .await
-        .map_err(err)?;
-    let page = commit.subject.to_string();
-    let response = super::simple::node_apply_local(commit, &own_commit_opts()).await?;
-    super::simple::push_local_write(&response, store.as_ref()).await;
-    Ok(format!("{page}#{key}"))
+        .map_err(err)
 }

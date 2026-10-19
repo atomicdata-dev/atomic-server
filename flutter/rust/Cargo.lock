@@ -3745,6 +3745,7 @@ dependencies = [
 name = "rust_lib_atomiccanvas_flutter"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "atomic_lib",
  "flutter_rust_bridge",
  "futures",
