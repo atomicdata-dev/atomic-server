@@ -4,7 +4,7 @@
 library;
 
 export 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColors, AppColorsExt;
+    show AppColors, AppColorsExt, HoldFan, HoldFanItem;
 
 // The seam to the host's store, and what goes through it.
 export 'src/assistant_api.dart';
@@ -22,6 +22,7 @@ export 'src/chats_screen.dart';
 export 'src/chat_screen.dart';
 export 'src/conversation_screen.dart';
 export 'src/search_screen.dart';
+export 'src/new_document_sheet.dart';
 
 // Resources: native views, else the embedded web renderer.
 export 'src/native_views.dart';
