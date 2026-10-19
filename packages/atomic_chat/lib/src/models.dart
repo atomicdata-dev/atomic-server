@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'chat_parts.dart';
+
 /// An AI chat of the active drive; `lastActivity` is unix ms, 0 when empty.
 typedef ChatSummary = ({String subject, String name, int lastActivity});
 
@@ -250,6 +252,54 @@ abstract final class AssistantJson {
       ));
     }
     return out;
+  }
+
+  /// Every message of a chat with all its parts (text, files, tool calls,
+  /// and the rest as is), user and assistant only; an entry without any
+  /// part is skipped. `ctx` (resources attached as context) is read too.
+  static List<ChatEntry> parseChatEntries(String json) {
+    final out = <ChatEntry>[];
+    for (final e in jsonDecode(json) as List) {
+      final role = e['role'] as String? ?? '';
+      if (role != 'user' && role != 'assistant') continue;
+      final parts = [
+        for (final p in (e['parts'] as List? ?? const []))
+          if (p is Map) ChatPart.fromJson(Map<String, dynamic>.from(p)),
+      ];
+      if (parts.isEmpty) continue;
+      out.add(ChatEntry(
+        id: e['id'] as String,
+        role: role,
+        createdAt: (e['c'] as num?)?.toInt() ?? 0,
+        parts: parts,
+        context: _context(e['ctx']),
+      ));
+    }
+    return out;
+  }
+
+  static List<ContextResource> _context(Object? raw) {
+    Object? list = raw;
+    if (raw is String && raw.isNotEmpty) {
+      try {
+        list = jsonDecode(raw);
+      } catch (_) {
+        return const [];
+      }
+    }
+    if (list is! List) return const [];
+    return [
+      for (final c in list)
+        if (c is Map &&
+            c['type'] == 'atomic-resource' &&
+            c['subject'] is String)
+          (
+            subject: c['subject'] as String,
+            title: c['title'] as String? ?? '',
+            className: c['class_name'] as String? ?? '',
+            emoji: null,
+          ),
+    ];
   }
 
   static List<RecentResource> parseRecentResources(String json) => [

@@ -9,7 +9,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'models.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
+import 'ai_tools.dart';
+import 'chat_parts.dart';
 import 'markdown_view.dart';
+import 'tool_step.dart';
 import 'native_views.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'hosted_ai.dart';
@@ -69,6 +72,11 @@ class ChatScreen extends StatefulWidget {
   /// A spoken chat: listen, send, speak the answer, listen again.
   final bool voiceMode;
 
+  /// The tools the model may call; the assistant's read-only tools
+  /// ([assistantTools]) when null. Only an AI that reports tool calls gets
+  /// them.
+  final List<AiTool>? tools;
+
   const ChatScreen({
     super.key,
     required this.api,
@@ -79,6 +87,7 @@ class ChatScreen extends StatefulWidget {
     this.hostedSpeechInput,
     this.accountLanguageHints = hostedLanguageHintSupported,
     this.voiceMode = false,
+    this.tools,
   });
 
   @override
@@ -89,7 +98,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _input = TextEditingController();
   final _focus = FocusNode();
   String? _chat;
-  List<ChatMessage> _messages = const [];
+  List<ChatEntry> _messages = const [];
   Object? _loadError;
   bool _loaded = false;
 
@@ -97,12 +106,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   HostedAi? _ai;
   bool _aiLooked = false;
 
-  /// The answer as it streams in; null when none is coming.
-  String? _partial;
+  /// The answer's parts as they stream in; null when none is coming.
+  List<ChatPart>? _partial;
 
-  /// What arrived since the screen last showed the answer: shown at most
+  /// Shows what arrived since the screen last showed the answer: at most
   /// about 30 times a second, not on every piece.
-  String _pending = '';
   Timer? _flush;
   bool _sending = false;
   String? _error;
@@ -516,7 +524,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       return;
     }
     try {
-      final messages = await widget.api.messages(chat);
+      final messages = await widget.api.chatEntries(chat);
       if (mounted) {
         setState(() {
           _messages = messages;
@@ -664,7 +672,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     });
   }
 
-  StreamSubscription<String>? _sub;
+  StreamSubscription<AiEvent>? _sub;
   Completer<void>? _streamDone;
 
   /// Stop writing the reply: the request is cancelled and what came so far
@@ -688,19 +696,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final sw = Stopwatch()..start();
     void lap(String what) =>
         debugPrint('[chat] +${sw.elapsedMilliseconds}ms $what');
-    final userMessage = (
+    final userParts = <ChatPart>[TextPart(text)];
+    final userMessage = ChatEntry(
       id: 'local-${_localId++}',
       role: 'user',
-      text: text,
       createdAt: DateTime.now().millisecondsSinceEpoch,
+      parts: userParts,
     );
     final asked = [..._messages, userMessage];
     setState(() {
       _sending = true;
       _error = null;
       _messages = asked;
-      _partial = '';
-      _pending = '';
+      _partial = [];
     });
     // Written in: New makes another chat from now on, also while the chat
     // itself is still being created.
@@ -713,24 +721,43 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         text.length > 40 ? '${text.substring(0, 40)}…' : text,
       );
       if (isNew) _noLongerNew();
-      await widget.api.addMessage(chat, 'user', text);
+      await widget.api.addEntry(chat, 'user', userParts);
     });
     String? spoken;
-    var answer = '';
+    // The answer's parts as they arrive: text, and tool calls in between.
+    final parts = <ChatPart>[];
     var stopped = false;
     try {
       final context = await _contextText();
       lap('context ready');
       final done = _streamDone = Completer<void>();
       var first = true;
-      _sub = ai.answer(asked, context: context).listen(
-        (delta) {
+      final tools = ai.supportsTools
+          ? (widget.tools ?? assistantTools(widget.api))
+          : null;
+      _sub = ai.run(asked, context: context, tools: tools ?? const []).listen(
+        (event) {
           if (first) {
             first = false;
-            lap('first delta');
+            lap('first event');
           }
-          answer += delta;
-          _showLater(answer);
+          switch (event) {
+            case AiTextDelta(:final text):
+              if (parts.isNotEmpty && parts.last is TextPart) {
+                parts.last = TextPart((parts.last as TextPart).text + text);
+              } else {
+                parts.add(TextPart(text));
+              }
+              _showLater(parts);
+            case AiToolStarted(:final part):
+              parts.add(part);
+              _showNow(parts);
+            case AiToolFinished(:final part):
+              final at = parts.indexWhere(
+                  (p) => p is ToolPart && p.toolCallId == part.toolCallId);
+              at < 0 ? parts.add(part) : parts[at] = part;
+              _showNow(parts);
+          }
         },
         onError: (Object e, StackTrace st) {
           if (!done.isCompleted) done.completeError(e, st);
@@ -756,18 +783,25 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _streamDone = null;
       _flush?.cancel();
       _flush = null;
-      final keep = answer.trim().isNotEmpty;
+      // A call cut off by Stop (or an error) did not finish.
+      for (var i = 0; i < parts.length; i++) {
+        final p = parts[i];
+        if (p is ToolPart && p.state.running) parts[i] = p.failed('Stopped');
+      }
+      final keep =
+          ChatEntry.textOf(parts).isNotEmpty || parts.any((p) => p is ToolPart);
       if (keep) {
-        final reply = (
+        final saved = List<ChatPart>.of(parts);
+        final reply = ChatEntry(
           id: 'local-${_localId++}',
           role: 'assistant',
-          text: answer,
           createdAt: DateTime.now().millisecondsSinceEpoch,
+          parts: saved,
         );
         _persist('assistant message', () async {
           final chat = _chat;
           if (chat != null) {
-            await widget.api.addMessage(chat, 'assistant', answer);
+            await widget.api.addEntry(chat, 'assistant', saved);
           }
         });
         if (mounted) _messages = [..._messages, reply];
@@ -780,7 +814,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       }
       lap('done');
     }
-    if (stopped || answer.trim().isEmpty) return;
+    final answer = ChatEntry.textOf(parts);
+    if (stopped || answer.isEmpty) return;
     if (_voiceLoop) {
       spoken = answer;
     } else if (widget.voiceMode && mounted) {
@@ -789,20 +824,25 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (spoken != null && mounted && _voiceLoop) await _speakThenListen(spoken);
   }
 
-  /// Shows [answer] as the partial reply on the next tick of a ~30 fps
+  /// Shows [parts] as the partial reply on the next tick of a ~30 fps
   /// clock: a fast stream redraws (and re-reads its Markdown) less often
   /// than it delivers pieces.
-  void _showLater(String answer) {
-    _pending = answer;
+  void _showLater(List<ChatPart> parts) {
     if (_flush != null || !mounted) return;
     // The first piece shows at once: the dots give way to text.
     final wait = _partial == null || _partial!.isEmpty
         ? Duration.zero
         : const Duration(milliseconds: 33);
-    _flush = Timer(wait, () {
-      _flush = null;
-      if (mounted && _partial != null) setState(() => _partial = _pending);
-    });
+    _flush = Timer(wait, () => _showNow(parts));
+  }
+
+  /// Shows [parts] as the partial reply now (a tool call starts or ends).
+  void _showNow(List<ChatPart> parts) {
+    _flush?.cancel();
+    _flush = null;
+    if (mounted && _partial != null) {
+      setState(() => _partial = List.of(parts));
+    }
   }
 
   /// Opens a link of a message: a resource in the app, anything else
@@ -855,52 +895,91 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final shown = [
       ..._messages,
       if (_partial != null)
-        (id: 'partial', role: 'assistant', text: '', createdAt: 0),
+        ChatEntry(
+            id: 'partial', role: 'assistant', createdAt: 0, parts: _partial!),
     ];
     if (shown.isEmpty) return _noAi ? _noAiState(c) : _picker(c);
-    return ListView.builder(
-      reverse: true,
-      padding: const EdgeInsets.all(16),
-      itemCount: shown.length,
-      itemBuilder: (context, i) {
-        final m = shown[shown.length - 1 - i];
-        final mine = m.role == 'user';
-        return Align(
-          alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.85,
+    return LayoutBuilder(
+      builder: (context, box) => ListView.builder(
+        reverse: true,
+        padding: const EdgeInsets.all(16),
+        itemCount: shown.length,
+        itemBuilder: (context, i) {
+          final m = shown[shown.length - 1 - i];
+          final mine = m.role == 'user';
+          return Align(
+            alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              constraints: BoxConstraints(
+                // An answer may hold code and tables: a little wider.
+                maxWidth: (box.maxWidth - 32) * (mine ? 0.85 : 0.95),
+              ),
+              decoration: BoxDecoration(
+                color: mine ? c.mainSelectedBg : c.bg1,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: _bubble(c, m, mine),
             ),
-            decoration: BoxDecoration(
-              color: mine ? c.mainSelectedBg : c.bg1,
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: m.id == 'partial'
-                ? (_partial!.isEmpty
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : MarkdownView(
-                        _partial!,
-                        key: const Key('chat-partial'),
-                        streaming: true,
-                        onLink: _openLink,
-                      ))
-                : MarkdownView(
-                    m.text,
-                    inline: mine,
-                    style: TextStyle(
-                      color: mine ? c.mainSelectedFg : c.textPrimary,
-                    ),
-                    onLink: _openLink,
-                  ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// What a message shows: its text in Markdown, its tool calls as steps.
+  Widget _bubble(AppColors c, ChatEntry m, bool mine) {
+    final partial = m.id == 'partial';
+    if (partial && m.parts.isEmpty) {
+      return const SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+    final titles = toolTitles(m.parts);
+    final children = <Widget>[];
+    for (var i = 0; i < m.parts.length; i++) {
+      final p = m.parts[i];
+      final last = i == m.parts.length - 1;
+      final Widget? w = switch (p) {
+        TextPart(:final text) when text.trim().isNotEmpty => MarkdownView(
+            text,
+            key: partial && last ? const Key('chat-partial') : null,
+            streaming: partial && last,
+            inline: mine,
+            style: mine ? TextStyle(color: c.mainSelectedFg) : null,
+            onLink: _openLink,
           ),
-        );
-      },
+        ToolPart() =>
+          ToolStepRow(p, key: ValueKey(p.toolCallId), titles: titles),
+        _ => null,
+      };
+      if (w == null) continue;
+      if (children.isNotEmpty) {
+        children.add(SizedBox(height: p is ToolPart ? 2 : 8));
+      }
+      children.add(w);
+    }
+    // Still thinking after a tool call: the dots say so.
+    if (partial &&
+        m.parts.last is ToolPart &&
+        !(m.parts.last as ToolPart).state.running) {
+      children.add(const Padding(
+        padding: EdgeInsets.only(top: 6),
+        child: SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ));
+    }
+    if (children.length == 1) return children.single;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: children,
     );
   }
 

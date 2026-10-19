@@ -9,7 +9,9 @@ export 'package:atomic_flutter/atomic_flutter.dart'
 // The seam to the host's store, and what goes through it.
 export 'src/assistant_api.dart';
 export 'src/models.dart';
+export 'src/chat_parts.dart';
 export 'src/hosted_ai.dart';
+export 'src/ai_tools.dart';
 
 // The shell: pages above a bottom bar that never moves.
 export 'src/app_shell.dart';
@@ -42,5 +44,6 @@ export 'src/hosted_voice.dart';
 // Small widgets.
 export 'src/fading_text.dart';
 export 'src/markdown_view.dart';
+export 'src/tool_step.dart';
 export 'src/list_and_field.dart';
 export 'src/atomic_place_mark.dart';

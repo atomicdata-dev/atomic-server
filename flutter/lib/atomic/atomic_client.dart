@@ -5,7 +5,9 @@ import 'package:atomic_chat/atomic_chat.dart'
     show
         ActivityEntry,
         AssistantJson,
+        ChatEntry,
         ChatMessage,
+        ChatPart,
         ChatRoomMessage,
         ChatSummary,
         ConversationMessage,
@@ -209,6 +211,16 @@ class AtomicClient {
         partsJson: AssistantJson.textParts(text),
       );
 
+  /// Adds a message by [role] with all its [parts] (text, files, tool calls,
+  /// in the web app's format) to [chat]; returns the entry's id.
+  static Future<String> appendChatEntryParts(
+          String chat, String role, List<ChatPart> parts) =>
+      assistant.appendChatEntry(
+        chat: chat,
+        role: role,
+        partsJson: jsonEncode([for (final p in parts) p.toJson()]),
+      );
+
   /// Readable text of [subject] from the local store (title, class,
   /// properties, children, document text), at most [maxChars] long.
   static Future<String> resourceText(String subject, {int maxChars = 4000}) =>
@@ -216,6 +228,11 @@ class AtomicClient {
 
   static Future<List<ChatMessage>> readChat(String subject) async =>
       AssistantJson.parseChatMessages(
+          await assistant.readChat(subject: subject));
+
+  /// Every message of an AI chat with all its parts, oldest first.
+  static Future<List<ChatEntry>> readChatEntries(String subject) async =>
+      AssistantJson.parseChatEntries(
           await assistant.readChat(subject: subject));
 
   /// Searches every drive; only in [drive] when it is given.

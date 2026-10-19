@@ -80,6 +80,12 @@ class AtomicAssistantApi extends AssistantApi {
   Future<void> addMessage(String chat, String role, String text) =>
       AtomicClient.appendChatEntry(chat, role, text);
   @override
+  Future<List<ChatEntry>> chatEntries(String chat) =>
+      AtomicClient.readChatEntries(chat);
+  @override
+  Future<void> addEntry(String chat, String role, List<ChatPart> parts) =>
+      AtomicClient.appendChatEntryParts(chat, role, parts);
+  @override
   Future<String> resourceText(String subject, {int maxChars = 4000}) =>
       AtomicClient.resourceText(subject, maxChars: maxChars);
   @override

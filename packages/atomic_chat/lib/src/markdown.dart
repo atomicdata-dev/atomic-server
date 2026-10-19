@@ -405,10 +405,10 @@ class MdLink extends MdInline {
   const MdLink(this.url, this.children, {this.image = false});
 }
 
-final _bareUrl = RegExp(
-    r'(?:https?://|atomic:|did:ad:|mailto:)[^\s<>"`]*[^\s<>"`.,;:!?)\]}'
-    "'"
-    r']');
+final _bareUrl =
+    RegExp(r'(?:https?://|atomic:|did:ad:|mailto:)[^\s<>"`]*[^\s<>"`.,;:!?)\]}'
+        "'"
+        r']');
 final _escapable = RegExp(r'''[\\`*_{}\[\]()#+\-.!|~<>"']''');
 
 bool _isWord(String s, int i) =>

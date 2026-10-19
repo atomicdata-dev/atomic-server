@@ -1,3 +1,4 @@
+import 'chat_parts.dart';
 import 'hosted_ai.dart';
 import 'models.dart';
 
@@ -75,6 +76,18 @@ abstract class AssistantApi {
 
   /// Adds a text message by [role] (`user` or `assistant`) to [chat].
   Future<void> addMessage(String chat, String role, String text);
+
+  /// The messages of an AI chat with all their parts (files, tool calls),
+  /// oldest first. A host that stores only text can leave this: it reads
+  /// [messages].
+  Future<List<ChatEntry>> chatEntries(String chat) async =>
+      [for (final m in await messages(chat)) ChatEntry.text(m)];
+
+  /// Adds a message by [role] with all its [parts] to [chat], in the web
+  /// app's format. A host that stores only text can leave this: it writes
+  /// the text parts with [addMessage].
+  Future<void> addEntry(String chat, String role, List<ChatPart> parts) =>
+      addMessage(chat, role, ChatEntry.textOf(parts));
 
   /// Readable text of [subject] (for an AI's context), at most [maxChars].
   Future<String> resourceText(String subject, {int maxChars = 4000});
