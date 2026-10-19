@@ -30,6 +30,16 @@ class _CoveredInsetsFreezeState extends State<CoveredInsetsFreeze> {
   MediaQueryData? _frozen;
   bool _holding = false;
   Timer? _release;
+  double? _lastBottom;
+  bool _releasing = false;
+  bool _moved = false;
+
+  void _scheduleRelease() {
+    _release?.cancel();
+    _release = Timer(CoveredInsetsFreeze.hold, () {
+      if (mounted) setState(() => _holding = false);
+    });
+  }
 
   @override
   void didChangeDependencies() {
@@ -40,9 +50,9 @@ class _CoveredInsetsFreezeState extends State<CoveredInsetsFreeze> {
     if (!current) {
       _holding = true;
     } else if (_holding) {
-      _release = Timer(CoveredInsetsFreeze.hold, () {
-        if (mounted) setState(() => _holding = false);
-      });
+      _lastBottom = null;
+      _moved = false;
+      _scheduleRelease();
     }
   }
 
@@ -63,7 +73,31 @@ class _CoveredInsetsFreezeState extends State<CoveredInsetsFreeze> {
         _frozen = null;
         return MediaQuery(data: live, child: child);
       }
-      return MediaQuery(data: _frozen ??= live, child: child);
+      final frozen = _frozen ??= live;
+      final route = ModalRoute.of(context);
+      if (route != null && route.isCurrent) {
+        // Back on top. The keyboard of this page may be coming back, and
+        // letting go of the old insets while it is half way would make the
+        // page jump: it is released when the keyboard has got where it was
+        // (at once) or has been still for a moment.
+        final bottom = live.viewInsets.bottom;
+        if (_lastBottom != null && bottom != _lastBottom) {
+          _moved = true;
+          _scheduleRelease();
+        }
+        _lastBottom = bottom;
+        if (_moved && bottom == frozen.viewInsets.bottom && !_releasing) {
+          _releasing = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _releasing = false;
+            if (mounted && _lastBottom == frozen.viewInsets.bottom) {
+              _release?.cancel();
+              setState(() => _holding = false);
+            }
+          });
+        }
+      }
+      return MediaQuery(data: frozen, child: child);
     });
   }
 }

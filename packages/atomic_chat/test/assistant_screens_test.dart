@@ -2317,6 +2317,41 @@ void main() {
       expect(builds, greaterThan(back));
     });
 
+    testWidgets(
+        'a page back on top keeps its layout while the keyboard returns',
+        (tester) async {
+      final seen = <double>[];
+      final key = GlobalKey<NavigatorState>();
+      await tester.pumpWidget(MaterialApp(
+        navigatorKey: key,
+        home: CoveredInsetsFreeze(
+          child: Builder(builder: (context) {
+            seen.add(MediaQuery.of(context).viewInsets.bottom);
+            return const Scaffold(body: Text('results'));
+          }),
+        ),
+      ));
+      addTearDown(tester.view.resetViewInsets);
+      tester.view.viewInsets = FakeViewPadding(bottom: 500);
+      await tester.pump();
+      key.currentState!.push(MaterialPageRoute<void>(
+          builder: (_) => const Scaffold(body: Text('result'))));
+      await tester.pumpAndSettle();
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pump();
+      key.currentState!.pop();
+      await tester.pump();
+      seen.clear();
+      // The keyboard comes back as the page slides in, over about 500 ms.
+      for (var i = 1; i <= 31; i++) {
+        tester.view.viewInsets = FakeViewPadding(bottom: 500.0 * i / 31);
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.pump(CoveredInsetsFreeze.hold);
+      expect(seen.where((b) => b != 500), isEmpty,
+          reason: 'no half-way layout: $seen');
+    });
+
     testWidgets('Home goes back to the home screen from any page',
         (tester) async {
       await tester.pumpWidget(
