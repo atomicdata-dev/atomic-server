@@ -45,6 +45,8 @@ export type UseVaultBackup = {
   status: VaultStatus;
   busy: boolean;
   error: string | null;
+  /** This device's public key, to mark its row in the storage dialog. */
+  devicePubkey: string | null;
   enable: () => Promise<void>;
   disable: () => Promise<void>;
   backupNow: () => Promise<void>;
@@ -497,6 +499,7 @@ export function useVaultBackup({
     status,
     busy,
     error,
+    devicePubkey,
     downloadBackup,
     restoreFromFile,
     enable,

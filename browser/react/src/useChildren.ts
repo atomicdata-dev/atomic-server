@@ -49,6 +49,18 @@ export function useChildren(
   const [total, setTotal] = useState(0);
   const disabled = !parentSubject;
 
+  // The hook stays mounted when the parent changes (the sidebar switching
+  // drives), but the list belongs to one parent. Reset it during render, so
+  // the previous parent's children are never returned for the new one and the
+  // "never produced a list yet" check below means "for this parent".
+  const [listParent, setListParent] = useState(parentSubject);
+
+  if (listParent !== parentSubject) {
+    setListParent(parentSubject);
+    setSubjects([]);
+    setTotal(0);
+  }
+
   // `subjectsRef` mirrors `subjects` for the `ResourceUpdated` listener
   // below — that listener subscribes once and reads the latest list
   // from the ref instead of being torn down + recreated on every
@@ -118,6 +130,11 @@ export function useChildren(
     // collection-invalidate path can trigger overlapping runs when the
     // user creates resources faster than `waitForReady` resolves, and
     // the late writer used to overwrite the new data with the old.
+    // `useCollection` keeps handing out the previous parent's collection until
+    // the new one is ready. Its members are not ours; this runs again once the
+    // collection for this parent arrives.
+    if (collection.value !== parentSubject) return;
+
     let cancelled = false;
 
     const extractMembers = async (attempt = 0) => {
@@ -200,7 +217,7 @@ export function useChildren(
     return () => {
       cancelled = true;
     };
-  }, [collection, disabled, limit, sortMembers, store]);
+  }, [collection, disabled, limit, parentSubject, sortMembers, store]);
 
   /**
    * Re-sort when any current child's `sortOrder` (or `createdAt`)
