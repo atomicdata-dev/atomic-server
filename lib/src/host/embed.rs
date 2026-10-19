@@ -489,6 +489,52 @@ mod tests {
         assert!(rows[2]["jsonAd"].is_null());
     }
 
+    /// A fresh account (Get Started → a name → Continue) opens its drive
+    /// first: the page reads it under the `atomic:` spelling Home hands over,
+    /// and must get its name, class and Loro state, plus an empty child list.
+    /// The auth proof a web page would sign for a cookie is refused, so the
+    /// page must never depend on it (`noServer` in the embed's store).
+    #[tokio::test]
+    async fn a_fresh_identitys_drive_opens_with_its_name() {
+        let store = Db::init_redb(None).await.unwrap();
+        let (_agent, drive) = store.setup("Tester").await.unwrap();
+        let d = Device {
+            node: AtomicNode::from_db(store.clone()),
+            store,
+            recents: crate::host::recents::RecentsIndex::new(),
+            drive,
+        };
+        let h = host(&d);
+        let atomic = d.drive.replacen("did:ad:", "atomic:", 1);
+
+        let rows = ask(&h, "getResourcesWithSnapshots", json!([[atomic]])).await;
+        let json_ad: Json = serde_json::from_str(rows[0]["jsonAd"].as_str().unwrap()).unwrap();
+        assert_eq!(json_ad["@id"], json!(atomic));
+        assert_eq!(json_ad[urls::NAME], json!("Tester's Drive"));
+        assert_eq!(json_ad[urls::IS_A], json!([urls::DRIVE]));
+        assert!(!rows[0]["snapshot"].as_str().unwrap().is_empty());
+
+        let children = ask(
+            &h,
+            "query",
+            json!([{ "property": urls::PARENT, "value": atomic, "limit": 10 }]),
+        )
+        .await;
+        assert_eq!(children["count"], 0);
+
+        let agent = ask(&h, "agent", json!([])).await;
+        let auth_proof = json!({
+            "https://atomicdata.dev/properties/auth/requestedSubject": "https://embed.invalid",
+            "https://atomicdata.dev/properties/auth/publicKey": "key",
+            "https://atomicdata.dev/properties/auth/agent": agent,
+            "https://atomicdata.dev/properties/auth/timestamp": 1,
+        });
+        assert!(h
+            .call("sign", &json!([auth_proof.to_string()]).to_string())
+            .await
+            .is_err());
+    }
+
     /// Answers one agent's profile and counts the calls.
     struct Profiles(std::sync::atomic::AtomicUsize, Option<String>);
 
