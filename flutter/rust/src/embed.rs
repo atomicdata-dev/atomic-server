@@ -3,11 +3,13 @@
 //! `atomic_lib`. One request is a method name and its arguments as JSON; the
 //! answer is JSON, with bytes as base64. See `planning/flutter-resource-webview.md`.
 //!
-//! Writes: the agent's secret stays here. The page can have exactly one kind of
-//! thing signed, a commit that names this agent as its signer (`sign`), and
-//! hand a signed commit back (`applyCommit`), which is applied like any local
-//! edit and queued for the server and peers. There is no raw signing, so a
-//! script inside the page cannot get a signature over anything else.
+//! Writes: the agent's secret stays here. The page can have two kinds of thing
+//! signed: a commit that names this agent as its signer (`sign`), and the
+//! genesis certificate that mints a new resource's DID (`signBytes`, only for
+//! bytes that decode as a certificate of this agent). It hands a signed commit
+//! back (`applyCommit`, the page's commit transport), which is applied like any
+//! local edit and queued for the server and peers. There is no raw signing, so
+//! a script inside the page cannot get a signature over anything else.
 
 use crate::api::simple::state::{db, err, node};
 use atomic_lib::{agents::ForAgent, storelike::Query, Resource, Storelike, Subject};
@@ -208,6 +210,66 @@ fn sign_commit(store: &atomic_lib::Db, payload: &str) -> Result<String, String> 
     atomic_lib::agents::sign_message(payload.as_bytes(), &key).map_err(err)
 }
 
+/// Signs a genesis certificate (base64 bytes) that names this device's agent
+/// as its signer: how the page mints the DID of a resource it creates
+/// (`Store.mintCertDid`, `Agent.privateDriveSubject`). The exact bytes are
+/// signed, as the page encoded them; anything that is not such a certificate
+/// is refused.
+fn sign_genesis_cert(store: &atomic_lib::Db, payload_b64: &str) -> Result<String, String> {
+    let agent = store.get_default_agent().map_err(err)?;
+    let bytes = atomic_lib::agents::decode_base64(payload_b64).map_err(err)?;
+    let cert = atomic_lib::genesis::GenesisCert::decode(&bytes)
+        .map_err(|_| "only a genesis certificate is signed as bytes")?;
+    let own_key = atomic_lib::agents::decode_base64(&agent.public_key).map_err(err)?;
+    if cert.signer_pubkey.as_slice() != own_key.as_slice() {
+        return Err("only a genesis certificate of this device's agent is signed".into());
+    }
+    let key = agent
+        .private_key
+        .ok_or("this device holds no secret for its agent")?;
+    atomic_lib::agents::sign_message(&bytes, &key).map_err(err)
+}
+
+/// A snapshot written together with outbox rows is the page's offline path
+/// (`Resource.saveOffline`): an edit kept for the page's own database, which
+/// here does not exist. It only happens when the page has no commit transport,
+/// and then the edit is lost: say so in the log.
+fn warn_unkept_local_edit(method: &str, outbox: Option<&Json>) {
+    let subjects: Vec<&str> = outbox
+        .and_then(|o| o.get("puts"))
+        .and_then(Json::as_array)
+        .map(|puts| {
+            puts.iter()
+                .filter_map(|p| p.get("subject").and_then(Json::as_str))
+                .collect()
+        })
+        .unwrap_or_default();
+    if !subjects.is_empty() {
+        tracing::warn!(
+            "[embed] {method} carries an offline edit of {subjects:?}, which is not kept: \
+             the page saves through applyCommit, so it is running without a commit transport"
+        );
+    }
+}
+
+/// The page hands over a commit as its `Client.postCommit` body: signed, but
+/// without an `@id` (a commit's id is derived from its signature, and the
+/// signed bytes never carry it). The local store reads a commit as a resource,
+/// so it gets the id a server would give it.
+fn with_commit_id(commit_json: &str) -> Result<String, String> {
+    let mut commit: Json = serde_json::from_str(commit_json).map_err(|e| e.to_string())?;
+    let object = commit.as_object_mut().ok_or("a commit is a JSON object")?;
+    if !object.contains_key("@id") {
+        let signature = object
+            .get(atomic_lib::urls::SIGNATURE)
+            .and_then(Json::as_str)
+            .ok_or("only a signed commit is applied")?;
+        let id = atomic_lib::identifiers::commit_subject(signature);
+        object.insert("@id".into(), json!(id));
+    }
+    Ok(commit.to_string())
+}
+
 /// One call from the page.
 pub(crate) async fn call(method: &str, args_json: &str) -> Result<String, String> {
     let args: Vec<Json> = serde_json::from_str(args_json).map_err(|e| e.to_string())?;
@@ -259,31 +321,41 @@ pub(crate) async fn call(method: &str, args_json: &str) -> Result<String, String
         "getBlob" => Json::Null,
         "flush" => Json::Null,
         "outboxEntries" => json!([]),
+        // The page's outbox bookkeeping: what it has yet to hand over. Its
+        // edits reach `applyCommit` within the page's life, so none is kept.
         "outboxWrite" => Json::Null,
-        // The page's local cache writes back what it just read; the real store
-        // already has it, so there is nothing to keep.
-        "putResource"
-        | "putResources"
-        | "putResourceWithSnapshot"
-        | "putBlob"
-        | "applyPeerCommit"
-        | "removeResource" => Json::Null,
+        // The page's local cache writes back what it just read, or what a
+        // commit it gave `applyCommit` already wrote here: the real store has
+        // it, so there is nothing to keep. An edit never travels this way.
+        "putResourceWithSnapshot" => {
+            warn_unkept_local_edit(method, args.get(3));
+            Json::Null
+        }
+        "putResource" | "putResources" | "putBlob" | "applyPeerCommit" | "removeResource" => {
+            Json::Null
+        }
         "publicKey" => match store.get_default_agent() {
             Ok(agent) => json!(agent.public_key),
             Err(_) => Json::Null,
         },
         "sign" => json!(sign_commit(store, str_arg(&args, 0)?)?),
+        "signBytes" => json!(sign_genesis_cert(store, str_arg(&args, 0)?)?),
         "applyCommit" => {
             let node = node()?;
+            let commit = with_commit_id(str_arg(&args, 0)?)?;
             let response = node
-                .apply_commit(
-                    str_arg(&args, 0)?,
-                    atomic_lib::runtime::IngestPolicy::LocalCache,
-                )
+                .apply_commit(&commit, atomic_lib::runtime::IngestPolicy::LocalCache)
                 .await
                 .map_err(err)?;
             node.outbox().mark_dirty(&response).await.map_err(err)?;
-            crate::api::simple::push_local_write(&response, store).await;
+            // Applied and queued: that is what the page waits for (its save,
+            // and leaving the page, wait on this answer). Sending it on to the
+            // server and peers can take a network round trip, so it goes on
+            // without the page.
+            let store: &'static atomic_lib::Db = db()?.as_ref();
+            tokio::spawn(async move {
+                crate::api::simple::push_local_write(&response, store).await;
+            });
             Json::Null
         }
         other => {
@@ -400,9 +472,9 @@ mod tests {
     #[tokio::test]
     async fn only_a_commit_by_this_agent_gets_signed() {
         shared_drive().await;
-        // No raw signing at all.
+        // No raw signing: bytes that are not a genesis certificate are refused.
         let refused = call("signBytes", "[\"eA\"]").await.unwrap_err();
-        assert!(refused.contains("not available"), "{refused}");
+        assert!(refused.contains("genesis certificate"), "{refused}");
         // Not a commit, or someone else's commit.
         assert!(call("sign", "[\"hello\"]").await.is_err());
         let agent = ask("agent", json!([])).await;
@@ -424,5 +496,154 @@ mod tests {
             signature.as_str().is_some_and(|s| s.len() > 60),
             "{signature}"
         );
+    }
+
+    /// The page mints a new resource's DID by having its genesis certificate
+    /// signed (`Store.mintCertDid`): this agent's certificate is signed, byte
+    /// for byte, and one naming another key is not.
+    #[tokio::test]
+    async fn a_genesis_certificate_of_this_agent_gets_signed() {
+        use atomic_lib::genesis::GenesisCert;
+        shared_drive().await;
+        let agent = db().unwrap().get_default_agent().unwrap();
+        let own: [u8; 32] = atomic_lib::agents::decode_base64(&agent.public_key)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let cert = |key: [u8; 32]| {
+            let c = GenesisCert::new_v2(key, 1_780_000_000_000, [7; 16], None, "", "");
+            atomic_lib::agents::encode_base64(&c.encode())
+        };
+
+        let signature = ask("signBytes", json!([cert(own)])).await;
+        let signature = signature.as_str().unwrap();
+        let mine = GenesisCert::new_v2(own, 1_780_000_000_000, [7; 16], None, "", "");
+        mine.verify(signature).expect("a valid signature over the cert");
+
+        let refused = call("signBytes", &json!([cert([9; 32])]).to_string())
+            .await
+            .unwrap_err();
+        assert!(refused.contains("this device's agent"), "{refused}");
+    }
+
+    /// Bytes in a commit's `loroUpdate` are standard, padded base64, as the
+    /// page's `encodeB64` writes them.
+    fn standard_base64(bytes: &[u8]) -> String {
+        let url_safe = atomic_lib::agents::encode_base64(bytes).replace('-', "+").replace('_', "/");
+        let pad = (4 - url_safe.len() % 4) % 4;
+        format!("{url_safe}{}", "=".repeat(pad))
+    }
+
+    /// The data loss this guards against: text typed into a document in the
+    /// page was gone when the document was opened again. The page saves by
+    /// signing a commit (`sign`) and handing it over (`applyCommit`, its commit
+    /// transport); reopening reads `getResourcesWithSnapshots`. Here the commit
+    /// is made the way the page makes it for a DocumentV2 edit: a Loro update
+    /// on top of the stored state, `previousCommit`, signed through `sign`.
+    #[tokio::test]
+    async fn a_typed_edit_to_a_document_is_there_when_it_is_opened_again() {
+        use atomic_lib::loro::AtomicLoroDoc;
+        let drive = shared_drive().await;
+        let store = db().unwrap();
+        let doc_subject = store
+            .create_resource(urls::DOCUMENT_V2, drive, "Typed doc", None)
+            .await
+            .unwrap();
+        let subject = subject_of(store, &doc_subject);
+
+        // The page's view of the document, as it opened it.
+        let opened = ask("getResourcesWithSnapshots", json!([[doc_subject]])).await;
+        let snapshot = atomic_lib::agents::decode_base64(opened[0]["snapshot"].as_str().unwrap())
+            .unwrap();
+        let page_doc = AtomicLoroDoc::from_snapshot(&snapshot).unwrap();
+        page_doc.set_peer_id(0x5eed).unwrap();
+        let before = page_doc.oplog_vv();
+        // Typing: the editor writes into the document's text.
+        page_doc
+            .doc()
+            .get_text("documentContent")
+            .insert(0, "Quokkatyped on the phone")
+            .unwrap();
+        page_doc.commit_with_message("e-typing");
+        let update = page_doc.export_updates_since(&before);
+        assert!(!update.is_empty());
+
+        // The commit, built and signed as the page does.
+        let agent = ask("agent", json!([])).await;
+        let previous = store
+            .get_resource(&subject)
+            .await
+            .unwrap()
+            .get(urls::LAST_COMMIT)
+            .map(|v| v.to_string())
+            .unwrap_or_else(|_| "did:ad:commit:earlier".to_string());
+        let mut commit = json!({
+            urls::IS_A: [urls::COMMIT],
+            urls::SUBJECT: doc_subject,
+            urls::SIGNER: agent,
+            urls::CREATED_AT: atomic_lib::utils::now(),
+            urls::PREVIOUS_COMMIT: previous,
+            urls::LORO_UPDATE: standard_base64(&update),
+        });
+        let signature = ask("sign", json!([commit.to_string()])).await;
+        commit[urls::SIGNATURE] = signature;
+
+        assert_eq!(
+            ask("applyCommit", json!([commit.to_string()])).await,
+            Json::Null
+        );
+
+        // Opening it again: the typed text is in what the page reads.
+        let reopened = ask("getResourcesWithSnapshots", json!([[doc_subject]])).await;
+        assert!(reopened[0]["jsonAd"].as_str().unwrap().contains("Typed doc"));
+        let snapshot =
+            atomic_lib::agents::decode_base64(reopened[0]["snapshot"].as_str().unwrap()).unwrap();
+        let text = AtomicLoroDoc::from_snapshot(&snapshot)
+            .unwrap()
+            .extract_document_plain_text();
+        assert!(text.contains("Quokkatyped on the phone"), "{text:?}");
+
+        // And it is queued to go to the server and peers.
+        assert!(
+            node().unwrap().outbox().has_pending(&subject.pure_id()),
+            "the edit is queued for sync"
+        );
+    }
+
+    /// A resource made in the page ("New resource") arrives as a genesis
+    /// commit, in the `Client.postCommit` body: no `@id`.
+    #[tokio::test]
+    async fn a_new_resource_from_the_page_is_stored() {
+        shared_drive().await;
+        // A genesis commit made elsewhere, as it would cross the wire.
+        let maker = atomic_lib::Db::init_redb(Some("https://localhost".into()))
+            .await
+            .unwrap();
+        maker.populate().await.unwrap();
+        let (_agent, drive) = maker.setup("Maker").await.unwrap();
+        let mut draft = Resource::new("did:ad:placeholder".into());
+        draft
+            .set_unsafe(
+                urls::NAME.into(),
+                atomic_lib::Value::String("Made in the page".into()),
+            )
+            .unwrap();
+        draft
+            .set_unsafe(urls::PARENT.into(), atomic_lib::Value::AtomicUrl(drive.into()))
+            .unwrap();
+        let response = draft.save_as_genesis(&maker).await.unwrap();
+        let subject = response.commit.subject.to_string();
+        let body = atomic_lib::client::commit_to_wire_json(&response.commit, &maker)
+            .await
+            .unwrap();
+        assert!(!body.contains("\"@id\""));
+
+        assert_eq!(ask("applyCommit", json!([body])).await, Json::Null);
+
+        let rows = ask("getResourcesWithSnapshots", json!([[subject]])).await;
+        assert!(rows[0]["jsonAd"]
+            .as_str()
+            .unwrap()
+            .contains("Made in the page"));
     }
 }
