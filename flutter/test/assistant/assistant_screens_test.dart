@@ -203,7 +203,7 @@ void main() {
       expect(api.opened, ['b3']);
     });
 
-    testWidgets('a drive opens its recently opened resources', (tester) async {
+    testWidgets('a drive opens as a resource page', (tester) async {
       final api = _PerDrive(
         driveList: [(subject: 'did:ad:a', name: 'Alpha')],
         byDrive: {
@@ -216,9 +216,12 @@ void main() {
       await tester.pumpWidget(
           app(ChatsScreen(drive: 'did:ad:a', api: api, onOpenGallery: () {})));
       await tester.pumpAndSettle();
+      ResourceView.serverFactory = () async => throw 'no server in a test';
       await tester.tap(find.text('Alpha').first);
       await tester.pumpAndSettle();
-      expect(find.text('Doc 0'), findsOneWidget);
+      final page = tester.widget<ResourceView>(find.byType(ResourceView));
+      expect(page.subject, 'did:ad:a');
+      expect(page.drive, 'did:ad:a');
     });
 
     testWidgets('the icon row has profile, notifications, sync, settings',

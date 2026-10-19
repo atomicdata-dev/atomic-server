@@ -15,18 +15,20 @@ use rustls::{ClientConfig, RootCertStore};
 /// Android. The bundled set is always added, so an empty or unreadable system
 /// store still yields a working client. Unparsable system certificates are
 /// skipped.
+#[cfg_attr(not(any(target_os = "android", test)), allow(dead_code))]
 pub(crate) fn root_store() -> RootCertStore {
     let mut roots = RootCertStore::empty();
     roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
     #[cfg(target_os = "android")]
-    for cert in rustls_native_certs::load_native_certs().certs {
-        let _ = roots.add(cert);
+    for der in super::helpers::android_root_ders() {
+        let _ = roots.add(rustls::pki_types::CertificateDer::from(der.clone()));
     }
     roots
 }
 
 /// A client config using the ring provider explicitly (never the process
 /// default) and [`root_store`].
+#[cfg_attr(not(any(target_os = "android", test)), allow(dead_code))]
 pub(crate) fn build_client_config() -> Result<ClientConfig, rustls::Error> {
     Ok(
         ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))

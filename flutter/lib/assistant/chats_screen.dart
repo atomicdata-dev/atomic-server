@@ -139,8 +139,13 @@ class _ChatsScreenState extends State<ChatsScreen> {
   Widget _driveRow(DriveInfo d) => ResourceRow(
         icon: Icons.folder_outlined,
         title: d.name.isEmpty ? 'Untitled drive' : d.name,
-        onTap: () => _push(_DriveRecentsPage(
-            api: widget.api, drive: d, onOpen: _openResource)),
+        // The drive itself, drawn by the page: everything in it, read from
+        // the store with the same query the web app uses.
+        onTap: () => _push(ResourceView(
+            api: widget.api,
+            drive: d.subject,
+            subject: d.subject,
+            title: d.name)),
       );
 
   Widget _chatRow(ChatSummary chat) => ResourceRow(
@@ -438,60 +443,6 @@ class _ListPage extends StatelessWidget {
       backgroundColor: c.bgBody,
       appBar: AppBar(backgroundColor: c.bgBody, title: Text(title)),
       body: ListView(children: children),
-    );
-  }
-}
-
-/// One drive: the resources opened lately in it.
-class _DriveRecentsPage extends StatefulWidget {
-  final AssistantApi api;
-  final DriveInfo drive;
-  final void Function(String drive, RecentResource) onOpen;
-
-  const _DriveRecentsPage({
-    required this.api,
-    required this.drive,
-    required this.onOpen,
-  });
-
-  @override
-  State<_DriveRecentsPage> createState() => _DriveRecentsPageState();
-}
-
-class _DriveRecentsPageState extends State<_DriveRecentsPage> {
-  late final Future<List<RecentResource>> _recent =
-      widget.api.recentResources(widget.drive.subject);
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.appColors;
-    return Scaffold(
-      backgroundColor: c.bgBody,
-      appBar: AppBar(
-        backgroundColor: c.bgBody,
-        title: Text(
-            widget.drive.name.isEmpty ? 'Untitled drive' : widget.drive.name),
-      ),
-      body: FutureBuilder<List<RecentResource>>(
-        future: _recent,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child:
-                  Text('${snapshot.error}', style: TextStyle(color: c.alert)),
-            );
-          }
-          final recent = snapshot.data;
-          if (recent == null) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (recent.isEmpty) return _Empty('Nothing opened yet', c);
-          return ListView(children: [
-            for (final r in recent)
-              _resourceRow(r, widget.onOpen, widget.drive.subject),
-          ]);
-        },
-      ),
     );
   }
 }

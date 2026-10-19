@@ -160,19 +160,54 @@ mod ssrf_guard {
     }
 }
 
-/// The system's CA certificates, read once. On Android reqwest's default
-/// verifier (rustls-platform-verifier) needs JNI initialisation from the host
-/// app and panics on the first HTTPS request without it ("Expect
-/// rustls-platform-verifier to be initialized"), so the roots are handed over
-/// directly and verified by rustls itself.
+/// The system's CA certificates as DER, read once from the places Android keeps
+/// them: the conscrypt APEX (Android 14+) and the older system directory. The
+/// usual loaders (`rustls-native-certs`, `openssl-probe`) look in neither on a
+/// current phone and find no roots at all. Each file is one PEM certificate.
+#[cfg(target_os = "android")]
+pub(crate) fn android_root_ders() -> &'static [Vec<u8>] {
+    use base64::Engine;
+    static ROOTS: std::sync::OnceLock<Vec<Vec<u8>>> = std::sync::OnceLock::new();
+    ROOTS.get_or_init(|| {
+        let mut ders = Vec::new();
+        for dir in [
+            "/apex/com.android.conscrypt/cacerts",
+            "/system/etc/security/cacerts",
+        ] {
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let Ok(text) = std::fs::read_to_string(entry.path()) else {
+                    continue;
+                };
+                let Some(start) = text.find("-----BEGIN CERTIFICATE-----") else {
+                    continue;
+                };
+                let body = &text[start + "-----BEGIN CERTIFICATE-----".len()..];
+                let Some(end) = body.find("-----END CERTIFICATE-----") else {
+                    continue;
+                };
+                let b64: String = body[..end].split_whitespace().collect();
+                if let Ok(der) = base64::engine::general_purpose::STANDARD.decode(b64) {
+                    ders.push(der);
+                }
+            }
+            if !ders.is_empty() {
+                break;
+            }
+        }
+        ders
+    })
+}
+
 #[cfg(target_os = "android")]
 fn android_roots() -> &'static [reqwest::Certificate] {
     static ROOTS: std::sync::OnceLock<Vec<reqwest::Certificate>> = std::sync::OnceLock::new();
     ROOTS.get_or_init(|| {
-        rustls_native_certs::load_native_certs()
-            .certs
+        android_root_ders()
             .iter()
-            .filter_map(|der| reqwest::Certificate::from_der(der.as_ref()).ok())
+            .filter_map(|der| reqwest::Certificate::from_der(der).ok())
             .collect()
     })
 }
