@@ -176,4 +176,35 @@ void main() {
     expect(sent!.length, HostedAi.maxHistoryMessages + 1);
     expect(sent!.last['content'], 'again');
   });
+
+  testWidgets(
+      'a streamed Markdown answer renders as it arrives, redrawn at most '
+      'about 30 times a second', (tester) async {
+    final controller = StreamController<String>();
+    final api = _Api(_ai(() => controller.stream));
+    await tester.pumpWidget(_app(ChatScreen(api: api)));
+    await tester.pumpAndSettle();
+    await _type(tester, 'Hi');
+
+    controller.add('## Steps');
+    await tester.pump(const Duration(milliseconds: 1));
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(find.text('Steps'), findsOneWidget);
+    // Many pieces within one frame of the clock: shown together, once.
+    for (final piece in ['\n\n1. **one', '**\n2. two', '\n\n```sh\nls']) {
+      controller.add(piece);
+    }
+    await tester.pump();
+    expect(find.text('one'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 40));
+    expect(find.text('one'), findsOneWidget);
+    expect(find.text('ls'), findsOneWidget);
+    expect(find.text('sh'), findsOneWidget);
+
+    await controller.close();
+    await tester.pumpAndSettle();
+    expect(find.text('Steps'), findsOneWidget);
+    expect(find.text('ls'), findsOneWidget);
+    expect(api.added.last.$3, '## Steps\n\n1. **one**\n2. two\n\n```sh\nls');
+  });
 }

@@ -9,7 +9,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'models.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
-import 'fading_text.dart';
+import 'markdown_view.dart';
+import 'native_views.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'hosted_ai.dart';
 import 'hosted_voice.dart';
 import 'voice.dart';
@@ -95,8 +97,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   HostedAi? _ai;
   bool _aiLooked = false;
 
-  /// The answer as it streams in, in the pieces it came in.
-  List<(String, DateTime)>? _partial;
+  /// The answer as it streams in; null when none is coming.
+  String? _partial;
+
+  /// What arrived since the screen last showed the answer: shown at most
+  /// about 30 times a second, not on every piece.
+  String _pending = '';
+  Timer? _flush;
   bool _sending = false;
   String? _error;
 
@@ -188,6 +195,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _flush?.cancel();
     _sub?.cancel();
     _input.removeListener(_inputChanged);
     WidgetsBinding.instance.removeObserver(this);
@@ -691,7 +699,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _sending = true;
       _error = null;
       _messages = asked;
-      _partial = [];
+      _partial = '';
+      _pending = '';
     });
     // Written in: New makes another chat from now on, also while the chat
     // itself is still being created.
@@ -721,9 +730,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             lap('first delta');
           }
           answer += delta;
-          if (mounted) {
-            setState(() => _partial = [..._partial!, (delta, DateTime.now())]);
-          }
+          _showLater(answer);
         },
         onError: (Object e, StackTrace st) {
           if (!done.isCompleted) done.completeError(e, st);
@@ -747,6 +754,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _sub?.cancel();
       _sub = null;
       _streamDone = null;
+      _flush?.cancel();
+      _flush = null;
       final keep = answer.trim().isNotEmpty;
       if (keep) {
         final reply = (
@@ -778,6 +787,38 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       (_outputInst ??= PluginSpeechOutput()).speak(answer);
     }
     if (spoken != null && mounted && _voiceLoop) await _speakThenListen(spoken);
+  }
+
+  /// Shows [answer] as the partial reply on the next tick of a ~30 fps
+  /// clock: a fast stream redraws (and re-reads its Markdown) less often
+  /// than it delivers pieces.
+  void _showLater(String answer) {
+    _pending = answer;
+    if (_flush != null || !mounted) return;
+    // The first piece shows at once: the dots give way to text.
+    final wait = _partial == null || _partial!.isEmpty
+        ? Duration.zero
+        : const Duration(milliseconds: 33);
+    _flush = Timer(wait, () {
+      _flush = null;
+      if (mounted && _partial != null) setState(() => _partial = _pending);
+    });
+  }
+
+  /// Opens a link of a message: a resource in the app, anything else
+  /// outside it.
+  void _openLink(String url) {
+    if (url.startsWith('atomic:') || url.startsWith('did:ad:')) {
+      openFromList<void>(
+        context,
+        (_) => openResourceView(api: widget.api, drive: '', subject: url),
+        subject: url,
+      );
+      return;
+    }
+    final uri = Uri.tryParse(url);
+    if (uri == null || !uri.hasScheme) return;
+    launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   /// The chat exists now: in the shell this page is no longer the bar's
@@ -843,15 +884,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : FadingText(
-                        chunks: _partial!,
-                        style: TextStyle(color: c.textPrimary),
+                    : MarkdownView(
+                        _partial!,
+                        key: const Key('chat-partial'),
+                        streaming: true,
+                        onLink: _openLink,
                       ))
-                : SelectableText(
+                : MarkdownView(
                     m.text,
+                    inline: mine,
                     style: TextStyle(
                       color: mine ? c.mainSelectedFg : c.textPrimary,
                     ),
+                    onLink: _openLink,
                   ),
           ),
         );
