@@ -704,6 +704,13 @@ export class Resource<C extends OptionalClass = any> {
      */
     validate = true,
   ): Promise<void> {
+    if (value === undefined) {
+      this.remove(prop);
+      this.eventManager.emit(ResourceEvents.LocalChange, prop, value);
+
+      return;
+    }
+
     if (this.store.isOffline() && validate) {
       console.warn('Offline, not validating');
       validate = false;
@@ -721,13 +728,6 @@ export class Resource<C extends OptionalClass = any> {
 
         throw e;
       }
-    }
-
-    if (value === undefined) {
-      this.remove(prop);
-      this.eventManager.emit(ResourceEvents.LocalChange, prop, value);
-
-      return;
     }
 
     this.propvals.set(prop, value);

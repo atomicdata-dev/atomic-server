@@ -43,7 +43,8 @@
     "test": "vitest run",
     "tsc": "tsc --build",
     "typecheck": "pnpm exec tsc --noEmit",
-    "watch": "pnpm exec vite build --watch"
+    "watch": "pnpm exec vite build --watch",
+    "prepare": "pnpm run build"
   },
   "source": "src/index.ts",
   "type": "module",
