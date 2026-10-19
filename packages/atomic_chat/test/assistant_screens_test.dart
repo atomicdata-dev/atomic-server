@@ -14,6 +14,8 @@ class FakeApi extends UnimplementedApi {
   final List<RecentResource> recent;
   final List<RecentResource> favoriteList;
   final List<RecentResource> conversationList;
+  List<NotificationItem> notificationList;
+  final List<String> markedRead = [];
 
   /// The newest message text of each conversation, by subject.
   final Map<String, String> lastMessages;
@@ -37,6 +39,7 @@ class FakeApi extends UnimplementedApi {
   Future<void>? drivesGate;
 
   FakeApi({
+    this.notificationList = const [],
     this.driveList = const [
       (subject: 'did:ad:drive', name: 'Home', emoji: null)
     ],
@@ -77,6 +80,27 @@ class FakeApi extends UnimplementedApi {
   Future<List<RecentResource>> recentResources(String drive) async => recent;
   @override
   Future<List<RecentResource>> favorites() async => favoriteList;
+  @override
+  Future<List<NotificationItem>> notifications() async => notificationList;
+  @override
+  Future<void> markNotificationRead(String subject) async {
+    markedRead.add(subject);
+    notificationList = [
+      for (final n in notificationList)
+        n.subject == subject
+            ? (
+                subject: n.subject,
+                title: n.title,
+                body: n.body,
+                about: n.about,
+                kind: n.kind,
+                occurredAt: n.occurredAt,
+                read: true
+              )
+            : n,
+    ];
+  }
+
   @override
   Future<List<ConversationRow>> conversations() async => [
         for (final r in conversationList)
@@ -254,6 +278,59 @@ void main() {
       expect(find.byType(ChatScreen), findsOneWidget);
       expect(find.text('Where to?'), findsOneWidget);
       expect(find.text('Lisbon.'), findsOneWidget);
+    });
+
+    testWidgets(
+        'notifications sit on top, unread first marked; a tap opens '
+        'the subject and reads it; hidden when empty', (tester) async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final api = FakeApi(
+        chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
+        notificationList: [
+          (
+            subject: 'n1',
+            title: 'Polle in Team chat',
+            body: 'See you at ten',
+            about: 'did:ad:teamchat',
+            kind: 'chat',
+            occurredAt: now - 5 * 60 * 1000,
+            read: false
+          ),
+          (
+            subject: 'n2',
+            title: 'Old news',
+            body: '',
+            about: 'did:ad:old',
+            kind: 'chat',
+            occurredAt: now - 3 * 3600 * 1000,
+            read: true
+          ),
+        ],
+      );
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      double y(String t) => tester.getTopLeft(find.text(t)).dy;
+      expect(y('Notifications'), lessThan(y('Drives')));
+      expect(find.text('Polle in Team chat'), findsOneWidget);
+      expect(find.text('See you at ten'), findsOneWidget);
+      expect(find.text('5 min ago'), findsOneWidget);
+      expect(find.byKey(const Key('notification-unread')), findsOneWidget);
+
+      ResourceView.serverFactory = () async => throw 'no server in a test';
+      await tester.tap(find.text('Polle in Team chat'));
+      await tester.pump();
+      expect(api.markedRead, ['n1']);
+      expect(api.opened, ['did:ad:teamchat']);
+      await tester.pump(const Duration(milliseconds: 500));
+    });
+
+    testWidgets('no notifications, no Notifications section', (tester) async {
+      await tester.pumpWidget(app(ChatsScreen(
+          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      expect(find.text('Notifications'), findsNothing);
+      expect(find.text('No notifications'), findsNothing);
     });
 
     testWidgets('a tap on a heading folds its section', (tester) async {

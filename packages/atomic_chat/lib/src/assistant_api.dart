@@ -26,6 +26,13 @@ abstract class AssistantApi {
   /// The person's favorites (all drives), newest added first.
   Future<List<RecentResource>> favorites();
 
+  /// The notifications in the Inbox of the person's private drive, newest
+  /// first (what the web app recorded there).
+  Future<List<NotificationItem>> notifications();
+
+  /// Marks a notification read, as the web app does.
+  Future<void> markNotificationRead(String subject);
+
   /// The person's conversations (DMs and group chats), newest message first.
   Future<List<ConversationRow>> conversations();
 

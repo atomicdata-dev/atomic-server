@@ -33,6 +33,19 @@ typedef SearchHit = ({
   String? emoji
 });
 
+/// A Notification of the Inbox in the private drive (as the web app records
+/// it): `title` the one-line summary, `body` a short excerpt, `about` what to
+/// open ('' when unknown), `occurredAt` in unix ms, `read` once seen.
+typedef NotificationItem = ({
+  String subject,
+  String title,
+  String body,
+  String about,
+  String kind,
+  int occurredAt,
+  bool read
+});
+
 typedef DriveInfo = ({String subject, String name, String? emoji});
 
 typedef RecentResource = ({
@@ -153,6 +166,19 @@ abstract final class AssistantJson {
         ),
     ];
   }
+
+  static List<NotificationItem> parseNotifications(String json) => [
+        for (final e in jsonDecode(json) as List)
+          (
+            subject: e['subject'] as String,
+            title: e['title'] as String? ?? '',
+            body: e['body'] as String? ?? '',
+            about: e['about'] as String? ?? '',
+            kind: e['kind'] as String? ?? '',
+            occurredAt: (e['occurred_at'] as num?)?.toInt() ?? 0,
+            read: e['read'] == true,
+          ),
+      ];
 
   static Map<String, String> parseIcons(String json) => {
         for (final e in (jsonDecode(json) as Map).entries)

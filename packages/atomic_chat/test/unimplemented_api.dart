@@ -22,6 +22,11 @@ class UnimplementedApi extends AssistantApi {
   @override
   Future<List<RecentResource>> favorites() => _no('favorites');
   @override
+  Future<List<NotificationItem>> notifications() => _no('notifications');
+  @override
+  Future<void> markNotificationRead(String subject) =>
+      _no('markNotificationRead');
+  @override
   Future<List<ConversationRow>> conversations() => _no('conversations');
   @override
   Future<List<ConversationMessage>> conversationMessages(String subject) =>

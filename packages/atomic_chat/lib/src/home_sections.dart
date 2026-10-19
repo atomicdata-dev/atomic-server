@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 /// A section of the Home screen.
 enum HomeSection {
+  notifications('Notifications'),
   drives('Drives'),
   recents('Recents'),
   activity('Activity'),

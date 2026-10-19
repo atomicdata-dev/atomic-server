@@ -84,6 +84,11 @@ class _ChatsScreenState extends State<ChatsScreen> {
       _timed('conversations', widget.api.conversations());
   late Future<List<ActivityEntry>> _activity =
       _timed('activity', _loadActivity());
+  late Future<List<NotificationItem>> _notifications =
+      _timed('notifications', _loadNotifications());
+
+  Future<List<NotificationItem>> _loadNotifications() async =>
+      widget.api.notifications();
 
   /// How long a home list took, in debug builds (`[home]` in logcat).
   Future<T> _timed<T>(String what, Future<T> future) {
@@ -215,6 +220,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         _favorites = widget.api.favorites();
         _conversations = widget.api.conversations();
         _activity = _loadActivity();
+        _notifications = _loadNotifications();
       });
     });
     // A frame must run for the callback to fire.
@@ -301,6 +307,49 @@ class _ChatsScreenState extends State<ChatsScreen> {
   /// current one.
   Widget _homeRow(RecentResource r) => _resourceRow(r, _openResource, _drive);
 
+  /// A notification: its title and excerpt, when it happened and an unread
+  /// dot. A tap opens what it is about and marks it read.
+  Widget _notificationRow(NotificationItem n) {
+    final c = context.appColors;
+    final body = n.body.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return ResourceRow(
+      key: ValueKey('notification-${n.subject}'),
+      icon: Icons.notifications_none,
+      title: n.title.isEmpty ? n.about : n.title,
+      detail: body.length > 80 ? '${body.substring(0, 79)}…' : body,
+      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+        if (n.occurredAt > 0)
+          Text(timeAgo(n.occurredAt),
+              style: TextStyle(color: c.textSecondary, fontSize: 12)),
+        if (!n.read) ...[
+          const SizedBox(width: 8),
+          Container(
+            key: const Key('notification-unread'),
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: c.main, shape: BoxShape.circle),
+          ),
+        ],
+      ]),
+      onTap: () => _openNotification(n),
+    );
+  }
+
+  void _openNotification(NotificationItem n) {
+    if (!n.read) {
+      widget.api.markNotificationRead(n.subject).then((_) {
+        if (!mounted) return;
+        setState(() {
+          _notifications = _loadNotifications();
+        });
+      }, onError: (Object _) {});
+    }
+    if (n.about.isEmpty) return;
+    widget.api.noteOpened(_drive, n.about);
+    _push(openResourceView(
+        api: widget.api, drive: _drive, subject: n.about, title: ''));
+  }
+
   /// A conversation: who is in it, the newest message and when it was sent.
   Widget _conversationRow(ConversationRow c) {
     final r = c.resource;
@@ -359,6 +408,19 @@ class _ChatsScreenState extends State<ChatsScreen> {
       onMenu: _applyAction,
     );
     switch (id) {
+      case HomeSection.notifications:
+        return _Section<NotificationItem>(
+          key: key,
+          title: id.title,
+          fold: fold,
+          future: _notifications,
+          empty: 'No notifications',
+          hideEmpty: true,
+          rows: (list) => [for (final n in list) _notificationRow(n)],
+          onShowAll: (list) => _push(_ListPage(
+              title: id.title,
+              children: [for (final n in list) _notificationRow(n)])),
+        );
       case HomeSection.drives:
         return _Section<DriveInfo>(
           key: key,

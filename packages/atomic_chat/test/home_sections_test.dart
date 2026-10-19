@@ -8,8 +8,20 @@ void main() {
     expect(layout.visible, HomeSection.values);
   });
 
+  test(
+      'notifications come first by default, and a stored layout without '
+      'them gets them on top', () {
+    expect(HomeSection.values.first, HomeSection.notifications);
+    final layout = HomeLayout.fromNames(
+        order: ['chats', 'drives', 'recents', 'activity', 'favorites']);
+    expect(layout.order.first, HomeSection.notifications);
+    expect(layout.order.indexOf(HomeSection.messages), layout.order.length - 1);
+  });
+
   test('move swaps with the visible neighbour and skips hidden sections', () {
-    var layout = const HomeLayout().setHidden(HomeSection.recents, true);
+    var layout = const HomeLayout()
+        .setHidden(HomeSection.notifications, true)
+        .setHidden(HomeSection.recents, true);
     expect(layout.canMove(HomeSection.drives, -1), isFalse);
     layout = layout.move(HomeSection.activity, -1);
     expect(layout.visible.take(2), [HomeSection.activity, HomeSection.drives]);
@@ -22,7 +34,7 @@ void main() {
       order: ['chats', 'bogus', 'drives', 'chats'],
       hidden: ['drives', 'bogus'],
     );
-    expect(layout.order.first, HomeSection.chats);
+    expect(layout.order[1], HomeSection.chats);
     expect(layout.order.toSet(), HomeSection.values.toSet());
     expect(layout.order.length, HomeSection.values.length);
     expect(layout.hidden, {HomeSection.drives});

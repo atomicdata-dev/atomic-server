@@ -24,6 +24,12 @@ class AtomicAssistantApi extends AssistantApi {
   @override
   Future<List<RecentResource>> favorites() => AtomicClient.favorites();
   @override
+  Future<List<NotificationItem>> notifications() =>
+      AtomicClient.notifications();
+  @override
+  Future<void> markNotificationRead(String subject) =>
+      AtomicClient.markNotificationRead(subject);
+  @override
   Future<List<ConversationRow>> conversations() => AtomicClient.conversations();
   @override
   Future<List<ConversationMessage>> conversationMessages(String subject) =>

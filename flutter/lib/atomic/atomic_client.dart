@@ -10,6 +10,7 @@ import 'package:atomic_chat/atomic_chat.dart'
         ConversationMessage,
         ConversationRow,
         DriveInfo,
+        NotificationItem,
         RecentResource,
         SearchHit;
 import 'package:atomic_chat/atomic_chat.dart' as chat show driveKey;
@@ -117,6 +118,15 @@ class AtomicClient {
   static Future<List<RecentResource>> favorites({int limit = 100}) async =>
       AssistantJson.parseRecentResources(
           await assistant.listFavorites(limit: limit));
+
+  /// The notifications of the Inbox in the private drive, newest first.
+  static Future<List<NotificationItem>> notifications({int limit = 50}) async =>
+      AssistantJson.parseNotifications(
+          await assistant.listNotifications(limit: limit));
+
+  /// Marks a notification read (and its copies), synced like any other edit.
+  static Future<void> markNotificationRead(String subject) =>
+      assistant.markNotificationRead(subject: subject);
 
   /// The person's conversations (DMs and group chats), titled by who is in
   /// them, newest message first.
