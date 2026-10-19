@@ -457,6 +457,18 @@ void main() {
       expect(find.text('Notifications'), findsNothing);
     });
 
+    testWidgets('sideways, the headings keep out of the cutout like the rows',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(900, 400);
+      tester.view.padding = const FakeViewPadding(left: 60);
+      addTearDown(tester.view.reset);
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(find.text('Drives')).dx, greaterThan(60));
+    });
+
     testWidgets('no notifications, no Notifications section', (tester) async {
       await tester
           .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));

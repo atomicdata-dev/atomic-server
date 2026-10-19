@@ -537,12 +537,18 @@ class _ChatsScreenState extends State<ChatsScreen> {
           body: ScrollConfiguration(
             behavior: ScrollConfiguration.of(context).copyWith(
                 overscroll: false, physics: const ClampingScrollPhysics()),
-            child: ListView(
-              physics: const ClampingScrollPhysics(),
-              children: [
-                for (final id in _layout.visible) _sectionFor(id, c),
-                if (_layout.visible.isEmpty) _showSectionsButton(),
-              ],
+            // Sideways the camera cutout is at a side: the rows (ListTiles)
+            // keep out of it, and so do the headings.
+            child: SafeArea(
+              top: false,
+              bottom: false,
+              child: ListView(
+                physics: const ClampingScrollPhysics(),
+                children: [
+                  for (final id in _layout.visible) _sectionFor(id, c),
+                  if (_layout.visible.isEmpty) _showSectionsButton(),
+                ],
+              ),
             ),
           ),
         );
@@ -744,7 +750,8 @@ class _ListPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: c.bgBody,
       appBar: AppTopBar(title: title),
-      body: ListView(children: children),
+      body: SafeArea(
+          top: false, bottom: false, child: ListView(children: children)),
     );
   }
 }
