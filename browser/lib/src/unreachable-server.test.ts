@@ -1,10 +1,14 @@
-import { describe, it, beforeEach, vi } from 'vitest';
+import { describe, it, beforeEach, afterEach, vi } from 'vitest';
 import {
   Agent,
   Store,
   core,
   JSCryptoProvider,
   isTransportError,
+  isUnreachableLoopbackSubject,
+  AtomicError,
+  ErrorType,
+  Resource,
 } from './index.js';
 import { bootstrapCoreVocab } from './test-vocab.js';
 
@@ -123,5 +127,95 @@ describe('Unreachable server', () => {
     await new Promise(resolve => setTimeout(resolve, 0));
 
     expect(attempts).toBe(2);
+  });
+});
+
+describe('Subjects a hosted page cannot reach', () => {
+  const hosted = 'https://ontola.atomic.place';
+
+  it('recognises loopback subjects only when page and server are hosted', ({
+    expect,
+  }) => {
+    const unreachable = (
+      s: string,
+      page: string | undefined = 'ontola.atomic.place',
+      srv = hosted,
+    ) => isUnreachableLoopbackSubject(s, page, srv);
+
+    expect(unreachable('http://localhost:9883/01ABC')).toBe(true);
+    expect(unreachable('http://drive.localhost:9883/01ABC')).toBe(true);
+    expect(unreachable('http://127.0.0.1:9883/x')).toBe(true);
+    expect(unreachable('http://[::1]:9883/x')).toBe(true);
+    expect(unreachable('https://example.com/x')).toBe(false);
+    expect(unreachable('did:ad:abc')).toBe(false);
+    // Local dev: page or server on loopback keeps working.
+    expect(unreachable('http://localhost:9883/x', 'localhost')).toBe(false);
+    expect(
+      isUnreachableLoopbackSubject(
+        'http://localhost:9883/x',
+        undefined,
+        hosted,
+      ),
+    ).toBe(false);
+    expect(
+      unreachable(
+        'http://localhost:9883/x',
+        'ontola.atomic.place',
+        'http://localhost:9883',
+      ),
+    ).toBe(false);
+  });
+
+  describe('in a hosted page', () => {
+    beforeEach(() => {
+      vi.stubGlobal('location', { hostname: 'ontola.atomic.place' });
+    });
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('fails a loopback fetch fast without a request', async ({ expect }) => {
+      const store = new Store({ serverUrl: hosted });
+      const fetch = vi.fn(async () => new Response('{}'));
+      store.injectFetch(fetch);
+
+      const resource = await store
+        .fetchResourceFromServer('http://localhost:9883/01ABC')
+        .catch(e => e);
+
+      expect(isTransportError(resource.error ?? resource)).toBe(true);
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('does not refetch loopback or failed foreign subjects on reconnect', async ({
+      expect,
+    }) => {
+      const store = new Store({ serverUrl: hosted });
+      const fetch = vi.fn(async () => {
+        throw new TypeError('NetworkError');
+      });
+      store.injectFetch(fetch);
+      const transport = () => new AtomicError('down', ErrorType.Transport);
+      const subjects = [
+        'http://localhost:9883/01ABC',
+        'http://drive.localhost:9883/01DEF',
+        'https://other.example/x',
+      ];
+
+      for (const subject of subjects) {
+        const r = new Resource(subject);
+        r.setError(transport());
+        store.addResource(r, { skipCommitCompare: true });
+      }
+
+      const stuck = new Resource('http://localhost:9883/01GHI');
+      stuck.loading = true;
+      store.addResource(stuck, { skipCommitCompare: true });
+
+      store.refetchOfflineErroredResources();
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(fetch).not.toHaveBeenCalled();
+    });
   });
 });

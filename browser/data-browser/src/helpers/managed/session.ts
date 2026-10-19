@@ -3,6 +3,7 @@
 // use `getManagedAccount()` and read `.email`) and the control-plane `GET /api/me`
 // route. Mirrors the captured `getManagedUser()` in helpers/managedUsage.ts.
 
+import { withDeadline } from '@tomic/lib';
 import { PRODUCT_NAME } from './product';
 import {
   getManagedDeviceToken,
@@ -26,6 +27,9 @@ export type ManagedAccount = {
 export function accountAddress(account: ManagedAccount): string {
   return account.address ?? account.email;
 }
+
+/** How long sign-out waits for the account's `/logout` before moving on. */
+const LOGOUT_DEADLINE_MS = 3000;
 
 let sessionGeneration = 0;
 let pendingLogouts = 0;
@@ -194,18 +198,27 @@ export async function logoutManagedSession(): Promise<void> {
   pendingLogouts++;
   logoutListeners.run();
 
-  try {
-    // A FOSS node has no control plane; its own origin answers 405.
-    if (!hasManagedApi()) return;
-    await managedFetch(`/logout`, {
-      method: 'POST',
-    });
-  } catch {
-    // No control plane reachable (self-hosted) — nothing to sign out of.
-  } finally {
-    // On a linked device the session *is* the token. Signing out ends it,
-    // and with it the record of which portal it belonged to.
-    setManagedDeviceToken(null);
-    pendingLogouts--;
-  }
+  // `pendingLogouts` stays up until the request truly settles, so a sign-in
+  // that follows a slow logout still ignores the stale account answers.
+  const request = (async () => {
+    try {
+      // A FOSS node has no control plane; its own origin answers 405.
+      if (!hasManagedApi()) return;
+      await managedFetch(`/logout`, {
+        method: 'POST',
+      });
+    } catch {
+      // No control plane reachable (self-hosted) — nothing to sign out of.
+    } finally {
+      pendingLogouts--;
+    }
+  })();
+
+  // Signing out must not wait on the network: carry on after a short
+  // deadline and let the request finish in the background.
+  await withDeadline(request, LOGOUT_DEADLINE_MS, undefined);
+
+  // On a linked device the session *is* the token. Signing out ends it,
+  // and with it the record of which portal it belonged to.
+  setManagedDeviceToken(null);
 }
