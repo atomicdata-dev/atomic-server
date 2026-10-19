@@ -35,4 +35,18 @@ void main() {
     expect((await get(server, '/%2e%2e/pubspec.yaml')).$1, 404);
     expect((await get(server, '/assets/../../pubspec.yaml')).$1, 404);
   });
+
+  test('keeps the same port from one start to the next, if it is free',
+      () async {
+    final first = await EmbedServer.start(port: 0);
+    final port = first.page.port;
+    await first.close();
+    final again = await EmbedServer.start(port: port);
+    expect(again.page.port, port);
+    // Taken: it moves to another port instead of failing.
+    final other = await EmbedServer.start(port: port);
+    expect(other.page.port, isNot(port));
+    await again.close();
+    await other.close();
+  });
 }

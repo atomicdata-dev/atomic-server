@@ -21,8 +21,23 @@ class EmbedServer {
   /// One server for the app's life; started the first time it is asked for.
   static Future<EmbedServer> instance() => _running ??= _start();
 
-  static Future<EmbedServer> _start() async {
-    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+  /// The same port on every start, so the page keeps one origin and what it
+  /// keeps in its own storage (its settings, the theme, the last used drive)
+  /// is still there next time. A random port was a new origin on each launch,
+  /// which looked like settings that did not stick.
+  static const preferredPort = 47831;
+
+  static Future<EmbedServer> _start() => start(port: preferredPort);
+
+  /// Binds [port], or any free port when that one is taken.
+  @visibleForTesting
+  static Future<EmbedServer> start({required int port}) async {
+    HttpServer server;
+    try {
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
+    } on SocketException {
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    }
     final embed = EmbedServer._(server);
     unawaited(embed._serve());
     return embed;
