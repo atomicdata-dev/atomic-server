@@ -2,6 +2,7 @@ import 'package:atomic_chat/atomic_chat.dart';
 
 import '../atomic/account_store.dart';
 import '../atomic/atomic_client.dart';
+import 'fake_ai.dart';
 
 /// The app's [AssistantApi]: the local node through [AtomicClient] (the Rust
 /// bridge), and the linked account from [AccountStore].
@@ -63,6 +64,7 @@ class AtomicAssistantApi extends AssistantApi {
   /// the account in first (as the web app does).
   @override
   Future<HostedAi?> hostedAi() async {
+    if (fakeAiEnabled) return fakeHostedAi();
     var saved = await AccountStore.read();
     if (saved == null && await AccountStore.signInWithAgent()) {
       saved = await AccountStore.read();
