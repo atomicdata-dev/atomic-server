@@ -460,13 +460,16 @@ pub async fn search(drive: Option<String>, query: String, limit: u32) -> Result<
                 name
             }
         };
-        out.push(json!({
-            "subject": hit.subject.to_string(),
-            "title": name_of(&resource),
-            "class_name": class_name,
-            "score": hit.score,
-            "drive": drives.of(store.as_ref(), &resource),
-        }));
+        out.push(with_emoji(
+            json!({
+                "subject": hit.subject.to_string(),
+                "title": name_of(&resource),
+                "class_name": class_name,
+                "score": hit.score,
+                "drive": drives.of(store.as_ref(), &resource),
+            }),
+            &resource,
+        ));
     }
     serde_json::to_string(&out).map_err(|e| e.to_string())
 }

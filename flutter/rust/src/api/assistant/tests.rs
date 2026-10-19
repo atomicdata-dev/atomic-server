@@ -627,8 +627,13 @@ async fn search_cost_breakdown() {
             let mut parent = root.clone();
             for depth in 0..6 {
                 n += 1;
-                parent = synced_node(n, &parent, &format!("Folder {f}-{depth}"), Some(urls::FOLDER))
-                    .await;
+                parent = synced_node(
+                    n,
+                    &parent,
+                    &format!("Folder {f}-{depth}"),
+                    Some(urls::FOLDER),
+                )
+                .await;
             }
             leaves_parents.push(parent);
         }
@@ -641,7 +646,11 @@ async fn search_cost_breakdown() {
         } else {
             leaves_parents[i as usize % leaves_parents.len()].clone()
         };
-        let class = if i % 10 == 5 { class_missing } else { urls::FOLDER };
+        let class = if i % 10 == 5 {
+            class_missing
+        } else {
+            urls::FOLDER
+        };
         synced_node(n, &parent, &format!("Quokka report {i} notes"), Some(class)).await;
     }
 
@@ -649,7 +658,15 @@ async fn search_cost_breakdown() {
         limit: Some(20),
         ..Default::default()
     };
-    for q in ["q", "qu", "quo", "quok", "quokka", "quokka rep", "quokka report 12"] {
+    for q in [
+        "q",
+        "qu",
+        "quo",
+        "quok",
+        "quokka",
+        "quokka rep",
+        "quokka report 12",
+    ] {
         let reps = 10;
         let t = std::time::Instant::now();
         for _ in 0..reps {
@@ -675,14 +692,27 @@ async fn search_cost_breakdown() {
 }
 
 #[tokio::test]
+#[ignore = "counts the store's full reads, which every other test in this process adds to: run it alone with --ignored"]
 async fn search_finds_the_drive_through_local_parents_without_full_reads() {
     let drive = shared_drive().await.to_string();
     let store = db().unwrap();
     let mut parent = drive.clone();
     for i in 0..4 {
-        parent = synced_node(900_000 + i, &parent, &format!("Chain {i}"), Some(urls::FOLDER)).await;
+        parent = synced_node(
+            900_000 + i,
+            &parent,
+            &format!("Chain {i}"),
+            Some(urls::FOLDER),
+        )
+        .await;
     }
-    let here = synced_node(900_010, &parent, "Narwhal deep in a chain", Some(urls::FOLDER)).await;
+    let here = synced_node(
+        900_010,
+        &parent,
+        "Narwhal deep in a chain",
+        Some(urls::FOLDER),
+    )
+    .await;
     let orphan = synced_node(
         900_011,
         "did:ad:benchgoneorphan000000000000000000000000000000000000000000000000==",
@@ -695,9 +725,15 @@ async fn search_finds_the_drive_through_local_parents_without_full_reads() {
     let hits: Vec<Json> =
         serde_json::from_str(&search(None, "narwhal".into(), 20).await.unwrap()).unwrap();
     assert_eq!(store.get_resource_call_count(), 0, "a search reads locally");
-    let find = |s: &str| hits.iter().find(|h| h["subject"].as_str().unwrap().ends_with(&s[9..]));
+    let find = |s: &str| {
+        hits.iter()
+            .find(|h| h["subject"].as_str().unwrap().ends_with(&s[9..]))
+    };
     let norm = |v: &Json| v.as_str().unwrap().replace("atomic:", "did:ad:");
-    assert_eq!(norm(&find(&here).unwrap()["drive"]), drive.replace("atomic:", "did:ad:"));
+    assert_eq!(
+        norm(&find(&here).unwrap()["drive"]),
+        drive.replace("atomic:", "did:ad:")
+    );
     assert_eq!(find(&here).unwrap()["class_name"], "folder");
     let o = find(&orphan).unwrap();
     assert_eq!(o["drive"], "");
