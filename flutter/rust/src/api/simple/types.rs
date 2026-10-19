@@ -11,28 +11,6 @@ pub struct AgentInfo {
     pub name: Option<String>,
 }
 
-pub struct CanvasListItem {
-    pub subject: String,
-    pub name: String,
-    /// Unix milliseconds (`dateEdited` property).
-    pub date_edited: i64,
-}
-
-/// JSON-only list entry (includes folder_id). Use `list_canvases_json` from Dart.
-#[derive(serde::Serialize)]
-pub struct CanvasListItemJson {
-    pub subject: String,
-    pub name: String,
-    pub folder_id: String,
-    pub date_edited: i64,
-}
-
-#[derive(serde::Serialize)]
-pub struct FolderListItem {
-    pub subject: String,
-    pub name: String,
-}
-
 /// Db event forwarded to Flutter (`poll_db_event`).
 #[derive(serde::Serialize)]
 pub struct DbEventDto {

@@ -245,18 +245,6 @@ pub async fn drain_outbox(store: &atomic_lib::Db) -> bool {
     }
 }
 
-/// Subscribe to live updates for a single canvas over WebSocket.
-pub async fn subscribe_canvas(subject: &str) -> Result<(), String> {
-    let client = ws_client_slot()
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clone()
-        .ok_or_else(|| "WS session not open".to_string())?;
-    client.subscribe_resource(subject).await.map_err(err)?;
-    client.subscribe_loro_sync(subject).await.map_err(err)?;
-    Ok(())
-}
-
 /// Follow another drive of the person over the open WS session: fetch it when
 /// missing and subscribe to its commits. Fails when the server does not host it.
 pub(crate) async fn follow_drive(drive: &str) -> Result<(), String> {

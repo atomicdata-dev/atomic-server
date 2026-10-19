@@ -11,11 +11,8 @@ pub mod ws_sync;
 
 pub use atomic_lib::{Commit, Db};
 
-use state::{
-    canvas_date_edited_ms, db, err, node, now_ms, set_db, touch_date_edited, CANVAS_CLASS,
-    CANVAS_DATE_EDITED, CANVAS_FOLDER_ID, CANVAS_STROKE_DATA, FOLDER_CLASS,
-};
-pub use types::{AgentInfo, CanvasListItem, FolderListItem, SetupResult, VersionMetadata};
+use state::{db, err, node, set_db};
+pub use types::{AgentInfo, SetupResult, VersionMetadata};
 
 /// Save resource locally, record it in the durable outbox, and drain the
 /// outbox over WS when a session is open. Offline edits wait on disk.
@@ -23,7 +20,6 @@ async fn save_and_push(
     resource: &mut atomic_lib::Resource,
     store: &atomic_lib::Db,
 ) -> Result<(), String> {
-    touch_date_edited(resource);
     let response = node()?.save_locally(resource).await.map_err(err)?;
     push_local_write(&response, store).await;
     Ok(())
@@ -62,27 +58,6 @@ pub(crate) async fn push_local_write(
     // we already broadcast above; still bulk-nudge if P2P-only (no hub).
     if !ws_ok || atomic_lib::sync::peer::live_peer_count() == 0 {
         nudge_peers_after_local_change(store).await;
-    }
-}
-
-/// Catch a cached editing session up to the store's current snapshot before a
-/// local edit. A peer's stroke that the sync layer merged into the store since
-/// this session was cached is not in the in-memory doc; without this, appending
-/// and saving would export a snapshot missing that stroke and silently revert
-/// it. Synchronous (under the canvas guard), unlike the async cache-invalidation
-/// listener which can lag behind a fast next stroke. Cheap when already current
-/// — importing already-known state is a Loro no-op.
-fn refresh_editing_session(
-    resource: &mut atomic_lib::Resource,
-    store: &atomic_lib::Db,
-    subject: &str,
-) {
-    let key = atomic_lib::Subject::from_raw(subject, store.get_base_domain().as_deref()).pure_id();
-    if let Ok(Some(snapshot)) = store
-        .kv
-        .get(atomic_lib::db::trees::Tree::LoroSnapshots, key.as_bytes())
-    {
-        let _ = resource.merge_persisted_state(&snapshot);
     }
 }
 
@@ -142,11 +117,10 @@ async fn nudge_peers_after_local_change(store: &atomic_lib::Db) {
 ///   2. Agent     — setup(), load_agent(), get_active_agent(), clear_agent()
 ///   3. Drive     — create_drive(), list_drives(), get_active_drive(), set_active_drive()
 ///   4. Resource  — create_resource(), set_property(), get_property()
-///   5. Canvas    — create_canvas(), save/load/list/delete/rename
-///   6. History   — warm_resource_history(), get_resource_history(), get_resource_at_version()
-///   7. Peer      — start_peer(), get_peer_id(), peer_announce(), peer_sync(), peer_discover_sync()
+///   5. History   — warm_resource_history(), get_resource_history()
+///   6. Peer      — start_peer(), get_peer_id(), peer_announce(), peer_sync(), peer_discover_sync()
 ///
-/// Networking (group 7) is explicit and opt-in. Nothing in groups 1-6 touches the network.
+/// Networking (group 6) is explicit and opt-in. Nothing in groups 1-5 touches the network.
 
 // ── 1. Database ────────────────────────────────────────────────────────────
 
@@ -408,440 +382,6 @@ pub async fn get_property(subject: String, property: String) -> Result<String, S
         .unwrap_or_default())
 }
 
-// ── 5. Canvas CRUD ─────────────────────────────────────────────────────────
-
-/// Create a new canvas. Uses the active drive as parent.
-pub async fn create_canvas(name: String) -> Result<String, String> {
-    create_canvas_with_folder(name, None).await
-}
-
-/// Create a canvas, optionally in a gallery folder (`folder_id` = folder resource subject).
-pub async fn create_canvas_with_folder(
-    name: String,
-    folder_id: Option<String>,
-) -> Result<String, String> {
-    let store = db()?;
-    let parent = store
-        .get_active_drive()
-        .ok_or("No drive set. Call setup() first.")?;
-    let mut props = vec![
-        (
-            CANVAS_STROKE_DATA,
-            atomic_lib::Value::Json(serde_json::Value::Array(vec![])),
-        ),
-        (CANVAS_DATE_EDITED, atomic_lib::Value::Timestamp(now_ms())),
-    ];
-    if let Some(fid) = folder_id.filter(|s| !s.is_empty()) {
-        props.push((CANVAS_FOLDER_ID, atomic_lib::Value::String(fid)));
-    }
-    let subject = store
-        .create_resource(CANVAS_CLASS, &parent, &name, Some(props))
-        .await
-        .map_err(err)?;
-    nudge_peers_after_local_change(store.as_ref()).await;
-    Ok(subject)
-}
-
-/// Create a folder resource under the active drive.
-pub async fn create_folder(name: String) -> Result<String, String> {
-    let store = db()?;
-    let parent = store
-        .get_active_drive()
-        .ok_or("No drive set. Call setup() first.")?;
-    let subject = store
-        .create_resource(FOLDER_CLASS, &parent, &name, None)
-        .await
-        .map_err(err)?;
-    nudge_peers_after_local_change(store.as_ref()).await;
-    Ok(subject)
-}
-
-/// List folder resources in the active drive.
-pub async fn list_folders() -> Result<Vec<FolderListItem>, String> {
-    let store = db()?;
-    let drive = store.get_active_drive().ok_or("No active drive")?;
-    let query = atomic_lib::storelike::Query::new_prop_val(atomic_lib::urls::PARENT, &drive);
-    let result = store.query(&query).await.map_err(err)?;
-    let mut items = Vec::new();
-    for subject in &result.subjects {
-        if let Ok(r) = store.get_resource(&subject.as_str().into()).await {
-            if let Ok(is_a) = r.get(atomic_lib::urls::IS_A) {
-                if !is_a.to_string().contains(FOLDER_CLASS) {
-                    continue;
-                }
-            } else {
-                continue;
-            }
-            items.push(FolderListItem {
-                subject: r.get_subject().to_string(),
-                name: r
-                    .get(atomic_lib::urls::NAME)
-                    .map(|v| v.to_string())
-                    .unwrap_or_default(),
-            });
-        }
-    }
-    items.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(items)
-}
-
-/// Set or clear the gallery folder for a canvas (persisted + synced).
-pub async fn set_canvas_folder(subject: String, folder_id: Option<String>) -> Result<(), String> {
-    let store = db()?;
-    let mut guard = get_canvas(&subject).await?;
-    let resource = guard.as_mut().unwrap();
-    if let Some(fid) = folder_id.filter(|s| !s.is_empty()) {
-        resource.set_unsafe(CANVAS_FOLDER_ID.into(), atomic_lib::Value::String(fid));
-    } else {
-        resource.remove_propval(CANVAS_FOLDER_ID);
-    }
-    save_and_push(resource, store.as_ref()).await
-}
-
-/// Per-canvas mutex that also caches the live Resource (with undo history).
-/// The Resource stays in memory so undo history survives across FFI calls.
-/// Auto-invalidates when the DB broadcasts a change for a cached subject.
-static CANVAS_CACHE: std::sync::Mutex<
-    Option<
-        std::collections::HashMap<
-            String,
-            std::sync::Arc<tokio::sync::Mutex<Option<atomic_lib::Resource>>>,
-        >,
-    >,
-> = std::sync::Mutex::new(None);
-
-/// Whether the cache listener is running.
-static CACHE_LISTENER_STARTED: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
-
-/// Start a background task that invalidates cached resources when the DB changes.
-fn ensure_cache_listener() {
-    if CACHE_LISTENER_STARTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
-        return;
-    }
-    let Ok(store) = db() else { return };
-    let mut rx = store.subscribe_events();
-    tokio::spawn(async move {
-        loop {
-            // `from_remote` decides whether to drop the cached edit session. A
-            // local commit already updated that cached doc in place, so keeping
-            // it is correct and skips a reload. A change that did NOT come from
-            // our own commit — a stroke merged in from a peer — is NOT in the
-            // cached doc, so we must drop it: otherwise the next local
-            // `push_stroke` appends to a stale doc and its save overwrites the
-            // just-merged remote stroke, silently reverting it.
-            // `from_commit == false` is the reliable signal (remote sync
-            // applies via `add_resource_opts`; local strokes via a signed
-            // commit), and a commit a peer sent carries its `source_id`. The
-            // import flag is per task now (`ws_apply::import_scope`), so it is
-            // never visible from this listener; the event itself says where
-            // the change came from. Over-invalidating only ever costs a
-            // reload, so a destroyed subject always drops its cached session.
-            let (subject, from_remote) = match rx.recv().await {
-                Ok(atomic_lib::DbEvent::Changed {
-                    subject,
-                    from_commit,
-                    source_id,
-                    ..
-                }) => (subject, !from_commit || source_id.is_some()),
-                Ok(atomic_lib::DbEvent::Destroyed { subject, .. }) => (subject, true),
-                Ok(atomic_lib::DbEvent::QueryMembershipChanged { .. }) => continue,
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                Err(_) => {
-                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                    if let Ok(s) = db() {
-                        rx = s.subscribe_events();
-                    }
-                    continue;
-                }
-            };
-            if from_remote {
-                let key = subject.to_string();
-                let mut cache = CANVAS_CACHE.lock().unwrap();
-                if let Some(map) = cache.as_mut() {
-                    if map.remove(&key).is_some() {
-                        tracing::debug!("[canvas_cache] invalidated {}", &key[..key.len().min(20)]);
-                    }
-                }
-            }
-        }
-    });
-}
-
-fn canvas_cache_key(subject: &str) -> String {
-    if let Ok(store) = db() {
-        atomic_lib::Subject::from_raw(subject, store.get_base_domain().as_deref())
-            .without_params()
-            .to_string()
-    } else {
-        subject.to_string()
-    }
-}
-
-fn canvas_entry(subject: &str) -> std::sync::Arc<tokio::sync::Mutex<Option<atomic_lib::Resource>>> {
-    let key = canvas_cache_key(subject);
-    let mut cache = CANVAS_CACHE.lock().unwrap();
-    let map = cache.get_or_insert_with(std::collections::HashMap::new);
-    map.entry(key)
-        .or_insert_with(|| std::sync::Arc::new(tokio::sync::Mutex::new(None)))
-        .clone()
-}
-
-/// Get or load the cached canvas resource (editable, with undo).
-async fn get_canvas(
-    subject: &str,
-) -> Result<tokio::sync::OwnedMutexGuard<Option<atomic_lib::Resource>>, String> {
-    ensure_cache_listener();
-    let entry = canvas_entry(subject);
-    let mut guard = entry.lock_owned().await;
-    if guard.is_none() {
-        let store = db()?;
-        let mut resource = store.get_resource(&subject.into()).await.map_err(err)?;
-        resource.ensure_editable().map_err(err)?;
-        *guard = Some(resource);
-    }
-    Ok(guard)
-}
-
-/// Push a single stroke to a canvas. Appends to the stroke list; merges across devices.
-pub async fn push_stroke(subject: String, stroke_json: String) -> Result<(), String> {
-    let store = db()?;
-    let item: serde_json::Value =
-        serde_json::from_str(&stroke_json).map_err(|e| format!("Invalid stroke JSON: {e}"))?;
-
-    let mut guard = get_canvas(&subject).await?;
-    let resource = guard.as_mut().unwrap();
-    // Merge any peer strokes the store received since this session was cached,
-    // so appending ours doesn't overwrite them.
-    refresh_editing_session(resource, store.as_ref(), &subject);
-    resource
-        .push_list_item(CANVAS_STROKE_DATA, item)
-        .map_err(err)?;
-    save_and_push(resource, store.as_ref()).await?;
-
-    Ok(())
-}
-
-/// Load strokes JSON from a canvas. Reads directly from DB (no edit session).
-pub async fn load_canvas_strokes(subject: String) -> Result<String, String> {
-    let store = db()?;
-    let resource = store
-        .get_resource(&subject.as_str().into())
-        .await
-        .map_err(err)?;
-    let result = match resource.get(CANVAS_STROKE_DATA) {
-        Ok(atomic_lib::Value::Json(val)) => {
-            serde_json::to_string(val).unwrap_or_else(|_| "[]".into())
-        }
-        Ok(v) => v.to_string(),
-        _ => "[]".into(),
-    };
-    Ok(result)
-}
-
-/// List all canvases in the active drive.
-/// Uses the query index (not a full scan) so results include synced resources.
-pub async fn list_canvases() -> Result<Vec<CanvasListItem>, String> {
-    let store = db()?;
-    let drive = store.get_active_drive().ok_or("No active drive")?;
-
-    let query = atomic_lib::storelike::Query::new_prop_val(atomic_lib::urls::PARENT, &drive);
-    let result = store.query(&query).await.map_err(err)?;
-
-    let mut items = Vec::new();
-    for subject in &result.subjects {
-        if let Ok(r) = store.get_resource(&subject.as_str().into()).await {
-            // Filter by canvas class
-            if let Ok(is_a) = r.get(atomic_lib::urls::IS_A) {
-                if !is_a.to_string().contains(CANVAS_CLASS) {
-                    continue;
-                }
-            } else {
-                continue;
-            }
-            items.push(CanvasListItem {
-                subject: r.get_subject().to_string(),
-                name: r
-                    .get(atomic_lib::urls::NAME)
-                    .map(|v| v.to_string())
-                    .unwrap_or_default(),
-                date_edited: canvas_date_edited_ms(&r),
-            });
-        }
-    }
-    items.sort_by(|a, b| b.date_edited.cmp(&a.date_edited));
-    Ok(items)
-}
-
-/// List canvases as JSON (includes `folder_id`). Prefer this from Dart until FRB codegen.
-pub async fn list_canvases_json() -> Result<String, String> {
-    let store = db()?;
-    let drive = store.get_active_drive().ok_or("No active drive")?;
-    let query = atomic_lib::storelike::Query::new_prop_val(atomic_lib::urls::PARENT, &drive);
-    let result = store.query(&query).await.map_err(err)?;
-
-    let mut items = Vec::new();
-    for subject in &result.subjects {
-        if let Ok(r) = store.get_resource(&subject.as_str().into()).await {
-            if let Ok(is_a) = r.get(atomic_lib::urls::IS_A) {
-                if !is_a.to_string().contains(CANVAS_CLASS) {
-                    continue;
-                }
-            } else {
-                continue;
-            }
-            let folder_id = r
-                .get(CANVAS_FOLDER_ID)
-                .map(|v| v.to_string())
-                .unwrap_or_default();
-            items.push(types::CanvasListItemJson {
-                subject: r.get_subject().to_string(),
-                name: r
-                    .get(atomic_lib::urls::NAME)
-                    .map(|v| v.to_string())
-                    .unwrap_or_default(),
-                folder_id,
-                date_edited: canvas_date_edited_ms(&r),
-            });
-        }
-    }
-    items.sort_by(|a, b| b.date_edited.cmp(&a.date_edited));
-    serde_json::to_string(&items).map_err(|e| e.to_string())
-}
-
-/// Signed destroy commit + WS push + Iroh live/bulk nudge (same path for canvases and folders).
-///
-/// Not used by `delete_canvas` any more, which parks the canvas in the drive's
-/// Trash instead. Kept for a permanent-delete API, which needs the bindings
-/// regenerated (`flutter_rust_bridge_codegen`) before Dart can call it.
-#[allow(dead_code)]
-async fn destroy_resource_and_sync(subject: String) -> Result<(), String> {
-    tracing::info!("[destroy_resource] {}", &subject[..subject.len().min(30)]);
-    let store = db()?;
-    let mut builder = atomic_lib::commit::CommitBuilder::new(subject.clone().into());
-    builder.destroy(true);
-    let agent = store.get_default_agent().map_err(err)?;
-    let resource = store
-        .get_resource(&subject.as_str().into())
-        .await
-        .map_err(err)?;
-    let commit = builder
-        .sign(&agent, store.as_ref(), &resource)
-        .await
-        .map_err(err)?;
-    let opts = atomic_lib::commit::CommitOpts {
-        validate_signature: true,
-        validate_timestamp: false,
-        validate_rights: false,
-        update_index: true,
-        ..atomic_lib::commit::CommitOpts::no_validations_no_index()
-    };
-    let response = node()?
-        .apply_local_commit(commit, &opts)
-        .await
-        .map_err(err)?;
-    let ws_ok = ws_sync::drain_outbox(store.as_ref()).await;
-    if !ws_ok {
-        nudge_peers_after_local_change(store.as_ref()).await;
-    }
-    Ok(())
-}
-
-/// Delete a canvas (or any resource): move it to the active drive's Trash
-/// folder (created on first use) and remember its old parent in `trashedFrom`.
-/// Nothing is destroyed, so `atomic_lib::trash::restore` can bring it back.
-/// A canvas already in the Trash is left alone. Trashed canvases drop out of
-/// `list_canvases*`, which list the drive's direct children.
-pub async fn delete_canvas(subject: String) -> Result<(), String> {
-    let store = db()?;
-    let drive = store
-        .get_active_drive()
-        .ok_or("No drive set. Call setup() first.")?;
-    let had_trash = atomic_lib::trash::peek_trash_folder(store.as_ref(), &drive).is_some();
-    let trash = atomic_lib::trash::get_or_create_trash_folder(store.as_ref(), &drive)
-        .await
-        .map_err(err)?;
-    if !had_trash {
-        // The folder and the drive's pointer to it are plain local commits.
-        nudge_peers_after_local_change(store.as_ref()).await;
-    }
-    let mut resource = store
-        .get_resource(&subject.as_str().into())
-        .await
-        .map_err(err)?;
-    if atomic_lib::trash::apply_trash(&mut resource, &trash).map_err(err)? {
-        save_and_push(&mut resource, store.as_ref()).await?;
-    }
-    Ok(())
-}
-
-/// Rename a canvas.
-pub async fn rename_canvas(subject: String, name: String) -> Result<(), String> {
-    let store = db()?;
-    let mut resource = store
-        .get_resource(&subject.as_str().into())
-        .await
-        .map_err(err)?;
-    resource.set_unsafe(
-        atomic_lib::urls::NAME.into(),
-        atomic_lib::Value::String(name),
-    );
-    save_and_push(&mut resource, store.as_ref()).await
-}
-
-/// Delete a single stroke by index.
-pub async fn delete_stroke(subject: String, index: i32) -> Result<(), String> {
-    let store = db()?;
-    let mut guard = get_canvas(&subject).await?;
-    let resource = guard.as_mut().unwrap();
-    resource
-        .delete_list_item(CANVAS_STROKE_DATA, index as usize)
-        .map_err(err)?;
-    save_and_push(resource, store.as_ref()).await
-}
-
-/// Undo the last edit on a canvas. Returns the new stroke count.
-pub async fn undo_canvas(subject: String) -> Result<i32, String> {
-    let store = db()?;
-    let mut guard = get_canvas(&subject).await?;
-    let resource = guard.as_mut().unwrap();
-    if resource.undo().map_err(err)? {
-        save_and_push(resource, store.as_ref()).await?;
-    }
-    let count = match resource.get(CANVAS_STROKE_DATA) {
-        Ok(atomic_lib::Value::Json(serde_json::Value::Array(arr))) => arr.len() as i32,
-        _ => 0,
-    };
-    Ok(count)
-}
-
-/// Whether the canvas has a local undo step available.
-pub async fn can_undo_canvas(subject: String) -> Result<bool, String> {
-    let guard = get_canvas(&subject).await?;
-    Ok(guard.as_ref().unwrap().can_undo())
-}
-
-/// Whether the canvas has a local redo step available.
-pub async fn can_redo_canvas(subject: String) -> Result<bool, String> {
-    let guard = get_canvas(&subject).await?;
-    Ok(guard.as_ref().unwrap().can_redo())
-}
-
-/// Redo the last undone edit on a canvas. Returns the new stroke count.
-pub async fn redo_canvas(subject: String) -> Result<i32, String> {
-    let store = db()?;
-    let mut guard = get_canvas(&subject).await?;
-    let resource = guard.as_mut().unwrap();
-    if resource.redo().map_err(err)? {
-        save_and_push(resource, store.as_ref()).await?;
-    }
-    let count = match resource.get(CANVAS_STROKE_DATA) {
-        Ok(atomic_lib::Value::Json(serde_json::Value::Array(arr))) => arr.len() as i32,
-        _ => 0,
-    };
-    Ok(count)
-}
-
 // ── 6. History ─────────────────────────────────────────────────────────────
 
 /// Load versioned state for history operations.
@@ -874,25 +414,6 @@ pub async fn get_resource_history(subject: String) -> Result<Vec<VersionMetadata
             message: m.message,
         })
         .collect())
-}
-
-/// Get canvas strokes at a specific historical version.
-pub async fn get_resource_at_version(
-    subject: String,
-    version_id: Vec<u8>,
-) -> Result<String, String> {
-    let store = db()?;
-    let mut resource = store
-        .get_resource(&subject.as_str().into())
-        .await
-        .map_err(err)?;
-    resource.warm_history().map_err(|e| e.to_string())?;
-    let version = atomic_lib::history::VersionID::from_bytes(version_id);
-    let detached = resource.view_at(&version).map_err(|e| e.to_string())?;
-    Ok(detached
-        .get(CANVAS_STROKE_DATA)
-        .map(|v| v.to_string())
-        .unwrap_or_else(|_| "[]".into()))
 }
 
 // ── 6b. WebSocket sync (server-backed, same as browser) ─────────────────────
@@ -1395,11 +916,6 @@ async fn try_auto_peer_sync(store: &atomic_lib::Db) -> Result<bool, String> {
     Ok(report.imported > 0 || report.live_peers > 0)
 }
 
-/// Subscribe to live updates for an open canvas over WebSocket.
-pub async fn ws_subscribe_canvas(subject: String) -> Result<(), String> {
-    ws_sync::subscribe_canvas(&subject).await
-}
-
 /// Block until a local DB event arrives. Returns JSON, or None on timeout.
 pub async fn poll_db_event(timeout_ms: u32) -> Result<Option<String>, String> {
     let store = db()?;
@@ -1710,64 +1226,6 @@ pub async fn watch_children(parent: String) -> Result<String, String> {
         Ok(subject) => Ok(subject),
         Err(_) => Ok("timeout".into()),
     }
-}
-
-pub async fn set_strokes(subject: String, strokes_json: String) -> Result<(), String> {
-    let store = db()?;
-    let parsed: serde_json::Value =
-        serde_json::from_str(&strokes_json).map_err(|e| format!("Invalid strokes JSON: {e}"))?;
-
-    // History scrub on a synced canvas: checkout a Loro version and persist it.
-    if let Some(v) = parsed.get("checkout_version_id") {
-        let bytes = version_id_from_json(v)?;
-        let mut guard = get_canvas(&subject).await?;
-        let resource = guard.as_mut().unwrap();
-        resource.warm_history().map_err(err)?;
-        let version = atomic_lib::history::VersionID::from_bytes(bytes);
-        resource.checkout(&version).map_err(err)?;
-        save_and_push(resource, store.as_ref()).await?;
-        return Ok(());
-    }
-
-    let arr: Vec<serde_json::Value> =
-        if let Some(strokes) = parsed.get("strokes").and_then(|s| s.as_array()) {
-            strokes.clone()
-        } else if parsed.is_array() {
-            parsed.as_array().cloned().unwrap_or_default()
-        } else {
-            return Err("Expected stroke array or {checkout_version_id: [...]}".into());
-        };
-
-    let mut guard = get_canvas(&subject).await?;
-    let resource = guard.as_mut().unwrap();
-    // Catch up first: `arr` was derived from the store's full stroke list, so
-    // the session has to be on that same basis before we clear. A clear can
-    // only remove elements the doc knows about, so against a stale session a
-    // peer's stroke survives the clear *and* is re-added by the loop below —
-    // the erase leaves a duplicate behind instead of erasing.
-    refresh_editing_session(resource, store.as_ref(), &subject);
-    resource.clear_json_array(CANVAS_STROKE_DATA).map_err(err)?;
-    for item in &arr {
-        resource
-            .push_list_item(CANVAS_STROKE_DATA, item.clone())
-            .map_err(err)?;
-    }
-    save_and_push(resource, store.as_ref()).await?;
-    Ok(())
-}
-
-fn version_id_from_json(v: &serde_json::Value) -> Result<Vec<u8>, String> {
-    let items = v
-        .as_array()
-        .ok_or_else(|| "checkout_version_id must be a JSON array of bytes".to_string())?;
-    items
-        .iter()
-        .map(|x| {
-            x.as_u64()
-                .ok_or_else(|| "checkout_version_id must be a JSON array of bytes".to_string())
-                .map(|n| n as u8)
-        })
-        .collect()
 }
 
 #[frb(sync)]

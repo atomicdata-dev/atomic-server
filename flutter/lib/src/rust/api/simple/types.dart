@@ -6,7 +6,7 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `CanvasListItemJson`, `DbEventDto`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `DbEventDto`
 
 class AgentInfo {
   final String secret;
@@ -33,53 +33,6 @@ class AgentInfo {
           secret == other.secret &&
           subject == other.subject &&
           publicKey == other.publicKey &&
-          name == other.name;
-}
-
-class CanvasListItem {
-  final String subject;
-  final String name;
-
-  /// Unix milliseconds (`dateEdited` property).
-  final PlatformInt64 dateEdited;
-
-  const CanvasListItem({
-    required this.subject,
-    required this.name,
-    required this.dateEdited,
-  });
-
-  @override
-  int get hashCode => subject.hashCode ^ name.hashCode ^ dateEdited.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is CanvasListItem &&
-          runtimeType == other.runtimeType &&
-          subject == other.subject &&
-          name == other.name &&
-          dateEdited == other.dateEdited;
-}
-
-class FolderListItem {
-  final String subject;
-  final String name;
-
-  const FolderListItem({
-    required this.subject,
-    required this.name,
-  });
-
-  @override
-  int get hashCode => subject.hashCode ^ name.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is FolderListItem &&
-          runtimeType == other.runtimeType &&
-          subject == other.subject &&
           name == other.name;
 }
 

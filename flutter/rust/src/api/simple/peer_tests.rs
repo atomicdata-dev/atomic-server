@@ -1,9 +1,8 @@
-//! The bridge's peer surface — the code the Android Canvas app calls to sync.
+//! The bridge's peer surface — the code the app calls to sync.
 //!
-//! `tests.rs` covers the canvas editing session; this covers getting a drawing
-//! off the device. Everything here goes through the same `pub` functions
+//! This covers getting a resource off the device. Everything here goes through the same `pub` functions
 //! Flutter calls, against a **real remote peer in another OS process** rather
-//! than a mock: the closest thing in CI to "Canvas syncs with my desktop".
+//! than a mock: the closest thing in CI to "the app syncs with my desktop".
 //!
 //! Why a separate process: `atomic_lib::sync::peer` keeps its router, endpoint
 //! and live-peer table in process globals, and this crate's `DB` is a
@@ -22,6 +21,9 @@ use super::*;
 
 const CHILD_DIR_ENV: &str = "ATOMIC_BRIDGE_PEER_CHILD_DIR";
 const REMOTE_NAME: &str = "Desktop";
+/// The property the test writes on one device and expects on the other.
+const SYNCED_PROPERTY: &str = "https://atomicdata.dev/properties/description";
+const SYNCED_VALUE: &str = "synced-through-the-bridge-42";
 
 /// What the parent hands the remote, and what the remote hands back.
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -29,10 +31,10 @@ struct Handshake {
     /// The account both sides run as. A peer serves only what the asking agent
     /// may read, so a different identity here would prove nothing.
     secret: String,
-    /// The exact canvas to watch for. Every test in this binary shares one
-    /// drive, so "any canvas with strokes" would happily match a neighbour's
-    /// drawing and prove nothing about ours.
-    canvas: String,
+    /// The exact resource to watch for. Every test in this binary shares one
+    /// drive, so "any resource with the property" would happily match a
+    /// neighbour's and prove nothing about ours.
+    subject: String,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -50,7 +52,7 @@ fn addr_path(dir: &std::path::Path) -> std::path::PathBuf {
     dir.join("remote-addr.json")
 }
 
-/// Written by the remote once it can actually see the pushed drawing.
+/// Written by the remote once it can actually see the pushed resource.
 fn receipt_path(dir: &std::path::Path) -> std::path::PathBuf {
     dir.join("receipt.txt")
 }
@@ -99,14 +101,12 @@ fn child_is_a_second_device() {
         )
         .unwrap();
 
-        // Watch for the drawing to arrive. Reporting from the receiving side is
+        // Watch for the value to arrive. Reporting from the receiving side is
         // what makes this independent proof rather than the sender's own count.
         for _ in 0..1200 {
-            if let Ok(resource) = store.get_resource(&handshake.canvas.as_str().into()).await {
-                if let Ok(atomic_lib::Value::Json(strokes)) = resource.get(CANVAS_STROKE_DATA) {
-                    if strokes.as_array().is_some_and(|a| !a.is_empty()) {
-                        std::fs::write(receipt_path(&dir), strokes.to_string()).unwrap();
-                    }
+            if let Ok(resource) = store.get_resource(&handshake.subject.as_str().into()).await {
+                if let Ok(value) = resource.get(SYNCED_PROPERTY) {
+                    std::fs::write(receipt_path(&dir), value.to_string()).unwrap();
                 }
             }
             if receipt_path(&dir).exists() {
@@ -134,13 +134,13 @@ impl Drop for RemoteDevice {
 }
 
 /// Boot the remote device and wait until it publishes a dialable address.
-async fn start_remote_device(secret: String, canvas: String) -> (RemoteDevice, RemoteAddr) {
+async fn start_remote_device(secret: String, subject: String) -> (RemoteDevice, RemoteAddr) {
     let dir = std::env::temp_dir().join(format!("atomic-bridge-peer-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(
         handshake_path(&dir),
-        serde_json::to_vec(&Handshake { secret, canvas }).unwrap(),
+        serde_json::to_vec(&Handshake { secret, subject }).unwrap(),
     )
     .unwrap();
 
@@ -177,19 +177,32 @@ async fn start_remote_device(secret: String, canvas: String) -> (RemoteDevice, R
     panic!("remote device never published an address");
 }
 
-/// A drawing made on this device reaches a second device, driven entirely
+/// A resource edited on this device reaches a second device, driven entirely
 /// through the bridge API Flutter calls.
 ///
 /// This is the one test that exercises `start_peer` → `add_known_peer` →
 /// `peer_sync` as a sequence, against something that can actually refuse.
 #[tokio::test]
-async fn a_canvas_syncs_to_a_second_device_through_the_bridge() {
-    let _ = shared_drive().await;
+async fn a_resource_syncs_to_a_second_device_through_the_bridge() {
+    let drive = shared_drive().await;
 
-    let canvas = create_canvas("Synced drawing".to_string()).await.unwrap();
-    push_stroke(canvas.clone(), r#"{"color":42,"path":[[3.0,4.0]]}"#.into())
+    let subject = db()
+        .unwrap()
+        .create_resource(
+            "https://atomicdata.dev/classes/Folder",
+            drive,
+            "Synced resource",
+            None,
+        )
         .await
         .unwrap();
+    set_property(
+        subject.clone(),
+        SYNCED_PROPERTY.to_string(),
+        SYNCED_VALUE.to_string(),
+    )
+    .await
+    .unwrap();
 
     let secret = get_active_agent()
         .await
@@ -205,7 +218,7 @@ async fn a_canvas_syncs_to_a_second_device_through_the_bridge() {
         "get_peer_id must report the node start_peer just created"
     );
 
-    let (remote, addr) = start_remote_device(secret, canvas.clone()).await;
+    let (remote, addr) = start_remote_device(secret, subject.clone()).await;
 
     // What pairing records: the peer, plus how to reach it. `peer_sync` builds
     // its dial target from this, so an unroutable record fails the sync.
@@ -221,15 +234,15 @@ async fn a_canvas_syncs_to_a_second_device_through_the_bridge() {
         serde_json::from_str(&peer_sync(addr.node_id.clone()).await.expect("peer_sync")).unwrap();
 
     // `add_known_peer` above also hands the peer to the auto-connect loop, which
-    // can dial it first and deliver the drawing before this `peer_sync` runs
+    // can dial it first and deliver the resource before this `peer_sync` runs
     // (this binary's other tests keep that loop awake). The explicit sync then
     // finds both sides level: the peer answers in sync and nothing is pushed.
-    // Either way the drawing has to reach the second device, which the receipt
+    // Either way the resource has to reach the second device, which the receipt
     // below proves; what must not happen is a sync that moved nothing and did
     // not find the peer level either.
     assert!(
         report["pushed"].as_i64().unwrap_or(0) > 0 || report["in_sync"].as_bool() == Some(true),
-        "the drawing should have been handed to the second device, or the peer already held it: {report}"
+        "the resource should have been handed to the second device, or the peer already held it: {report}"
     );
     assert_eq!(
         report["peer_name"].as_str(),
@@ -248,12 +261,12 @@ async fn a_canvas_syncs_to_a_second_device_through_the_bridge() {
             }
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
-        found.expect("the second device never saw the drawing")
+        found.expect("the second device never saw the resource")
     };
 
     assert!(
-        receipt.contains("42"),
-        "the second device saw a drawing, but not the stroke we drew: {receipt}"
+        receipt.contains(SYNCED_VALUE),
+        "the second device saw the resource, but not the value we set: {receipt}"
     );
 }
 

@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'simple/types.dart';
 
-// These functions are ignored because they are not marked as `pub`: `canvas_cache_key`, `canvas_entry`, `db_event_to_json`, `destroy_resource_and_sync`, `drive_resource_exists`, `ensure_cache_listener`, `ensure_sync_connectivity`, `fetch_other_drive`, `follow_listed_drives`, `get_canvas`, `is_corruption_error`, `is_unreachable_hub_url`, `node_apply_local`, `nudge_peers_after_local_change`, `peer_ids_to_try`, `push_local_write`, `refresh_editing_session`, `save_and_push`, `short_id`, `sync_connectivity_inner`, `try_auto_peer_sync`, `version_id_from_json`
+// These functions are ignored because they are not marked as `pub`: `catch_up_search_index`, `db_event_to_json`, `drive_resource_exists`, `ensure_sync_connectivity`, `fetch_other_drive`, `follow_listed_drives`, `is_corruption_error`, `is_unreachable_hub_url`, `node_apply_local`, `nudge_peers_after_local_change`, `peer_ids_to_try`, `push_local_write`, `save_and_push`, `short_id`, `sync_connectivity_inner`, `try_auto_peer_sync`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `PeerSyncReport`, `SyncConnectivityReport`
 
 /// Local-first Atomic Data SDK for Flutter.
@@ -17,11 +17,10 @@ import 'simple/types.dart';
 ///   2. Agent     — setup(), load_agent(), get_active_agent(), clear_agent()
 ///   3. Drive     — create_drive(), list_drives(), get_active_drive(), set_active_drive()
 ///   4. Resource  — create_resource(), set_property(), get_property()
-///   5. Canvas    — create_canvas(), save/load/list/delete/rename
-///   6. History   — warm_resource_history(), get_resource_history(), get_resource_at_version()
-///   7. Peer      — start_peer(), get_peer_id(), peer_announce(), peer_sync(), peer_discover_sync()
+///   5. History   — warm_resource_history(), get_resource_history()
+///   6. Peer      — start_peer(), get_peer_id(), peer_announce(), peer_sync(), peer_discover_sync()
 ///
-/// Networking (group 7) is explicit and opt-in. Nothing in groups 1-6 touches the network.
+/// Networking (group 6) is explicit and opt-in. Nothing in groups 1-5 touches the network.
 /// Open a local database. Call once on app start.
 Future<void> openDb({required String path}) =>
     RustLib.instance.api.crateApiSimpleOpenDb(path: path);
@@ -89,82 +88,6 @@ Future<String> getProperty(
     RustLib.instance.api
         .crateApiSimpleGetProperty(subject: subject, property: property);
 
-/// Create a new canvas. Uses the active drive as parent.
-Future<String> createCanvas({required String name}) =>
-    RustLib.instance.api.crateApiSimpleCreateCanvas(name: name);
-
-/// Create a canvas, optionally in a gallery folder (`folder_id` = folder resource subject).
-Future<String> createCanvasWithFolder(
-        {required String name, String? folderId}) =>
-    RustLib.instance.api
-        .crateApiSimpleCreateCanvasWithFolder(name: name, folderId: folderId);
-
-/// Create a folder resource under the active drive.
-Future<String> createFolder({required String name}) =>
-    RustLib.instance.api.crateApiSimpleCreateFolder(name: name);
-
-/// List folder resources in the active drive.
-Future<List<FolderListItem>> listFolders() =>
-    RustLib.instance.api.crateApiSimpleListFolders();
-
-/// Set or clear the gallery folder for a canvas (persisted + synced).
-Future<void> setCanvasFolder({required String subject, String? folderId}) =>
-    RustLib.instance.api
-        .crateApiSimpleSetCanvasFolder(subject: subject, folderId: folderId);
-
-/// Push a single stroke to a canvas. Appends to the stroke list; merges across devices.
-Future<void> pushStroke(
-        {required String subject, required String strokeJson}) =>
-    RustLib.instance.api
-        .crateApiSimplePushStroke(subject: subject, strokeJson: strokeJson);
-
-/// Load strokes JSON from a canvas. Reads directly from DB (no edit session).
-Future<String> loadCanvasStrokes({required String subject}) =>
-    RustLib.instance.api.crateApiSimpleLoadCanvasStrokes(subject: subject);
-
-/// List all canvases in the active drive.
-/// Uses the query index (not a full scan) so results include synced resources.
-Future<List<CanvasListItem>> listCanvases() =>
-    RustLib.instance.api.crateApiSimpleListCanvases();
-
-/// List canvases as JSON (includes `folder_id`). Prefer this from Dart until FRB codegen.
-Future<String> listCanvasesJson() =>
-    RustLib.instance.api.crateApiSimpleListCanvasesJson();
-
-/// Delete a canvas (or any resource): move it to the active drive's Trash
-/// folder (created on first use) and remember its old parent in `trashedFrom`.
-/// Nothing is destroyed, so `atomic_lib::trash::restore` can bring it back.
-/// A canvas already in the Trash is left alone. Trashed canvases drop out of
-/// `list_canvases*`, which list the drive's direct children.
-Future<void> deleteCanvas({required String subject}) =>
-    RustLib.instance.api.crateApiSimpleDeleteCanvas(subject: subject);
-
-/// Rename a canvas.
-Future<void> renameCanvas({required String subject, required String name}) =>
-    RustLib.instance.api
-        .crateApiSimpleRenameCanvas(subject: subject, name: name);
-
-/// Delete a single stroke by index.
-Future<void> deleteStroke({required String subject, required int index}) =>
-    RustLib.instance.api
-        .crateApiSimpleDeleteStroke(subject: subject, index: index);
-
-/// Undo the last edit on a canvas. Returns the new stroke count.
-Future<int> undoCanvas({required String subject}) =>
-    RustLib.instance.api.crateApiSimpleUndoCanvas(subject: subject);
-
-/// Whether the canvas has a local undo step available.
-Future<bool> canUndoCanvas({required String subject}) =>
-    RustLib.instance.api.crateApiSimpleCanUndoCanvas(subject: subject);
-
-/// Whether the canvas has a local redo step available.
-Future<bool> canRedoCanvas({required String subject}) =>
-    RustLib.instance.api.crateApiSimpleCanRedoCanvas(subject: subject);
-
-/// Redo the last undone edit on a canvas. Returns the new stroke count.
-Future<int> redoCanvas({required String subject}) =>
-    RustLib.instance.api.crateApiSimpleRedoCanvas(subject: subject);
-
 /// Load versioned state for history operations.
 Future<void> warmResourceHistory({required String subject}) =>
     RustLib.instance.api.crateApiSimpleWarmResourceHistory(subject: subject);
@@ -172,12 +95,6 @@ Future<void> warmResourceHistory({required String subject}) =>
 /// Get the edit history of a resource.
 Future<List<VersionMetadata>> getResourceHistory({required String subject}) =>
     RustLib.instance.api.crateApiSimpleGetResourceHistory(subject: subject);
-
-/// Get canvas strokes at a specific historical version.
-Future<String> getResourceAtVersion(
-        {required String subject, required List<int> versionId}) =>
-    RustLib.instance.api.crateApiSimpleGetResourceAtVersion(
-        subject: subject, versionId: versionId);
 
 /// Open a WebSocket sync session to an Atomic Server. Authenticates, SUBs the active drive,
 /// and applies incoming UPDATE / QUERY_UPDATE / COMMIT frames to the local DB.
@@ -235,10 +152,6 @@ bool genesisAnswerVerifies({required String body, required String drive}) =>
 /// personal drive lists. Call it only for an origin whose genesis verified.
 Future<void> connectHomeServer({required String origin}) =>
     RustLib.instance.api.crateApiSimpleConnectHomeServer(origin: origin);
-
-/// Subscribe to live updates for an open canvas over WebSocket.
-Future<void> wsSubscribeCanvas({required String subject}) =>
-    RustLib.instance.api.crateApiSimpleWsSubscribeCanvas(subject: subject);
 
 /// Block until a local DB event arrives. Returns JSON, or None on timeout.
 Future<String?> pollDbEvent({required int timeoutMs}) =>
@@ -304,11 +217,6 @@ Future<String> watchResource({required String subject}) =>
 
 Future<String> watchChildren({required String parent}) =>
     RustLib.instance.api.crateApiSimpleWatchChildren(parent: parent);
-
-Future<void> setStrokes(
-        {required String subject, required String strokesJson}) =>
-    RustLib.instance.api
-        .crateApiSimpleSetStrokes(subject: subject, strokesJson: strokesJson);
 
 String getKnownPeersJson() =>
     RustLib.instance.api.crateApiSimpleGetKnownPeersJson();

@@ -20,10 +20,6 @@ Future<void> closeWsSync() =>
 Future<void> openWsSync({required String serverOrigin}) => RustLib.instance.api
     .crateApiSimpleWsSyncOpenWsSync(serverOrigin: serverOrigin);
 
-/// Subscribe to live updates for a single canvas over WebSocket.
-Future<void> subscribeCanvas({required String subject}) =>
-    RustLib.instance.api.crateApiSimpleWsSyncSubscribeCanvas(subject: subject);
-
 /// Post a commit JSON-AD over the open WS session (falls back to error if closed).
 Future<String> postCommitOverWs({required String commitJson}) =>
     RustLib.instance.api

@@ -34,7 +34,7 @@ export '../src/rust/api/simple/types.dart'
 ///   2. Agent     — setup(), loadAgent(), getActiveAgent(), clearAgent()
 ///   3. Drive     — createDrive(), listDrives(), getActiveDrive(), setActiveDrive()
 ///   4. Resource  — getProperty(), setProperty()
-///   6. History   — warmResourceHistory(), getResourceHistory(), getResourceAtVersion()
+///   6. History   — warmResourceHistory(), getResourceHistory()
 ///   7. Peer      — startPeer(), getPeerId(), peerAnnounce(), peerSync(), peerDiscoverSync()
 ///
 /// Networking (group 7) is explicit. Nothing in groups 1-6 touches the network.
@@ -218,14 +218,6 @@ class AtomicClient {
 
   static Future<List<VersionMetadata>> getResourceHistory(String subject) =>
       ffi.getResourceHistory(subject: subject);
-
-  static Future<String> getResourceAtVersion(
-          String subject, List<int> versionId) =>
-      ffi.getResourceAtVersion(
-          subject: subject,
-          versionId: versionId is Uint8List
-              ? versionId
-              : Uint8List.fromList(versionId));
 
   // ── 7. Peer / Sync (explicit, opt-in) ────────────────────────────────────
 
