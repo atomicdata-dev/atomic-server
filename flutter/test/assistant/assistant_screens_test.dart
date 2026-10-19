@@ -224,6 +224,18 @@ void main() {
       expect(find.text('Search in Beta'), findsOneWidget);
     });
 
+    testWidgets('search and new chat sit in one bar at the bottom',
+        (tester) async {
+      await tester.pumpWidget(app(ChatsScreen(
+          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      final search = tester.getTopLeft(find.byType(TextField));
+      final add = tester.getTopLeft(find.byTooltip('New chat'));
+      final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+      expect(search.dy, greaterThan(screen.height * 0.7));
+      expect((search.dy - add.dy).abs(), lessThan(24));
+    });
+
     testWidgets('a drive with nothing opened gets no page', (tester) async {
       final api = FakeApi(driveList: [
         (subject: 'did:ad:a', name: 'Alpha'),
@@ -340,7 +352,7 @@ void main() {
           onOpenGallery: () {})));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('New chat'));
+      await tester.tap(find.byTooltip('New chat'));
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen), findsOneWidget);
       expect(find.text('Message'), findsOneWidget);

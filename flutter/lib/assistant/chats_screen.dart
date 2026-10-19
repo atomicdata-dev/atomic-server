@@ -138,6 +138,16 @@ class _ChatsScreenState extends State<ChatsScreen> {
               ),
             ],
           ),
+          bottomNavigationBar: drives == null || drive == null
+              ? null
+              : _BottomBar(
+                  hint:
+                      drives.length > 1 ? 'Search in ${drive.name}' : 'Search',
+                  onSearch: () => _push(
+                      SearchScreen(drive: drive.subject, api: widget.api)),
+                  onNewChat: () => _push(
+                      ChatScreen(api: widget.api, subject: null, title: '')),
+                ),
           body: snapshot.hasError
               ? Center(
                   child: Text('${snapshot.error}',
@@ -147,26 +157,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
                   ? const Center(child: CircularProgressIndicator())
                   : Column(
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                          child: TextField(
-                            readOnly: true,
-                            decoration: InputDecoration(
-                              hintText: drives.length > 1
-                                  ? 'Search in ${drive.name}'
-                                  : 'Search',
-                              prefixIcon: const Icon(Icons.search),
-                              filled: true,
-                              fillColor: c.bg1,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(9),
-                                borderSide: BorderSide.none,
-                              ),
-                            ),
-                            onTap: () => _push(SearchScreen(
-                                drive: drive.subject, api: widget.api)),
-                          ),
-                        ),
                         // The chats scroll away above the drive pages, so
                         // the pages always get the screen's height to swipe
                         // and scroll in, however many chats there are.
@@ -229,11 +219,6 @@ class _ChatsSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ResourceRow(
-              icon: Icons.add,
-              title: 'New chat',
-              onTap: () => onOpen(null),
-            ),
             if (snapshot.hasError)
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -260,6 +245,57 @@ class _ChatsSection extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// Search and a new chat, fixed at the bottom where the thumb is: one row.
+class _BottomBar extends StatelessWidget {
+  final String hint;
+  final VoidCallback onSearch;
+  final VoidCallback onNewChat;
+
+  const _BottomBar({
+    required this.hint,
+    required this.onSearch,
+    required this.onNewChat,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    return Material(
+      color: c.bgBody,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: Row(children: [
+            Expanded(
+              child: TextField(
+                readOnly: true,
+                decoration: InputDecoration(
+                  hintText: hint,
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: c.bg1,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(9),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                onTap: onSearch,
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filled(
+              tooltip: 'New chat',
+              iconSize: 26,
+              onPressed: onNewChat,
+              icon: const Icon(Icons.add),
+            ),
+          ]),
+        ),
+      ),
     );
   }
 }
