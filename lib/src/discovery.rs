@@ -176,15 +176,7 @@ pub async fn resolve_node_id(drive_did: &str) -> AtomicResult<String> {
     #[cfg(not(feature = "iroh"))]
     let my_node_id: Option<String> = None;
 
-    resolve_node_id_filtered(drive_did, my_node_id.as_deref()).await
-}
-
-/// Resolve Iroh NodeIDs for a drive, filtering out `exclude_node_id` if provided.
-pub async fn resolve_node_id_filtered(
-    drive_did: &str,
-    exclude_node_id: Option<&str>,
-) -> AtomicResult<String> {
-    let ids = resolve_node_ids_filtered(drive_did, exclude_node_id).await?;
+    let ids = resolve_node_ids_filtered(drive_did, my_node_id.as_deref()).await?;
     Ok(ids.into_iter().next().expect("not empty"))
 }
 
@@ -224,16 +216,14 @@ pub async fn resolve_node_ids_filtered(
 
 /// What the pkarr relay says about where a drive lives: its replicas' Iroh
 /// NodeIDs and public https origins. Anyone may have written to the record, so
-/// an origin from it proves nothing until [`verified_home_origin`] checks it.
+/// an origin from it proves nothing until its genesis answer passes
+/// [`genesis_body_verifies`].
 pub async fn resolve_drive_record(drive_did: &str) -> AtomicResult<DriveRecord> {
     let keypair = drive_did_to_pkarr_keypair(drive_did)?;
     let client = build_client()?;
     Ok(resolve_record_raw(&client, &keypair.public_key()).await)
 }
 
-/// How many announced origins are looked at: the record is public.
-const MAX_ORIGIN_CANDIDATES: usize = 3;
-const GENESIS_PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(4);
 const MAX_GENESIS_BODY_BYTES: usize = 256 * 1024;
 
 /// Whether `body` (the answer of `GET /genesis?subject=<drive>`) carries the
@@ -266,70 +256,6 @@ pub fn genesis_body_verifies(body: &str, drive_did: &str) -> bool {
     crate::genesis::GenesisCert::decode(&bytes)
         .and_then(|cert| cert.verify_signed_bytes(&bytes, signature))
         .is_ok()
-}
-
-/// Whether the node at `origin` serves `drive_did`'s genesis and it verifies.
-/// An anonymous GET that returns the certificate and nothing else, no
-/// redirects, a short deadline; any failure counts as "not verified".
-pub async fn origin_serves_genesis(origin: &str, drive_did: &str) -> bool {
-    let client = match reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(GENESIS_PROBE_TIMEOUT)
-        .build()
-    {
-        Ok(client) => client,
-        Err(e) => {
-            tracing::warn!("Discovery: cannot build an HTTP client: {e}");
-            return false;
-        }
-    };
-    let url = format!(
-        "{}/genesis?subject={}",
-        origin.trim_end_matches('/'),
-        urlencoding::encode(drive_did)
-    );
-    tracing::info!("Discovery: GET {url}");
-    let response = match client
-        .get(url)
-        .header("Accept", "application/ad+json")
-        .send()
-        .await
-    {
-        Ok(response) => response,
-        Err(e) => {
-            tracing::warn!("Discovery: {origin} unreachable: {e:?}");
-            return false;
-        }
-    };
-    if !response.status().is_success() {
-        tracing::info!("Discovery: {origin} answered {}", response.status());
-        return false;
-    }
-    match response.text().await {
-        Ok(body) => genesis_body_verifies(&body, drive_did),
-        Err(_) => false,
-    }
-}
-
-/// The first https origin the pkarr record names that serves the drive's
-/// verified genesis: where the drive is hosted, found from the DID alone.
-pub async fn verified_home_origin(drive_did: &str) -> AtomicResult<Option<String>> {
-    let record = resolve_drive_record(drive_did).await?;
-    tracing::info!(
-        "Discovery: {} names {} NodeIDs and {} origins {:?}",
-        drive_did,
-        record.node_ids.len(),
-        record.http_origins.len(),
-        record.http_origins
-    );
-    for origin in record.http_origins.iter().take(MAX_ORIGIN_CANDIDATES) {
-        let verified = origin_serves_genesis(origin, drive_did).await;
-        tracing::info!("Discovery: {origin} serves the genesis: {verified}");
-        if verified {
-            return Ok(Some(origin.clone()));
-        }
-    }
-    Ok(None)
 }
 
 /// Resolve all NodeIDs from the pkarr relay for a given public key.
@@ -476,15 +402,6 @@ mod tests {
         json[crate::urls::GENESIS] = "AAAA".into();
         assert!(!genesis_body_verifies(&json.to_string(), &did));
         assert!(!genesis_body_verifies(&body, "did:ad:nonsense"));
-    }
-
-    /// Hits the real network: a known public drive, served by public nodes.
-    #[tokio::test]
-    #[ignore = "needs the network"]
-    async fn a_public_node_serves_a_verifiable_genesis() {
-        let did = "atomic:W2Q3m_ZUK0cz2qOStZPkmPRRYMPRJh6owaGmXw5MPm41ETEpVCCPLZFoPdJ0e5Why1bZj7jgKD8AcTV9ZvVLCQ";
-        assert!(origin_serves_genesis("https://atomic.ontola.io", did).await);
-        assert!(!origin_serves_genesis("https://atomic.ontola.io", &fake_drive_did(7)).await);
     }
 
     #[test]
@@ -652,11 +569,11 @@ mod tests {
             .await
             .expect("publish should succeed via pkarr relay");
 
-        let resolved = resolve_node_id_filtered(&drive_did, None)
+        let resolved = resolve_node_ids_filtered(&drive_did, None)
             .await
             .expect("resolve should find the published NodeID");
 
-        assert_eq!(resolved, node_id);
+        assert_eq!(resolved, [node_id]);
         println!("SUCCESS: pkarr relay publish + resolve works");
     }
 }

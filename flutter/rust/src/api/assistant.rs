@@ -85,6 +85,16 @@ pub(crate) async fn chat_entries(chat: &str) -> Result<Vec<(i64, Json)>, String>
     Ok(out.into_iter().map(|(c, _, json)| (c, json)).collect())
 }
 
+/// A `{subject, title, class_name, <extra>}` row of the resource lists.
+async fn resource_row(subject: &str, resource: &Resource, extra: (&str, Json)) -> Json {
+    json!({
+        "subject": subject,
+        "title": name_of(resource),
+        "class_name": class_name_of(resource).await,
+        extra.0: extra.1,
+    })
+}
+
 /// The newest `limit` AI chats of the person (all drives), newest activity first, as JSON
 /// `[{subject, name, last_activity}]` (`last_activity` in ms, 0 when empty).
 /// Read from the recents index, not rebuilt from the chats' pages.
@@ -123,12 +133,7 @@ pub async fn list_recent_resources(drive: String, limit: u32) -> Result<String, 
                 continue;
             }
         };
-        out.push(json!({
-            "subject": subject,
-            "title": name_of(&resource),
-            "class_name": class_name_of(&resource).await,
-            "opened_at": opened_at,
-        }));
+        out.push(resource_row(&subject, &resource, ("opened_at", json!(opened_at))).await);
     }
     serde_json::to_string(&out).map_err(|e| e.to_string())
 }
@@ -160,13 +165,14 @@ pub async fn search(drive: String, query: String, limit: u32) -> Result<String, 
         let Ok(resource) = store.get_resource(&hit.subject).await else {
             continue;
         };
-        let class_name = class_name_of(&resource).await;
-        out.push(json!({
-            "subject": hit.subject.to_string(),
-            "title": name_of(&resource),
-            "class_name": class_name,
-            "score": hit.score,
-        }));
+        out.push(
+            resource_row(
+                &hit.subject.to_string(),
+                &resource,
+                ("score", json!(hit.score)),
+            )
+            .await,
+        );
     }
     serde_json::to_string(&out).map_err(|e| e.to_string())
 }
@@ -176,21 +182,11 @@ pub async fn search(drive: String, query: String, limit: u32) -> Result<String, 
 #[frb(sync)]
 pub fn resource_web_url(subject: String) -> Result<String, String> {
     let origin = connected_server().ok_or("Not connected to a server")?;
-    let mut encoded = String::new();
-    for b in subject.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                encoded.push(b as char)
-            }
-            _ => encoded.push_str(&format!("%{b:02X}")),
-        }
-    }
-    Ok(format!("{origin}/app/show?subject={encoded}"))
+    Ok(format!(
+        "{origin}/app/show?subject={}",
+        urlencoding::encode(&subject)
+    ))
 }
-
-/// Entries a `ChatLog` page holds before the next page is started
-/// (`browser/data-browser/src/helpers/chatLog.ts`, `CHAT_LOG_CAPACITY`).
-const CHAT_LOG_CAPACITY: usize = 256;
 
 /// The options of a commit this device signs for its own agent.
 fn own_commit_opts() -> CommitOpts {
@@ -244,37 +240,10 @@ pub async fn append_chat_entry(
         .extra
         .insert("parts".into(), parts_json.as_str().into());
 
-    // The newest page that is not full.
-    let pages = store
-        .query(&Query::new_prop_val(urls::PARENT, &chat))
+    if let Some(subject) = atomic_lib::chat_log::page_with_room(store.as_ref(), &chat)
         .await
-        .map_err(err)?;
-    let mut target: Option<(i64, Subject)> = None;
-    for subject in &pages.subjects {
-        let Ok(page) = store.get_resource(subject).await else {
-            continue;
-        };
-        if !atomic_lib::hierarchy::is_chat_log(&page) {
-            continue;
-        }
-        let Ok(doc) = page.build_state_doc() else {
-            continue;
-        };
-        let entries = doc.entries();
-        if entries.len() >= CHAT_LOG_CAPACITY {
-            continue;
-        }
-        let last = entries
-            .values()
-            .filter_map(atomic_lib::chat_log::entry_created_at)
-            .max()
-            .unwrap_or(0);
-        if target.as_ref().is_none_or(|(best, _)| last >= *best) {
-            target = Some((last, subject.clone()));
-        }
-    }
-
-    if let Some((_, subject)) = target {
+        .map_err(err)?
+    {
         let mut page = store.get_resource(&subject).await.map_err(err)?;
         let key = page.add_chat_entry(&entry).map_err(err)?;
         let response = super::simple::state::node()?

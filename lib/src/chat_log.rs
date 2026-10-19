@@ -29,6 +29,49 @@ pub const FIELD_REPLY_TO: &str = "r";
 pub const FIELD_EDITED_AT: &str = "e";
 pub const FIELD_KINDS: &str = "k";
 
+/// Entries a `ChatLog` page holds before the next page is started; the same as
+/// `CHAT_LOG_CAPACITY` in `browser/data-browser/src/helpers/chatLog.ts`.
+pub const CHAT_LOG_CAPACITY: usize = 256;
+
+/// The page of `chat` a new entry goes to: the newest page (by its latest
+/// entry) that is not full, or `None` when a first or next page must be made.
+pub async fn page_with_room(
+    store: &impl crate::Storelike,
+    chat: &str,
+) -> AtomicResult<Option<crate::Subject>> {
+    let pages = store
+        .query(&crate::storelike::Query::new_prop_val(
+            crate::urls::PARENT,
+            chat,
+        ))
+        .await?;
+    let mut target: Option<(i64, crate::Subject)> = None;
+    for subject in &pages.subjects {
+        let Ok(page) = store.get_resource(subject).await else {
+            continue;
+        };
+        if !crate::hierarchy::is_chat_log(&page) {
+            continue;
+        }
+        let Ok(doc) = page.build_state_doc() else {
+            continue;
+        };
+        let entries = doc.entries();
+        if entries.len() >= CHAT_LOG_CAPACITY {
+            continue;
+        }
+        let last = entries
+            .values()
+            .filter_map(entry_created_at)
+            .max()
+            .unwrap_or(0);
+        if target.as_ref().is_none_or(|(best, _)| last >= *best) {
+            target = Some((last, subject.clone()));
+        }
+    }
+    Ok(target.map(|(_, subject)| subject))
+}
+
 /// `<createdAt hex>-<8 random hex>`.
 pub fn new_entry_key(created_at: i64) -> String {
     use rand::Rng;

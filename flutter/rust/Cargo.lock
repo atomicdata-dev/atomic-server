@@ -3753,6 +3753,7 @@ dependencies = [
  "tracing",
  "tracing-android",
  "tracing-subscriber",
+ "urlencoding",
 ]
 
 [[package]]

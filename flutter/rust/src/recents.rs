@@ -1,5 +1,9 @@
 //! The home screen's two lists, kept so reading them is a lookup.
 //!
+//! The index exists because building the chat list by reading every chat's
+//! Loro pages at app start was too slow (seconds); the home screen now reads a
+//! small persisted index instead.
+//!
 //! Which chat spoke last used to be found by rebuilding every chat's Loro pages
 //! in every drive. Now a listener on the store's change events keeps a small
 //! index: the newest entry time of each AI chat (chats belong to the person,
