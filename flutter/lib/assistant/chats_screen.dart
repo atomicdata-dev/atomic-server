@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../atomic/atomic_client.dart';
@@ -47,12 +48,23 @@ class ChatsScreen extends StatefulWidget {
 }
 
 class _ChatsScreenState extends State<ChatsScreen> {
-  late Future<List<DriveInfo>> _drives = _loadDrives();
-  late Future<List<ChatSummary>> _chats = widget.api.chats();
-  late Future<List<_Recent>> _recents = _loadRecents();
-  late Future<List<RecentResource>> _favorites = widget.api.favorites();
-  late Future<List<RecentResource>> _conversations = widget.api.conversations();
-  late Future<List<ActivityEntry>> _activity = _loadActivity();
+  late Future<List<DriveInfo>> _drives = _timed('drives', _loadDrives());
+  late Future<List<ChatSummary>> _chats = _timed('chats', widget.api.chats());
+  late Future<List<_Recent>> _recents = _timed('recents', _loadRecents());
+  late Future<List<RecentResource>> _favorites =
+      _timed('favorites', widget.api.favorites());
+  late Future<List<RecentResource>> _conversations =
+      _timed('conversations', widget.api.conversations());
+  late Future<List<ActivityEntry>> _activity =
+      _timed('activity', _loadActivity());
+
+  /// How long a home list took, in debug builds (`[home]` in logcat).
+  Future<T> _timed<T>(String what, Future<T> future) {
+    if (!kDebugMode) return future;
+    final watch = Stopwatch()..start();
+    return future.whenComplete(
+        () => debugPrint('[home] $what ${watch.elapsedMilliseconds} ms'));
+  }
 
   /// The emojis of the activity's resources, filled in after the list shows.
   Map<String, String> _icons = const {};

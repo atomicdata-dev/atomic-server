@@ -34,11 +34,17 @@ pub(crate) fn name_of(resource: &Resource) -> String {
 /// which skips decoding the whole Loro history that `get_resource` does per
 /// call. Rows need a title and a class, which the last commit materialized, so
 /// this can only lag a Loro import that has not materialized yet. Falls back to
-/// the full read when there is no stored row.
+/// the full read when there is a stored resource without a row, and to nothing
+/// when this device does not hold the resource at all.
 pub(crate) async fn row_resource(store: &atomic_lib::Db, subject: &Subject) -> Option<Resource> {
     match store.get_resource_shallow(subject) {
         Ok(r) => Some(r),
-        Err(_) => store.get_resource(subject).await.ok(),
+        // The full read is for a stored resource whose row is not materialized
+        // yet. For anything this device does not hold it would go and fetch
+        // it over the network, one subject after the other: with dozens of
+        // listed drives that is the app waiting seconds on every start.
+        Err(_) if store.has_stored_resource(subject) => store.get_resource(subject).await.ok(),
+        Err(_) => None,
     }
 }
 
