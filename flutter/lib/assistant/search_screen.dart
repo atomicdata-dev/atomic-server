@@ -51,14 +51,19 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  /// "<class> · <drive name>" when there is more than one drive.
+  /// The same drive may be spelled `did:ad:x` or `atomic:x`.
+  static String _id(String subject) =>
+      subject.replaceFirst('did:ad:', '').replaceFirst('atomic:', '');
+
+  /// "<class> · <drive name>": every result says which drive it is in.
   String _detail(String className, String drive) {
-    final name = _drives.length > 1
-        ? _drives
-            .where((d) => d.subject == drive)
+    final id = _id(drive);
+    final name = drive.isEmpty
+        ? null
+        : _drives
+            .where((d) => _id(d.subject) == id)
             .map((d) => d.name)
-            .firstOrNull
-        : null;
+            .firstOrNull;
     return [className, if (name != null && name.isNotEmpty) name]
         .where((t) => t.isNotEmpty)
         .join(' · ');
