@@ -85,15 +85,38 @@ pub fn read(db: &Db, drive: &str, plugin: &str) -> Result<Option<Session>, Strin
         .map(|b| serde_json::from_slice(&b).map_err(|e| e.to_string()))
         .transpose()
 }
+const MAX_SESSION_BYTES: usize = 8 * 1024 * 1024;
 fn save(db: &Db, drive: &str, plugin: &str, session: &Session) -> Result<(), String> {
     let bytes = serde_json::to_vec(session).map_err(|e| e.to_string())?;
-    if bytes.len() > 8 * 1024 * 1024 {
-        return Err("sync session exceeds eight MiB".into());
+    if bytes.len() > MAX_SESSION_BYTES {
+        return Err(format!(
+            "sync session exceeds the {MAX_SESSION_BYTES} byte (8 MiB) save limit"
+        ));
     }
     db.kv
         .insert(Tree::PluginMeta, key(drive, plugin).as_bytes(), &bytes)
         .map_err(|e| e.to_string())?;
     db.flush().map_err(|e| e.to_string())
+}
+/// Stores the session as `error`. A step that pushed the session over the save
+/// cap leaves the oversized `pending` and `result` in memory, so saving the
+/// error as-is would fail the same way and leave the stored session `running`,
+/// to be retried forever. Those are dropped when the first save is refused.
+fn fail(
+    db: &Db,
+    drive: &str,
+    plugin: &str,
+    session: &mut Session,
+    error: String,
+) -> Result<(), String> {
+    session.status = "error".into();
+    session.error = Some(error);
+    if save(db, drive, plugin, session).is_err() {
+        session.pending = None;
+        session.result = Value::Null;
+        save(db, drive, plugin, session)?;
+    }
+    Ok(())
 }
 async fn invoke<H: PluginHost>(
     source: &str,
@@ -334,9 +357,51 @@ where
     }
     .await;
     if let Err(error) = execution {
-        session.status = "error".into();
-        session.error = Some(error);
-        save(db, drive, plugin, &session)?;
+        fail(db, drive, plugin, &mut session, error)?;
     }
     Ok(session)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[actix_rt::test]
+    async fn oversized_pending_ends_the_run_in_error() {
+        let db = Db::init_temp("sync_session_oversized").await.unwrap();
+        let (drive, plugin) = ("did:ad:drive", "did:ad:plugin");
+        let mut session = Session {
+            run: "run".into(),
+            started_at: 0,
+            release: "release".into(),
+            config: Value::Null,
+            binding_required: false,
+            connection: State::default(),
+            proposal: Value::Null,
+            problems: vec![],
+            cursor: Value::Null,
+            result: Value::Null,
+            pending: Some(Pending {
+                effect: Effect::Atomic {
+                    id: "big".into(),
+                    verdict: json!("x".repeat(MAX_SESSION_BYTES)),
+                },
+                cursor: Value::Null,
+            }),
+            completed: BTreeSet::new(),
+            approved_by: Some("actor".into()),
+            status: "running".into(),
+            error: None,
+            checkpointed: false,
+        };
+        let error = save(&db, drive, plugin, &session).unwrap_err();
+        assert!(error.contains("8 MiB"));
+
+        fail(&db, drive, plugin, &mut session, error).unwrap();
+
+        let stored = read(&db, drive, plugin).unwrap().unwrap();
+        assert_eq!(stored.status, "error");
+        assert!(stored.error.unwrap().contains("8 MiB"));
+        assert!(stored.pending.is_none());
+    }
 }
