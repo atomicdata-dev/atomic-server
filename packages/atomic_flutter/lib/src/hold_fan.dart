@@ -77,8 +77,12 @@ class HoldFan<T> extends StatefulWidget {
   /// Shown as the current page: drawn as is, and marked selected.
   final bool selected;
 
-  /// Side of the square tap target.
+  /// Side of the square tap target (its height when [width] is set).
   final double size;
+
+  /// Width of the tap target when it is not square (`double.infinity` fills
+  /// the space it is given): for a heading or a row that opens a fan.
+  final double? width;
 
   const HoldFan({
     super.key,
@@ -94,6 +98,7 @@ class HoldFan<T> extends StatefulWidget {
     this.menuLabel = 'More options',
     this.selected = false,
     this.size = 48,
+    this.width,
   });
 
   @override
@@ -404,9 +409,11 @@ class _HoldFanState<T> extends State<HoldFan<T>>
       onTap: widget.onTap,
       radius: widget.size / 2,
       child: SizedBox(
-        width: widget.size,
+        width: widget.width ?? widget.size,
         height: widget.size,
-        child: Center(child: widget.child),
+        child: widget.width == null
+            ? Center(child: widget.child)
+            : widget.child,
       ),
     );
     if (widget.tooltip != null) {

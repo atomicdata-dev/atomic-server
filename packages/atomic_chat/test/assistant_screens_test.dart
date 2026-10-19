@@ -256,6 +256,58 @@ void main() {
       expect(find.text('Lisbon.'), findsOneWidget);
     });
 
+    testWidgets('a tap on a heading folds its section', (tester) async {
+      final api = FakeApi(
+        chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
+      );
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      expect(find.text('A chat'), findsOneWidget);
+      await tester.tap(find.text('AI chats'));
+      await tester.pumpAndSettle();
+      expect(find.text('A chat'), findsNothing);
+      expect(find.text('AI chats'), findsOneWidget);
+      await tester.tap(find.text('AI chats'));
+      await tester.pumpAndSettle();
+      expect(find.text('A chat'), findsOneWidget);
+    });
+
+    testWidgets('holding a heading moves and hides sections', (tester) async {
+      final api = FakeApi(
+        chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
+      );
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      double y(String t) => tester.getTopLeft(find.text(t)).dy;
+      expect(y('Drives'), lessThan(y('AI chats')));
+
+      Future<void> pick(String heading, String item) async {
+        final gesture =
+            await tester.startGesture(tester.getCenter(find.text(heading)));
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.pumpAndSettle();
+        final target = tester.getCenter(find.text(item));
+        await gesture.moveTo(target);
+        await tester.pump();
+        await gesture.up();
+        await tester.pumpAndSettle();
+      }
+
+      // Move AI chats up past Activity, Recents and Drives.
+      for (var i = 0; i < 3; i++) {
+        await pick('AI chats', '⬆️ Move up');
+      }
+      expect(y('AI chats'), lessThan(y('Drives')));
+
+      await pick('Drives', '🙈 Hide Drives');
+      expect(find.text('Drives'), findsNothing);
+
+      await pick('AI chats', '👁️ Show Drives');
+      expect(find.text('Drives'), findsOneWidget);
+    });
+
     testWidgets('keeps the old rows while a reload is pending', (tester) async {
       final api = _SlowChatsApi(
         chatList: [(subject: 'did:ad:1', name: 'Trip plan', lastActivity: 5)],
@@ -340,7 +392,7 @@ void main() {
       expect(find.byType(SearchScreen), findsOneWidget);
     });
 
-    testWidgets('sections come in order: Drives, Recents, AI Chats',
+    testWidgets('sections come in order: Drives, Recents, AI chats',
         (tester) async {
       final api = FakeApi(
         chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
@@ -359,11 +411,11 @@ void main() {
       await tester.pumpAndSettle();
       double y(String t) => tester.getTopLeft(find.text(t)).dy;
       expect(y('Drives'), lessThan(y('Recents')));
-      expect(y('Recents'), lessThan(y('AI Chats')));
+      expect(y('Recents'), lessThan(y('AI chats')));
       expect(find.text('Show all'), findsNothing);
     });
 
-    testWidgets('Favorites and Messages come after AI Chats, hidden if empty',
+    testWidgets('Favorites and Messages come after AI chats, hidden if empty',
         (tester) async {
       tester.view.physicalSize = const Size(800, 3000);
       tester.view.devicePixelRatio = 1;
@@ -402,7 +454,7 @@ void main() {
       );
       await pump(api);
       double y(String t) => tester.getTopLeft(find.text(t)).dy;
-      expect(y('AI Chats'), lessThan(y('Favorites')));
+      expect(y('AI chats'), lessThan(y('Favorites')));
       expect(y('Favorites'), lessThan(y('Messages')));
       expect(find.text('Starred'), findsOneWidget);
       expect(find.text('Folder'), findsOneWidget);
@@ -479,7 +531,7 @@ void main() {
       expect(find.text('Today'), findsOneWidget);
     });
 
-    testWidgets('Activity sits between Recents and AI Chats', (tester) async {
+    testWidgets('Activity sits between Recents and AI chats', (tester) async {
       final api = FakeApi(
         chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
         recent: [
@@ -498,7 +550,7 @@ void main() {
       await tester.pumpAndSettle();
       double y(String t) => tester.getTopLeft(find.text(t)).dy;
       expect(y('Recents'), lessThan(y('Activity')));
-      expect(y('Activity'), lessThan(y('AI Chats')));
+      expect(y('Activity'), lessThan(y('AI chats')));
       expect(find.text('Ann changed · 5 min ago'), findsOneWidget);
     });
 
@@ -610,6 +662,9 @@ void main() {
       expect(y('Second b'), lessThan(y('Mid b')));
       expect(y('Mid b'), lessThan(y('Old a')));
       expect(find.text('Oldest b'), findsNothing);
+      // The drive's name comes before the class in the subtitle.
+      expect(find.textContaining('Beta'), findsWidgets);
+      expect(find.textContaining('Alpha'), findsWidgets);
 
       ResourceView.serverFactory = () async => throw 'no server in a test';
       await tester.tap(find.text('Second b'));
@@ -1468,56 +1523,17 @@ void main() {
         expect(field(tester), '');
       });
 
-      testWidgets('read aloud on speaks a finished answer once',
+      testWidgets('a text chat has no read-aloud toggle and never speaks',
           (tester) async {
-        SharedPreferences.setMockInitialValues({'chat_read_aloud': true});
         final output = FakeSpeechOutput();
         await open(tester, FakeSpeechInput(), output);
-        expect(find.byIcon(Icons.volume_up), findsOneWidget);
-        await tester.enterText(find.byType(TextField), 'Hi');
-        await tester.pump();
-        await tester.tap(find.byTooltip('Send'));
-        await tester.pumpAndSettle();
-        expect(output.spoken, ['Hoi!']);
-      });
-
-      testWidgets('read aloud off never speaks', (tester) async {
-        final output = FakeSpeechOutput();
-        await open(tester, FakeSpeechInput(), output);
-        expect(find.byIcon(Icons.volume_off), findsOneWidget);
+        expect(find.byIcon(Icons.volume_up), findsNothing);
+        expect(find.byIcon(Icons.volume_off), findsNothing);
         await tester.enterText(find.byType(TextField), 'Hi');
         await tester.pump();
         await tester.tap(find.byTooltip('Send'));
         await tester.pumpAndSettle();
         expect(output.spoken, isEmpty);
-      });
-
-      testWidgets('toggling off or sending stops speech, toggle persists',
-          (tester) async {
-        SharedPreferences.setMockInitialValues({'chat_read_aloud': true});
-        final output = FakeSpeechOutput();
-        await open(tester, FakeSpeechInput(), output);
-        await tester.tap(find.byIcon(Icons.volume_up));
-        await tester.pumpAndSettle();
-        expect(output.stops, 1);
-        expect(find.byIcon(Icons.volume_off), findsOneWidget);
-        expect(
-            (await SharedPreferences.getInstance()).getBool('chat_read_aloud'),
-            isFalse);
-
-        await tester.tap(find.byIcon(Icons.volume_off));
-        await tester.pumpAndSettle();
-        expect(
-            (await SharedPreferences.getInstance()).getBool('chat_read_aloud'),
-            isTrue);
-
-        await tester.enterText(find.byType(TextField), 'Hi');
-        await tester.pump();
-        await tester.tap(find.byTooltip('Send'));
-        await tester.pumpAndSettle();
-        // Sending stopped speech first, then the new answer was read.
-        expect(output.stops, 2);
-        expect(output.spoken, ['Hoi!']);
       });
     });
 
@@ -1782,13 +1798,12 @@ void main() {
   });
 
   group('host pages', () {
-    testWidgets('Profile opens the host\'s page; signing out there reaches '
+    testWidgets(
+        'Profile opens the host\'s page; signing out there reaches '
         'the host', (tester) async {
       var signedOut = 0;
       final home = ChatsScreen(
-          drive: 'did:ad:drive',
-          api: FakeApi(),
-          onSignOut: () => signedOut++);
+          drive: 'did:ad:drive', api: FakeApi(), onSignOut: () => signedOut++);
       await tester.pumpWidget(app(AppShell(
         api: home.api,
         drive: home.drive,

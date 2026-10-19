@@ -1,8 +1,9 @@
 import 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColors, AppColorsExt;
+    show AppColors, AppColorsExt, HoldFan, HoldFanItem, HoldFanLayout;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'app_top_bar.dart';
+import 'home_sections.dart';
 
 import 'models.dart';
 import 'slide_back_route.dart';
@@ -21,6 +22,23 @@ const _maxRecents = 100;
 
 /// Most entries the activity feed holds.
 const _maxActivity = 100;
+
+enum _SectionOp { up, down, hide, show }
+
+/// A choice of a heading's hold menu.
+class _SectionAction {
+  final _SectionOp op;
+  final HomeSection section;
+  const _SectionAction(this.op, this.section);
+}
+
+/// How a section folds and what its heading's hold menu offers.
+typedef _Fold = ({
+  bool collapsed,
+  VoidCallback onToggle,
+  List<HoldFanItem<_SectionAction>> menu,
+  ValueChanged<_SectionAction> onMenu,
+});
 
 typedef _Recent = ({String drive, RecentResource resource});
 
@@ -80,6 +98,48 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   /// The most recent drive: the one the home opened on, else the first.
   String _drive = '';
+
+  /// Drive subject → name, for the drive shown in front of a recent.
+  Map<String, String> _driveNames = const {};
+
+  /// Which sections show, in which order, and which are folded (per device).
+  HomeLayout _layout = const HomeLayout();
+
+  @override
+  void initState() {
+    super.initState();
+    HomeLayout.load().then((layout) {
+      if (mounted) setState(() => _layout = layout);
+    });
+  }
+
+  void _setLayout(HomeLayout layout) {
+    setState(() => _layout = layout);
+    layout.save();
+  }
+
+  /// The hold menu of a section's heading: move it, hide it, and bring back
+  /// the hidden ones.
+  List<HoldFanItem<_SectionAction>> _menuFor(HomeSection s) => [
+        if (_layout.canMove(s, -1))
+          HoldFanItem('Move up', _SectionAction(_SectionOp.up, s), emoji: '⬆️'),
+        if (_layout.canMove(s, 1))
+          HoldFanItem('Move down', _SectionAction(_SectionOp.down, s),
+              emoji: '⬇️'),
+        HoldFanItem('Hide ${s.title}', _SectionAction(_SectionOp.hide, s),
+            emoji: '🙈'),
+        for (final h in _layout.order)
+          if (_layout.hidden.contains(h))
+            HoldFanItem('Show ${h.title}', _SectionAction(_SectionOp.show, h),
+                emoji: '👁️'),
+      ];
+
+  void _applyAction(_SectionAction a) => _setLayout(switch (a.op) {
+        _SectionOp.up => _layout.move(a.section, -1),
+        _SectionOp.down => _layout.move(a.section, 1),
+        _SectionOp.hide => _layout.setHidden(a.section, true),
+        _SectionOp.show => _layout.setHidden(a.section, false),
+      });
   ShellController? _shell;
 
   @override
@@ -106,6 +166,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     _drive = drives.any((d) => d.subject == widget.drive)
         ? widget.drive
         : drives.first.subject;
+    _driveNames = {for (final d in drives) d.subject: d.name};
     if (mounted) _shell?.drive.value = _drive;
     return drives;
   }
@@ -231,8 +292,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
         onTap: () => _openChat(chat),
       );
 
+  /// `<drive> · <class> · <when>`: the drive first, when it has a name.
   Widget _recentRow(_Recent r) =>
-      _resourceRow(r.resource, _openResource, r.drive);
+      _resourceRow(r.resource, _openResource, r.drive,
+          driveName: _driveNames[r.drive]);
 
   /// Favorites and conversations are not tied to one drive: they open in the
   /// current one.
@@ -276,6 +339,104 @@ class _ChatsScreenState extends State<ChatsScreen> {
               },
       );
 
+  Widget _showSectionsButton() => Padding(
+        padding: const EdgeInsets.all(32),
+        child: Center(
+          child: TextButton(
+            onPressed: () => _setLayout(const HomeLayout()),
+            child: const Text('Show all sections'),
+          ),
+        ),
+      );
+
+  /// One section of the home, with the layout's fold state and hold menu.
+  Widget _sectionFor(HomeSection id, AppColors c) {
+    final key = ValueKey(id);
+    final fold = (
+      collapsed: _layout.collapsed.contains(id),
+      onToggle: () => _setLayout(_layout.toggleCollapsed(id)),
+      menu: _menuFor(id),
+      onMenu: _applyAction,
+    );
+    switch (id) {
+      case HomeSection.drives:
+        return _Section<DriveInfo>(
+          key: key,
+          title: id.title,
+          fold: fold,
+          future: _drives,
+          empty: 'No drives yet',
+          rows: (list) => [for (final d in list) _driveRow(d)],
+          onShowAll: (list) => _push(_ListPage(
+              title: id.title, children: [for (final d in list) _driveRow(d)])),
+        );
+      case HomeSection.recents:
+        return _Section<_Recent>(
+          key: key,
+          title: id.title,
+          fold: fold,
+          future: _recents,
+          empty: 'Nothing opened yet',
+          rows: (list) => [for (final r in list) _recentRow(r)],
+          onShowAll: (list) => _push(_ListPage(title: id.title, children: [
+            for (final r in list.take(_maxRecents)) _recentRow(r),
+          ])),
+        );
+      case HomeSection.activity:
+        return _Section<ActivityEntry>(
+          key: key,
+          title: id.title,
+          fold: fold,
+          future: _activity,
+          empty: 'No activity yet',
+          rows: (list) => [for (final a in list) _activityRow(a)],
+          onShowAll: (list) => _push(_ListPage(title: id.title, children: [
+            for (final a in list.take(_maxActivity)) _activityRow(a),
+          ])),
+        );
+      case HomeSection.chats:
+        return _Section<ChatSummary>(
+          key: key,
+          title: id.title,
+          fold: fold,
+          future: _chats,
+          empty: 'No chats yet',
+          rows: (list) => [for (final chat in list) _chatRow(chat)],
+          onShowAll: (list) => _push(_ListPage(title: id.title, children: [
+            for (final (label, group) in groupChatsByAge(list)) ...[
+              _Heading(label, c),
+              for (final chat in group) _chatRow(chat),
+            ],
+          ])),
+        );
+      case HomeSection.favorites:
+        return _Section<RecentResource>(
+          key: key,
+          title: id.title,
+          fold: fold,
+          future: _favorites,
+          empty: 'No favorites yet',
+          hideEmpty: true,
+          rows: (list) => [for (final r in list) _homeRow(r)],
+          onShowAll: (list) => _push(_ListPage(
+              title: id.title, children: [for (final r in list) _homeRow(r)])),
+        );
+      case HomeSection.messages:
+        return _Section<ConversationRow>(
+          key: key,
+          title: id.title,
+          fold: fold,
+          future: _conversations,
+          empty: 'No messages yet',
+          hideEmpty: true,
+          rows: (list) => [for (final r in list) _conversationRow(r)],
+          onShowAll: (list) => _push(_ListPage(
+              title: id.title,
+              children: [for (final r in list) _conversationRow(r)])),
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
@@ -297,68 +458,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
           ),
           body: ListView(
             children: [
-              _Section<DriveInfo>(
-                title: 'Drives',
-                future: _drives,
-                empty: 'No drives yet',
-                rows: (list) => [for (final d in list) _driveRow(d)],
-                onShowAll: (list) => _push(_ListPage(
-                    title: 'Drives',
-                    children: [for (final d in list) _driveRow(d)])),
-              ),
-              _Section<_Recent>(
-                title: 'Recents',
-                future: _recents,
-                empty: 'Nothing opened yet',
-                rows: (list) => [for (final r in list) _recentRow(r)],
-                onShowAll: (list) =>
-                    _push(_ListPage(title: 'Recents', children: [
-                  for (final r in list.take(_maxRecents)) _recentRow(r),
-                ])),
-              ),
-              _Section<ActivityEntry>(
-                title: 'Activity',
-                future: _activity,
-                empty: 'No activity yet',
-                rows: (list) => [for (final a in list) _activityRow(a)],
-                onShowAll: (list) =>
-                    _push(_ListPage(title: 'Activity', children: [
-                  for (final a in list.take(_maxActivity)) _activityRow(a),
-                ])),
-              ),
-              _Section<ChatSummary>(
-                title: 'AI Chats',
-                future: _chats,
-                empty: 'No chats yet',
-                rows: (list) => [for (final chat in list) _chatRow(chat)],
-                onShowAll: (list) =>
-                    _push(_ListPage(title: 'AI Chats', children: [
-                  for (final (label, group) in groupChatsByAge(list)) ...[
-                    _Heading(label, c),
-                    for (final chat in group) _chatRow(chat),
-                  ],
-                ])),
-              ),
-              _Section<RecentResource>(
-                title: 'Favorites',
-                future: _favorites,
-                empty: 'No favorites yet',
-                hideEmpty: true,
-                rows: (list) => [for (final r in list) _homeRow(r)],
-                onShowAll: (list) => _push(_ListPage(
-                    title: 'Favorites',
-                    children: [for (final r in list) _homeRow(r)])),
-              ),
-              _Section<ConversationRow>(
-                title: 'Messages',
-                future: _conversations,
-                empty: 'No messages yet',
-                hideEmpty: true,
-                rows: (list) => [for (final r in list) _conversationRow(r)],
-                onShowAll: (list) => _push(_ListPage(
-                    title: 'Messages',
-                    children: [for (final r in list) _conversationRow(r)])),
-              ),
+              for (final id in _layout.visible) _sectionFor(id, c),
+              if (_layout.visible.isEmpty) _showSectionsButton(),
             ],
           ),
         );
@@ -370,14 +471,17 @@ class _ChatsScreenState extends State<ChatsScreen> {
 /// The current drive; tapping it lets you pick another.
 
 ResourceRow _resourceRow(RecentResource r,
-        void Function(String drive, RecentResource) onOpen, String drive) =>
+        void Function(String drive, RecentResource) onOpen, String drive,
+        {String? driveName}) =>
     ResourceRow(
       icon: iconForClass(r.className),
       emoji: r.emoji,
       title: r.title.isEmpty ? r.subject : r.title,
-      detail: [r.className, if (r.openedAt > 0) timeAgo(r.openedAt)]
-          .where((t) => t.isNotEmpty)
-          .join(' · '),
+      detail: [
+        if (driveName != null) driveName,
+        r.className,
+        if (r.openedAt > 0) timeAgo(r.openedAt)
+      ].where((t) => t.isNotEmpty).join(' · '),
       onTap: () => onOpen(drive, r),
     );
 
@@ -391,6 +495,7 @@ ResourceRow _resourceRow(RecentResource r,
 /// first load, and a refresh that fails keeps the old rows without an error.
 class _Section<T> extends StatefulWidget {
   final String title;
+  final _Fold fold;
   final Future<List<T>> future;
   final String empty;
   final List<Widget> Function(List<T>) rows;
@@ -401,7 +506,9 @@ class _Section<T> extends StatefulWidget {
   final bool hideEmpty;
 
   const _Section({
+    super.key,
     required this.title,
+    required this.fold,
     required this.future,
     required this.empty,
     required this.rows,
@@ -443,6 +550,40 @@ class _SectionState<T> extends State<_Section<T>> {
     });
   }
 
+  /// The heading: a tap folds the section, a hold opens the menu to move or
+  /// hide sections.
+  Widget _foldHeading(BuildContext context) {
+    final c = context.appColors;
+    final fold = widget.fold;
+    return HoldFan<_SectionAction>(
+      width: double.infinity,
+      size: 40,
+      tooltip: widget.title,
+      menuLabel: 'Arrange sections',
+      layout: HoldFanLayout.list,
+      defaultIndex: null,
+      onTap: fold.onToggle,
+      items: fold.menu,
+      onSelected: fold.onMenu,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 16, top: 8),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Text(widget.title,
+                style: TextStyle(
+                    color: c.textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(width: 4),
+            Icon(fold.collapsed ? Icons.chevron_right : Icons.expand_more,
+                size: 18, color: c.textSecondary),
+          ]),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
@@ -456,10 +597,10 @@ class _SectionState<T> extends State<_Section<T>> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(children: [
-          Expanded(child: _Heading(widget.title, c)),
+          Expanded(child: _foldHeading(context)),
           // Same size, weight and padding as the heading, so the two sit on
           // one baseline.
-          if (more)
+          if (more && !widget.fold.collapsed)
             InkWell(
               onTap: () => widget.onShowAll(list),
               child: Padding(
@@ -472,7 +613,9 @@ class _SectionState<T> extends State<_Section<T>> {
               ),
             ),
         ]),
-        if (error != null)
+        if (widget.fold.collapsed)
+          const SizedBox.shrink()
+        else if (error != null)
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text('$error', style: TextStyle(color: c.alert)),
