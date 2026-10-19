@@ -48,5 +48,6 @@
   },
   "source": "src/index.ts",
   "type": "module",
-  "types": "dist/src/index.d.ts"
+  "types": "dist/src/index.d.ts",
+  "packageManager": "pnpm@9.3.0"
 }
