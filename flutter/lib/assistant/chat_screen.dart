@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../atomic/atomic_client.dart';
 import '../theme.dart';
 import 'assistant_api.dart';
+import 'fading_text.dart';
 import 'hosted_ai.dart';
 
 /// A chat: the text of each message, newest at the bottom, and, when an AI is
@@ -35,8 +36,8 @@ class _ChatScreenState extends State<ChatScreen> {
   HostedAi? _ai;
   bool _aiLooked = false;
 
-  /// The answer as it streams in.
-  String? _partial;
+  /// The answer as it streams in, in the pieces it came in.
+  List<(String, DateTime)>? _partial;
   bool _sending = false;
   String? _error;
 
@@ -120,7 +121,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _sending = true;
       _error = null;
       _messages = asked;
-      _partial = '';
+      _partial = [];
     });
     try {
       // The chat exists from the first message on, named after it.
@@ -131,7 +132,9 @@ class _ChatScreenState extends State<ChatScreen> {
       var answer = '';
       await for (final delta in ai.answer(asked)) {
         answer += delta;
-        if (mounted) setState(() => _partial = answer);
+        if (mounted) {
+          setState(() => _partial = [..._partial!, (delta, DateTime.now())]);
+        }
       }
       if (answer.trim().isNotEmpty) {
         await widget.api.addMessage(chat, 'assistant', answer);
@@ -181,7 +184,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final shown = [
       ..._messages,
       if (_partial != null)
-        (id: 'partial', role: 'assistant', text: _partial!, createdAt: 0),
+        (id: 'partial', role: 'assistant', text: '', createdAt: 0),
     ];
     if (shown.isEmpty) {
       return Center(
@@ -207,12 +210,17 @@ class _ChatScreenState extends State<ChatScreen> {
               color: mine ? c.mainSelectedBg : c.bg1,
               borderRadius: BorderRadius.circular(9),
             ),
-            child: m.text.isEmpty
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
+            child: m.id == 'partial'
+                ? (_partial!.isEmpty
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : FadingText(
+                        chunks: _partial!,
+                        style: TextStyle(color: c.textPrimary),
+                      ))
                 : SelectableText(
                     m.text,
                     style: TextStyle(

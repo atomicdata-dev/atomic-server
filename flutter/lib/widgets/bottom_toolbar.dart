@@ -308,8 +308,9 @@ class _BottomToolbarState extends State<BottomToolbar> {
       // Full-width row for small screens, respects system nav bar
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-        color:
-            _overlayActive ? Colors.transparent : c.panelBg.withValues(alpha: 0.95),
+        color: _overlayActive
+            ? Colors.transparent
+            : c.panelBg.withValues(alpha: 0.95),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: buttons,
@@ -320,8 +321,9 @@ class _BottomToolbarState extends State<BottomToolbar> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color:
-            _overlayActive ? Colors.transparent : c.panelBg.withValues(alpha: 0.88),
+        color: _overlayActive
+            ? Colors.transparent
+            : c.panelBg.withValues(alpha: 0.88),
         borderRadius: BorderRadius.circular(32),
         boxShadow: _overlayActive
             ? null
@@ -366,7 +368,8 @@ class _CircleBtn extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: c.panelBg.withValues(alpha: enabled ? (hovered ? 1.0 : 0.9) : 0.5),
+        color:
+            c.panelBg.withValues(alpha: enabled ? (hovered ? 1.0 : 0.9) : 0.5),
         shape: BoxShape.circle,
         boxShadow: hovered && enabled
             ? [BoxShadow(color: c.hoverShadow, blurRadius: 6, spreadRadius: 1)]

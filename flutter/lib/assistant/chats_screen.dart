@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../atomic/atomic_client.dart';
 import '../screens/sync_screen.dart';
 import '../theme.dart';
+import '../widgets/slide_back_route.dart';
 import 'assistant_api.dart';
 import 'chat_screen.dart';
 import 'resource_row.dart';
@@ -87,7 +88,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   Future<void> _push(Widget screen) async {
     await Navigator.of(context)
-        .push(MaterialPageRoute<void>(builder: (_) => screen));
+        .push(SlideBackRoute<void>(builder: (_) => screen));
     if (mounted) _reload();
   }
 

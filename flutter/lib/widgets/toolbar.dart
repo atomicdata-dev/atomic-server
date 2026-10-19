@@ -78,8 +78,9 @@ class _CanvasToolbarState extends State<CanvasToolbar> {
           width: 48,
           height: 48,
           decoration: BoxDecoration(
-            color:
-                isActive ? const Color(0xFF1976D2) : c.panelBg.withValues(alpha: 0.9),
+            color: isActive
+                ? const Color(0xFF1976D2)
+                : c.panelBg.withValues(alpha: 0.9),
             shape: BoxShape.circle,
             boxShadow: [BoxShadow(color: c.panelShadow, blurRadius: 4)],
           ),

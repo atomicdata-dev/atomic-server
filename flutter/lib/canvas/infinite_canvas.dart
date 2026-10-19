@@ -79,6 +79,7 @@ class _InfiniteCanvasState extends State<InfiniteCanvas>
   List<StrokeData>? _scrubPreviewStrokes;
   double _scrubStartIndex = 0.0;
   double _scrubAccumDx = 0.0;
+
   /// Loro oplog versions (oldest → newest) when history was created on another device.
   List<List<int>> _loroVersionIds = [];
   List<List<StrokeData>> _loroStrokeStates = [];
@@ -131,7 +132,8 @@ class _InfiniteCanvasState extends State<InfiniteCanvas>
   bool _loroCanRedo = false;
 
   bool get _canUndoToolbar => _isHistoryMode ? _actionIndex > 0 : _loroCanUndo;
-  bool get _canRedoToolbar => _isHistoryMode ? _actionIndex < _allActions.length : _loroCanRedo;
+  bool get _canRedoToolbar =>
+      _isHistoryMode ? _actionIndex < _allActions.length : _loroCanRedo;
 
   DateTime? _lastMetricsChange;
   Size? _lastSize;
@@ -370,9 +372,7 @@ class _InfiniteCanvasState extends State<InfiniteCanvas>
       await _refreshUndoRedoState();
       if (!mounted) return;
       widget.store.onCanvasChanged(widget.canvas, _strokes,
-          isDarkMode: isDarkMode,
-          penColor: _penColor,
-          prevColor: _prevColor);
+          isDarkMode: isDarkMode, penColor: _penColor, prevColor: _prevColor);
     });
   }
 
@@ -393,9 +393,7 @@ class _InfiniteCanvasState extends State<InfiniteCanvas>
       await _refreshUndoRedoState();
       if (!mounted) return;
       widget.store.onCanvasChanged(widget.canvas, _strokes,
-          isDarkMode: isDarkMode,
-          penColor: _penColor,
-          prevColor: _prevColor);
+          isDarkMode: isDarkMode, penColor: _penColor, prevColor: _prevColor);
     });
   }
 
@@ -637,9 +635,10 @@ class _InfiniteCanvasState extends State<InfiniteCanvas>
     if (_useLoroHistory && _loroStrokeStates.isNotEmpty) {
       final total = _loroStrokeStates.length.toDouble();
       setState(() {
-        _historyIndex =
-            (_scrubStartIndex + (_scrubAccumDx / 300.0) * total).clamp(0, total);
-        final idx = _historyIndex.toInt().clamp(0, _loroStrokeStates.length - 1);
+        _historyIndex = (_scrubStartIndex + (_scrubAccumDx / 300.0) * total)
+            .clamp(0, total);
+        final idx =
+            _historyIndex.toInt().clamp(0, _loroStrokeStates.length - 1);
         _scrubPreviewStrokes = List.of(_loroStrokeStates[idx]);
       });
       return;
@@ -681,9 +680,7 @@ class _InfiniteCanvasState extends State<InfiniteCanvas>
         _isHistoryMode = false;
       });
     } else if (_useLoroHistory && _loroVersionIds.isNotEmpty) {
-      final idx = _historyIndex
-          .toInt()
-          .clamp(0, _loroVersionIds.length - 1);
+      final idx = _historyIndex.toInt().clamp(0, _loroVersionIds.length - 1);
       final versionId = _loroVersionIds[idx];
       try {
         await AtomicClient.checkoutCanvasVersion(widget.canvas.id, versionId);

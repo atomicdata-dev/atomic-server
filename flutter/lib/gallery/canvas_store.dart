@@ -69,8 +69,8 @@ class CanvasStore {
       final folderItems = await AtomicClient.listFolders();
       folders
         ..clear()
-        ..addAll(folderItems.map(
-            (f) => FolderEntry(id: f.subject, name: f.name)));
+        ..addAll(
+            folderItems.map((f) => FolderEntry(id: f.subject, name: f.name)));
       // Merge: keep existing entries (with thumbnails), add new, remove stale
       final newIds = items.map((i) => i.subject).toSet();
       canvases.removeWhere((c) => c.id.isNotEmpty && !newIds.contains(c.id));
@@ -262,7 +262,8 @@ class CanvasStore {
     }
   }
 
-  Future<({bool canUndo, bool canRedo})> undoRedoState(CanvasEntry canvas) async {
+  Future<({bool canUndo, bool canRedo})> undoRedoState(
+      CanvasEntry canvas) async {
     if (canvas.id.isEmpty) {
       return (canUndo: false, canRedo: false);
     }

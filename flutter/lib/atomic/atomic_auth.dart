@@ -30,8 +30,7 @@ String encodeAtomicBase64(List<int> bytes) =>
 Uint8List decodeAtomicBase64(String input) {
   final standard = input.replaceAll('-', '+').replaceAll('_', '/');
   final remainder = standard.length % 4;
-  final padded =
-      remainder == 0 ? standard : standard + '=' * (4 - remainder);
+  final padded = remainder == 0 ? standard : standard + '=' * (4 - remainder);
 
   return base64Decode(padded);
 }
