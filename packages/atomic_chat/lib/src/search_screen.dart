@@ -14,14 +14,20 @@ import 'native_views.dart';
 
 /// Type-ahead search over every drive; a hit opens in its own drive. [drive]
 /// is only the fallback for what has no drive of its own.
+///
+/// With [scopeDrive] it searches that drive only (and lists only its recently
+/// opened resources), said next to the field with a way back to every drive.
+/// The scope belongs to this opening of the screen.
 class SearchScreen extends StatefulWidget {
   final AssistantApi api;
   final String drive;
+  final String? scopeDrive;
 
   const SearchScreen({
     super.key,
     required this.drive,
     required this.api,
+    this.scopeDrive,
   });
 
   /// A quick fade and short rise instead of the page slide: the keyboard rises
@@ -29,10 +35,14 @@ class SearchScreen extends StatefulWidget {
   static Route<void> route({
     required String drive,
     required AssistantApi api,
+    String? scopeDrive,
+    RouteSettings? settings,
   }) =>
       PageRouteBuilder<void>(
-        pageBuilder: (_, __, ___) =>
-            CoveredInsetsFreeze(child: SearchScreen(drive: drive, api: api)),
+        settings: settings,
+        pageBuilder: (_, __, ___) => CoveredInsetsFreeze(
+            child:
+                SearchScreen(drive: drive, api: api, scopeDrive: scopeDrive)),
         transitionDuration: const Duration(milliseconds: 140),
         reverseTransitionDuration: const Duration(milliseconds: 110),
         transitionsBuilder: (context, animation, _, child) => AnimatedBuilder(
@@ -75,6 +85,9 @@ class _SearchModel extends ChangeNotifier {
   Object? error;
   String query = '';
 
+  /// The one drive searched, or null for all of them.
+  String? scope;
+
   void changed() => notifyListeners();
 }
 
@@ -87,12 +100,37 @@ class _SearchScreenState extends State<SearchScreen> {
   void initState() {
     super.initState();
     _shell = ShellScope.maybeOf(context);
+    _model.scope = widget.scopeDrive;
     final cache = _shell?.searchCache;
     if (cache != null) {
       _model.drives = cache.drives;
-      _model.recent = cache.recent;
+      _model.recent = _inScope(cache.recent);
     }
     _load();
+  }
+
+  /// [recent] limited to the scope's drive, when there is one.
+  List<({String drive, RecentResource resource})> _inScope(
+      List<({String drive, RecentResource resource})> recent) {
+    final scope = _model.scope;
+    if (scope == null) return recent;
+    return [
+      for (final r in recent)
+        if (_id(r.drive) == _id(scope)) r
+    ];
+  }
+
+  /// Back to every drive: the same screen, the query searched again.
+  void _clearScope() {
+    _model.scope = null;
+    final route = ModalRoute.of(context);
+    if (route != null) _shell?.setKind(route, ShellPage.search);
+    final query = _model.query;
+    _model.query = '';
+    _model.hits = const [];
+    _model.changed();
+    _loadRecent(_model.drives);
+    if (query.isNotEmpty) _changed(query);
   }
 
   /// One drives call for both the names and the recents; it paints the cached
@@ -111,7 +149,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _loadRecent(List<DriveInfo> known) async {
     try {
-      var drives = [for (final d in known) d.subject];
+      final scope = _model.scope;
+      var drives = scope != null ? [scope] : [for (final d in known) d.subject];
       if (drives.isEmpty) drives = [widget.drive];
       final lists = await Future.wait([
         for (final drive in drives)
@@ -124,8 +163,8 @@ class _SearchScreenState extends State<SearchScreen> {
       final merged = [for (final l in lists) ...l]
         ..sort((a, b) => b.resource.openedAt.compareTo(a.resource.openedAt));
       final recent = merged.take(20).toList();
-      _shell?.searchCache = SearchCache(known, recent);
-      if (!mounted) return;
+      if (scope == null) _shell?.searchCache = SearchCache(known, recent);
+      if (!mounted || scope != _model.scope) return;
       _model.recent = recent;
       _model.changed();
     } catch (_) {
@@ -190,7 +229,9 @@ class _SearchScreenState extends State<SearchScreen> {
     _model.changed();
     _debounce = Timer(const Duration(milliseconds: 120), () async {
       try {
-        final hits = await widget.api.search(query);
+        final scope = _model.scope;
+        final hits = await widget.api.search(query, drive: scope);
+        if (scope != _model.scope) return;
         if (mounted && query == _model.query) {
           _model.hits = hits;
           _model.error = null;
@@ -238,6 +279,52 @@ class _SearchScreenState extends State<SearchScreen> {
     _open(i.drive, i.subject, i.title, i.className);
   }
 
+  /// `In: <drive>` with a way back to every drive, while scoped.
+  Widget _scopeLabel(BuildContext context) {
+    final scope = _model.scope;
+    if (scope == null) return const SizedBox.shrink();
+    final c = context.appColors;
+    final name = _model.drives
+            .where((d) => _id(d.subject) == _id(scope))
+            .map((d) => d.name)
+            .where((n) => n.isNotEmpty)
+            .firstOrNull ??
+        'this drive';
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: Container(
+        key: const Key('search-scope'),
+        padding: const EdgeInsets.only(left: 10),
+        constraints: const BoxConstraints(maxWidth: 140),
+        decoration: BoxDecoration(
+          color: c.mainSelectedBg,
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                'In: $name',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: c.mainSelectedFg, fontSize: 12),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Search all drives',
+              visualDensity: VisualDensity.compact,
+              iconSize: 16,
+              color: c.mainSelectedFg,
+              onPressed: _clearScope,
+              icon: const Icon(Icons.close),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   late final Widget _field = RepaintBoundary(
     child: SafeArea(
       top: false,
@@ -275,6 +362,10 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                 );
               }),
+            ),
+            ListenableBuilder(
+              listenable: _model,
+              builder: (context, _) => _scopeLabel(context),
             ),
           ],
         ),

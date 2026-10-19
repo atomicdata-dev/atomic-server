@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -9,6 +10,26 @@ import 'covered_insets_freeze.dart';
 import 'app_bottom_bar.dart';
 import 'models.dart';
 import 'assistant_api.dart';
+import 'slide_back_route.dart';
+
+/// The route names of the pages the bottom bar opens: a page's kind. The bar
+/// shows which of its pages is on top and never stacks a second one of a
+/// kind (see [ShellController.open]).
+abstract final class ShellPage {
+  static const home = 'home';
+  static const search = 'search';
+
+  /// A search in one drive is `search:<drive>`.
+  static String searchIn(String drive) => '$search:$drive';
+  static bool isSearch(String? kind) =>
+      kind == search || (kind?.startsWith('$search:') ?? false);
+
+  static const newChat = 'new-chat';
+  static const voiceChat = 'voice-chat';
+  static const newResource = 'new-resource';
+  static const profile = 'profile';
+  static const settings = 'settings';
+}
 
 /// What the static bottom bar needs to know about the pages above it. The
 /// shell owns one; pages find it through [ShellScope].
@@ -36,8 +57,62 @@ class ShellController extends ChangeNotifier {
   final Map<Route<dynamic>, VoidCallback> _menus = {};
   Route<dynamic>? _top;
 
+  /// The page routes of the shell's navigator, bottom first.
+  final List<Route<dynamic>> _stack = [];
+
+  /// Kinds that changed after a page was opened (a new chat that got its
+  /// first message is no longer a new chat).
+  final Map<Route<dynamic>, String?> _kinds = {};
+
   /// The page route that is on top of the shell's navigator.
   Route<dynamic>? get top => _top;
+
+  /// The kind ([ShellPage]) of [route]: its route name unless [setKind]
+  /// changed it.
+  String? kindOf(Route<dynamic> route) =>
+      _kinds.containsKey(route) ? _kinds[route] : route.settings.name;
+
+  /// The kind ([ShellPage]) of the page on top, if it has one.
+  String? get topKind => _top == null ? null : kindOf(_top!);
+
+  /// Whether a page of [kind] is anywhere in the stack.
+  bool hasPage(String kind) => _stack.any((r) => kindOf(r) == kind);
+
+  /// [route] is a page of [kind] from now on (null: of none).
+  void setKind(Route<dynamic> route, String? kind) {
+    if (_kinds.containsKey(route) && _kinds[route] == kind) return;
+    _kinds[route] = kind;
+    if (identical(route, _top)) _changed();
+  }
+
+  /// A push from the bar happened a moment ago: a second tap is ignored.
+  Timer? _settling;
+
+  /// Opens the page of [kind] the bar asks for, at most once: nothing
+  /// happens when it is on top already or a push is under way (a double
+  /// tap), and when it is further down the stack the pages above it are
+  /// popped instead of a second one pushed. Answers what the pushed page pops
+  /// with; null when nothing was pushed.
+  Future<T?> open<T>(
+      String kind, Route<T> Function(RouteSettings settings) route) async {
+    final navigator = navigatorKey.currentState;
+    if (navigator == null || topKind == kind || _settling != null) return null;
+    if (hasPage(kind)) {
+      navigator.popUntil((r) => kindOf(r) == kind);
+      return null;
+    }
+    _settling =
+        Timer(const Duration(milliseconds: 300), () => _settling = null);
+    return navigator.push(route(RouteSettings(name: kind)));
+  }
+
+  /// [open] with the page sliding in from the right.
+  Future<T?> openPage<T>(String kind, WidgetBuilder builder) => open<T>(kind,
+      (settings) => SlideBackRoute<T>(builder: builder, settings: settings));
+
+  /// Back to the first page.
+  void goHome() =>
+      navigatorKey.currentState?.popUntil((route) => route.isFirst);
 
   /// The menu action of the page on top, if that page has one.
   VoidCallback? get topMenu => _top == null ? null : _menus[_top];
@@ -51,6 +126,17 @@ class ShellController extends ChangeNotifier {
 
   void unregisterMenu(Route<dynamic> route) {
     if (_menus.remove(route) != null) _changed();
+  }
+
+  void _pushed(Route<dynamic> route) {
+    _stack.add(route);
+    _setTop(route);
+  }
+
+  void _removed(Route<dynamic> route) {
+    _stack.remove(route);
+    _kinds.remove(route);
+    _menus.remove(route);
   }
 
   void _setTop(Route<dynamic>? route) {
@@ -78,6 +164,7 @@ class ShellController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _settling?.cancel();
     drive.dispose();
     super.dispose();
   }
@@ -105,26 +192,34 @@ class _TopObserver extends NavigatorObserver {
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    if (route is PageRoute) shell._setTop(route);
+    if (route is PageRoute) shell._pushed(route);
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    if (route is PageRoute && previousRoute is PageRoute) {
-      shell._setTop(previousRoute);
-    }
+    if (route is! PageRoute) return;
+    shell._removed(route);
+    if (previousRoute is PageRoute) shell._setTop(previousRoute);
   }
 
   @override
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    if (identical(route, shell.top) && previousRoute is PageRoute) {
-      shell._setTop(previousRoute);
-    }
+    if (route is! PageRoute) return;
+    final wasTop = identical(route, shell.top);
+    shell._removed(route);
+    if (wasTop && previousRoute is PageRoute) shell._setTop(previousRoute);
   }
 
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
-    if (newRoute is PageRoute) shell._setTop(newRoute);
+    if (oldRoute is PageRoute) {
+      final at = shell._stack.indexOf(oldRoute);
+      shell._removed(oldRoute);
+      if (newRoute is PageRoute && at >= 0) shell._stack.insert(at, newRoute);
+    }
+    if (newRoute is PageRoute && identical(newRoute, shell._stack.lastOrNull)) {
+      shell._setTop(newRoute);
+    }
   }
 }
 
@@ -165,6 +260,7 @@ class _AppShellState extends State<AppShell> {
     key: _shell.navigatorKey,
     observers: [_observer],
     onGenerateRoute: (_) => MaterialPageRoute<void>(
+      settings: const RouteSettings(name: ShellPage.home),
       builder: (_) => CoveredInsetsFreeze(child: widget.home),
     ),
   );

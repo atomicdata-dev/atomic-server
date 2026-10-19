@@ -8,7 +8,7 @@ import 'covered_insets_freeze.dart';
 /// below is there on the left while it moves. The back button and the system
 /// back run the same slide.
 class SlideBackRoute<T> extends PageRouteBuilder<T> {
-  SlideBackRoute({required WidgetBuilder builder})
+  SlideBackRoute({required WidgetBuilder builder, super.settings})
       : super(
           pageBuilder: (context, _, __) =>
               CoveredInsetsFreeze(child: builder(context)),

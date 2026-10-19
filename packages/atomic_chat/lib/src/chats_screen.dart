@@ -177,9 +177,14 @@ class _ChatsScreenState extends State<ChatsScreen> {
     final profile = _profile;
     if (profile == null) return;
     // In the shell's navigator, so the bottom bar stays under it.
-    final signedOut = await Navigator.of(context).push<bool>(
-          SlideBackRoute<bool>(builder: profile),
-        ) ??
+    // Through the shell when there is one: it is the bar's Profile page,
+    // opened once.
+    final shell = _shell;
+    final signedOut = await (shell != null
+            ? shell.openPage<bool>(ShellPage.profile, profile)
+            : Navigator.of(context).push<bool>(
+                SlideBackRoute<bool>(builder: profile),
+              )) ??
         false;
     if (signedOut) {
       widget.onSignOut?.call();
