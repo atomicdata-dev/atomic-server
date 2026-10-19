@@ -1,4 +1,5 @@
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
+import 'package:flutter/foundation.dart';
 
 import '../atomic/account_store.dart';
 import '../atomic/atomic_client.dart';
@@ -39,10 +40,15 @@ class HostedAi {
   Future<void> enable() async => status = await _enable();
 
   /// The answer to [history] (oldest first), as it is written.
-  Stream<String> answer(List<ChatMessage> history) => _stream([
-        {'role': 'system', 'content': _systemPrompt},
-        for (final m in history) {'role': m.role, 'content': m.text},
-      ], model);
+  Stream<String> answer(List<ChatMessage> history) {
+    final messages = [
+      {'role': 'system', 'content': _systemPrompt},
+      for (final m in history) {'role': m.role, 'content': m.text},
+    ];
+    debugPrint('[ai] sending ${messages.length} messages '
+        '(${history.length} of the chat) to model "$model"');
+    return _stream(messages, model);
+  }
 
   /// The linked account's AI, or null when no account is linked or the
   /// provider offers none. Throws when the provider cannot be reached.

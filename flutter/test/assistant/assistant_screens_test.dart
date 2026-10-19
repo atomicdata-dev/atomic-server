@@ -340,6 +340,38 @@ void main() {
       expect(tester.getBottomLeft(find.text('No messages')).dy, before);
     });
 
+    testWidgets('an existing chat sends its history along', (tester) async {
+      List<Map<String, String>>? sent;
+      final api = FakeApi(
+        messageList: [
+          (id: 'p#1', role: 'user', text: 'Where to?', createdAt: 1),
+          (id: 'p#2', role: 'assistant', text: 'Lisbon.', createdAt: 2),
+        ],
+        ai: HostedAi(
+          status: {'enabled': true, 'consent': true, 'model': 'm'},
+          stream: (messages, model) {
+            sent = messages;
+            return Stream.value('ok');
+          },
+          enable: () async => {},
+        ),
+      );
+      await tester.pumpWidget(
+          app(ChatScreen(api: api, subject: 'did:ad:chat', title: 'Trip')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextField), 'And food?');
+      await tester.tap(find.byTooltip('Send'));
+      await tester.pumpAndSettle();
+
+      expect(sent!.map((m) => '${m['role']}: ${m['content']}').toList(), [
+        startsWith('system:'),
+        'user: Where to?',
+        'assistant: Lisbon.',
+        'user: And food?',
+      ]);
+    });
+
     testWidgets('asks for consent before the AI is used', (tester) async {
       final api = FakeApi(ai: ai(consent: false));
       await tester.pumpWidget(app(ChatScreen(api: api)));
