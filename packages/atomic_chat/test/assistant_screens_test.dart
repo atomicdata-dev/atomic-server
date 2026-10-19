@@ -1161,6 +1161,21 @@ void main() {
       expect(find.text('Zebra'), findsNothing);
     });
 
+    testWidgets('sideways with the keyboard up, the field fits',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      // The emulator sideways: 914 x 411, status bar, keyboard.
+      tester.view.physicalSize = const Size(914, 411);
+      tester.view.padding = const FakeViewPadding(top: 24, left: 42);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 265);
+      addTearDown(tester.view.reset);
+      await tester
+          .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: FakeApi())));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.byType(TextField), findsOneWidget);
+    });
+
     testWidgets('a query without hits says so, not a blank page',
         (tester) async {
       final api = FakeApi(hits: const []);

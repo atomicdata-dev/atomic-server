@@ -355,6 +355,9 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  /// Below this height the page shows only the field.
+  static const _fieldRoom = 120.0;
+
   late final Widget _field = RepaintBoundary(
     child: SafeArea(
       top: false,
@@ -463,19 +466,27 @@ class _SearchScreenState extends State<SearchScreen> {
       body: SafeArea(
         top: false,
         bottom: false,
-        child: Column(
-          children: [
-            Expanded(
-              child: RepaintBoundary(
-                child: ListenableBuilder(
-                  listenable: _model,
-                  builder: (context, _) => _results(context),
+        child: LayoutBuilder(builder: (context, box) {
+          // Sideways with the keyboard up there is no room for the list, and
+          // the field alone overflowed the page by a few pixels: then the
+          // field only, scrollable.
+          if (box.maxHeight < _fieldRoom) {
+            return SingleChildScrollView(reverse: true, child: _field);
+          }
+          return Column(
+            children: [
+              Expanded(
+                child: RepaintBoundary(
+                  child: ListenableBuilder(
+                    listenable: _model,
+                    builder: (context, _) => _results(context),
+                  ),
                 ),
               ),
-            ),
-            _field,
-          ],
-        ),
+              _field,
+            ],
+          );
+        }),
       ),
     );
   }
