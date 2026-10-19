@@ -17,6 +17,9 @@ export class SaveStatusCoordinator {
   constructor(private dependencies: SaveStatusDependencies) {}
 
   private scheduledByResource = new WeakMap<Resource, number>();
+  /** Schedulers with a save waiting in their debounce slot or running, and
+   *  how many (a new slot can open while the last save still runs). */
+  private pending = new Map<ScheduledSave, number>();
   private saveSnapshots = new WeakMap<Resource, ResourceSaveState>();
 
   /** One owner per debounce slot. Resource identity survives genesis renaming. */
@@ -29,7 +32,7 @@ export class SaveStatusCoordinator {
   ): ScheduledSave {
     const target = resource.__internalObject;
 
-    return new ScheduledSave(
+    const scheduler: ScheduledSave = new ScheduledSave(
       async () => {
         if (options.shouldSave?.() === false) return;
 
@@ -46,9 +49,21 @@ export class SaveStatusCoordinator {
           target,
           (this.scheduledByResource.get(target) ?? 0) + delta,
         );
+        const count = (this.pending.get(scheduler) ?? 0) + delta;
+        if (count > 0) this.pending.set(scheduler, count);
+        else this.pending.delete(scheduler);
         this.dependencies.changePending(delta);
       },
       options.onError ?? (error => this.dependencies.onError(error)),
+    );
+
+    return scheduler;
+  }
+
+  /** Run every debounced save now, and wait for those already running. */
+  async flushAll(): Promise<void> {
+    await Promise.all(
+      [...this.pending.keys()].map(scheduler => scheduler.flush()),
     );
   }
 

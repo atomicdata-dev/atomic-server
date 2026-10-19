@@ -5883,6 +5883,15 @@ export class Store {
     return this.saveStatus.createScheduler(resource, options);
   }
 
+  /**
+   * Run every save a UI debounce timer is holding (`createSaveScheduler`,
+   * `useValue`'s commit debounce) now instead of when its timer fires, and
+   * wait for them. For a page about to go away: its timers would die with it.
+   */
+  public flushScheduledSaves(): Promise<void> {
+    return this.saveStatus.flushAll();
+  }
+
   /** Read status is separate: a queued offline edit can still be fully readable. */
   public getSaveState(resource: Resource): ResourceSaveState {
     return this.saveStatus.getState(resource);
