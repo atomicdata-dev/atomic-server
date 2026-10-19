@@ -15,6 +15,7 @@ IconData iconForClass(String className) {
     'table' => Icons.table_chart_outlined,
     'canvas' => Icons.draw_outlined,
     'aichat' || 'conversation' || 'chatroom' => Icons.chat_bubble_outline,
+    'meeting' => Icons.videocam_outlined,
     'class' || 'property' || 'ontology' => Icons.data_object,
     'formfield' || 'form' => Icons.input,
     'bookmark' => Icons.bookmark_border,

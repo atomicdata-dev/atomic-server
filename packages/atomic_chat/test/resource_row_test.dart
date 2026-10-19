@@ -38,6 +38,8 @@ void main() {
       'AI chat': Icons.chat_bubble_outline,
       'ai-chat': Icons.chat_bubble_outline,
       'Conversation': Icons.chat_bubble_outline,
+      'ChatRoom': Icons.chat_bubble_outline,
+      'meeting': Icons.videocam_outlined,
       'Class': Icons.data_object,
       'property': Icons.data_object,
       'form-field': Icons.input,
