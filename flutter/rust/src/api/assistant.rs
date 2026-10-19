@@ -11,7 +11,7 @@ mod tests;
 
 use super::simple::state::{connected_server, db, err, node};
 use crate::host::{conversations, pusher, recents, to_json};
-use atomic_lib::host::{chats, lists};
+use atomic_lib::host::{chats, lists, notifications};
 use flutter_rust_bridge::frb;
 
 /// The emojis of `subjects` as JSON `{subject: emoji}`, only for those that
@@ -29,6 +29,32 @@ pub async fn list_ai_chats(limit: u32) -> Result<String, String> {
         .await
         .map_err(err)?;
     to_json(&list)
+}
+
+/// The notifications in the Inbox of the person's private drive (what the web
+/// app recorded there), newest first, one per source, as JSON `[{subject,
+/// title, body, about, kind, actor, source, occurred_at, read}]`. Read from the
+/// local store; empty when there is no Inbox on this device.
+pub async fn list_notifications(limit: u32) -> Result<String, String> {
+    to_json(
+        &notifications::list_notifications(db()?, limit as usize)
+            .await
+            .map_err(err)?,
+    )
+}
+
+/// Mark a notification read (`readAt`, as the web app does), and the other
+/// copies of the same event in the Inbox. Synced like any other edit.
+pub async fn mark_notification_read(subject: String) -> Result<(), String> {
+    notifications::mark_notification_read(
+        &node()?,
+        pusher().as_ref(),
+        &subject,
+        super::simple::state::now_ms(),
+    )
+    .await
+    .map(|_| ())
+    .map_err(err)
 }
 
 /// One line of the activity feed.

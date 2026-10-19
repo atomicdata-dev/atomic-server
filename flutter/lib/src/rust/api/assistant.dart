@@ -18,6 +18,19 @@ Future<String> resourceIcons({required List<String> subjects}) =>
 Future<String> listAiChats({required int limit}) =>
     RustLib.instance.api.crateApiAssistantListAiChats(limit: limit);
 
+/// The notifications in the Inbox of the person's private drive (what the web
+/// app recorded there), newest first, one per source, as JSON `[{subject,
+/// title, body, about, kind, actor, source, occurred_at, read}]`. Read from the
+/// local store; empty when there is no Inbox on this device.
+Future<String> listNotifications({required int limit}) =>
+    RustLib.instance.api.crateApiAssistantListNotifications(limit: limit);
+
+/// Mark a notification read (`readAt`, as the web app does), and the other
+/// copies of the same event in the Inbox. Synced like any other edit.
+Future<void> markNotificationRead({required String subject}) =>
+    RustLib.instance.api
+        .crateApiAssistantMarkNotificationRead(subject: subject);
+
 /// What changed lately in every drive, newest first, by whom. Read from the
 /// recents index, which the store's change events keep.
 Future<List<ActivityEntry>> listActivity({required int limit}) =>

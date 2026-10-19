@@ -10,7 +10,7 @@ use atomic_lib::{
     agents::Agent,
     commit::CommitBuilder,
     conversation::{encryption_public_key, seal_message, Keyring, Member},
-    host::{conversations::vault_proof, own_commit_opts, rows::FAVORITES},
+    host::{conversations::vault_proof, notifications, own_commit_opts, rows::FAVORITES},
     urls, Commit, Storelike, Subject, Value,
 };
 use serde_json::{json, Value as Json};
@@ -353,4 +353,46 @@ async fn a_document_created_here_is_in_the_drive_and_found_by_search() {
         .await
         .unwrap();
     assert!(hits.contains(&subject), "{hits}");
+}
+
+#[tokio::test]
+async fn the_inbox_is_listed_and_a_notification_marked_read_through_the_bridge() {
+    let drive = shared_drive().await;
+    let store = db().unwrap();
+    let inbox = store
+        .create_resource("https://atomicdata.dev/classes/Inbox", drive, "Inbox", None)
+        .await
+        .unwrap();
+    let mut home = store.get_resource(&Subject::from(drive)).await.unwrap();
+    home.set_unsafe(
+        notifications::INBOX.into(),
+        Value::AtomicUrl(inbox.as_str().into()),
+    )
+    .unwrap();
+    node().unwrap().save_locally(&mut home).await.unwrap();
+    let subject = store
+        .create_resource(
+            notifications::NOTIFICATION,
+            &inbox,
+            "Polle in Team chat",
+            Some(vec![
+                (
+                    notifications::NOTIFICATION_SOURCE,
+                    Value::AtomicUrl("https://example.test/bridge-message".into()),
+                ),
+                (notifications::OCCURRED_AT, Value::Timestamp(4_000)),
+            ]),
+        )
+        .await
+        .unwrap();
+
+    let list: Vec<Json> = serde_json::from_str(&list_notifications(50).await.unwrap()).unwrap();
+    let found = list.iter().find(|n| n["subject"] == subject).unwrap();
+    assert_eq!(found["title"], "Polle in Team chat");
+    assert_eq!(found["read"], false);
+
+    mark_notification_read(subject.clone()).await.unwrap();
+    let list: Vec<Json> = serde_json::from_str(&list_notifications(50).await.unwrap()).unwrap();
+    let found = list.iter().find(|n| n["subject"] == subject).unwrap();
+    assert_eq!(found["read"], true);
 }

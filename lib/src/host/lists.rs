@@ -132,6 +132,21 @@ pub async fn private_drive_list(store: &Db, property: &str) -> AtomicResult<Vec<
         .unwrap_or_default())
 }
 
+/// The first subject in a single-valued link property of the private drive
+/// (a "standard location" such as the Inbox), `None` when unset or when the
+/// drive is not on this device.
+pub async fn private_drive_list_one(store: &Db, property: &str) -> AtomicResult<Option<String>> {
+    let home = store.private_drive_subject()?;
+    let Ok(drive) = store.get_resource(&Subject::from(home.as_str())).await else {
+        return Ok(None);
+    };
+    Ok(drive
+        .get(property)
+        .ok()
+        .and_then(|v| v.to_subjects(None).ok())
+        .and_then(|list| list.into_iter().next()))
+}
+
 /// The person's favorites (all drives), newest added first, as
 /// `[{subject, title, class_name, opened_at, emoji?}]` (`opened_at` is always
 /// 0). Favorites that are gone or unreadable are left out.
