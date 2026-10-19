@@ -22,6 +22,8 @@ class _LoginScreenState extends State<LoginScreen> {
   _Step _step = _Step.loading;
   final _nameController = TextEditingController(text: '');
   final _secretController = TextEditingController();
+  final _shownSecretController = TextEditingController();
+  final _accountNameController = TextEditingController(text: 'atomic.place');
   // A secret is hidden by default — it is a password. A reveal toggle lets
   // someone check a value they typed or pasted.
   bool _obscureSecret = true;
@@ -49,6 +51,8 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _nameController.dispose();
     _secretController.dispose();
+    _accountNameController.dispose();
+    _shownSecretController.dispose();
     _serverController.dispose();
     super.dispose();
   }
@@ -271,6 +275,9 @@ class _LoginScreenState extends State<LoginScreen> {
         await AtomicSession.saveDrive(drive);
       }
 
+      // The secret was accepted: let the password manager offer to save it.
+      TextInput.finishAutofillContext();
+
       if (status == 'ok' && await _driveReady()) {
         widget.onLoggedIn();
       } else {
@@ -461,9 +468,33 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
               ),
               const SizedBox(height: 12),
-              SelectableText(
-                _generatedSecret ?? '',
-                style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+              // A read-only password field, so a password manager can save the
+              // new secret (with the fixed account name) when this is left.
+              AutofillGroup(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Offstage(
+                      child: TextField(
+                        key: const ValueKey('secret-username'),
+                        controller: _accountNameController,
+                        readOnly: true,
+                        autofillHints: const [AutofillHints.username],
+                      ),
+                    ),
+                    TextField(
+                      key: const ValueKey('secret-password'),
+                      controller: _shownSecretController
+                        ..text = _generatedSecret ?? '',
+                      readOnly: true,
+                      maxLines: null,
+                      autofillHints: const [AutofillHints.newPassword],
+                      style: const TextStyle(
+                          fontSize: 11, fontFamily: 'monospace'),
+                      decoration: const InputDecoration.collapsed(hintText: ''),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
@@ -481,7 +512,12 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 24),
         ElevatedButton(
-          onPressed: () => widget.onLoggedIn(),
+          onPressed: () {
+            // Leaving the form commits the autofill context: the manager
+            // offers to save the new secret.
+            TextInput.finishAutofillContext();
+            widget.onLoggedIn();
+          },
           style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14)),
           child: const Text('Continue to Atomic'),
@@ -493,88 +529,110 @@ class _LoginScreenState extends State<LoginScreen> {
   // ── Sign In ─────────────────────────────────────────────────────────
 
   Widget _buildSignIn(AppColors c) {
-    return Column(
-      key: const ValueKey('signin'),
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
+    return AutofillGroup(
+        key: const ValueKey('signin'),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => setState(() {
-                _step = _Step.welcome;
-                _error = null;
-              }),
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => setState(() {
+                    _step = _Step.welcome;
+                    _error = null;
+                  }),
+                ),
+                const Text('Sign in',
+                    style:
+                        TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              ],
             ),
-            const Text('Sign in',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Paste your secret to restore your identity.',
-          style: TextStyle(fontSize: 13, color: c.iconDisabled),
-        ),
-        const SizedBox(height: 24),
-        // Signing in restores who you are. Where your data is, is the next
-        // screen's question — and only if it turns out not to be here, which
-        // is the moment it can be asked with something to point at (`needsSync`
-        // offers pairing). Asking up front asks everyone, before anyone has the
-        // problem, and asks it as an address when the answer is usually a
-        // device you can just scan.
-        TextField(
-          controller: _secretController,
-          obscureText: _obscureSecret,
-          autofocus: true,
-          // Enter submits — a secret is one line, pasted or not.
-          onSubmitted: (_) => _busy ? null : _doSignIn(),
-          decoration: InputDecoration(
-            labelText: 'Your secret',
-            border: const OutlineInputBorder(),
-            isDense: true,
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscureSecret ? Icons.visibility : Icons.visibility_off,
-                size: 20,
-              ),
-              tooltip: _obscureSecret ? 'Show' : 'Hide',
-              onPressed: () => setState(() => _obscureSecret = !_obscureSecret),
+            const SizedBox(height: 8),
+            Text(
+              'Paste your secret to restore your identity.',
+              style: TextStyle(fontSize: 13, color: c.iconDisabled),
             ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: ElevatedButton(
-                onPressed: _busy ? null : _doSignIn,
-                style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14)),
-                child: _busy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('Sign In'),
+            const SizedBox(height: 24),
+            // Signing in restores who you are. Where your data is, is the next
+            // screen's question — and only if it turns out not to be here, which
+            // is the moment it can be asked with something to point at (`needsSync`
+            // offers pairing). Asking up front asks everyone, before anyone has the
+            // problem, and asks it as an address when the answer is usually a
+            // device you can just scan.
+            // Password managers pair a credential with an account name: a fixed,
+            // read-only one, so the secret is saved and offered as "atomic.place".
+            TextField(
+              key: const ValueKey('signin-username'),
+              controller: _accountNameController,
+              readOnly: true,
+              autofillHints: const [AutofillHints.username],
+              decoration: const InputDecoration(
+                labelText: 'Account',
+                border: OutlineInputBorder(),
+                isDense: true,
               ),
             ),
-            const SizedBox(width: 8),
-            // Paste-and-go: the secret lives on another device's clipboard,
-            // so one tap pastes it and signs in.
-            OutlinedButton.icon(
-              onPressed: _busy ? null : _pasteSecretAndSignIn,
-              icon: const Icon(Icons.content_paste, size: 18),
-              label: const Text('Paste'),
-              style: OutlinedButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 14, horizontal: 12)),
+            const SizedBox(height: 12),
+            TextField(
+              key: const ValueKey('signin-secret'),
+              controller: _secretController,
+              obscureText: _obscureSecret,
+              autofillHints: const [AutofillHints.password],
+              enableSuggestions: false,
+              autocorrect: false,
+              keyboardType: TextInputType.visiblePassword,
+              autofocus: true,
+              // Enter submits — a secret is one line, pasted or not.
+              onSubmitted: (_) => _busy ? null : _doSignIn(),
+              decoration: InputDecoration(
+                labelText: 'Your secret',
+                border: const OutlineInputBorder(),
+                isDense: true,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscureSecret ? Icons.visibility : Icons.visibility_off,
+                    size: 20,
+                  ),
+                  tooltip: _obscureSecret ? 'Show' : 'Hide',
+                  onPressed: () =>
+                      setState(() => _obscureSecret = !_obscureSecret),
+                ),
+              ),
             ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _busy ? null : _doSignIn,
+                    style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14)),
+                    child: _busy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Text('Sign In'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Paste-and-go: the secret lives on another device's clipboard,
+                // so one tap pastes it and signs in.
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _pasteSecretAndSignIn,
+                  icon: const Icon(Icons.content_paste, size: 18),
+                  label: const Text('Paste'),
+                  style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 14, horizontal: 12)),
+                ),
+              ],
+            ),
+            _errorWidget(),
           ],
-        ),
-        _errorWidget(),
-      ],
-    );
+        ));
   }
 
   // ── Needs Sync ──────────────────────────────────────────────────────
