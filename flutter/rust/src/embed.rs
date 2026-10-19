@@ -3,10 +3,13 @@
 //! `atomic_lib`. One request is a method name and its arguments as JSON; the
 //! answer is JSON, with bytes as base64. See `planning/flutter-resource-webview.md`.
 //!
-//! Reads only for now. Writes and signing follow (step 3); until then they are
-//! refused, so a page cannot appear to save what was not saved.
+//! Writes: the agent's secret stays here. The page can have exactly one kind of
+//! thing signed, a commit that names this agent as its signer (`sign`), and
+//! hand a signed commit back (`applyCommit`), which is applied like any local
+//! edit and queued for the server and peers. There is no raw signing, so a
+//! script inside the page cannot get a signature over anything else.
 
-use crate::api::simple::state::{db, err};
+use crate::api::simple::state::{db, err, node};
 use atomic_lib::{agents::ForAgent, storelike::Query, Resource, Storelike, Subject};
 use serde_json::{json, Value as Json};
 use std::collections::HashMap;
@@ -188,6 +191,23 @@ fn version_vectors(store: &atomic_lib::Db, subjects: Vec<String>) -> Json {
     json!(out)
 }
 
+/// Signs `payload` if it is a commit by this device's agent, and nothing else.
+fn sign_commit(store: &atomic_lib::Db, payload: &str) -> Result<String, String> {
+    let agent = store.get_default_agent().map_err(err)?;
+    let commit: Json = serde_json::from_str(payload).map_err(|_| "only commits are signed")?;
+    let is_commit = commit[atomic_lib::urls::IS_A]
+        .as_array()
+        .is_some_and(|classes| classes.iter().any(|c| c == atomic_lib::urls::COMMIT));
+    let signer = commit[atomic_lib::urls::SIGNER].as_str();
+    if !is_commit || signer != Some(agent.subject.to_string().as_str()) {
+        return Err("only a commit by this device's agent is signed".into());
+    }
+    let key = agent
+        .private_key
+        .ok_or("this device holds no secret for its agent")?;
+    atomic_lib::agents::sign_message(payload.as_bytes(), &key).map_err(err)
+}
+
 /// One call from the page.
 pub(crate) async fn call(method: &str, args_json: &str) -> Result<String, String> {
     let args: Vec<Json> = serde_json::from_str(args_json).map_err(|e| e.to_string())?;
@@ -248,6 +268,20 @@ pub(crate) async fn call(method: &str, args_json: &str) -> Result<String, String
             Ok(agent) => json!(agent.public_key),
             Err(_) => Json::Null,
         },
+        "sign" => json!(sign_commit(store, str_arg(&args, 0)?)?),
+        "applyCommit" => {
+            let node = node()?;
+            let response = node
+                .apply_commit(
+                    str_arg(&args, 0)?,
+                    atomic_lib::runtime::IngestPolicy::LocalCache,
+                )
+                .await
+                .map_err(err)?;
+            node.outbox().mark_dirty(&response).await.map_err(err)?;
+            crate::api::simple::push_local_write(&response, store).await;
+            Json::Null
+        }
         other => {
             return Err(format!(
                 "{other}: not available in the embedded renderer yet"
@@ -360,11 +394,28 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn writes_are_refused_until_they_are_signed_here() {
+    async fn only_a_commit_by_this_agent_gets_signed() {
         shared_drive().await;
-        for method in ["applyCommit", "sign", "signBytes"] {
-            let refused = call(method, "[\"x\"]").await.unwrap_err();
-            assert!(refused.contains("not available"), "{method}: {refused}");
-        }
+        // No raw signing at all.
+        let refused = call("signBytes", "[\"eA\"]").await.unwrap_err();
+        assert!(refused.contains("not available"), "{refused}");
+        // Not a commit, or someone else's commit.
+        assert!(call("sign", "[\"hello\"]").await.is_err());
+        let agent = ask("agent", json!([])).await;
+        let other = json!({
+            atomic_lib::urls::IS_A: [atomic_lib::urls::COMMIT],
+            atomic_lib::urls::SIGNER: "did:ad:someone-else",
+        });
+        assert!(call("sign", &json!([other.to_string()]).to_string())
+            .await
+            .is_err());
+        // This agent's own commit: signed, and the signature verifies.
+        let mine = json!({
+            atomic_lib::urls::IS_A: [atomic_lib::urls::COMMIT],
+            atomic_lib::urls::SIGNER: agent,
+        })
+        .to_string();
+        let signature = ask("sign", json!([mine])).await;
+        assert!(signature.as_str().is_some_and(|s| s.len() > 60), "{signature}");
     }
 }
