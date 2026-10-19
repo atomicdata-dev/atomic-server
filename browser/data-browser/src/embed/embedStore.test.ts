@@ -2,6 +2,7 @@
 // @wc-ignore-file
 import { expect, it } from 'vitest';
 import { core, server, type NativeChannel } from '@tomic/react';
+import { fetchPluginList } from '../components/CustomViewProvider';
 import { createEmbedStore } from './embedStore';
 
 const AGENT = 'atomic:agent:pZyZYvKoOcwczHXJoYvYctgrHXn2pZ7qfeWMyoUfQ_8';
@@ -64,4 +65,14 @@ it('makes no auth cookie and never asks the host to sign a request', async () =>
   );
   expect(refused).toEqual([]);
   expect(document.cookie).not.toContain('atomic_session');
+});
+
+it('lists no server plugins, without signing a request', async () => {
+  const { channel, refused } = host();
+  const { store } = await createEmbedStore(channel);
+  const [views, manifests] = await fetchPluginList(store, DRIVE);
+
+  expect(views.size).toBe(0);
+  expect(manifests.size).toBe(0);
+  expect(refused).toEqual([]);
 });
