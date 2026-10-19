@@ -670,10 +670,14 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
             let my_node_id = atomic_lib::sync::peer::get_node_id()
                 .ok_or("Peer not started")?
                 .to_string();
-            atomic_lib::discovery::resolve_node_ids_filtered(&drive, Some(&my_node_id)).await
+            // Only other devices: a drive on this device alone names none,
+            // which is nothing to report (it toasted "No peer on network:
+            // Found 1 NodeID(s) but all are ours (…)" on every start).
+            atomic_lib::discovery::resolve_other_node_ids(&drive, Some(&my_node_id)).await
         })
         .await
         {
+            Ok(Ok(node_ids)) if node_ids.is_empty() => {}
             Ok(Ok(node_ids)) => {
                 let tried = node_ids.len().min(PKARR_PEERS_TO_TRY);
                 let drive = drive.as_str();

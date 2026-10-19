@@ -183,6 +183,27 @@ pub async fn resolve_node_id(drive_did: &str) -> AtomicResult<String> {
 /// Every NodeID the drive's record names except `exclude_node_id`, newest
 /// first. Records keep the replicas of uninstalled apps too, so a caller
 /// should try several rather than trust the first. Errors when none is left.
+/// The NodeIDs the drive's pkarr record names, without `exclude_node_id`
+/// (this device's own). Empty, not an error, when the record names no other
+/// device: for a drive on one device that is the normal case, nothing went
+/// wrong.
+pub async fn resolve_other_node_ids(
+    drive_did: &str,
+    exclude_node_id: Option<&str>,
+) -> AtomicResult<Vec<String>> {
+    let keypair = drive_did_to_pkarr_keypair(drive_did)?;
+    let client = build_client()?;
+    let node_ids = resolve_node_ids_raw(&client, &keypair.public_key()).await;
+    Ok(other_node_ids(node_ids, exclude_node_id))
+}
+
+fn other_node_ids(node_ids: Vec<String>, exclude_node_id: Option<&str>) -> Vec<String> {
+    node_ids
+        .into_iter()
+        .filter(|id| Some(id.as_str()) != exclude_node_id)
+        .collect()
+}
+
 pub async fn resolve_node_ids_filtered(
     drive_did: &str,
     exclude_node_id: Option<&str>,
@@ -195,10 +216,7 @@ pub async fn resolve_node_ids_filtered(
         return Err(format!("No peers found for drive {drive_did}").into());
     }
     let total = node_ids.len();
-    let peers: Vec<String> = node_ids
-        .into_iter()
-        .filter(|id| Some(id.as_str()) != exclude_node_id)
-        .collect();
+    let peers = other_node_ids(node_ids, exclude_node_id);
     if peers.is_empty() {
         return Err(format!(
             "Found {total} NodeID(s) but all are ours ({})",
@@ -354,6 +372,18 @@ fn build_client() -> AtomicResult<pkarr::Client> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_our_own_node_id_is_no_other_device() {
+        let ours = "aa".repeat(32);
+        let theirs = "bb".repeat(32);
+        assert!(other_node_ids(vec![ours.clone()], Some(&ours)).is_empty());
+        assert_eq!(
+            other_node_ids(vec![ours.clone(), theirs.clone()], Some(&ours)),
+            vec![theirs]
+        );
+        assert!(other_node_ids(vec![], Some(&ours)).is_empty());
+    }
 
     /// Builds a `did:ad:{...}` whose base64 payload decodes to exactly
     /// 64 bytes, satisfying `drive_did_to_pkarr_keypair`'s shape check.
