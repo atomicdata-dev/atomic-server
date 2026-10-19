@@ -75,7 +75,7 @@ class AppBottomBar extends StatelessWidget {
                   _push(context, SearchScreen(drive: drive, api: api)),
               icon: const Icon(Icons.search),
             ),
-            IconButton.filled(
+            IconButton(
               tooltip: 'New chat',
               onPressed: () => _push(
                   context, ChatScreen(api: api, subject: null, title: '')),
@@ -84,10 +84,7 @@ class AppBottomBar extends StatelessWidget {
             IconButton(
               tooltip: 'Profile',
               onPressed: onUser ?? () => _push(context, const SyncScreen()),
-              icon: FutureBuilder<String?>(
-                future: api.agentName(),
-                builder: (_, s) => AgentAvatar(name: s.data),
-              ),
+              icon: const Icon(Icons.person_outline),
             ),
             IconButton(
               tooltip: 'Settings',
