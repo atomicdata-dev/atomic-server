@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../atomic/atomic_client.dart';
 import '../theme.dart';
@@ -6,6 +7,10 @@ import 'assistant_api.dart';
 import 'fading_text.dart';
 import 'hosted_ai.dart';
 import 'resource_row.dart';
+import 'voice.dart';
+
+/// SharedPreferences key: speak each new answer aloud.
+const _readAloudKey = 'chat_read_aloud';
 
 /// A resource the person attached to a new chat as context.
 typedef _Attached = ({String subject, String title, String className});
@@ -25,18 +30,25 @@ class ChatScreen extends StatefulWidget {
   final String? subject;
   final String title;
 
+  /// Speech to text and text to speech; the plugin ones when null, created
+  /// only when first used.
+  final SpeechInput? speechInput;
+  final SpeechOutput? speechOutput;
+
   const ChatScreen({
     super.key,
     required this.api,
     this.subject,
     this.title = '',
+    this.speechInput,
+    this.speechOutput,
   });
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _input = TextEditingController();
   final _focus = FocusNode();
   String? _chat;
@@ -63,9 +75,22 @@ class _ChatScreenState extends State<ChatScreen> {
   List<(String drive, RecentResource)>? _recent;
   bool _pickerRead = false;
 
+  SpeechInput? _inputInst;
+  SpeechOutput? _outputInst;
+  bool _listening = false;
+  bool _readAloud = false;
+
+  /// Bumped whenever listening starts or is cancelled, so late results of an
+  /// older session are ignored.
+  int _listenSession = 0;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _inputInst = widget.speechInput;
+    _outputInst = widget.speechOutput;
+    _loadReadAloud();
     _chat = widget.subject;
     _readMessages();
     _lookUpAi();
@@ -74,9 +99,89 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _listenSession++;
+    _inputInst?.stop();
+    _outputInst?.stop();
     _focus.dispose();
     _input.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) _stopListening();
+  }
+
+  Future<void> _loadReadAloud() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final on = prefs.getBool(_readAloudKey) ?? false;
+      if (mounted && on != _readAloud) setState(() => _readAloud = on);
+    } catch (_) {}
+  }
+
+  Future<void> _toggleReadAloud() async {
+    final on = !_readAloud;
+    setState(() => _readAloud = on);
+    if (!on) _outputInst?.stop();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_readAloudKey, on);
+    } catch (_) {}
+  }
+
+  /// Ends listening; what was heard so far stays in the field.
+  void _stopListening() {
+    if (!_listening) return;
+    _listenSession++;
+    _listening = false;
+    _inputInst?.stop();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _toggleListening() async {
+    if (_listening) {
+      _stopListening();
+      return;
+    }
+    final input = _inputInst ??= PluginSpeechInput();
+    // Typed text stays; what is heard is appended after it.
+    final typed = _input.text;
+    final base = typed.isEmpty || typed.endsWith(' ') || typed.endsWith('\n')
+        ? typed
+        : '$typed ';
+    final session = ++_listenSession;
+    setState(() {
+      _listening = true;
+      _error = null;
+    });
+    // Speech from the speaker would be heard as input.
+    _outputInst?.stop();
+    final ok = await input.start(
+      onText: (text, isFinal) {
+        if (!mounted || session != _listenSession) return;
+        _input.value = TextEditingValue(
+          text: '$base$text',
+          selection: TextSelection.collapsed(offset: base.length + text.length),
+        );
+        if (isFinal) setState(() => _listening = false);
+      },
+      onError: (e) {
+        if (!mounted || session != _listenSession) return;
+        setState(() {
+          _listening = false;
+          _error = 'Voice input failed: $e';
+        });
+      },
+    );
+    if (!mounted || session != _listenSession) return;
+    if (!ok) {
+      setState(() {
+        _listening = false;
+        _error = 'Voice input is not available on this device.';
+      });
+    }
   }
 
   Future<void> _readMessages() async {
@@ -217,6 +322,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _input.text.trim();
     final ai = _ai;
     if (text.isEmpty || ai == null || _sending) return;
+    _stopListening();
+    _outputInst?.stop();
     _input.clear();
     final asked = [
       ..._messages,
@@ -246,6 +353,9 @@ class _ChatScreenState extends State<ChatScreen> {
         await widget.api.addMessage(chat, 'assistant', answer);
       }
       await _readMessages();
+      if (_readAloud && mounted && answer.trim().isNotEmpty) {
+        (_outputInst ??= PluginSpeechOutput()).speak(answer);
+      }
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
     } finally {
@@ -270,6 +380,13 @@ class _ChatScreenState extends State<ChatScreen> {
               ? (_chat == null ? 'New chat' : 'Untitled chat')
               : widget.title,
         ),
+        actions: [
+          IconButton(
+            tooltip: _readAloud ? 'Stop reading aloud' : 'Read answers aloud',
+            onPressed: _toggleReadAloud,
+            icon: Icon(_readAloud ? Icons.volume_up : Icons.volume_off),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -508,7 +625,13 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                IconButton(
+                  tooltip:
+                      _listening ? 'Stop voice input' : 'Start voice input',
+                  onPressed: ai == null ? null : _toggleListening,
+                  color: _listening ? c.main : null,
+                  icon: Icon(_listening ? Icons.stop : Icons.mic),
+                ),
                 IconButton.filled(
                   tooltip: 'Send',
                   onPressed: _sending || ai == null ? null : _send,

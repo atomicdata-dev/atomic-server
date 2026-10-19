@@ -10,10 +10,12 @@ import 'package:atomiccanvas_flutter/assistant/chat_screen.dart';
 import 'package:atomiccanvas_flutter/assistant/chats_screen.dart';
 import 'package:atomiccanvas_flutter/assistant/resource_view.dart';
 import 'package:atomiccanvas_flutter/assistant/search_screen.dart';
+import 'package:atomiccanvas_flutter/assistant/voice.dart';
 import 'package:atomiccanvas_flutter/atomic/atomic_client.dart';
 import 'package:atomiccanvas_flutter/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FakeApi extends AssistantApi {
   final List<DriveInfo> driveList;
@@ -91,6 +93,48 @@ class FakeApi extends AssistantApi {
 
   @override
   String webUrl(String subject) => throw 'Not connected to a server';
+}
+
+class FakeSpeechInput implements SpeechInput {
+  final bool available;
+  int starts = 0;
+  int stops = 0;
+  bool _on = false;
+  void Function(String, bool)? onText;
+
+  FakeSpeechInput({this.available = true});
+
+  @override
+  bool get listening => _on;
+
+  @override
+  Future<bool> start({
+    required void Function(String text, bool isFinal) onText,
+    required void Function(String error) onError,
+  }) async {
+    starts++;
+    if (!available) return false;
+    this.onText = onText;
+    _on = true;
+    return true;
+  }
+
+  @override
+  Future<void> stop() async {
+    stops++;
+    _on = false;
+  }
+}
+
+class FakeSpeechOutput implements SpeechOutput {
+  final List<String> spoken = [];
+  int stops = 0;
+
+  @override
+  Future<void> speak(String text) async => spoken.add(text);
+
+  @override
+  Future<void> stop() async => stops++;
 }
 
 /// A fake whose `chats()` answers only when the test completes it.
@@ -732,6 +776,136 @@ void main() {
         'assistant: Lisbon.',
         'user: And food?',
       ]);
+    });
+
+    group('voice', () {
+      setUp(() => SharedPreferences.setMockInitialValues({}));
+
+      Future<void> open(WidgetTester tester, FakeSpeechInput input,
+          FakeSpeechOutput output) async {
+        await tester.pumpWidget(app(ChatScreen(
+          api: FakeApi(ai: ai()),
+          speechInput: input,
+          speechOutput: output,
+        )));
+        await tester.pumpAndSettle();
+      }
+
+      String field(WidgetTester tester) =>
+          tester.widget<TextField>(find.byType(TextField)).controller!.text;
+
+      testWidgets('dictation fills the field after typed text, stop ends it',
+          (tester) async {
+        final input = FakeSpeechInput();
+        await open(tester, input, FakeSpeechOutput());
+        await tester.enterText(find.byType(TextField), 'Hello');
+        await tester.tap(find.byIcon(Icons.mic));
+        await tester.pump();
+        expect(find.byIcon(Icons.stop), findsOneWidget);
+
+        input.onText!('wor', false);
+        await tester.pump();
+        expect(field(tester), 'Hello wor');
+        input.onText!('world', false);
+        await tester.pump();
+        expect(field(tester), 'Hello world');
+
+        await tester.tap(find.byIcon(Icons.stop));
+        await tester.pump();
+        expect(input.stops, 1);
+        expect(find.byIcon(Icons.mic), findsOneWidget);
+        expect(field(tester), 'Hello world');
+      });
+
+      testWidgets('a final result leaves the text, not sent', (tester) async {
+        final input = FakeSpeechInput();
+        final api = FakeApi(ai: ai());
+        await tester.pumpWidget(app(ChatScreen(
+            api: api, speechInput: input, speechOutput: FakeSpeechOutput())));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byIcon(Icons.mic));
+        await tester.pump();
+        input.onText!('good morning', true);
+        await tester.pump();
+        expect(field(tester), 'good morning');
+        expect(find.byIcon(Icons.mic), findsOneWidget);
+        expect(api.added, isEmpty);
+      });
+
+      testWidgets('says so when voice input is not available', (tester) async {
+        await open(
+            tester, FakeSpeechInput(available: false), FakeSpeechOutput());
+        await tester.tap(find.byIcon(Icons.mic));
+        await tester.pump();
+        expect(find.text('Voice input is not available on this device.'),
+            findsOneWidget);
+        expect(find.byIcon(Icons.mic), findsOneWidget);
+        expect(find.byType(TextField), findsOneWidget);
+      });
+
+      testWidgets('sending stops listening', (tester) async {
+        final input = FakeSpeechInput();
+        await open(tester, input, FakeSpeechOutput());
+        await tester.tap(find.byIcon(Icons.mic));
+        await tester.pump();
+        input.onText!('hi there', false);
+        await tester.pump();
+        await tester.tap(find.byTooltip('Send'));
+        await tester.pumpAndSettle();
+        expect(input.stops, 1);
+        expect(input.listening, isFalse);
+        expect(find.byIcon(Icons.mic), findsOneWidget);
+        expect(field(tester), '');
+      });
+
+      testWidgets('read aloud on speaks a finished answer once',
+          (tester) async {
+        SharedPreferences.setMockInitialValues({'chat_read_aloud': true});
+        final output = FakeSpeechOutput();
+        await open(tester, FakeSpeechInput(), output);
+        expect(find.byIcon(Icons.volume_up), findsOneWidget);
+        await tester.enterText(find.byType(TextField), 'Hi');
+        await tester.tap(find.byTooltip('Send'));
+        await tester.pumpAndSettle();
+        expect(output.spoken, ['Hoi!']);
+      });
+
+      testWidgets('read aloud off never speaks', (tester) async {
+        final output = FakeSpeechOutput();
+        await open(tester, FakeSpeechInput(), output);
+        expect(find.byIcon(Icons.volume_off), findsOneWidget);
+        await tester.enterText(find.byType(TextField), 'Hi');
+        await tester.tap(find.byTooltip('Send'));
+        await tester.pumpAndSettle();
+        expect(output.spoken, isEmpty);
+      });
+
+      testWidgets('toggling off or sending stops speech, toggle persists',
+          (tester) async {
+        SharedPreferences.setMockInitialValues({'chat_read_aloud': true});
+        final output = FakeSpeechOutput();
+        await open(tester, FakeSpeechInput(), output);
+        await tester.tap(find.byIcon(Icons.volume_up));
+        await tester.pumpAndSettle();
+        expect(output.stops, 1);
+        expect(find.byIcon(Icons.volume_off), findsOneWidget);
+        expect(
+            (await SharedPreferences.getInstance()).getBool('chat_read_aloud'),
+            isFalse);
+
+        await tester.tap(find.byIcon(Icons.volume_off));
+        await tester.pumpAndSettle();
+        expect(
+            (await SharedPreferences.getInstance()).getBool('chat_read_aloud'),
+            isTrue);
+
+        await tester.enterText(find.byType(TextField), 'Hi');
+        await tester.tap(find.byTooltip('Send'));
+        await tester.pumpAndSettle();
+        // Sending stopped speech first, then the new answer was read.
+        expect(output.stops, 2);
+        expect(output.spoken, ['Hoi!']);
+      });
     });
 
     group('context picker', () {

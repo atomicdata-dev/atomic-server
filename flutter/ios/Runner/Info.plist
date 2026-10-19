@@ -45,6 +45,10 @@
 	<false/>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera is used to scan QR codes for device pairing</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Speech recognition turns what you say into a chat message</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>The microphone is used to dictate chat messages</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

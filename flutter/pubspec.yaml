@@ -27,6 +27,8 @@ dependencies:
   webview_flutter: ^4.14.1
   webview_flutter_android: ^4.10.0
   url_launcher: ^6.3.0
+  speech_to_text: ^7.5.0
+  flutter_tts: ^4.2.5
 
 dev_dependencies:
   integration_test:
