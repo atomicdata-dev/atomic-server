@@ -217,6 +217,31 @@ messages from others, which need the host to push `changed`; the native screen
 polls instead), and the web bundle with these page changes (the thread session
 rebuilds it).
 
+## No server in the page (fresh account, 2026-10-19)
+
+A fresh account's drive opened as its raw subject and "Empty". The host read
+the drive fine; the page then "refreshed it from the server" (the drive
+page's plugin lookup, `useDriveClass`), which signed an HTTP request through
+the host. The host signs only commits, and the refusal became the drive's
+error. The auth cookie on `setAgent` and the plugin list asked for the same
+signature. Fixed with a Store option `noServer` (`browser/lib`): every read
+comes from the client database (the host), nothing goes over HTTP, no auth
+cookie. The embed's store is made in `src/embed/embedStore.ts`, which also
+registers the create actions and delete dialogs `App.tsx` registers (without
+them the drive's Document / Folder buttons opened the bare property form).
+Tests: `no-server.test.ts`, `src/embed/embedStore.test.ts`,
+`host::embed` `a_fresh_identitys_drive_opens_with_its_name`.
+
+Found on the way: the app's sign-in with the saved secret on every start
+replaced the agent's stored resource with a nameless one ("Someone created",
+"You"); `load_agent_from_secret` now keeps what the store holds. The home
+reloads when a page of the bottom bar closes.
+
+Still open: a resource opened by navigating inside the page (a folder's
+child, the drive's quick-create) is not noted as opened, so it is missing
+from Recents; the page's Data view (`DataRoute.fetchAs`) still signs an HTTP
+request (refused, harmless).
+
 ## Not planned
 
 - Running the web app's own router or sidebar in the embed.
