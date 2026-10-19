@@ -325,7 +325,7 @@ fn members_of(conversation: &Resource) -> Vec<String> {
 }
 
 /// Whether two spellings name the same agent (`did:ad:agent:X`, `atomic:agent:X`).
-fn same_agent(a: &str, b: &str) -> bool {
+pub(crate) fn same_agent(a: &str, b: &str) -> bool {
     use crate::identifiers::agent_public_key;
     a == b || matches!((agent_public_key(a), agent_public_key(b)), (Some(x), Some(y)) if x == y)
 }

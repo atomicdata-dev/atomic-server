@@ -18,7 +18,7 @@
 //! [`AgentProfiles`] instead: the profile the connected server has, in memory
 //! only, never written to the store (this device did not sign or verify it).
 
-use super::{profiles::AgentProfiles, LocalWritePusher};
+use super::{conversations::same_agent, profiles::AgentProfiles, LocalWritePusher};
 use crate::{
     agents::ForAgent, runtime::AtomicNode, storelike::Query, Db, Resource, Storelike, Subject,
 };
@@ -91,13 +91,31 @@ async fn read_many(store: &Db, profiles: &AgentProfiles, raws: &[String]) -> Vec
     for raw in raws {
         rows.push(read_local(store, raw).await);
     }
+    // An agent the store only knows by its key is a stub without a name (the
+    // store derives one for any agent subject): it needs the profile too.
+    let nameless = |row: &Json| {
+        row["jsonAd"]
+            .as_str()
+            .is_none_or(|ad| !ad.contains("\"https://atomicdata.dev/properties/name\""))
+    };
+    // This device's own agent is never asked for.
+    let me = store
+        .get_default_agent()
+        .ok()
+        .map(|a| a.subject.to_string());
     let missing: Vec<usize> = (0..raws.len())
-        .filter(|&i| rows[i]["jsonAd"].is_null() && subject_of(store, &raws[i]).is_agent_did())
+        .filter(|&i| {
+            nameless(&rows[i])
+                && subject_of(store, &raws[i]).is_agent_did()
+                && me.as_deref().is_none_or(|me| !same_agent(me, &raws[i]))
+        })
         .collect();
     let found = futures::future::join_all(missing.iter().map(|&i| profiles.get(&raws[i]))).await;
     for (i, profile) in missing.into_iter().zip(found) {
         if let Some(json_ad) = profile {
             rows[i]["jsonAd"] = json!(json_ad);
+            // Not a resource of this device: no snapshot to go with it.
+            rows[i]["snapshot"] = Json::Null;
         }
     }
     rows
@@ -527,6 +545,22 @@ mod tests {
             .store
             .get_resource_shallow(&subject_of(&d.store, stranger))
             .is_err());
+    }
+
+    #[tokio::test]
+    async fn an_agent_the_store_only_knows_by_its_key_still_gets_its_profile() {
+        // The store derives a bare agent (key only, no name) for any agent
+        // subject; the page needs the name from the server.
+        let d = Device::new().await;
+        let reply = json!({ "@id": "https://server.test/x", urls::NAME: "Dora" }).to_string();
+        let fetcher = Arc::new(Profiles(Default::default(), Some(reply)));
+        let h = host_with(&d, fetcher.clone());
+        let stub = "atomic:agent:QmfpRIBn2JYEatT0MjSkMNoBJzstz19orwnT5oT2rcQ=";
+        let rows = ask(&h, "getResourcesWithSnapshots", json!([[stub]])).await;
+        let json_ad = rows[0]["jsonAd"].as_str().unwrap();
+        assert!(json_ad.contains("Dora"), "{json_ad}");
+        assert!(rows[0]["snapshot"].is_null());
+        assert_eq!(calls(&fetcher), 1);
     }
 
     #[tokio::test]
