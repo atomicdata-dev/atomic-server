@@ -35,6 +35,25 @@ makes the embed cheaper to run.
 
 Each step ships on its own and has a test that fails without it.
 
+- [x] **0. Host logic lives in atomic_lib.** What the Flutter bridge crate did
+  that is not Flutter-specific moved to `atomic_lib::host` (`lib/src/host/`,
+  native builds with the `db` feature), so the Tauri desktop app, native
+  iOS/Android shells and the CLI can bind the same code. Moved: the embed call
+  dispatcher with its signing policy (`host::embed::EmbedHost`), the recents /
+  activity / chat index with its persistence and event listener
+  (`host::recents::RecentsIndex`), list rows (`host::rows`: `row_resource`,
+  `class_name_of`, `with_emoji`, `name_of`, `DriveCache`), the home lists and
+  search (`host::lists`), AI chats read and written (`host::chats`), encrypted
+  conversations listed, read and sent, with the agent-name and opened-message
+  caches (`host::conversations`), and resource text for an AI
+  (`host::context`). Two seams stay with the host: `LocalWritePusher` (the
+  bridge's `push_local_write`: WS drain, live peers, peer nudge) and
+  `AgentNameFetcher` (the bridge asks the connected server). The bridge
+  (`flutter/rust/src/host.rs`) keeps the statics, frb attributes, `ws_sync`,
+  Iroh peers and canvas CRUD; its public functions kept their signatures, so
+  the Dart bindings were not regenerated. Tests moved with the code (each on
+  its own in-memory store, `host::test_support::Device`); the bridge keeps
+  one end-to-end test per function.
 - [x] **1. Commit transport and flush.** Store option `commitTransport`,
   `canCommit` for write-side checks, `atomicEmbed.flush()` and the Dart handshake
   before leaving a page. A keystroke now travels: loro-prosemirror commits the
@@ -47,7 +66,8 @@ Each step ships on its own and has a test that fails without it.
   (3 s cap); Dart waits for the `flushed` message (2 s cap). `signBytes` now
   signs genesis certificates of the device's agent, so "New resource" can mint
   a DID. Tests: `commit-transport.test.ts`, `resource_view_test.dart`, the
-  `embed.rs` document-edit round trip. Not yet seen on a phone.
+  `embed.rs` document-edit round trip (`lib/src/host/embed.rs`, and through the
+  bridge in `flutter/rust/src/embed.rs`). Not yet seen on a phone.
 - [ ] **2. One host module.** Move the embed's special cases into
   `browser/data-browser/src/embed/host.ts` with a documented `EmbedHost` surface:
   `{ channel, insets, panels, routes }`. The web app sees one typed object:
@@ -136,4 +156,4 @@ the host to push `changed`).
 - A second store or a WebSocket inside the page.
 - Raw signing for the page: only commits of the device's own agent (`sign`) and
   genesis certificates naming it (`signBytes`) are signed
-  (`flutter/rust/src/embed.rs`).
+  (`lib/src/host/embed.rs`).

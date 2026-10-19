@@ -30,7 +30,10 @@ The Kotlin app stores Loro snapshots as local files. The Flutter app uses **atom
 
 - **Mobile (Android/iOS)**: FFI via `flutter_rust_bridge` — works with `dart:ffi`
 - **Web**: WASM compilation — `flutter_rust_bridge` handles this, but `dart:ffi` is unavailable on web, so the bridge generates WASM bindings automatically
-- Rust source lives in `/rust/src/`
+- Rust source lives in `/rust/src/`. Keep it thin: logic that another host
+  (Tauri, a native shell, the CLI) could use goes in `atomic_lib::host`
+  (`lib/src/host/`: lists, chats, conversations, recents, embed dispatcher) with
+  its tests; the bridge binds it to the global store (`rust/src/host.rs`).
 - `atomic_lib` is referenced as a local path dependency: `../../../atomicdata-dev/atomic-server/lib`
 
 ### Loro CRDT: Not Yet Integrated in Flutter
