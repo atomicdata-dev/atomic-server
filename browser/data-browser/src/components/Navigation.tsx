@@ -139,6 +139,14 @@ export function NavWrapper({ children }: NavWrapperProps): JSX.Element {
                   <AISidebarMemo />
                 </HideInPrint>
               )}
+              {/* The app's resource page has no side panels except comments,
+               * which open over the page (a narrow screen overlays them). The
+               * AI chat is the app's own native one. */}
+              {embedded && (
+                <HideInPrint>
+                  <CommentsPanelMemo />
+                </HideInPrint>
+              )}
             </SideBarWrapper>
             {hideGlobalChrome && !embedded && <OnboardingFeedback />}
             <OverlayContainer />
