@@ -24,6 +24,10 @@ class ResourceRow extends StatelessWidget {
             icon == null ? null : Icon(icon, color: context.appColors.main),
         title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: detail == null || detail!.isEmpty ? null : Text(detail!),
+        // A plain list of titles reads better tight.
+        visualDensity: detail == null && icon == null
+            ? VisualDensity.compact
+            : VisualDensity.standard,
         onTap: onTap,
       );
 }
