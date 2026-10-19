@@ -36,12 +36,28 @@ struct ServerProfileFetcher;
 #[async_trait::async_trait]
 impl AgentProfileFetcher for ServerProfileFetcher {
     async fn fetch_agent_resource(&self, member: &str) -> Option<String> {
-        let origin = connected_server()?;
+        let Some(origin) = connected_server() else {
+            tracing::debug!("[profile] no connected server for {member}");
+            return None;
+        };
         let agent = db().ok()?.get_default_agent().ok();
         let url = format!("{origin}/{member}");
-        atomic_lib::client::fetch_body(&url, atomic_lib::parse::JSON_AD_MIME, agent.as_ref())
-            .await
-            .ok()
+        let started = std::time::Instant::now();
+        let fetched =
+            atomic_lib::client::fetch_body(&url, atomic_lib::parse::JSON_AD_MIME, agent.as_ref())
+                .await;
+        match &fetched {
+            Ok(body) => tracing::debug!(
+                "[profile] {url}: {} bytes in {} ms",
+                body.len(),
+                started.elapsed().as_millis()
+            ),
+            Err(e) => tracing::debug!(
+                "[profile] {url} failed after {} ms: {e}",
+                started.elapsed().as_millis()
+            ),
+        }
+        fetched.ok()
     }
 }
 

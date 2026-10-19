@@ -18,7 +18,7 @@
 //! [`AgentProfiles`] instead: the profile the connected server has, in memory
 //! only, never written to the store (this device did not sign or verify it).
 
-use super::{conversations::same_agent, profiles::AgentProfiles, LocalWritePusher};
+use super::{profiles::AgentProfiles, LocalWritePusher};
 use crate::{
     agents::ForAgent, runtime::AtomicNode, storelike::Query, Db, Resource, Storelike, Subject,
 };
@@ -98,17 +98,10 @@ async fn read_many(store: &Db, profiles: &AgentProfiles, raws: &[String]) -> Vec
             .as_str()
             .is_none_or(|ad| !ad.contains("\"https://atomicdata.dev/properties/name\""))
     };
-    // This device's own agent is never asked for.
-    let me = store
-        .get_default_agent()
-        .ok()
-        .map(|a| a.subject.to_string());
+    // This includes this device's own agent when it has no name here: the
+    // server has the profile the user gave it.
     let missing: Vec<usize> = (0..raws.len())
-        .filter(|&i| {
-            nameless(&rows[i])
-                && subject_of(store, &raws[i]).is_agent_did()
-                && me.as_deref().is_none_or(|me| !same_agent(me, &raws[i]))
-        })
+        .filter(|&i| nameless(&rows[i]) && subject_of(store, &raws[i]).is_agent_did())
         .collect();
     let found = futures::future::join_all(missing.iter().map(|&i| profiles.get(&raws[i]))).await;
     for (i, profile) in missing.into_iter().zip(found) {
@@ -581,7 +574,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn local_agents_and_other_subjects_never_ask_the_server() {
+    async fn a_named_local_agent_and_other_subjects_never_ask_the_server() {
         let d = Device::new().await;
         let fetcher = Arc::new(Profiles(Default::default(), Some("{}".into())));
         let h = host_with(&d, fetcher.clone());
@@ -593,10 +586,7 @@ mod tests {
             json!([[me, "did:ad:not-here", "https://example.test/nope"]]),
         )
         .await;
-        assert!(
-            !rows[0]["jsonAd"].is_null(),
-            "this device's own agent is local"
-        );
+        assert!(!rows[0]["jsonAd"].is_null(), "this device's own agent");
         assert!(rows[1]["jsonAd"].is_null());
         assert!(rows[2]["jsonAd"].is_null());
         assert_eq!(calls(&fetcher), 0);
