@@ -4,6 +4,7 @@ import 'package:atomic_app/atomic/account_store.dart';
 import 'package:atomic_app/screens/sync_screen.dart';
 import 'package:atomic_app/theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _Servers extends shared.AtomicServerBackend {
@@ -126,6 +127,29 @@ void main() {
     expect(find.text('Team'), findsNothing);
     expect(find.text('Account'), findsNothing);
     expect(find.text('Link your account'), findsNothing);
+  });
+
+  testWidgets('the ID under the name copies it, and says so', (tester) async {
+    String? copied;
+    tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied = (call.arguments as Map)['text'] as String?;
+      }
+      return null;
+    });
+    addTearDown(() => tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null));
+    await tester.pumpWidget(_app(SyncScreen(
+      backend: _Backend(),
+      loadAccount: (_) async => null,
+    )));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Copy ID'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('copy-agent-id')));
+    await tester.pump();
+    expect(copied, 'did:ad:agent');
+    await tester.pumpAndSettle(const Duration(seconds: 5));
   });
 
   testWidgets('tapping the identity opens the agent page', (tester) async {

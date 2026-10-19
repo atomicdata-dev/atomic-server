@@ -631,11 +631,28 @@ class _SyncScreenState extends State<SyncScreen> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   if (agent != null)
-                    GestureDetector(
-                      onTap: () => _copy(agent.subject, 'Agent ID'),
-                      child: Text(_short(agent.subject),
-                          style:
-                              TextStyle(color: c.textSecondary, fontSize: 12)),
+                    // The ID with a copy mark: a bare line of grey text gave
+                    // no hint that a tap copies it.
+                    Tooltip(
+                      message: 'Copy ID',
+                      child: InkWell(
+                        key: const Key('copy-agent-id'),
+                        onTap: () => _copy(agent.subject, 'Agent ID'),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Flexible(
+                              child: Text(_short(agent.subject),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      color: c.textSecondary, fontSize: 12)),
+                            ),
+                            const SizedBox(width: 6),
+                            Icon(Icons.copy, size: 14, color: c.textSecondary),
+                          ]),
+                        ),
+                      ),
                     ),
                 ],
               ),
