@@ -590,8 +590,8 @@ class _Section<T> extends StatefulWidget {
   final List<Widget> Function(List<T>) rows;
   final void Function(List<T>) onShowAll;
 
-  /// Show nothing at all (no heading) while there is nothing to list, and
-  /// when the data cannot be read.
+  /// Show nothing at all (no heading) while there is nothing to list, while
+  /// it is still being read, and when the data cannot be read.
   final bool hideEmpty;
 
   const _Section({
@@ -683,7 +683,10 @@ class _SectionState<T> extends State<_Section<T>>
     final c = context.appColors;
     final list = _list;
     final error = list == null ? _error : null;
-    if (widget.hideEmpty && (error != null || (list?.isEmpty ?? false))) {
+    // A section that is left out when empty is also left out until it is
+    // known not to be: a heading and spinner for each of them filled the
+    // first screen of the home, and then went away, moving everything up.
+    if (widget.hideEmpty && (error != null || (list?.isEmpty ?? true))) {
       return const SizedBox.shrink();
     }
     final more = list != null && list.length > _homeItems;

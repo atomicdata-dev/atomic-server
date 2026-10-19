@@ -1,5 +1,5 @@
-import 'dart:math' as math;
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:convert';
 
 import 'package:atomic_chat/atomic_chat.dart';
@@ -442,6 +442,19 @@ void main() {
       expect(api.markedRead, ['n1']);
       expect(api.opened, ['did:ad:teamchat']);
       await tester.pump(const Duration(milliseconds: 500));
+    });
+
+    testWidgets('a section hidden when empty stays hidden while it loads',
+        (tester) async {
+      final pending = Completer<List<NotificationItem>>();
+      await tester.pumpWidget(app(ChatsScreen(
+          drive: 'did:ad:drive', api: _SlowNotifications(pending.future))));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('Notifications'), findsNothing);
+      expect(find.text('Drives'), findsOneWidget);
+      pending.complete(const []);
+      await tester.pumpAndSettle();
+      expect(find.text('Notifications'), findsNothing);
     });
 
     testWidgets('no notifications, no Notifications section', (tester) async {
@@ -2618,4 +2631,11 @@ class _PerDrive extends FakeApi {
 class _Failing extends FakeApi {
   @override
   Future<List<ChatSummary>> chats() => Future.error('No active drive');
+}
+
+class _SlowNotifications extends FakeApi {
+  final Future<List<NotificationItem>> pending;
+  _SlowNotifications(this.pending);
+  @override
+  Future<List<NotificationItem>> notifications() => pending;
 }
