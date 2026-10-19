@@ -138,6 +138,92 @@ pub async fn list_recent_resources(drive: String, limit: u32) -> Result<String, 
     serde_json::to_string(&out).map_err(|e| e.to_string())
 }
 
+/// `favorites` on the private drive: what the web app's Favorites panel lists.
+pub(crate) const FAVORITES: &str = "https://atomicdata.dev/properties/favorites";
+
+/// The subjects in a list property of the agent's private drive (the web
+/// app's "home index"), in stored order; empty when there is no such drive or
+/// list yet.
+async fn private_drive_list(property: &str) -> Result<Vec<String>, String> {
+    let store = db()?;
+    let home = store.private_drive_subject().map_err(err)?;
+    let Ok(drive) = store.get_resource(&Subject::from(home.as_str())).await else {
+        return Ok(Vec::new());
+    };
+    Ok(drive
+        .get(property)
+        .ok()
+        .and_then(|v| v.to_subjects(None).ok())
+        .unwrap_or_default())
+}
+
+/// The person's favorites (all drives), newest added first, as JSON
+/// `[{subject, title, class_name, opened_at}]` (`opened_at` is always 0).
+/// Favorites that are gone or unreadable are left out.
+pub async fn list_favorites(limit: u32) -> Result<String, String> {
+    let store = db()?;
+    let mut out = Vec::new();
+    // The web app appends, so the last one listed is the newest.
+    for subject in private_drive_list(FAVORITES).await?.into_iter().rev() {
+        if out.len() >= limit as usize {
+            break;
+        }
+        let Ok(resource) = store.get_resource(&Subject::from(subject.as_str())).await else {
+            continue;
+        };
+        out.push(resource_row(&subject, &resource, ("opened_at", json!(0))).await);
+    }
+    serde_json::to_string(&out).map_err(|e| e.to_string())
+}
+
+/// The person's conversations (DMs and group chats), as JSON
+/// `[{subject, title, class_name, opened_at}]`, in the order the private drive
+/// lists them. A conversation has no name of its own: its title is who else is
+/// in it (its `read` list minus this agent), as the web app shows it. Last
+/// activity is not cheap to know, so `opened_at` is 0.
+pub async fn list_conversations(limit: u32) -> Result<String, String> {
+    let store = db()?;
+    let me = store.get_default_agent().map_err(err)?.subject.to_string();
+    let mut out = Vec::new();
+    for subject in private_drive_list(urls::CONVERSATIONS).await? {
+        if out.len() >= limit as usize {
+            break;
+        }
+        let Ok(conversation) = store.get_resource(&Subject::from(subject.as_str())).await else {
+            continue;
+        };
+        let members = conversation
+            .get(urls::READ)
+            .ok()
+            .and_then(|v| v.to_subjects(None).ok())
+            .unwrap_or_default();
+        let mut names = Vec::new();
+        for member in members.iter().filter(|m| **m != me) {
+            let name = match store.get_resource(&Subject::from(member.as_str())).await {
+                Ok(agent) => name_of(&agent),
+                Err(_) => String::new(),
+            };
+            names.push(if name.is_empty() {
+                member.clone()
+            } else {
+                name
+            });
+        }
+        let title = if names.is_empty() {
+            "Only you".to_string()
+        } else {
+            names.join(", ")
+        };
+        out.push(json!({
+            "subject": subject,
+            "title": title,
+            "class_name": "",
+            "opened_at": 0,
+        }));
+    }
+    serde_json::to_string(&out).map_err(|e| e.to_string())
+}
+
 /// The entries of a chat, oldest first, as a JSON array of the fields the web
 /// app stores: `id`, `a`, `c`, `role`, `parts` (array) and the rest as is.
 pub async fn read_chat(subject: String) -> Result<String, String> {

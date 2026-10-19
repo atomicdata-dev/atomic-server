@@ -7,6 +7,7 @@
 // ignore_for_file: argument_type_not_assignable
 
 import 'api/assistant.dart';
+import 'api/embed.dart';
 import 'api/simple.dart';
 import 'api/simple/types.dart';
 import 'api/simple/ws_sync.dart';

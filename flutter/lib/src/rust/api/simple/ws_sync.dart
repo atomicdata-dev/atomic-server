@@ -6,7 +6,7 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `ensure_drive_materialized`, `fetch_resource_state`, `handle_ws_message`, `ws_client_slot`, `ws_task_slot`
+// These functions are ignored because they are not marked as `pub`: `ensure_drive_materialized`, `fetch_resource_state`, `follow_drive`, `handle_ws_message`, `ws_client_slot`, `ws_task_slot`
 // These functions are ignored (category: IgnoreBecauseExplicitAttribute): `drain_outbox`
 
 /// `http://host:9883` → `ws://host:9883/ws`

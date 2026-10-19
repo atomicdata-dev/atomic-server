@@ -320,3 +320,66 @@ async fn a_chat_started_here_takes_messages_in_order_on_one_page() {
     assert!(list.contains(&chat));
     assert!(list.contains("Phone chat"));
 }
+
+/// Put `subjects` in a list property of the private drive, as the web app does.
+async fn set_home_list(property: &str, subjects: &[&str]) {
+    let store = db().unwrap();
+    let home = store.ensure_private_drive().await.unwrap();
+    let mut drive = store
+        .get_resource(&Subject::from(home.as_str()))
+        .await
+        .unwrap();
+    let list = Value::ResourceArray(subjects.iter().map(|s| (*s).into()).collect());
+    drive.set_unsafe(property.into(), list).unwrap();
+    let response = super::super::simple::state::node()
+        .unwrap()
+        .save_locally(&mut drive)
+        .await
+        .unwrap();
+    super::super::simple::push_local_write(&response, store.as_ref()).await;
+}
+
+#[tokio::test]
+async fn favorites_come_from_the_private_drive_newest_first() {
+    let a = new_chat("Fav a").await;
+    let b = new_chat("Fav b").await;
+    set_home_list(FAVORITES, &[&a, "https://example.test/gone", &b]).await;
+
+    let list: Vec<Json> = serde_json::from_str(&list_favorites(10).await.unwrap()).unwrap();
+    let titles: Vec<&str> = list.iter().map(|r| r["title"].as_str().unwrap()).collect();
+    assert_eq!(titles, ["Fav b", "Fav a"]);
+    assert_eq!(list[0]["subject"], b.as_str());
+
+    let limited: Vec<Json> = serde_json::from_str(&list_favorites(1).await.unwrap()).unwrap();
+    assert_eq!(limited.len(), 1);
+}
+
+#[tokio::test]
+async fn conversations_are_titled_by_the_other_members() {
+    shared_drive().await;
+    let store = db().unwrap();
+    let me = store.get_default_agent().unwrap().subject.to_string();
+    let convo = new_chat("Ignored name").await;
+    let mut resource = store
+        .get_resource(&Subject::from(convo.as_str()))
+        .await
+        .unwrap();
+    let members = Value::ResourceArray(vec![
+        me.as_str().into(),
+        "https://example.test/agent".into(),
+    ]);
+    resource.set_unsafe(urls::READ.into(), members).unwrap();
+    super::super::simple::state::node()
+        .unwrap()
+        .save_locally(&mut resource)
+        .await
+        .unwrap();
+    let alone = new_chat("Alone").await;
+    set_home_list(urls::CONVERSATIONS, &[&convo, &alone]).await;
+
+    let list: Vec<Json> = serde_json::from_str(&list_conversations(10).await.unwrap()).unwrap();
+    assert_eq!(list.len(), 2);
+    assert_eq!(list[0]["subject"], convo.as_str());
+    assert_eq!(list[0]["title"], "https://example.test/agent");
+    assert_eq!(list[1]["title"], "Only you");
+}

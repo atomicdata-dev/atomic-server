@@ -144,6 +144,15 @@ class AtomicClient {
       parseRecentResources(
           await assistant.listRecentResources(drive: drive, limit: limit));
 
+  /// The person's favorites (all drives), newest added first. `openedAt` is 0.
+  static Future<List<RecentResource>> favorites({int limit = 100}) async =>
+      parseRecentResources(await assistant.listFavorites(limit: limit));
+
+  /// The person's conversations (DMs and group chats), titled by who is in
+  /// them. `openedAt` is 0.
+  static Future<List<RecentResource>> conversations({int limit = 100}) async =>
+      parseRecentResources(await assistant.listConversations(limit: limit));
+
   /// Starts an AI chat named [name] in the private drive; returns its subject.
   static Future<String> createAiChat(String name) =>
       assistant.createAiChat(name: name);

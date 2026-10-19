@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'simple/types.dart';
 
-// These functions are ignored because they are not marked as `pub`: `canvas_cache_key`, `canvas_entry`, `db_event_to_json`, `destroy_resource_and_sync`, `drive_resource_exists`, `ensure_cache_listener`, `ensure_sync_connectivity`, `follow_listed_drives`, `get_canvas`, `is_corruption_error`, `is_unreachable_hub_url`, `nudge_peers_after_local_change`, `refresh_editing_session`, `save_and_push`, `sync_connectivity_inner`, `try_auto_peer_sync`, `version_id_from_json`
+// These functions are ignored because they are not marked as `pub`: `canvas_cache_key`, `canvas_entry`, `db_event_to_json`, `destroy_resource_and_sync`, `drive_resource_exists`, `ensure_cache_listener`, `ensure_sync_connectivity`, `fetch_other_drive`, `follow_listed_drives`, `get_canvas`, `is_corruption_error`, `is_unreachable_hub_url`, `node_apply_local`, `nudge_peers_after_local_change`, `peer_ids_to_try`, `push_local_write`, `refresh_editing_session`, `save_and_push`, `short_id`, `sync_connectivity_inner`, `try_auto_peer_sync`, `version_id_from_json`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `PeerSyncReport`, `SyncConnectivityReport`
 
 /// Local-first Atomic Data SDK for Flutter.

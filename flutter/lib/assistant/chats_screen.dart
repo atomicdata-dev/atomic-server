@@ -46,6 +46,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
   late Future<List<DriveInfo>> _drives = _loadDrives();
   late Future<List<ChatSummary>> _chats = widget.api.chats();
   late Future<List<_Recent>> _recents = _loadRecents();
+  late Future<List<RecentResource>> _favorites = widget.api.favorites();
+  late Future<List<RecentResource>> _conversations = widget.api.conversations();
 
   /// The most recent drive: the one the home opened on, else the first.
   String _drive = '';
@@ -78,6 +80,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
   void _reload() => setState(() {
         _chats = widget.api.chats();
         _recents = _loadRecents();
+        _favorites = widget.api.favorites();
+        _conversations = widget.api.conversations();
       });
 
   Future<void> _push(Widget screen) async {
@@ -132,6 +136,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   Widget _recentRow(_Recent r) =>
       _resourceRow(r.resource, _openResource, r.drive);
+
+  /// Favorites and conversations are not tied to one drive: they open in the
+  /// current one.
+  Widget _homeRow(RecentResource r) => _resourceRow(r, _openResource, _drive);
 
   @override
   Widget build(BuildContext context) {
@@ -195,6 +203,26 @@ class _ChatsScreenState extends State<ChatsScreen> {
                   ],
                 ])),
               ),
+              _Section<RecentResource>(
+                title: 'Favorites',
+                future: _favorites,
+                empty: 'No favorites yet',
+                hideEmpty: true,
+                rows: (list) => [for (final r in list) _homeRow(r)],
+                onShowAll: (list) => _push(_ListPage(
+                    title: 'Favorites',
+                    children: [for (final r in list) _homeRow(r)])),
+              ),
+              _Section<RecentResource>(
+                title: 'Messages',
+                future: _conversations,
+                empty: 'No messages yet',
+                hideEmpty: true,
+                rows: (list) => [for (final r in list) _homeRow(r)],
+                onShowAll: (list) => _push(_ListPage(
+                    title: 'Messages',
+                    children: [for (final r in list) _homeRow(r)])),
+              ),
             ],
           ),
         );
@@ -210,7 +238,7 @@ ResourceRow _resourceRow(RecentResource r,
     ResourceRow(
       icon: Icons.description_outlined,
       title: r.title.isEmpty ? r.subject : r.title,
-      detail: [r.className, timeAgo(r.openedAt)]
+      detail: [r.className, if (r.openedAt > 0) timeAgo(r.openedAt)]
           .where((t) => t.isNotEmpty)
           .join(' · '),
       onTap: () => onOpen(drive, r),
@@ -226,12 +254,17 @@ class _Section<T> extends StatelessWidget {
   final List<Widget> Function(List<T>) rows;
   final void Function(List<T>) onShowAll;
 
+  /// Show nothing at all (no heading) while there is nothing to list, and
+  /// when the data cannot be read.
+  final bool hideEmpty;
+
   const _Section({
     required this.title,
     required this.future,
     required this.empty,
     required this.rows,
     required this.onShowAll,
+    this.hideEmpty = false,
   });
 
   @override
@@ -241,6 +274,9 @@ class _Section<T> extends StatelessWidget {
       future: future,
       builder: (context, snapshot) {
         final list = snapshot.data;
+        if (hideEmpty && (snapshot.hasError || (list?.isEmpty ?? false))) {
+          return const SizedBox.shrink();
+        }
         final more = list != null && list.length > _homeItems;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,

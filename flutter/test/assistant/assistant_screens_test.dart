@@ -15,6 +15,8 @@ import 'package:flutter_test/flutter_test.dart';
 class FakeApi extends AssistantApi {
   final List<DriveInfo> driveList;
   final List<RecentResource> recent;
+  final List<RecentResource> favoriteList;
+  final List<RecentResource> conversationList;
   final List<ChatSummary> chatList;
   final List<ChatMessage> messageList;
   final List<SearchHit> hits;
@@ -27,6 +29,8 @@ class FakeApi extends AssistantApi {
   FakeApi({
     this.driveList = const [(subject: 'did:ad:drive', name: 'Home')],
     this.recent = const [],
+    this.favoriteList = const [],
+    this.conversationList = const [],
     this.ai,
     this.chatList = const [],
     this.messageList = const [],
@@ -41,6 +45,10 @@ class FakeApi extends AssistantApi {
   Future<List<ChatSummary>> chats() async => chatList;
   @override
   Future<List<RecentResource>> recentResources(String drive) async => recent;
+  @override
+  Future<List<RecentResource>> favorites() async => favoriteList;
+  @override
+  Future<List<RecentResource>> conversations() async => conversationList;
   @override
   Future<List<ChatMessage>> messages(String chat) async => messageList;
   @override
@@ -147,6 +155,59 @@ void main() {
       expect(y('Drives'), lessThan(y('Recents')));
       expect(y('Recents'), lessThan(y('AI Chats')));
       expect(find.text('Show all'), findsNothing);
+    });
+
+    testWidgets('Favorites and Messages come after AI Chats, hidden if empty',
+        (tester) async {
+      tester.view.physicalSize = const Size(800, 3000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      Future<void> pump(FakeApi api) async {
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpWidget(app(ChatsScreen(
+            drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+        await tester.pumpAndSettle();
+      }
+
+      await pump(FakeApi());
+      expect(find.text('Favorites'), findsNothing);
+      expect(find.text('Messages'), findsNothing);
+
+      final api = FakeApi(
+        chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
+        favoriteList: [
+          (subject: 'f1', title: 'Starred', className: 'Folder', openedAt: 0),
+        ],
+        conversationList: [
+          (subject: 'm1', title: 'Alice, Bob', className: '', openedAt: 0),
+        ],
+      );
+      await pump(api);
+      double y(String t) => tester.getTopLeft(find.text(t)).dy;
+      expect(y('AI Chats'), lessThan(y('Favorites')));
+      expect(y('Favorites'), lessThan(y('Messages')));
+      expect(find.text('Starred'), findsOneWidget);
+      expect(find.text('Folder'), findsOneWidget);
+
+      ResourceView.serverFactory = () async => throw 'no server in a test';
+      await tester.tap(find.text('Alice, Bob'));
+      await tester.pumpAndSettle();
+      expect(api.opened, ['m1']);
+      expect(find.byType(ResourceView), findsOneWidget);
+    });
+
+    testWidgets('Favorites shows 4, Show all lists the rest', (tester) async {
+      final api = FakeApi(favoriteList: [
+        for (var i = 0; i < 6; i++)
+          (subject: 'f$i', title: 'Fav $i', className: '', openedAt: 0),
+      ]);
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      expect(find.text('Fav 4'), findsNothing);
+      await tester.tap(find.text('Show all'));
+      await tester.pumpAndSettle();
+      expect(find.text('Fav 5'), findsOneWidget);
     });
 
     testWidgets('a section shows at most 4, Show all lists the rest',

@@ -6,7 +6,7 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `chat_entries`, `class_name_of`, `name_of`, `own_commit_opts`, `resource_row`
+// These functions are ignored because they are not marked as `pub`: `chat_entries`, `class_name_of`, `name_of`, `own_commit_opts`, `private_drive_list`, `resource_row`
 
 /// The newest `limit` AI chats of the person (all drives), newest activity first, as JSON
 /// `[{subject, name, last_activity}]` (`last_activity` in ms, 0 when empty).
@@ -27,6 +27,20 @@ Future<String> listRecentResources(
         {required String drive, required int limit}) =>
     RustLib.instance.api
         .crateApiAssistantListRecentResources(drive: drive, limit: limit);
+
+/// The person's favorites (all drives), newest added first, as JSON
+/// `[{subject, title, class_name, opened_at}]` (`opened_at` is always 0).
+/// Favorites that are gone or unreadable are left out.
+Future<String> listFavorites({required int limit}) =>
+    RustLib.instance.api.crateApiAssistantListFavorites(limit: limit);
+
+/// The person's conversations (DMs and group chats), as JSON
+/// `[{subject, title, class_name, opened_at}]`, in the order the private drive
+/// lists them. A conversation has no name of its own: its title is who else is
+/// in it (its `read` list minus this agent), as the web app shows it. Last
+/// activity is not cheap to know, so `opened_at` is 0.
+Future<String> listConversations({required int limit}) =>
+    RustLib.instance.api.crateApiAssistantListConversations(limit: limit);
 
 /// The entries of a chat, oldest first, as a JSON array of the fields the web
 /// app stores: `id`, `a`, `c`, `role`, `parts` (array) and the rest as is.
