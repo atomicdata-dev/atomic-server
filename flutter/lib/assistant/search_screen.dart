@@ -53,7 +53,11 @@ class _SearchScreenState extends State<SearchScreen> {
     widget.api.noteOpened(widget.drive, subject);
     await Navigator.of(context).push(
       SlideBackRoute<void>(
-        builder: (_) => ResourceView(subject: subject, title: title),
+        builder: (_) => ResourceView(
+            api: widget.api,
+            drive: widget.drive,
+            subject: subject,
+            title: title),
       ),
     );
     if (mounted) await _loadRecent();

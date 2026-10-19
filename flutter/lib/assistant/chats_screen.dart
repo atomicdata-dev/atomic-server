@@ -4,11 +4,11 @@ import '../atomic/atomic_client.dart';
 import '../screens/sync_screen.dart';
 import '../theme.dart';
 import '../widgets/slide_back_route.dart';
+import 'app_bottom_bar.dart';
 import 'assistant_api.dart';
 import 'chat_screen.dart';
 import 'resource_row.dart';
 import 'resource_view.dart';
-import 'search_screen.dart';
 
 /// Chats shown on the home; the rest is one tap away in a chat list later.
 const _homeChats = 8;
@@ -141,13 +141,12 @@ class _ChatsScreenState extends State<ChatsScreen> {
           ),
           bottomNavigationBar: drives == null || drive == null
               ? null
-              : _BottomBar(
+              : AppBottomBar(
+                  api: widget.api,
+                  drive: drive.subject,
                   hint:
                       drives.length > 1 ? 'Search in ${drive.name}' : 'Search',
-                  onSearch: () => _push(
-                      SearchScreen(drive: drive.subject, api: widget.api)),
-                  onNewChat: () => _push(
-                      ChatScreen(api: widget.api, subject: null, title: '')),
+                  onPush: _push,
                 ),
           body: snapshot.hasError
               ? Center(
@@ -251,56 +250,6 @@ class _ChatsSection extends StatelessWidget {
 }
 
 /// Search and a new chat, fixed at the bottom where the thumb is: one row.
-class _BottomBar extends StatelessWidget {
-  final String hint;
-  final VoidCallback onSearch;
-  final VoidCallback onNewChat;
-
-  const _BottomBar({
-    required this.hint,
-    required this.onSearch,
-    required this.onNewChat,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.appColors;
-    return Material(
-      color: c.bgBody,
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: Row(children: [
-            Expanded(
-              child: TextField(
-                readOnly: true,
-                decoration: InputDecoration(
-                  hintText: hint,
-                  prefixIcon: const Icon(Icons.search),
-                  filled: true,
-                  fillColor: c.bg1,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(9),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                onTap: onSearch,
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton.filled(
-              tooltip: 'New chat',
-              iconSize: 26,
-              onPressed: onNewChat,
-              icon: const Icon(Icons.add),
-            ),
-          ]),
-        ),
-      ),
-    );
-  }
-}
-
 class _Dots extends StatelessWidget {
   final int count;
   final int current;
@@ -428,8 +377,11 @@ class _OpenedPageState extends State<_OpenedPage>
                     .join(' · '),
                 onTap: () {
                   widget.api.noteOpened(widget.drive, r.subject);
-                  widget
-                      .onOpen(ResourceView(subject: r.subject, title: r.title));
+                  widget.onOpen(ResourceView(
+                      api: widget.api,
+                      drive: widget.drive,
+                      subject: r.subject,
+                      title: r.title));
                 },
               ),
           ],

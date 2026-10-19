@@ -1,11 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../atomic/atomic_client.dart';
 import '../theme.dart';
+import 'app_bottom_bar.dart';
+import 'assistant_api.dart';
 import 'embed_server.dart';
 
 /// A resource as the web app draws it, without the web app around it: the
@@ -13,14 +17,23 @@ import 'embed_server.dart';
 /// store through a JavaScript channel. No server, no sign-in, no second copy of
 /// the data in the page.
 class ResourceView extends StatefulWidget {
+  final AssistantApi api;
+  final String drive;
   final String subject;
   final String title;
+
+  /// Where the bundled page comes from. A test swaps it for one that fails
+  /// fast instead of starting a real server.
+  @visibleForTesting
+  static Future<EmbedServer> Function() serverFactory = EmbedServer.instance;
 
   /// Answers one call of the page. Replaceable in a test.
   final Future<String> Function(String method, String argsJson)? call;
 
   const ResourceView({
     super.key,
+    required this.api,
+    required this.drive,
     required this.subject,
     this.title = '',
     this.call,
@@ -44,7 +57,7 @@ class _ResourceViewState extends State<ResourceView> {
 
   Future<void> _start() async {
     try {
-      final server = await EmbedServer.instance();
+      final server = await ResourceView.serverFactory();
       final origin = server.page.origin;
       final controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -61,6 +74,10 @@ class _ResourceViewState extends State<ResourceView> {
         ))
         ..loadRequest(
             server.page.replace(queryParameters: {'subject': widget.subject}));
+      // Debug builds can be inspected from chrome://inspect.
+      if (kDebugMode && controller.platform is AndroidWebViewController) {
+        await AndroidWebViewController.enableDebugging(true);
+      }
       if (mounted) setState(() => _controller = controller);
     } catch (e) {
       if (mounted) setState(() => _error = e);
@@ -97,16 +114,23 @@ class _ResourceViewState extends State<ResourceView> {
     final controller = _controller;
     return Scaffold(
       backgroundColor: c.bgBody,
-      appBar: AppBar(
-        backgroundColor: c.bgBody,
-        title: Text(widget.title.isEmpty ? widget.subject : widget.title,
-            maxLines: 1, overflow: TextOverflow.ellipsis),
+      body: SafeArea(
+        bottom: false,
+        child: _error != null
+            ? Center(child: Text('$_error', style: TextStyle(color: c.alert)))
+            : controller == null
+                ? const Center(child: CircularProgressIndicator())
+                : WebViewWidget(controller: controller),
       ),
-      body: _error != null
-          ? Center(child: Text('$_error', style: TextStyle(color: c.alert)))
-          : controller == null
-              ? const Center(child: CircularProgressIndicator())
-              : WebViewWidget(controller: controller),
+      // The same bar as everywhere; "more" is the page's own resource menu
+      // (the web app's navbar menu, drawn by the page).
+      bottomNavigationBar: AppBottomBar(
+        api: widget.api,
+        drive: widget.drive,
+        onMore: controller == null
+            ? null
+            : () => controller.runJavaScript('window.atomicEmbed?.openMenu()'),
+      ),
     );
   }
 }

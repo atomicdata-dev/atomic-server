@@ -5,6 +5,7 @@ import 'package:atomiccanvas_flutter/assistant/assistant_api.dart';
 import 'package:atomiccanvas_flutter/assistant/hosted_ai.dart';
 import 'package:atomiccanvas_flutter/assistant/chat_screen.dart';
 import 'package:atomiccanvas_flutter/assistant/chats_screen.dart';
+import 'package:atomiccanvas_flutter/assistant/resource_view.dart';
 import 'package:atomiccanvas_flutter/assistant/search_screen.dart';
 import 'package:atomiccanvas_flutter/atomic/atomic_client.dart';
 import 'package:atomiccanvas_flutter/theme.dart';
@@ -320,6 +321,7 @@ void main() {
       expect(find.text('Opened doc'), findsOneWidget);
       expect(find.text('Zebra'), findsNothing);
 
+      ResourceView.serverFactory = () async => throw 'no server in a test';
       await tester.tap(find.text('Opened doc'));
       await tester.pump();
       expect(api.opened, ['r1']);

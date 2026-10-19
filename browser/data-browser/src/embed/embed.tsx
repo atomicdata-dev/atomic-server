@@ -11,7 +11,7 @@
  *   changed(subjects) these resources changed in the host's store
  */
 import '../helpers/preloadLocale';
-import { StrictMode } from 'react';
+import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   createMemoryHistory,
@@ -33,6 +33,7 @@ import {
 } from '@tomic/react';
 import { enableEmbedMode } from '../helpers/embedMode';
 import { Providers } from '../Providers';
+import { ResourceContextMenu } from '../components/ResourceContextMenu';
 import ResourcePage from '../views/ResourcePage';
 import { createFlutterHost } from './flutterHost';
 import { createMockHost } from './mockHost';
@@ -48,6 +49,7 @@ declare global {
     atomicEmbed?: {
       show(subject: string): void;
       changed(subjects: string[]): void;
+      openMenu(): void;
     };
   }
 }
@@ -92,7 +94,34 @@ const showRoute = createRoute({
   component: function Show() {
     const { subject } = showRoute.useSearch();
 
-    return subject ? <ResourcePage key={subject} subject={subject} /> : null;
+    // The app's native "more" button opens the same menu as the web navbar's.
+    const [menuId, setMenuId] = useState(0);
+
+    useEffect(() => {
+      const open = () => setMenuId(id => id + 1);
+
+      window.addEventListener('atomic-embed-menu', open);
+
+      return () => window.removeEventListener('atomic-embed-menu', open);
+    }, []);
+
+    if (!subject) {
+      return null;
+    }
+
+    return (
+      <>
+        <ResourcePage key={subject} subject={subject} />
+        {menuId > 0 && (
+          <ResourceContextMenu
+            key={menuId}
+            subject={subject}
+            isMainMenu
+            anchorPoint={{ x: 16, y: window.innerHeight }}
+          />
+        )}
+      </>
+    );
   },
 });
 
@@ -115,6 +144,9 @@ window.atomicEmbed = {
   },
   changed(subjects) {
     for (const subject of subjects) void store.getResource(subject);
+  },
+  openMenu() {
+    window.dispatchEvent(new Event('atomic-embed-menu'));
   },
 };
 
