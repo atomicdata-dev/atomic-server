@@ -60,6 +60,23 @@ class ResourceView extends StatefulWidget {
   State<ResourceView> createState() => _ResourceViewState();
 }
 
+const _readMethods = {
+  'getResource',
+  'getResourcesWithSnapshots',
+  'getLoroSnapshot',
+  'query',
+  'search',
+  'allSubjects',
+  'getDriveSubjects',
+  'getVersionVectorsForDrive',
+  'getVersionVectorsForSubjects',
+  'getAllVersionVectors',
+  'historyAttribution',
+  'getBlob',
+  'init',
+  'agent',
+};
+
 /// What the screen needs of the page: run a script in it, and show it.
 abstract class EmbedPage {
   Future<void> runJavaScript(String script);
@@ -256,6 +273,10 @@ class _ResourceViewState extends State<ResourceView>
     final method = request['method'] as String;
     final started = _clock.elapsedMilliseconds;
     String reply;
+    // Writes show up in logcat, so what the page persists can be followed.
+    if (kDebugMode && !_readMethods.contains(method)) {
+      debugPrint('[embed] call $method (${message.length} chars)');
+    }
     try {
       final answer = await (widget.call ?? AtomicClient.embedCall)(
           method, jsonEncode(request['args'] ?? const []));
