@@ -562,7 +562,7 @@ ResourceRow _resourceRow(RecentResource r,
       title: r.title.isEmpty ? r.subject : r.title,
       detail: [
         if (driveName != null) driveName,
-        r.className,
+        classLabel(r.className),
         if (r.openedAt > 0) timeAgo(r.openedAt)
       ].where((t) => t.isNotEmpty).join(' · '),
       onTap: () => onOpen(drive, r),

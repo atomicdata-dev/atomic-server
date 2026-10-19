@@ -1,5 +1,4 @@
-import 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColorsExt;
+import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt;
 import 'package:flutter/material.dart';
 
 /// The icon of a class, by the class's name as the rows carry it (the class's
@@ -24,6 +23,56 @@ IconData iconForClass(String className) {
     'tag' => Icons.sell_outlined,
     _ => Icons.description_outlined,
   };
+}
+
+const _classLabels = {
+  'document': 'Document',
+  'documentv2': 'Document',
+  'table': 'Table',
+  'folder': 'Folder',
+  'drive': 'Drive',
+  'chatroom': 'Chat',
+  'conversation': 'Chat',
+  'meeting': 'Meeting',
+  'aichat': 'AI chat',
+  'chatlog': 'AI chat',
+  'canvas': 'Canvas',
+  'bookmark': 'Bookmark',
+  'file': 'File',
+  'dashboard': 'Dashboard',
+  'tag': 'Tag',
+  'class': 'Class',
+  'property': 'Property',
+  'ontology': 'Ontology',
+  'formfield': 'Form field',
+  'form': 'Form',
+  'message': 'Message',
+  'article': 'Article',
+  'agent': 'Agent',
+};
+
+/// A class as a person reads it: [className] is a shortname (`document-v2`)
+/// or a class URL; a known class gets its label (`Document`), any other the
+/// shortname without a version suffix, hyphens and underscores as spaces and
+/// a capital (`web-page-v3` -> `Web page`).
+String classLabel(String className) {
+  var name = className
+          .trim()
+          .split(RegExp(r'[/#]'))
+          .where((p) => p.isNotEmpty)
+          .lastOrNull ??
+      '';
+  if (name.isEmpty) return '';
+  final known =
+      _classLabels[name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '')];
+  if (known != null) return known;
+  name = name
+      .replaceFirst(RegExp(r'[-_ ]?v\d+$', caseSensitive: false), '')
+      .replaceAll(RegExp(r'[-_]+'), ' ')
+      .replaceAllMapped(RegExp(r'([a-z0-9])([A-Z])'), (m) => '${m[1]} ${m[2]}')
+      .trim()
+      .toLowerCase();
+  return name.isEmpty ? '' : name[0].toUpperCase() + name.substring(1);
 }
 
 /// One line of a list of resources: the resource's own [emoji] or else an icon

@@ -208,7 +208,7 @@ class _SearchScreenState extends State<SearchScreen> {
             .where((d) => _id(d.subject) == id)
             .map((d) => d.name)
             .firstOrNull;
-    return [className, if (name != null && name.isNotEmpty) name]
+    return [classLabel(className), if (name != null && name.isNotEmpty) name]
         .where((t) => t.isNotEmpty)
         .join(' · ');
   }

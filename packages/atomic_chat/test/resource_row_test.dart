@@ -52,4 +52,20 @@ void main() {
       expect(iconForClass(e.key), e.value, reason: e.key);
     }
   });
+
+  test('classLabel gives class shortnames and URLs a human label', () {
+    expect(classLabel('document-v2'), 'Document');
+    expect(classLabel('https://atomicdata.dev/classes/DocumentV2'), 'Document');
+    expect(classLabel('table'), 'Table');
+    expect(classLabel('Folder'), 'Folder');
+    expect(classLabel('drive'), 'Drive');
+    expect(classLabel('chatroom'), 'Chat');
+    expect(classLabel('meeting'), 'Meeting');
+    expect(classLabel('ai-chat'), 'AI chat');
+    expect(classLabel('chatlog'), 'AI chat');
+    expect(classLabel('canvas'), 'Canvas');
+    expect(classLabel('web-page-v3'), 'Web page');
+    expect(classLabel('some_thing'), 'Some thing');
+    expect(classLabel(''), '');
+  });
 }
