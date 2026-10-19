@@ -7,7 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart' show WebViewCookie;
 
 import 'package:atomic_chat/atomic_chat.dart'
-    show AppTopBar, ResourceWebView, timeAgo;
+    show AppTopBar, ResourceWebView, openResourceView, timeAgo;
 
 import '../assistant/atomic_assistant_api.dart';
 import '../atomic/account_store.dart';
@@ -62,6 +62,10 @@ class SyncScreen extends StatefulWidget {
   /// by default.
   final Future<String?> Function(Uri portal)? portalCookie;
 
+  /// Test seam for the page the agent profile opens in.
+  @visibleForTesting
+  final Widget Function(String subject)? profilePage;
+
   /// Test seam for the page the portal opens in.
   @visibleForTesting
   final Widget Function(ResourceWebView page)? portalPage;
@@ -74,6 +78,7 @@ class SyncScreen extends StatefulWidget {
     this.loadCredits,
     this.portalCookie,
     this.portalPage,
+    this.profilePage,
   });
 
   @override
@@ -276,6 +281,25 @@ class _SyncScreenState extends State<SyncScreen> {
     }
   }
 
+  /// The agent's own page in the embedded web renderer.
+  Future<void> _openProfile() async {
+    final agent = _agent;
+    final drive = _activeDrive;
+    if (agent == null || drive == null) return;
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) =>
+          widget.profilePage?.call(agent.subject) ??
+          openResourceView(
+            api: const AtomicAssistantApi(),
+            drive: drive,
+            subject: agent.subject,
+            title: (agent.name?.isNotEmpty ?? false) ? agent.name! : 'You',
+            className: 'agent',
+          ),
+    ));
+    if (mounted) await _load();
+  }
+
   Future<void> _newWorkspace() async {
     final name = await _ask('New workspace', 'Name');
     if (name == null || name.isEmpty) return;
@@ -421,6 +445,7 @@ class _SyncScreenState extends State<SyncScreen> {
                     child: Text(_error!, style: TextStyle(color: c.alert)),
                   ),
                 _identity(c),
+                _workspaceSwitcher(c),
                 if (_account != null || _accountError != null) _account_(c),
                 if (_account == null && _portal != null) _linkRow(c, _portal!),
                 _group(c, 'This device', [_thisDevice(c)]),
@@ -433,15 +458,38 @@ class _SyncScreenState extends State<SyncScreen> {
                     onServerChanged: _load,
                   ),
                 ),
-                _workspaces(c),
               ],
             ),
     );
   }
 
+  /// One row: the current workspace. It opens a sheet to switch, so the page
+  /// is not a list of every workspace.
+  Widget _workspaceSwitcher(AppColors c) {
+    final active = _activeDrive;
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Material(
+        color: c.bgBody,
+        shape: RoundedRectangleBorder(
+          side: BorderSide(color: c.textSecondary.withValues(alpha: 0.3)),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.folder_outlined, color: c.main),
+          title: Text(active == null ? 'No workspace' : _driveLabel(active)),
+          subtitle: const Text('Workspace'),
+          trailing: Icon(Icons.expand_more, color: c.textSecondary),
+          onTap: _pickWorkspace,
+        ),
+      ),
+    );
+  }
+
   /// The workspaces that are on this device, each once. Listed drives that
   /// have not been received (no name yet) are one line, not forty.
-  Widget _workspaces(AppColors c) {
+  Future<void> _pickWorkspace() async {
     final seen = <String>{};
     final shown = <String>[];
     var elsewhere = 0;
@@ -454,30 +502,47 @@ class _SyncScreenState extends State<SyncScreen> {
         elsewhere++;
       }
     }
-    return _group(c, 'Workspaces', [
-      for (final d in shown)
-        ListTile(
-          leading: Icon(
-              d == _activeDrive
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_off,
-              color: c.main),
-          title: Text(_driveLabel(d)),
-          subtitle: d == _activeDrive ? const Text('Active workspace') : null,
-          onTap: d == _activeDrive ? null : () => _switch(d),
+    final c = context.appColors;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: c.bgBody,
+      builder: (ctx) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            for (final d in shown)
+              ListTile(
+                leading: Icon(
+                    d == _activeDrive
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_off,
+                    color: c.main),
+                title: Text(_driveLabel(d)),
+                onTap: () => Navigator.pop(ctx, d),
+              ),
+            if (elsewhere > 0)
+              ListTile(
+                leading:
+                    Icon(Icons.cloud_download_outlined, color: c.textSecondary),
+                title: Text(
+                    '$elsewhere more workspace${elsewhere == 1 ? '' : 's'} not on this device yet'),
+              ),
+            ListTile(
+              leading: Icon(Icons.add, color: c.main),
+              title: const Text('New workspace'),
+              onTap: () => Navigator.pop(ctx, ''),
+            ),
+          ],
         ),
-      if (elsewhere > 0)
-        ListTile(
-          leading: Icon(Icons.cloud_download_outlined, color: c.textSecondary),
-          title: Text(
-              '$elsewhere more workspace${elsewhere == 1 ? '' : 's'} not on this device yet'),
-        ),
-      ListTile(
-        leading: Icon(Icons.add, color: c.main),
-        title: const Text('New workspace'),
-        onTap: _newWorkspace,
       ),
-    ]);
+    );
+    if (!mounted || picked == null) return;
+    if (picked.isEmpty) {
+      await _newWorkspace();
+    } else if (picked != _activeDrive) {
+      await _switch(picked);
+    }
   }
 
   Widget _group(AppColors c, String title, List<Widget> children) => Padding(
@@ -508,27 +573,34 @@ class _SyncScreenState extends State<SyncScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [
-          AgentAvatar(name: agent?.name, radius: 28),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  (agent?.name?.isNotEmpty ?? false) ? agent!.name! : 'You',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                if (agent != null)
-                  GestureDetector(
-                    onTap: () => _copy(agent.subject, 'Agent ID'),
-                    child: Text(_short(agent.subject),
-                        style: TextStyle(color: c.textSecondary, fontSize: 12)),
+        InkWell(
+          onTap: agent == null ? null : _openProfile,
+          borderRadius: BorderRadius.circular(12),
+          child: Row(children: [
+            AgentAvatar(name: agent?.name, radius: 28),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    (agent?.name?.isNotEmpty ?? false) ? agent!.name! : 'You',
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
-              ],
+                  if (agent != null)
+                    GestureDetector(
+                      onTap: () => _copy(agent.subject, 'Agent ID'),
+                      child: Text(_short(agent.subject),
+                          style:
+                              TextStyle(color: c.textSecondary, fontSize: 12)),
+                    ),
+                ],
+              ),
             ),
-          ),
-        ]),
+            if (agent != null)
+              Icon(Icons.chevron_right, color: c.textSecondary),
+          ]),
+        ),
         const SizedBox(height: 12),
         Wrap(spacing: 8, children: [
           OutlinedButton.icon(

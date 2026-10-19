@@ -102,10 +102,28 @@ void main() {
     expect(find.text('This device'), findsOneWidget);
     expect(find.text('Pixel'), findsOneWidget);
     expect(find.text('Devices'), findsOneWidget);
+    // Only the current workspace shows; the others are in the switcher.
     expect(find.text('Private'), findsOneWidget);
-    expect(find.text('Team'), findsOneWidget);
+    expect(find.text('Team'), findsNothing);
     expect(find.text('Account'), findsNothing);
     expect(find.text('Link your account'), findsNothing);
+  });
+
+  testWidgets('tapping the identity opens the agent page', (tester) async {
+    String? opened;
+    await tester.pumpWidget(_app(SyncScreen(
+      backend: _Backend(),
+      loadAccount: (_) async => null,
+      profilePage: (subject) {
+        opened = subject;
+        return const Scaffold(body: Text('profile page'));
+      },
+    )));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Joep'));
+    await tester.pumpAndSettle();
+    expect(find.text('profile page'), findsOneWidget);
+    expect(opened, 'did:ad:agent');
   });
 
   testWidgets('a linked account shows address, vault and server',
@@ -172,7 +190,9 @@ void main() {
       loadAccount: (_) async => null,
     )));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Team'), 300);
+    await tester.tap(find.text('Private'));
+    await tester.pumpAndSettle();
+    expect(find.text('Team'), findsOneWidget);
     await tester.tap(find.text('Team'));
     await tester.pumpAndSettle();
     expect(backend.switched, ['did:ad:b']);
@@ -195,7 +215,8 @@ void main() {
       },
     )));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Manage in the portal'), 300);
+    await tester.ensureVisible(find.text('Manage in the portal'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Manage in the portal'));
     await tester.pumpAndSettle();
     return opened;
