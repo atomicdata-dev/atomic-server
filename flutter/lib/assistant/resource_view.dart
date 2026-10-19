@@ -23,6 +23,10 @@ class ResourceView extends StatefulWidget {
   final String subject;
   final String title;
 
+  /// A route of the web app to show instead of a resource (`/app/settings`).
+  /// Then [subject] may be empty.
+  final String? path;
+
   /// Where the bundled page comes from. A test swaps it for one that fails
   /// fast instead of starting a real server.
   @visibleForTesting
@@ -35,8 +39,9 @@ class ResourceView extends StatefulWidget {
     super.key,
     required this.api,
     required this.drive,
-    required this.subject,
+    this.subject = '',
     this.title = '',
+    this.path,
     this.call,
   });
 
@@ -73,8 +78,12 @@ class _ResourceViewState extends State<ResourceView> {
           onPageFinished: (_) => debugPrint(
               '[embed] page loaded after ${_clock.elapsedMilliseconds} ms'),
         ))
-        ..loadRequest(
-            server.page.replace(queryParameters: {'subject': widget.subject}));
+        ..loadRequest(server.page.replace(queryParameters: {
+          if (widget.path != null)
+            'path': widget.path!
+          else
+            'subject': widget.subject,
+        }));
       // Debug builds can be inspected from chrome://inspect.
       if (kDebugMode && controller.platform is AndroidWebViewController) {
         await AndroidWebViewController.enableDebugging(true);

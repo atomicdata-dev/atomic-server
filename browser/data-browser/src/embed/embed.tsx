@@ -43,6 +43,8 @@ import { HistoryRoute } from '../routes/History/HistoryRoute';
 import { ShareRoute } from '../routes/Share/ShareRoute';
 import { ImportRoute } from '../routes/ImportRoute';
 import { StorageRoute } from '../routes/StorageRoute';
+import { NotificationsRoute } from '../routes/NotificationsRoute';
+import { AppSettingsRoute } from '../routes/AppSettings';
 import { createFlutterHost } from './flutterHost';
 import { createMockHost } from './mockHost';
 
@@ -145,6 +147,8 @@ const actionRoutes = [
   [paths.share, ShareRoute],
   [paths.import, ImportRoute],
   [paths.storage, StorageRoute],
+  [paths.notifications, NotificationsRoute],
+  [paths.appSettings, AppSettingsRoute],
 ].map(([path, source]) =>
   createRoute({
     getParentRoute: () => rootRoute,
@@ -158,9 +162,11 @@ const actionRoutes = [
 
 const history = createMemoryHistory({
   initialEntries: [
-    `/app/show?subject=${encodeURIComponent(
-      new URLSearchParams(location.search).get('subject') ?? '',
-    )}`,
+    // The app opens a page of its own (notifications, settings) with `path`.
+    new URLSearchParams(location.search).get('path') ??
+      `/app/show?subject=${encodeURIComponent(
+        new URLSearchParams(location.search).get('subject') ?? '',
+      )}`,
   ],
 });
 

@@ -216,19 +216,60 @@ void main() {
       await tester.pumpWidget(
           app(ChatsScreen(drive: 'did:ad:a', api: api, onOpenGallery: () {})));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Alpha'));
+      await tester.tap(find.text('Alpha').first);
       await tester.pumpAndSettle();
       expect(find.text('Doc 0'), findsOneWidget);
     });
 
-    testWidgets('the agent avatar is the way to agent and sync',
+    testWidgets('the icon row has profile, notifications, sync, settings',
         (tester) async {
       await tester.pumpWidget(app(ChatsScreen(
           drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
       await tester.pumpAndSettle();
       expect(find.text('J'), findsOneWidget);
-      expect(find.byTooltip('Your agent and sync'), findsOneWidget);
-      expect(find.byIcon(Icons.settings_outlined), findsNothing);
+      for (final t in ['Profile', 'Notifications', 'Sync', 'Settings']) {
+        expect(find.byTooltip(t), findsOneWidget);
+      }
+      expect(find.byTooltip('Your agent and sync'), findsNothing);
+    });
+
+    testWidgets('notifications and settings open the web pages',
+        (tester) async {
+      ResourceView.serverFactory = () async => throw 'no server in a test';
+      await tester.pumpWidget(app(ChatsScreen(
+          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Notifications'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ResourceView), findsOneWidget);
+      expect(tester.widget<ResourceView>(find.byType(ResourceView)).path,
+          '/app/notifications');
+    });
+
+    testWidgets('the drive card shows the drive and switches it',
+        (tester) async {
+      final api = FakeApi(driveList: [
+        (subject: 'did:ad:a', name: 'Alpha'),
+        (subject: 'did:ad:b', name: 'Beta'),
+      ]);
+      await tester.pumpWidget(
+          app(ChatsScreen(drive: 'did:ad:a', api: api, onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      final card = find.ancestor(
+          of: find.byIcon(Icons.unfold_more), matching: find.byType(InkWell));
+      expect(find.descendant(of: card, matching: find.text('Alpha')), findsOne);
+      expect(find.text('Search in Alpha'), findsOneWidget);
+
+      await tester.tap(card);
+      await tester.pumpAndSettle();
+      final sheet = find.byType(BottomSheet);
+      expect(find.descendant(of: sheet, matching: find.text('Alpha')),
+          findsOneWidget);
+      await tester.tap(find.descendant(of: sheet, matching: find.text('Beta')));
+      await tester.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.text('Search in Beta'), findsOneWidget);
+      expect(find.descendant(of: card, matching: find.text('Beta')), findsOne);
     });
 
     testWidgets('opens on the drive it is given', (tester) async {

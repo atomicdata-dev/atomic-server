@@ -103,6 +103,27 @@ class _ChatsScreenState extends State<ChatsScreen> {
     }
   }
 
+  void _openPath(String path) =>
+      _push(ResourceView(api: widget.api, drive: _drive, path: path));
+
+  Future<void> _pickDrive(List<DriveInfo> drives) async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: ListView(shrinkWrap: true, children: [
+          for (final d in drives)
+            ListTile(
+              leading: const Icon(Icons.folder_outlined),
+              title: Text(d.name.isEmpty ? 'Untitled drive' : d.name),
+              selected: d.subject == _drive,
+              onTap: () => Navigator.of(context).pop(d.subject),
+            ),
+        ]),
+      ),
+    );
+    if (picked != null && mounted) setState(() => _drive = picked);
+  }
+
   void _openChat(ChatSummary? chat) => _push(ChatScreen(
         api: widget.api,
         subject: chat?.subject,
@@ -153,25 +174,39 @@ class _ChatsScreenState extends State<ChatsScreen> {
                 icon: const Icon(Icons.draw_outlined),
                 onPressed: widget.onOpenGallery,
               ),
-              IconButton(
-                tooltip: 'Your agent and sync',
-                icon: FutureBuilder<String?>(
-                  future: _agentName,
-                  builder: (_, s) => AgentAvatar(name: s.data),
-                ),
-                onPressed: _settings,
-              ),
             ],
           ),
           bottomNavigationBar: drives == null
               ? null
-              : AppBottomBar(
-                  api: widget.api,
-                  drive: _drive,
-                  hint: several && name != null && name.isNotEmpty
-                      ? 'Search in $name'
-                      : 'Search',
-                  onPush: _push,
+              : Material(
+                  color: c.bgBody,
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    _IconRow(
+                      agentName: _agentName,
+                      onProfile: _settings,
+                      onSync: _settings,
+                      onNotifications: () => _openPath('/app/notifications'),
+                      onSettings: () => _openPath('/app/settings'),
+                    ),
+                    // The bar keeps its own safe area off; the card below
+                    // takes the bottom inset for both.
+                    MediaQuery.removePadding(
+                      context: context,
+                      removeBottom: true,
+                      child: AppBottomBar(
+                        api: widget.api,
+                        drive: _drive,
+                        hint: several && name != null && name.isNotEmpty
+                            ? 'Search in $name'
+                            : 'Search',
+                        onPush: _push,
+                      ),
+                    ),
+                    _DriveCard(
+                      name: name ?? '',
+                      onTap: () => _pickDrive(drives),
+                    ),
+                  ]),
                 ),
           body: ListView(
             children: [
@@ -211,6 +246,110 @@ class _ChatsScreenState extends State<ChatsScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Profile, notifications, sync and settings, evenly spread.
+class _IconRow extends StatelessWidget {
+  final Future<String?> agentName;
+  final VoidCallback onProfile;
+  final VoidCallback onNotifications;
+  final VoidCallback onSync;
+  final VoidCallback onSettings;
+
+  const _IconRow({
+    required this.agentName,
+    required this.onProfile,
+    required this.onNotifications,
+    required this.onSync,
+    required this.onSettings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    return SizedBox(
+      height: 44,
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+        IconButton(
+          tooltip: 'Profile',
+          icon: FutureBuilder<String?>(
+            future: agentName,
+            builder: (_, s) => AgentAvatar(name: s.data, radius: 13),
+          ),
+          onPressed: onProfile,
+        ),
+        IconButton(
+          tooltip: 'Notifications',
+          icon: const Icon(Icons.notifications_outlined),
+          onPressed: onNotifications,
+        ),
+        IconButton(
+          tooltip: 'Sync',
+          icon: Stack(clipBehavior: Clip.none, children: [
+            const Icon(Icons.sync),
+            Positioned(
+              right: -1,
+              top: -1,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                    color: c.textSecondary, shape: BoxShape.circle),
+              ),
+            ),
+          ]),
+          onPressed: onSync,
+        ),
+        IconButton(
+          tooltip: 'Settings',
+          icon: const Icon(Icons.settings_outlined),
+          onPressed: onSettings,
+        ),
+      ]),
+    );
+  }
+}
+
+/// The current drive; tapping it lets you pick another.
+class _DriveCard extends StatelessWidget {
+  final String name;
+  final VoidCallback onTap;
+
+  const _DriveCard({required this.name, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        child: Material(
+          color: c.bg1,
+          borderRadius: BorderRadius.circular(9),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(9),
+            onTap: onTap,
+            child: SizedBox(
+              height: 40,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(children: [
+                  Icon(Icons.folder_outlined, size: 18, color: c.textSecondary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(name.isEmpty ? 'Untitled drive' : name,
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
+                  Icon(Icons.unfold_more, size: 18, color: c.textSecondary),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
