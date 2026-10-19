@@ -74,7 +74,7 @@ class SyncScreen extends StatefulWidget {
 
 class _SyncScreenState extends State<SyncScreen> {
   late final shared.AtomicSettingsBackend _backend =
-      widget.backend ?? CanvasSettingsBackend();
+      widget.backend ?? AppSettingsBackend();
 
   bool _loading = true;
   String? _error;

@@ -18,21 +18,21 @@ void main() async {
   final dir = await getApplicationDocumentsDirectory();
   await AtomicClient.openDb(dir.path);
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  runApp(const AtomicCanvasApp());
+  runApp(const AtomicApp());
 }
 
-class AtomicCanvasApp extends StatefulWidget {
-  const AtomicCanvasApp({super.key});
+class AtomicApp extends StatefulWidget {
+  const AtomicApp({super.key});
 
   @override
-  State<AtomicCanvasApp> createState() => _AtomicCanvasAppState();
+  State<AtomicApp> createState() => _AtomicAppState();
 }
 
-class _AtomicCanvasAppState extends State<AtomicCanvasApp>
+class _AtomicAppState extends State<AtomicApp>
     with WidgetsBindingObserver {
   bool _loggedIn = false;
   final _navKey = GlobalKey<NavigatorState>();
-  static const _linkChannel = MethodChannel('app.atomicdata.canvas/deeplink');
+  static const _linkChannel = MethodChannel('app.atomicdata.app/deeplink');
   Timer? _eventPoller;
   bool _backgroundSyncRunning = false;
   final Map<String, DateTime> _lastSyncSnackAt = {};

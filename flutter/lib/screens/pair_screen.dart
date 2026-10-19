@@ -202,7 +202,7 @@ class PairScreen extends StatefulWidget {
   /// Get the local device name from the OS.
   static Future<String> getDeviceName() async {
     try {
-      const channel = MethodChannel('app.atomicdata.canvas/deeplink');
+      const channel = MethodChannel('app.atomicdata.app/deeplink');
       final name = await channel.invokeMethod<String>('getDeviceName');
       return name ?? Platform.localHostname;
     } catch (_) {

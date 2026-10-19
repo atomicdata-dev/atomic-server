@@ -6,9 +6,9 @@ import 'server_info.dart';
 import 'session.dart';
 import '../screens/pair_screen.dart';
 
-/// Canvas keeps its existing native bridge, secure storage and transport.
+/// The app keeps its existing native bridge, secure storage and transport.
 /// Only the UI is shared with other Atomic applications.
-class CanvasSettingsBackend extends shared.AtomicSettingsBackend {
+class AppSettingsBackend extends shared.AtomicSettingsBackend {
   @override
   Future<shared.AtomicIdentity?> getActiveAgent() async {
     final agent = await AtomicClient.getActiveAgent();
@@ -72,12 +72,12 @@ class CanvasSettingsBackend extends shared.AtomicSettingsBackend {
   }
 
   @override
-  shared.AtomicServerBackend get servers => CanvasServerBackend();
+  shared.AtomicServerBackend get servers => AppServerBackend();
   @override
   Future<void> Function() get signOut => AtomicSession.clear;
 }
 
-class CanvasServerBackend extends shared.AtomicServerBackend {
+class AppServerBackend extends shared.AtomicServerBackend {
   @override
   Future<List<String>> knownServers() => AtomicSession.knownServers();
   @override

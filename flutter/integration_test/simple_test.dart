@@ -14,7 +14,7 @@ void main() {
     addTearDown(() => dir.delete(recursive: true));
     await AtomicClient.openDb(dir.path);
     final account = await AtomicClient.setup('Package test');
-    final backend = CanvasSettingsBackend();
+    final backend = AppSettingsBackend();
     expect((await backend.getActiveAgent())?.subject, account.agentSubject);
     expect(await backend.listDrives(), contains(account.driveSubject));
     expect(await backend.exportSecret(), account.agentSecret);

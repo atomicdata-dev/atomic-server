@@ -486,7 +486,7 @@ class _LoginScreenState extends State<LoginScreen> {
           onPressed: () => widget.onLoggedIn(),
           style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14)),
-          child: const Text('Continue to Canvas'),
+          child: const Text('Continue to Atomic'),
         ),
       ],
     );
