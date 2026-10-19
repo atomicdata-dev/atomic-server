@@ -7,7 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart' show WebViewCookie;
 
 import 'package:atomic_chat/atomic_chat.dart'
-    show AppTopBar, ResourceWebView, openResourceView, timeAgo;
+    show AppTopBar, ReadableWidth, ResourceWebView, openResourceView, timeAgo;
 
 import '../assistant/atomic_assistant_api.dart';
 import '../atomic/account_store.dart';
@@ -479,7 +479,9 @@ class _SyncScreenState extends State<SyncScreen> {
       appBar: const AppTopBar(title: 'Sync'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
+          // A tablet's detail pane: a readable column, centred.
+          : ReadableWidth(
+              child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
               children: [
                 if (_error != null)
@@ -502,7 +504,7 @@ class _SyncScreenState extends State<SyncScreen> {
                   ),
                 ),
               ],
-            ),
+            )),
     );
   }
 
