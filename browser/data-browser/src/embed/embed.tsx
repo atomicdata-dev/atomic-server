@@ -88,6 +88,14 @@ new MutationObserver(records => {
   }
 }).observe(document.head, { childList: true });
 
+// The web app styles `::-webkit-scrollbar` for desktop, which makes the
+// Android web view draw a classic scrollbar: a grey bar along the whole
+// right edge that takes 9px of the page, always visible. A phone scrolls by
+// touch, so the page shows none (as the app's native lists).
+const noScrollbars = document.createElement('style');
+noScrollbars.textContent = '::-webkit-scrollbar { display: none; }';
+document.head.append(noScrollbars);
+
 declare global {
   interface Window {
     /** Set by the Flutter host: how the page calls Rust. */
