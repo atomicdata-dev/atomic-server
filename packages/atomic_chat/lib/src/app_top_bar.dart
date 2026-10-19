@@ -62,11 +62,17 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
 
 /// The atomic.place wordmark: the web logo's artwork (see
 /// `atomic_wordmark_svg.dart`) in the theme's text colour, with the gradient
-/// full stop. Left-aligned, [height] tall.
+/// full stop. [height] tall; left-aligned by default (top bar), pass
+/// [alignment] `Alignment.center` to centre it (welcome screen).
 class AtomicWordmark extends StatelessWidget {
   final double height;
+  final Alignment alignment;
 
-  const AtomicWordmark({super.key, this.height = 22});
+  const AtomicWordmark({
+    super.key,
+    this.height = 22,
+    this.alignment = Alignment.centerLeft,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +86,7 @@ class AtomicWordmark extends StatelessWidget {
         atomicWordmarkSvg.replaceAll('currentColor', hex),
         key: const Key('atomic-wordmark'),
         height: height,
-        alignment: Alignment.centerLeft,
+        alignment: alignment,
       ),
     );
   }

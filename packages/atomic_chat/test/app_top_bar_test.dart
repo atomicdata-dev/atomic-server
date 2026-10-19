@@ -40,6 +40,20 @@ void main() {
     expect(find.byKey(const Key('atomic-wordmark')), findsOneWidget);
   });
 
+  testWidgets('the wordmark takes a larger height and can be centred',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(extensions: const [AppColors.light]),
+      home: const Scaffold(
+        body: Center(
+          child: AtomicWordmark(height: 40, alignment: Alignment.center),
+        ),
+      ),
+    ));
+    expect(tester.getSize(find.byKey(const Key('atomic-wordmark'))).height, 40);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a pushed screen gets a back button and the same height',
       (tester) async {
     await tester.pumpWidget(_app(const AppTopBar(title: 'First')));

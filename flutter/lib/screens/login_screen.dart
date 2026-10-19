@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:atomic_chat/atomic_chat.dart' show AtomicWordmark;
 import '../atomic/atomic_client.dart';
 import '../atomic/server_url.dart';
 import '../atomic/session.dart';
@@ -336,13 +337,10 @@ class _LoginScreenState extends State<LoginScreen> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(Icons.brush, size: 48, color: Colors.blue),
-        const SizedBox(height: 16),
-        const Text(
-          'atomic.place',
-          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-          textAlign: TextAlign.center,
+        const Center(
+          child: AtomicWordmark(height: 40, alignment: Alignment.center),
         ),
+        const SizedBox(height: 16),
         const SizedBox(height: 8),
         Text(
           'Your data stays on this device.\nSync with others when you choose to.',
