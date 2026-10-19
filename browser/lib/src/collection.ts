@@ -1058,8 +1058,13 @@ export class Collection {
     // A connected store that cannot fetch the page must say so: an empty page
     // here would be indistinguishable from a collection with no members.
     if (this.store.serverConnected) {
-      await this.fetchPageFromServer(page);
-      this.retryAfterDriveSync();
+      try {
+        await this.fetchPageFromServer(page);
+      } finally {
+        // Still arm the post-sync retry when the fetch failed: that is the
+        // case it exists for.
+        this.retryAfterDriveSync();
+      }
 
       return;
     }
@@ -1077,8 +1082,11 @@ export class Collection {
     await this.store.waitForServerConnected(3000);
 
     if (this.store.serverConnected) {
-      await this.fetchPageFromServer(page);
-      this.retryAfterDriveSync();
+      try {
+        await this.fetchPageFromServer(page);
+      } finally {
+        this.retryAfterDriveSync();
+      }
     }
   }
 
