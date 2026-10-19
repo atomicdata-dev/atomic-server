@@ -15,16 +15,16 @@ class AccountLinkDialog extends StatefulWidget {
   final String deviceName;
   final Future<void> Function(String session) save;
 
-  /// Shows the approval page inside the app, for a person who has no other
-  /// device at hand.
-  final void Function(Uri url)? openInApp;
+  /// Opens the approval page in the system browser, where the sign-in (an
+  /// emailed link, a passkey) can finish; an in-app page cannot receive it.
+  final Future<void> Function(Uri url)? openInBrowser;
 
   const AccountLinkDialog({
     super.key,
     required this.client,
     required this.deviceName,
     required this.save,
-    this.openInApp,
+    this.openInBrowser,
   });
 
   @override
@@ -64,7 +64,7 @@ class _AccountLinkDialogState extends State<AccountLinkDialog> {
       _timer = Timer(request.interval, () => _poll(request, generation));
     } catch (e) {
       if (mounted && generation == _generation) {
-        setState(() => _error = '$e');
+        setState(() => _error = _friendly(e));
       }
     }
   }
@@ -75,7 +75,7 @@ class _AccountLinkDialogState extends State<AccountLinkDialog> {
       if (!mounted || generation != _generation) return;
       switch (progress) {
         case shared.AtomicLinkProgress.pending:
-          _timer = Timer(request.interval, () => _poll(request, generation));
+          _timer = Timer(_every(request), () => _poll(request, generation));
         case shared.AtomicLinkProgress.expired:
           setState(() => _error = 'That code expired. Start again.');
         case shared.AtomicLinkProgress.approved:
@@ -83,11 +83,30 @@ class _AccountLinkDialogState extends State<AccountLinkDialog> {
           if (mounted) Navigator.pop(context, true);
       }
     } catch (e) {
-      if (mounted && generation == _generation) {
-        setState(() => _error = '$e');
+      if (!mounted || generation != _generation) return;
+      // The portal limits how often it is asked: wait and ask again, the
+      // code stays good.
+      if (_isRateLimit(e)) {
+        _timer = Timer(_every(request) * 3, () => _poll(request, generation));
+      } else {
+        setState(() => _error = _friendly(e));
       }
     }
   }
+
+  /// Not faster than every three seconds: the code does not get approved
+  /// sooner for being asked more often.
+  Duration _every(shared.AtomicDeviceLink request) =>
+      request.interval < const Duration(seconds: 3)
+          ? const Duration(seconds: 3)
+          : request.interval;
+
+  static bool _isRateLimit(Object e) =>
+      '$e'.toLowerCase().contains('too many attempts');
+
+  static String _friendly(Object e) => _isRateLimit(e)
+      ? 'Too many attempts. Wait a minute, then try again.'
+      : '$e'.replaceFirst('Bad state: ', '');
 
   @override
   Widget build(BuildContext context) {
@@ -128,12 +147,12 @@ class _AccountLinkDialogState extends State<AccountLinkDialog> {
                   Text('Waiting for approval…',
                       style: theme.textTheme.bodySmall),
                 ]),
-                if (_error == null && widget.openInApp != null) ...[
+                if (_error == null && widget.openInBrowser != null) ...[
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.open_in_browser, size: 18),
-                    label: const Text('Open the page here'),
-                    onPressed: () => widget.openInApp!(request.approvalUrl),
+                    label: const Text('Open in your browser'),
+                    onPressed: () => widget.openInBrowser!(request.approvalUrl),
                   ),
                 ],
               ],

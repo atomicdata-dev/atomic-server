@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../assistant/assistant_api.dart';
 import '../assistant/chats_screen.dart' show timeAgo;
@@ -285,6 +286,13 @@ class _SyncScreenState extends State<SyncScreen> {
         ),
       ));
 
+  /// In the system browser: it is where the emailed sign-in link will open,
+  /// and where a passkey lives.
+  Future<void> _openInBrowser(Uri url) async {
+    final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) _fail('Could not open the browser', url.host);
+  }
+
   Future<void> _link(String portal) async {
     try {
       if (widget.linkAccount != null) {
@@ -297,7 +305,7 @@ class _SyncScreenState extends State<SyncScreen> {
             client: shared.AtomicAccountClient(portal),
             deviceName: _deviceName.isEmpty ? 'atomic.place' : _deviceName,
             save: AccountStore.save,
-            openInApp: _openPortal,
+            openInBrowser: _openInBrowser,
           ),
         );
       }

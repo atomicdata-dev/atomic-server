@@ -79,4 +79,50 @@ void main() {
     expect(find.textContaining('Account request failed'), findsOneWidget);
     expect(find.text('Try again'), findsOneWidget);
   });
+
+  testWidgets('being rate limited while waiting does not give up the code',
+      (tester) async {
+    var polls = 0;
+    final client = shared.AtomicAccountClient('https://portal.example',
+        client: MockClient((request) async {
+      if (request.method == 'POST') {
+        return http.Response(
+            jsonEncode({
+              'device_code': 'd',
+              'user_code': 'WXYZ-9999',
+              'interval': 1,
+              'expires_in': 600,
+            }),
+            200);
+      }
+      polls++;
+      if (polls == 1) return http.Response('slow down', 429);
+      return http.Response(
+          jsonEncode({'state': 'approved', 'token': 'bearer-token'}), 200);
+    }));
+    String? saved;
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(
+        builder: (context) => TextButton(
+          onPressed: () => showDialog<bool>(
+            context: context,
+            builder: (_) => AccountLinkDialog(
+              client: client,
+              deviceName: 'Phone',
+              save: (session) async => saved = session,
+            ),
+          ),
+          child: const Text('go'),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('go'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(seconds: 3));
+    expect(find.textContaining('Too many attempts'), findsNothing);
+    await tester.pump(const Duration(seconds: 10));
+    await tester.pumpAndSettle();
+    expect(saved, isNotNull);
+  });
 }
