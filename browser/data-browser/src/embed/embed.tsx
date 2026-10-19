@@ -103,7 +103,8 @@ declare global {
       show(subject: string): void;
       open(subject: string): void;
       changed(subjects: string[]): void;
-      openMenu(): void;
+      /** `anchor`: the app's "more" button (right edge, top), in page px. */
+      openMenu(anchor?: { x: number; y: number }): void;
       back(): boolean;
       flush(leaving?: boolean): Promise<void>;
       setColorScheme(scheme: HostColorScheme | undefined): void;
@@ -201,9 +202,19 @@ const showRoute = createRoute({
 
     // The app's native "more" button opens the same menu as the web navbar's.
     const [menuId, setMenuId] = useState(0);
+    const [menuAnchor, setMenuAnchor] = useState({
+      x: 16,
+      y: window.innerHeight,
+    });
 
     useEffect(() => {
-      const open = () => setMenuId(id => id + 1);
+      const open = (e: Event) => {
+        const at = (e as CustomEvent<{ x: number; y: number } | undefined>)
+          .detail;
+
+        setMenuAnchor(at ?? { x: 16, y: window.innerHeight });
+        setMenuId(id => id + 1);
+      };
 
       window.addEventListener('atomic-embed-menu', open);
 
@@ -240,7 +251,7 @@ const showRoute = createRoute({
             key={menuId}
             subject={subject}
             isMainMenu
-            anchorPoint={{ x: 16, y: window.innerHeight }}
+            anchorPoint={menuAnchor}
           />
         )}
       </ShowFrame>
@@ -320,8 +331,10 @@ window.atomicEmbed = {
   setColorScheme(scheme) {
     setHostColorScheme(scheme);
   },
-  openMenu() {
-    window.dispatchEvent(new Event('atomic-embed-menu'));
+  openMenu(anchor) {
+    window.dispatchEvent(
+      new CustomEvent('atomic-embed-menu', { detail: anchor }),
+    );
   },
   /** Every pending edit handed to the host. `leaving`: the page is about to
    * close, so an edit in progress (a focused field) ends first. */

@@ -34,6 +34,10 @@ abstract final class ShellPage {
 
 /// What the static bottom bar needs to know about the pages above it. The
 /// shell owns one; pages find it through [ShellScope].
+/// Opens a page's menu; [anchor] is the bar button that asked, in global
+/// coordinates, so the menu opens at that button.
+typedef ShellMenu = void Function(Rect anchor);
+
 class ShellController extends ChangeNotifier {
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -59,7 +63,7 @@ class ShellController extends ChangeNotifier {
   /// list on its first frame and refresh behind it.
   SearchCache? searchCache;
 
-  final Map<Route<dynamic>, VoidCallback> _menus = {};
+  final Map<Route<dynamic>, ShellMenu> _menus = {};
   Route<dynamic>? _top;
 
   /// The page routes of the shell's navigator, bottom first.
@@ -120,11 +124,11 @@ class ShellController extends ChangeNotifier {
       navigatorKey.currentState?.popUntil((route) => route.isFirst);
 
   /// The menu action of the page on top, if that page has one.
-  VoidCallback? get topMenu => _top == null ? null : _menus[_top];
+  ShellMenu? get topMenu => _top == null ? null : _menus[_top];
 
   /// A page with a resource menu registers it under its own route. It only
   /// counts while that route is the top one.
-  void registerMenu(Route<dynamic> route, VoidCallback onMore) {
+  void registerMenu(Route<dynamic> route, ShellMenu onMore) {
     _menus[route] = onMore;
     _changed();
   }

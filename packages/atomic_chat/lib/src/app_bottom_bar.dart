@@ -2,7 +2,6 @@ import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColorsExt, HoldFan, HoldFanItem, HoldFanLayout;
 import 'package:flutter/material.dart';
 
-import 'atomic_place_mark.dart';
 import 'slide_back_route.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
@@ -124,7 +123,12 @@ class AppBottomBar extends StatelessWidget {
                       child: IconButton(
                         tooltip: 'Home',
                         onPressed: top == ShellPage.home ? null : shell.goHome,
-                        icon: const AtomicPlaceMark(size: 24),
+                        icon: _barIcon(
+                            context,
+                            top == ShellPage.home
+                                ? Icons.home
+                                : Icons.home_outlined,
+                            top == ShellPage.home),
                       ),
                     ),
                     _Current(
@@ -166,11 +170,18 @@ class AppBottomBar extends StatelessWidget {
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 200),
                       child: onMore != null
-                          ? IconButton(
+                          ? Builder(
                               key: const ValueKey('more'),
-                              tooltip: 'More',
-                              onPressed: onMore,
-                              icon: const Icon(Icons.more_vert),
+                              builder: (button) => IconButton(
+                                tooltip: 'More',
+                                onPressed: () {
+                                  final box =
+                                      button.findRenderObject() as RenderBox;
+                                  onMore(box.localToGlobal(Offset.zero) &
+                                      box.size);
+                                },
+                                icon: const Icon(Icons.more_vert),
+                              ),
                             )
                           : _Current(
                               key: const ValueKey('settings'),

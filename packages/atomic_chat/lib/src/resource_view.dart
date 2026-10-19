@@ -194,8 +194,15 @@ class _ResourceViewState extends State<ResourceView>
     _shell = shell;
     // Until the page has loaded there is nothing to open: the tap does
     // nothing.
-    shell.registerMenu(
-        route, () => _page?.runJavaScript('window.atomicEmbed?.openMenu()'));
+    shell.registerMenu(route, (anchor) {
+      // The page's own coordinates: its right edge is the button's.
+      final box = context.findRenderObject() as RenderBox?;
+      final at = box == null || !box.hasSize
+          ? anchor
+          : anchor.shift(-box.localToGlobal(Offset.zero));
+      _page?.runJavaScript(
+          'window.atomicEmbed?.openMenu({x:${at.right},y:${at.top}})');
+    });
   }
 
   /// The app's light/dark mode as the page last heard it.

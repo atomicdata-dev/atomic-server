@@ -78,6 +78,63 @@ void main() {
     ResourceView.serverFactory = () async => throw 'no server in a test';
   });
 
+  testWidgets('the Home button is a house, filled on the home', (tester) async {
+    await tester.pumpWidget(_shell(_BarApi()));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.home), findsOneWidget);
+    expect(find.byIcon(Icons.home_outlined), findsNothing);
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byIcon(Icons.home_outlined), findsOneWidget);
+  });
+
+  group('wide screen', () {
+    void wide(WidgetTester tester) {
+      tester.view.physicalSize = const Size(1800, 2880);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
+    }
+
+    testWidgets('the More menu is asked to open at the More button',
+        (tester) async {
+      wide(tester);
+      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpAndSettle();
+      Rect? anchor;
+      final route = ModalRoute.of(tester.element(find.byType(ChatsScreen)))!;
+      _controller(tester).registerMenu(route, (a) => anchor = a);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('More'));
+      await tester.pump();
+      final button = tester.getRect(find.byTooltip('More'));
+      expect(anchor, isNotNull);
+      expect(anchor!.right, closeTo(button.right, 8));
+      // The right end of a 900 wide screen, not its left.
+      expect(anchor!.center.dx, greaterThan(700));
+    });
+
+    testWidgets('the + and Search fans open over their own buttons',
+        (tester) async {
+      wide(tester);
+      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpAndSettle();
+      for (final (tooltip, item) in [
+        ('New chat', 'AI chat'),
+        ('Search', 'All drives')
+      ]) {
+        final button = tester.getRect(find
+            .byWidgetPredicate((w) => w is HoldFan && w.tooltip == tooltip));
+        final gesture = await _hold(tester, tooltip);
+        final pill = tester.getRect(find.text(item).last);
+        expect((pill.center.dx - button.center.dx).abs(), lessThan(150),
+            reason: tooltip);
+        await gesture.moveTo(const Offset(1, 1));
+        await gesture.up();
+        await tester.pumpAndSettle();
+      }
+    });
+  });
+
   group('New (+)', () {
     testWidgets('a tap still opens a new chat; holding offers the four kinds',
         (tester) async {
