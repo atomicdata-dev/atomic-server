@@ -184,8 +184,14 @@ async fn assistant_web_url_names_the_connected_server() {
 /// listener does in the app.
 async fn pump(rx: &mut tokio::sync::broadcast::Receiver<atomic_lib::db::DbEvent>) {
     let store = db().unwrap();
-    while let Ok(event) = rx.try_recv() {
-        recents::handle_event(store, event).await;
+    // The channel holds 64 events and tests run side by side: a receiver that
+    // fell behind skips what it missed instead of stopping.
+    loop {
+        match rx.try_recv() {
+            Ok(event) => recents::handle_event(store, event).await,
+            Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => continue,
+            Err(_) => break,
+        }
     }
 }
 

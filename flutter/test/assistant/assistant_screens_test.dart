@@ -26,6 +26,7 @@ class FakeApi extends AssistantApi {
   final HostedAi? ai;
   final List<(String, String, String)> added = [];
   final List<String> created = [];
+  final Map<String, String> texts;
 
   FakeApi({
     this.driveList = const [(subject: 'did:ad:drive', name: 'Home')],
@@ -37,6 +38,7 @@ class FakeApi extends AssistantApi {
     this.chatList = const [],
     this.messageList = const [],
     this.hits = const [],
+    this.texts = const {},
   });
 
   @override
@@ -64,6 +66,9 @@ class FakeApi extends AssistantApi {
 
   @override
   Future<HostedAi?> hostedAi() async => ai;
+  @override
+  Future<String> resourceText(String subject, {int maxChars = 4000}) async =>
+      texts[subject] ?? 'text of $subject';
   @override
   Future<String> newChat(String name) async {
     created.add(name);
@@ -547,11 +552,11 @@ void main() {
       final api = _SlowAi(lookup.future);
       await tester.pumpWidget(app(ChatScreen(api: api)));
       await tester.pump();
-      final before = tester.getBottomLeft(find.text('No messages')).dy;
+      final before = tester.getTopLeft(find.text('Add context')).dy;
       lookup.complete(ai());
       await tester.pumpAndSettle();
       expect(find.byType(TextField), findsOneWidget);
-      expect(tester.getBottomLeft(find.text('No messages')).dy, before);
+      expect(tester.getTopLeft(find.text('Add context')).dy, before);
     });
 
     testWidgets('an existing chat sends its history along', (tester) async {
@@ -584,6 +589,147 @@ void main() {
         'assistant: Lisbon.',
         'user: And food?',
       ]);
+    });
+
+    group('context picker', () {
+      final recent = [
+        (subject: 'r1', title: 'Trip plan', className: 'Document', openedAt: 5),
+        (subject: 'r2', title: 'Budget', className: 'Table', openedAt: 9),
+      ];
+
+      testWidgets('a new chat offers drives and recent, not "No messages"',
+          (tester) async {
+        final api = FakeApi(ai: ai(), recent: recent);
+        await tester.pumpWidget(app(ChatScreen(api: api)));
+        await tester.pumpAndSettle();
+
+        expect(find.text('No messages'), findsNothing);
+        expect(find.text('Add context'), findsOneWidget);
+        expect(find.text('Drives'), findsOneWidget);
+        expect(find.text('Home'), findsOneWidget);
+        expect(find.text('Recent'), findsOneWidget);
+        // Newest first.
+        expect(tester.getTopLeft(find.text('Budget')).dy,
+            lessThan(tester.getTopLeft(find.text('Trip plan')).dy));
+      });
+
+      testWidgets('an existing chat with messages shows them, not the picker',
+          (tester) async {
+        final api = FakeApi(ai: ai(), messageList: [
+          (id: 'p#1', role: 'user', text: 'Where to?', createdAt: 1),
+        ]);
+        await tester.pumpWidget(
+            app(ChatScreen(api: api, subject: 'did:ad:chat', title: 'Trip')));
+        await tester.pumpAndSettle();
+        expect(find.text('Where to?'), findsOneWidget);
+        expect(find.text('Add context'), findsNothing);
+        expect(
+            tester
+                .widget<TextField>(find.byType(TextField))
+                .focusNode!
+                .hasFocus,
+            isFalse);
+      });
+
+      testWidgets('an existing empty chat shows the picker', (tester) async {
+        await tester.pumpWidget(app(ChatScreen(
+            api: FakeApi(ai: ai(), recent: recent), subject: 'did:ad:chat')));
+        await tester.pumpAndSettle();
+        expect(find.text('Add context'), findsOneWidget);
+      });
+
+      testWidgets('the input has focus once the AI is ready', (tester) async {
+        final lookup = Completer<HostedAi?>();
+        await tester.pumpWidget(app(ChatScreen(api: _SlowAi(lookup.future))));
+        await tester.pump();
+        lookup.complete(ai());
+        await tester.pumpAndSettle();
+        final field = tester.widget<TextField>(find.byType(TextField));
+        expect(field.focusNode!.hasFocus, isTrue);
+      });
+
+      testWidgets('picking shows a chip, its x removes it', (tester) async {
+        await tester.pumpWidget(
+            app(ChatScreen(api: FakeApi(ai: ai(), recent: recent))));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Trip plan'));
+        await tester.pump();
+        expect(find.byType(Chip), findsOneWidget);
+        expect(find.byIcon(Icons.check), findsOneWidget);
+
+        await tester.tap(find.byTooltip('Remove Trip plan'));
+        await tester.pump();
+        expect(find.byType(Chip), findsNothing);
+        expect(find.byIcon(Icons.check), findsNothing);
+
+        // Tapping the row again toggles it off too.
+        await tester.tap(find.text('Trip plan'));
+        await tester.pump();
+        await tester.tap(find.text('Trip plan').first);
+        await tester.pump();
+        expect(find.byType(Chip), findsNothing);
+      });
+
+      testWidgets('sending gives the AI the text of what was picked',
+          (tester) async {
+        final sent = <List<Map<String, String>>>[];
+        final api = FakeApi(
+          recent: recent,
+          texts: {'r1': 'Day 1: Lisbon'},
+          ai: HostedAi(
+            status: {'enabled': true, 'consent': true, 'model': 'm'},
+            stream: (messages, model) {
+              sent.add(messages);
+              return Stream.value('ok');
+            },
+            enable: () async => {},
+          ),
+        );
+        await tester.pumpWidget(app(ChatScreen(api: api)));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Trip plan'));
+        await tester.pump();
+
+        await tester.enterText(find.byType(TextField), 'Summarize');
+        await tester.tap(find.byTooltip('Send'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'More');
+        await tester.tap(find.byTooltip('Send'));
+        await tester.pumpAndSettle();
+
+        // Every message of the screen carries the context ahead of the chat.
+        expect(sent, hasLength(2));
+        for (final messages in sent) {
+          final ctx = messages
+              .firstWhere((m) => m['content']!.startsWith('The user attached'));
+          expect(ctx['role'], 'system');
+          expect(ctx['content'], contains('Trip plan (Document)'));
+          expect(ctx['content'], contains('Day 1: Lisbon'));
+        }
+        // Not part of the chat log.
+        expect(api.added.where((m) => m.$3.contains('Lisbon')), isEmpty);
+      });
+
+      testWidgets('without a pick nothing is added', (tester) async {
+        List<Map<String, String>>? sent;
+        final api = FakeApi(
+          ai: HostedAi(
+            status: {'enabled': true, 'consent': true, 'model': 'm'},
+            stream: (messages, model) {
+              sent = messages;
+              return Stream.value('ok');
+            },
+            enable: () async => {},
+          ),
+        );
+        await tester.pumpWidget(app(ChatScreen(api: api)));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'Hi');
+        await tester.tap(find.byTooltip('Send'));
+        await tester.pumpAndSettle();
+        expect(sent, hasLength(2));
+      });
     });
 
     testWidgets('asks for consent before the AI is used', (tester) async {

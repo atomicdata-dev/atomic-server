@@ -12,12 +12,16 @@ class ResourceRow extends StatelessWidget {
   /// Null for a row that is only information.
   final VoidCallback? onTap;
 
+  /// Shown at the end of the line, e.g. a check mark for a selected row.
+  final Widget? trailing;
+
   const ResourceRow({
     super.key,
     this.icon,
     required this.title,
     this.detail,
     this.onTap,
+    this.trailing,
   });
 
   @override
@@ -30,6 +34,7 @@ class ResourceRow extends StatelessWidget {
         visualDensity: detail == null && icon == null
             ? VisualDensity.compact
             : VisualDensity.standard,
+        trailing: trailing,
         onTap: onTap,
       );
 }

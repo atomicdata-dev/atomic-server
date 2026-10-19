@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../src/rust/api/assistant.dart' as assistant;
 import '../src/rust/api/assistant.dart' show ActivityEntry;
+import '../src/rust/api/context.dart' as context;
 import '../src/rust/api/embed.dart' as embed;
 import 'session.dart';
 import '../src/rust/api/simple.dart' as ffi;
@@ -154,6 +155,7 @@ class AtomicClient {
   /// them. `openedAt` is 0.
   static Future<List<RecentResource>> conversations({int limit = 100}) async =>
       parseRecentResources(await assistant.listConversations(limit: limit));
+
   /// What changed lately in every drive, newest first, by whom.
   static Future<List<ActivityEntry>> activity({int limit = 100}) =>
       assistant.listActivity(limit: limit);
@@ -173,6 +175,11 @@ class AtomicClient {
           {'type': 'text', 'text': text}
         ]),
       );
+
+  /// Readable text of [subject] from the local store (title, class,
+  /// properties, children, document text), at most [maxChars] long.
+  static Future<String> resourceText(String subject, {int maxChars = 4000}) =>
+      context.readResourceText(subject: subject, maxChars: maxChars);
 
   static Future<List<ChatMessage>> readChat(String subject) async =>
       parseChatMessages(await assistant.readChat(subject: subject));

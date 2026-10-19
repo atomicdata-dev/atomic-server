@@ -40,9 +40,14 @@ class HostedAi {
   Future<void> enable() async => status = await _enable();
 
   /// The answer to [history] (oldest first), as it is written.
-  Stream<String> answer(List<ChatMessage> history) {
+  ///
+  /// [context], when given, is sent as a second system message ahead of the
+  /// history: resources the person attached. It is not part of the chat.
+  Stream<String> answer(List<ChatMessage> history, {String? context}) {
     final messages = [
       {'role': 'system', 'content': _systemPrompt},
+      if (context != null && context.isNotEmpty)
+        {'role': 'system', 'content': context},
       for (final m in history) {'role': m.role, 'content': m.text},
     ];
     debugPrint('[ai] sending ${messages.length} messages '

@@ -5,6 +5,17 @@ import '../theme.dart';
 import 'assistant_api.dart';
 import 'fading_text.dart';
 import 'hosted_ai.dart';
+import 'resource_row.dart';
+
+/// A resource the person attached to a new chat as context.
+typedef _Attached = ({String subject, String title, String className});
+
+/// Most characters of one attached resource, and of all of them, sent to the AI.
+const _maxItemChars = 4000;
+const _maxContextChars = 12000;
+
+/// Most recently opened resources offered in the picker.
+const _maxRecent = 6;
 
 /// A chat: the text of each message, newest at the bottom, and, when an AI is
 /// available, a field to write to it. A chat without a [subject] is new: it is
@@ -27,6 +38,7 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final _input = TextEditingController();
+  final _focus = FocusNode();
   String? _chat;
   List<ChatMessage> _messages = const [];
   Object? _loadError;
@@ -41,16 +53,28 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _sending = false;
   String? _error;
 
+  /// What the person attached, in the order they picked it; sent to the AI
+  /// with every message of this screen, never stored in the chat.
+  final List<_Attached> _attached = [];
+  final Map<String, String> _attachedText = {};
+
+  /// What the picker offers, once read.
+  List<DriveInfo>? _drives;
+  List<(String drive, RecentResource)>? _recent;
+  bool _pickerRead = false;
+
   @override
   void initState() {
     super.initState();
     _chat = widget.subject;
     _readMessages();
     _lookUpAi();
+    if (_chat == null) _readPicker();
   }
 
   @override
   void dispose() {
+    _focus.dispose();
     _input.dispose();
     super.dispose();
   }
@@ -69,6 +93,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _loaded = true;
           _loadError = null;
         });
+        if (messages.isEmpty) _readPicker();
       }
     } catch (e) {
       if (mounted) {
@@ -80,6 +105,82 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  /// A new chat is for writing: the field gets the cursor as soon as it can.
+  void _focusInput() {
+    if (widget.subject != null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _ai != null && _ai!.available && _ai!.consent) {
+        _focus.requestFocus();
+      }
+    });
+  }
+
+  /// The drives and the recently opened resources of all of them, newest
+  /// first, for the picker.
+  Future<void> _readPicker() async {
+    if (_pickerRead) return;
+    _pickerRead = true;
+    List<DriveInfo> drives;
+    try {
+      drives = await widget.api.drives();
+    } catch (_) {
+      drives = const [];
+    }
+    final lists = await Future.wait([
+      for (final d in drives)
+        widget.api.recentResources(d.subject).then(
+              (list) => [for (final r in list) (d.subject, r)],
+              onError: (Object _) => <(String, RecentResource)>[],
+            ),
+    ]);
+    final recent = [for (final l in lists) ...l]
+      ..sort((a, b) => b.$2.openedAt.compareTo(a.$2.openedAt));
+    if (mounted) {
+      setState(() {
+        _drives = drives;
+        _recent = recent.take(_maxRecent).toList();
+      });
+    }
+  }
+
+  void _toggle(_Attached item) {
+    setState(() {
+      final at = _attached.indexWhere((a) => a.subject == item.subject);
+      if (at >= 0) {
+        _attached.removeAt(at);
+      } else {
+        _attached.add(item);
+      }
+    });
+  }
+
+  /// The text of what was attached, to go ahead of the history; null when
+  /// nothing was.
+  Future<String?> _contextText() async {
+    if (_attached.isEmpty) return null;
+    final parts = <String>[];
+    for (final a in List.of(_attached)) {
+      var text = _attachedText[a.subject];
+      if (text == null) {
+        try {
+          text =
+              await widget.api.resourceText(a.subject, maxChars: _maxItemChars);
+        } catch (_) {
+          continue;
+        }
+        _attachedText[a.subject] = text;
+      }
+      if (text.length > _maxItemChars) text = text.substring(0, _maxItemChars);
+      parts.add('${a.title} (${a.className})\n$text');
+    }
+    if (parts.isEmpty) return null;
+    final all = 'The user attached these resources as context:\n\n'
+        '${parts.join('\n\n')}';
+    return all.length > _maxContextChars
+        ? all.substring(0, _maxContextChars)
+        : all;
+  }
+
   Future<void> _lookUpAi() async {
     try {
       final ai = await widget.api.hostedAi();
@@ -88,6 +189,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _ai = ai;
           _aiLooked = true;
         });
+        _focusInput();
       }
     } catch (e) {
       if (mounted) {
@@ -102,7 +204,10 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _enableAi() async {
     try {
       await _ai!.enable();
-      if (mounted) setState(() => _error = null);
+      if (mounted) {
+        setState(() => _error = null);
+        _focusInput();
+      }
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
     }
@@ -130,7 +235,8 @@ class _ChatScreenState extends State<ChatScreen> {
       );
       await widget.api.addMessage(chat, 'user', text);
       var answer = '';
-      await for (final delta in ai.answer(asked)) {
+      final context = await _contextText();
+      await for (final delta in ai.answer(asked, context: context)) {
         answer += delta;
         if (mounted) {
           setState(() => _partial = [..._partial!, (delta, DateTime.now())]);
@@ -186,11 +292,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (_partial != null)
         (id: 'partial', role: 'assistant', text: '', createdAt: 0),
     ];
-    if (shown.isEmpty) {
-      return Center(
-        child: Text('No messages', style: TextStyle(color: c.textSecondary)),
-      );
-    }
+    if (shown.isEmpty) return _picker(c);
     return ListView.builder(
       reverse: true,
       padding: const EdgeInsets.all(16),
@@ -232,6 +334,93 @@ class _ChatScreenState extends State<ChatScreen> {
       },
     );
   }
+
+  Widget _heading(AppColors c, String text) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: c.textSecondary,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+
+  Widget _pickRow(
+    AppColors c, {
+    required IconData icon,
+    required String title,
+    required String className,
+    required String subject,
+    String? detail,
+  }) {
+    final item = (subject: subject, title: title, className: className);
+    final on = _attached.any((a) => a.subject == subject);
+    return ResourceRow(
+      icon: icon,
+      title: title,
+      detail: detail,
+      trailing: on ? Icon(Icons.check, color: c.main) : null,
+      onTap: () => _toggle(item),
+    );
+  }
+
+  /// What a new chat shows instead of messages: resources to give the AI as
+  /// context. Optional; the chat starts without if nothing is picked.
+  Widget _picker(AppColors c) {
+    final drives = _drives ?? const <DriveInfo>[];
+    final recent = _recent ?? const <(String, RecentResource)>[];
+    return ListView(
+      children: [
+        _heading(c, 'Add context'),
+        if (drives.isNotEmpty) ...[
+          _heading(c, 'Drives'),
+          for (final d in drives)
+            _pickRow(
+              c,
+              icon: Icons.folder_outlined,
+              title: d.name.isEmpty ? 'Untitled drive' : d.name,
+              className: 'Drive',
+              subject: d.subject,
+            ),
+        ],
+        if (recent.isNotEmpty) ...[
+          _heading(c, 'Recent'),
+          for (final (_, r) in recent)
+            _pickRow(
+              c,
+              icon: Icons.history,
+              title: r.title.isEmpty ? 'Untitled' : r.title,
+              className: r.className,
+              subject: r.subject,
+              detail: r.className,
+            ),
+        ],
+      ],
+    );
+  }
+
+  /// The attached resources, each removable.
+  Widget _chips() => Align(
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              for (final a in _attached)
+                Chip(
+                  label: Text(a.title, overflow: TextOverflow.ellipsis),
+                  visualDensity: VisualDensity.compact,
+                  onDeleted: () => _toggle(a),
+                  deleteButtonTooltipMessage: 'Remove ${a.title}',
+                ),
+            ],
+          ),
+        ),
+      );
 
   /// The way to write, when there is an AI to write to; otherwise one line
   /// saying so.
@@ -292,11 +481,13 @@ class _ChatScreenState extends State<ChatScreen> {
                   style: TextStyle(color: c.alert, fontSize: 12),
                 ),
               ),
+            if (_attached.isNotEmpty) _chips(),
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _input,
+                    focusNode: _focus,
                     minLines: 1,
                     maxLines: 5,
                     textInputAction: TextInputAction.send,

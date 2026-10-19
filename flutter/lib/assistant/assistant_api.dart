@@ -28,5 +28,7 @@ class AssistantApi {
   Future<String> newChat(String name) => AtomicClient.createAiChat(name);
   Future<void> addMessage(String chat, String role, String text) =>
       AtomicClient.appendChatEntry(chat, role, text);
+  Future<String> resourceText(String subject, {int maxChars = 4000}) =>
+      AtomicClient.resourceText(subject, maxChars: maxChars);
   String webUrl(String subject) => AtomicClient.resourceWebUrl(subject);
 }
