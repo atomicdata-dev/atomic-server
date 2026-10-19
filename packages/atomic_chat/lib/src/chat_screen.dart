@@ -809,7 +809,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (_partial != null)
         (id: 'partial', role: 'assistant', text: '', createdAt: 0),
     ];
-    if (shown.isEmpty) return _picker(c);
+    if (shown.isEmpty) return _noAi ? _noAiState(c) : _picker(c);
     return ListView.builder(
       reverse: true,
       padding: const EdgeInsets.all(16),
@@ -954,6 +954,44 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ),
       );
 
+  /// Looked up, and there is no AI to write to (no account on the device).
+  bool get _noAi => _aiLooked && _ai == null;
+
+  static const _noAiTitle = 'AI chat needs an atomic.place account';
+
+  /// What a new chat shows without an AI: why, instead of a context picker
+  /// for a chat that cannot be had and a line under an empty page.
+  Widget _noAiState(AppColors c) => Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.auto_awesome_outlined, size: 40, color: c.main),
+              const SizedBox(height: 16),
+              Text(
+                _noAiTitle,
+                key: const Key('no-ai-title'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    color: c.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _error ??
+                    'The AI runs on the account, and this device has none '
+                        'linked. Your drives, documents and chat rooms work '
+                        'without one.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: c.textSecondary, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+      );
+
   /// The way to write, when there is an AI to write to; otherwise one line
   /// saying so.
   Widget _composer(AppColors c) {
@@ -968,8 +1006,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         );
     // While the AI is looked up, the field is there already, switched off:
     // the messages above stay where they are when the answer lands.
-    if (_aiLooked && ai == null) {
-      return SafeArea(child: hint(_error ?? 'No AI is set up on this device.'));
+    if (_noAi) {
+      // An empty chat says it in the middle (see [_noAiState]).
+      if (_messages.isEmpty) return const SizedBox.shrink();
+      return SafeArea(child: hint(_error ?? '$_noAiTitle.'));
     }
     if (ai != null && !ai.available) {
       return SafeArea(child: hint('Included AI is not available.'));

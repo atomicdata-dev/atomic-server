@@ -1074,15 +1074,21 @@ void main() {
     });
 
     testWidgets('the new-chat context pills prefix the emoji', (tester) async {
-      final api = FakeApi(recent: [
-        (
-          subject: 'r1',
-          title: 'Fox doc',
-          className: 'Document',
-          openedAt: 2,
-          emoji: '🦊'
-        ),
-      ]);
+      final api = FakeApi(
+          ai: HostedAi(
+            status: {'enabled': true, 'consent': true, 'model': 'm'},
+            stream: (messages, model) => const Stream.empty(),
+            enable: () async => {'enabled': true, 'consent': true},
+          ),
+          recent: [
+            (
+              subject: 'r1',
+              title: 'Fox doc',
+              className: 'Document',
+              openedAt: 2,
+              emoji: '🦊'
+            ),
+          ]);
       await tester.pumpWidget(app(ChatScreen(api: api)));
       await tester.pumpAndSettle();
       expect(find.text('🦊 Fox doc'), findsOneWidget);
@@ -1974,7 +1980,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(TextField), findsNothing);
-      expect(find.text('No AI is set up on this device.'), findsOneWidget);
+      expect(
+          find.text('AI chat needs an atomic.place account'), findsOneWidget);
+      // No context to pick for a chat that cannot be had.
+      expect(find.text('Add context?'), findsNothing);
     });
 
     testWidgets('a new chat can be started from the home', (tester) async {
