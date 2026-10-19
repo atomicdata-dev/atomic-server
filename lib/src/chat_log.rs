@@ -33,8 +33,10 @@ pub const FIELD_KINDS: &str = "k";
 /// `CHAT_LOG_CAPACITY` in `browser/data-browser/src/helpers/chatLog.ts`.
 pub const CHAT_LOG_CAPACITY: usize = 256;
 
-/// The page of `chat` a new entry goes to: the newest page (by its latest
-/// entry) that is not full, or `None` when a first or next page must be made.
+/// The page of `chat` a new entry goes to: the newest page (by `createdAt`,
+/// then subject), if it has room; `None` when a first or next page must be
+/// made. The same rule as `pageWithRoom` in
+/// `browser/data-browser/src/helpers/chatLog.ts`, so both clients fill one page.
 pub async fn page_with_room(
     store: &impl crate::Storelike,
     chat: &str,
@@ -45,7 +47,7 @@ pub async fn page_with_room(
             chat,
         ))
         .await?;
-    let mut target: Option<(i64, crate::Subject)> = None;
+    let mut newest: Option<(i64, crate::Resource)> = None;
     for subject in &pages.subjects {
         let Ok(page) = store.get_resource(subject).await else {
             continue;
@@ -53,23 +55,27 @@ pub async fn page_with_room(
         if !crate::hierarchy::is_chat_log(&page) {
             continue;
         }
-        let Ok(doc) = page.build_state_doc() else {
-            continue;
-        };
-        let entries = doc.entries();
-        if entries.len() >= CHAT_LOG_CAPACITY {
-            continue;
-        }
-        let last = entries
-            .values()
-            .filter_map(entry_created_at)
-            .max()
+        let created_at = page
+            .get(crate::urls::CREATED_AT)
+            .ok()
+            .and_then(|v| v.to_int().ok())
             .unwrap_or(0);
-        if target.as_ref().is_none_or(|(best, _)| last >= *best) {
-            target = Some((last, subject.clone()));
+        let newer = newest.as_ref().is_none_or(|(best, best_page)| {
+            created_at > *best
+                || (created_at == *best
+                    && page.get_subject().as_str() > best_page.get_subject().as_str())
+        });
+        if newer {
+            newest = Some((created_at, page));
         }
     }
-    Ok(target.map(|(_, subject)| subject))
+    let Some((_, page)) = newest else {
+        return Ok(None);
+    };
+    let has_room = page
+        .build_state_doc()
+        .is_ok_and(|doc| doc.entries().len() < CHAT_LOG_CAPACITY);
+    Ok(has_room.then(|| page.get_subject().clone()))
 }
 
 /// `<createdAt hex>-<8 random hex>`.
