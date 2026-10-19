@@ -16,6 +16,13 @@ class SlideBackRoute<T> extends PageRouteBuilder<T> {
           reverseTransitionDuration: const Duration(milliseconds: 320),
         );
 
+  /// Work the page must finish before it is gone (an embedded page handing
+  /// over its last edits). A swipe that leaves slides the page out at once,
+  /// then waits for this before the route is removed. The page itself sets it
+  /// ([ModalRoute.of]); the back button and the system back go through its
+  /// `PopScope` instead.
+  Future<void> Function()? beforeSwipeLeave;
+
   /// A finger or a spring is moving the page: its position is the animation's
   /// value as it is. Otherwise (a push, the back button) the value goes
   /// through a curve that starts fast and settles slowly.
@@ -95,12 +102,24 @@ class _SwipeBackState extends State<_SwipeBack> {
     if (leave) {
       // Out: as long as the page still has to travel, at the speed the finger
       // had (not slower than a gentle push), slowing down as it goes.
-      navigator.pop();
+      final route = widget.route;
+      final hold = route.beforeSwipeLeave;
+      if (hold == null) navigator.pop();
       final seconds = controller.value / velocity.clamp(1.2, 6.0);
-      controller.animateBack(0,
+      final out = controller.animateBack(0,
           duration:
               Duration(milliseconds: (seconds * 1000).clamp(140, 420).round()),
           curve: Curves.easeOutCubic);
+      if (hold != null) {
+        // Gone once it is out of sight and the page is done. Removed rather
+        // than popped: its animation has nothing left to run.
+        Future.wait([
+          out.orCancel.catchError((_) {}),
+          hold().catchError((_) {}),
+        ]).whenComplete(() {
+          if (route.isActive) navigator.removeRoute(route);
+        });
+      }
     } else {
       // Back in: a spring with the finger's speed, so a quick flick back
       // overshoots the decision and settles.

@@ -1,0 +1,157 @@
+import 'dart:convert';
+
+import 'package:atomiccanvas_flutter/assistant/assistant_api.dart';
+import 'package:atomiccanvas_flutter/assistant/resource_view.dart';
+import 'package:atomiccanvas_flutter/theme.dart';
+import 'package:atomiccanvas_flutter/widgets/slide_back_route.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+/// The page in a web view, without the web view: records what it is asked to
+/// run, and answers a flush only when the test says so.
+class FakePage implements EmbedPage {
+  final void Function(String message) send;
+  final scripts = <String>[];
+  FakePage(this.send);
+
+  /// Flushes asked for and not answered yet.
+  final waiting = <int>[];
+
+  @override
+  Future<void> runJavaScript(String script) async {
+    scripts.add(script);
+    final flush = RegExp(r'flush:(\d+)').firstMatch(script);
+    if (script.contains('atomicEmbed.flush(') && flush != null) {
+      waiting.add(int.parse(flush.group(1)!));
+    }
+  }
+
+  @override
+  Future<Object> runJavaScriptReturningResult(String script) async => false;
+
+  @override
+  Widget build() => const Center(child: Text('the page'));
+
+  /// What the page posts once its flush resolved.
+  void answerFlushes() {
+    for (final id in waiting) {
+      send(jsonEncode({'method': 'flushed', 'flush': id}));
+    }
+    waiting.clear();
+  }
+
+  bool get askedToFlush => scripts.any((s) => s.contains('atomicEmbed.flush('));
+}
+
+void main() {
+  late FakePage page;
+
+  setUp(() {
+    ResourceView.pageFactory = (send) => page = FakePage(send);
+    ResourceView.flushTimeout = const Duration(seconds: 2);
+  });
+  tearDown(() => ResourceView.pageFactory = null);
+
+  Future<NavigatorState> open(WidgetTester tester,
+      {bool slideBack = false}) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(extensions: const [AppColors.light]),
+      home: const Scaffold(body: Text('home')),
+    ));
+    final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+    Widget page(BuildContext _) =>
+        const ResourceView(api: AssistantApi(), drive: 'd', subject: 's');
+    navigator.push(slideBack
+        ? SlideBackRoute<void>(builder: page)
+        : MaterialPageRoute<void>(builder: page));
+    await tester.pumpAndSettle();
+    expect(find.text('the page'), findsOneWidget);
+    return navigator;
+  }
+
+  testWidgets('back waits until the page has handed over its edits',
+      (tester) async {
+    final navigator = await open(tester);
+
+    await navigator.maybePop();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // Asked, with the page told it is leaving, and still open.
+    expect(page.askedToFlush, isTrue);
+    expect(page.scripts.last, contains('atomicEmbed.flush(true)'));
+    expect(find.text('the page'), findsOneWidget);
+
+    page.answerFlushes();
+    await tester.pumpAndSettle();
+    expect(find.text('the page'), findsNothing);
+    expect(find.text('home'), findsOneWidget);
+  });
+
+  testWidgets('back still leaves when the page never answers', (tester) async {
+    final navigator = await open(tester);
+
+    await navigator.maybePop();
+    await tester.pump(const Duration(milliseconds: 1900));
+    expect(find.text('the page'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(find.text('the page'), findsNothing);
+  });
+
+  testWidgets('a second back while waiting does not pop twice', (tester) async {
+    final navigator = await open(tester);
+
+    await navigator.maybePop();
+    await navigator.maybePop();
+    await tester.pump();
+    page.answerFlushes();
+    await tester.pumpAndSettle();
+    expect(find.text('home'), findsOneWidget);
+    expect(navigator.canPop(), isFalse);
+  });
+
+  testWidgets('swipe back slides out, then waits for the page', (tester) async {
+    await open(tester, slideBack: true);
+
+    await tester.drag(find.text('the page'), const Offset(700, 0));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(page.askedToFlush, isTrue);
+    // Out of sight, but still there: its last commit may be on its way.
+    expect(find.text('the page', skipOffstage: false), findsOneWidget);
+
+    page.answerFlushes();
+    await tester.pumpAndSettle();
+    expect(find.text('the page', skipOffstage: false), findsNothing);
+    expect(find.text('home'), findsOneWidget);
+  });
+
+  testWidgets('a page opened over it, or the app going away, flushes',
+      (tester) async {
+    final navigator = await open(tester);
+
+    navigator.push(MaterialPageRoute<void>(
+        builder: (_) => const Scaffold(body: Text('search'))));
+    await tester.pumpAndSettle();
+    expect(page.askedToFlush, isTrue);
+    expect(page.scripts.last, contains('atomicEmbed.flush(false)'));
+
+    page.scripts.clear();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    expect(page.askedToFlush, isTrue);
+    page.answerFlushes();
+    await tester.pumpAndSettle();
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    navigator.pop();
+    await tester.pumpAndSettle();
+    await navigator.maybePop();
+    await tester.pump();
+    page.answerFlushes();
+    await tester.pumpAndSettle();
+    expect(find.text('home'), findsOneWidget);
+  });
+}
