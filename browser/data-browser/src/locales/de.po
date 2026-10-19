@@ -11123,13 +11123,10 @@ msgid "Could not read storage use."
 msgstr ""
 
 #. 0: formatBytes(result.bytes_reclaimed)
-#. 0: formatBytes(result.bytes_reclaimed)
-#: src/components/Vault/VaultStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 msgid "Freed {0}."
 msgstr ""
 
-#: src/components/Vault/VaultStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 msgid "Nothing to free."
