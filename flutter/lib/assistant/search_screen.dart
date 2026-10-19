@@ -186,7 +186,7 @@ class _SearchScreenState extends State<SearchScreen> {
     // Typing flips the list from recents to hits once; the debounce then only
     // swaps the hits.
     _model.changed();
-    _debounce = Timer(const Duration(milliseconds: 200), () async {
+    _debounce = Timer(const Duration(milliseconds: 120), () async {
       try {
         final hits = await widget.api.search(query);
         if (mounted && query == _model.query) {

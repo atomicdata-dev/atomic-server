@@ -579,3 +579,132 @@ async fn assistant_search_covers_every_drive_and_names_the_hit_drive() {
     assert_eq!(only.len(), 1);
     assert!(only[0]["subject"].as_str().unwrap().ends_with(&there[9..]));
 }
+
+/// A synced resource with a parent, optional class and no `drive` property.
+async fn synced_node(n: u64, parent: &str, name: &str, class: Option<&str>) -> String {
+    let store = db().unwrap();
+    let subject = format!("did:ad:bench{:0>58}{:0>6}==", std::process::id(), n);
+    let mut authored = atomic_lib::Resource::new(subject.clone());
+    authored
+        .set_unsafe(urls::PARENT.into(), Value::AtomicUrl(parent.into()))
+        .unwrap();
+    authored
+        .set_unsafe(urls::NAME.into(), Value::String(name.into()))
+        .unwrap();
+    if let Some(class) = class {
+        authored
+            .set_unsafe(urls::IS_A.into(), Value::ResourceArray(vec![class.into()]))
+            .unwrap();
+    }
+    let state = authored.build_state_doc().unwrap().export_snapshot();
+    atomic_lib::sync::ws_apply::apply_state_update(store.as_ref(), &subject, &state)
+        .await
+        .unwrap();
+    subject
+}
+
+/// Times `search` over 4 drives and ~3000 synced resources nested 6 folders
+/// deep (no `drive` property on any of them), a tenth with a parent that is not
+/// local and a tenth with a class that is not local. Run with `--ignored
+/// --nocapture`. Prints the index query next to the whole call and the number
+/// of reads that could go over the network (`get_resource`).
+#[tokio::test]
+#[ignore = "timing; adds 3000 resources to the shared store"]
+async fn search_cost_breakdown() {
+    let first = shared_drive().await.to_string();
+    let store = db().unwrap();
+    let roots = [
+        first,
+        "did:ad:benchdrive1000000000000000000000000000000000000000000000000000000==".to_string(),
+        "did:ad:benchdrive2000000000000000000000000000000000000000000000000000000==".to_string(),
+        "did:ad:benchdrive3000000000000000000000000000000000000000000000000000000==".to_string(),
+    ];
+    let mut n = 0u64;
+    let mut leaves_parents = Vec::new();
+    for root in &roots {
+        for f in 0..25 {
+            // A chain root > 6 folders; the folders carry no `drive`.
+            let mut parent = root.clone();
+            for depth in 0..6 {
+                n += 1;
+                parent = synced_node(n, &parent, &format!("Folder {f}-{depth}"), Some(urls::FOLDER))
+                    .await;
+            }
+            leaves_parents.push(parent);
+        }
+    }
+    let class_missing = "https://example.invalid/class/never-local";
+    for i in 0..3000u64 {
+        n += 1;
+        let parent = if i % 10 == 0 {
+            format!("did:ad:benchgone{:0>60}{i:0>4}==", 0)
+        } else {
+            leaves_parents[i as usize % leaves_parents.len()].clone()
+        };
+        let class = if i % 10 == 5 { class_missing } else { urls::FOLDER };
+        synced_node(n, &parent, &format!("Quokka report {i} notes"), Some(class)).await;
+    }
+
+    let opts = atomic_lib::client::search::SearchOpts {
+        limit: Some(20),
+        ..Default::default()
+    };
+    for q in ["q", "qu", "quo", "quok", "quokka", "quokka rep", "quokka report 12"] {
+        let reps = 10;
+        let t = std::time::Instant::now();
+        for _ in 0..reps {
+            atomic_lib::search::query(store.as_ref(), q, &opts).unwrap();
+        }
+        let query_ms = t.elapsed().as_secs_f64() * 1000.0 / reps as f64;
+        store.reset_fetch_counters();
+        let t = std::time::Instant::now();
+        let mut hits = 0;
+        for _ in 0..reps {
+            let out: Vec<Json> =
+                serde_json::from_str(&search(None, q.into(), 20).await.unwrap()).unwrap();
+            hits = out.len();
+        }
+        let total_ms = t.elapsed().as_secs_f64() * 1000.0 / reps as f64;
+        println!(
+            "[timing] {q:?}: {hits} hits, index query {query_ms:.2} ms, whole search {total_ms:.2} ms, enrichment {:.2} ms, full reads/search {}, shallow reads/search {}",
+            total_ms - query_ms,
+            store.get_resource_call_count() / reps,
+            store.get_resource_shallow_call_count() / reps,
+        );
+    }
+}
+
+#[tokio::test]
+async fn search_finds_the_drive_through_local_parents_without_full_reads() {
+    let drive = shared_drive().await.to_string();
+    let store = db().unwrap();
+    let mut parent = drive.clone();
+    for i in 0..4 {
+        parent = synced_node(900_000 + i, &parent, &format!("Chain {i}"), Some(urls::FOLDER)).await;
+    }
+    let here = synced_node(900_010, &parent, "Narwhal deep in a chain", Some(urls::FOLDER)).await;
+    let orphan = synced_node(
+        900_011,
+        "did:ad:benchgoneorphan000000000000000000000000000000000000000000000000==",
+        "Narwhal orphan",
+        Some("https://example.invalid/class/never-local"),
+    )
+    .await;
+
+    store.reset_fetch_counters();
+    let hits: Vec<Json> =
+        serde_json::from_str(&search(None, "narwhal".into(), 20).await.unwrap()).unwrap();
+    assert_eq!(store.get_resource_call_count(), 0, "a search reads locally");
+    let find = |s: &str| hits.iter().find(|h| h["subject"].as_str().unwrap().ends_with(&s[9..]));
+    let norm = |v: &Json| v.as_str().unwrap().replace("atomic:", "did:ad:");
+    assert_eq!(norm(&find(&here).unwrap()["drive"]), drive.replace("atomic:", "did:ad:"));
+    assert_eq!(find(&here).unwrap()["class_name"], "folder");
+    let o = find(&orphan).unwrap();
+    assert_eq!(o["drive"], "");
+    assert_eq!(o["class_name"], "https://example.invalid/class/never-local");
+
+    // Capped to the limit.
+    let one: Vec<Json> =
+        serde_json::from_str(&search(None, "narwhal".into(), 1).await.unwrap()).unwrap();
+    assert_eq!(one.len(), 1);
+}

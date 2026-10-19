@@ -389,37 +389,82 @@ pub async fn search(drive: Option<String>, query: String, limit: u32) -> Result<
     };
     let hits = atomic_lib::search::query(store.as_ref(), query.trim(), &opts).map_err(err)?;
 
+    // Local propvals only, and each parent / class is looked up once per
+    // query: a search never waits on the network and never decodes a Loro doc.
+    let mut drives = DriveCache::default();
+    let mut classes: std::collections::HashMap<String, String> = Default::default();
     let mut out = Vec::new();
-    for hit in hits {
-        let Some(resource) = row_resource(&store, &hit.subject).await else {
+    for hit in hits.into_iter().take(limit as usize) {
+        let Ok(resource) = store.get_resource_shallow(&hit.subject) else {
             continue;
         };
-        let mut row = resource_row(
-            &hit.subject.to_string(),
-            &resource,
-            ("score", json!(hit.score)),
-        )
-        .await;
-        row["drive"] = json!(drive_of(store.as_ref(), &resource).await);
-        out.push(row);
+        let class = first_class(&resource);
+        let class_name = match classes.get(&class) {
+            Some(name) => name.clone(),
+            None => {
+                let name = match store.get_resource_shallow(&Subject::from(class.as_str())) {
+                    Ok(c) if !name_of(&c).is_empty() => name_of(&c),
+                    _ => class.clone(),
+                };
+                classes.insert(class, name.clone());
+                name
+            }
+        };
+        out.push(json!({
+            "subject": hit.subject.to_string(),
+            "title": name_of(&resource),
+            "class_name": class_name,
+            "score": hit.score,
+            "drive": drives.of(store.as_ref(), &resource),
+        }));
     }
     serde_json::to_string(&out).map_err(|e| e.to_string())
 }
 
-/// The drive `resource` lives in: its `drive` property, else the one found by
-/// walking up its parents.
-async fn drive_of(store: &atomic_lib::Db, resource: &Resource) -> String {
-    let mut current = resource.clone();
-    for _ in 0..32 {
-        if let Some(drive) = current.get_drive() {
-            return drive.to_string();
-        }
-        match current.get_parent(store).await {
-            Ok(parent) => current = parent,
-            Err(_) => break,
-        }
+/// The subject of a resource's first class, "" when it has none.
+fn first_class(resource: &Resource) -> String {
+    match resource.get(urls::IS_A).map(|v| v.to_subjects(None)) {
+        Ok(Ok(classes)) => classes.into_iter().next().unwrap_or_default(),
+        _ => String::new(),
     }
-    String::new()
+}
+
+/// The drive of resources found by a search: their `drive` property, else the
+/// one found by walking up the parents through local propvals only. Every
+/// resource on a walked chain is remembered, so siblings cost one lookup.
+#[derive(Default)]
+struct DriveCache(std::collections::HashMap<String, String>);
+
+impl DriveCache {
+    fn of(&mut self, store: &atomic_lib::Db, resource: &Resource) -> String {
+        let mut chain: Vec<String> = Vec::new();
+        let mut current = resource.clone();
+        let mut found = String::new();
+        for _ in 0..32 {
+            if let Some(drive) = current.get_drive() {
+                found = drive.to_string();
+                break;
+            }
+            let Ok(parent) = current.get(urls::PARENT).map(|v| v.to_string()) else {
+                break;
+            };
+            if let Some(known) = self.0.get(&parent) {
+                found = known.clone();
+                break;
+            }
+            let Ok(next) = store.get_resource_shallow(&Subject::from(parent.as_str())) else {
+                // Not local: unknown, and remembered so it is asked once.
+                self.0.insert(parent, String::new());
+                break;
+            };
+            chain.push(parent);
+            current = next;
+        }
+        for subject in chain {
+            self.0.insert(subject, found.clone());
+        }
+        found
+    }
 }
 
 /// The URL that shows `subject` in the data-browser of the connected server,
