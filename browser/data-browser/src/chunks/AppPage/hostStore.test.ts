@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { core } from '@tomic/react';
 import type { Store } from '@tomic/react';
+import { ProxyError } from '@helpers/proxyConnections';
 import {
+  errorReply,
   handleRequest,
   isHostRequest,
   isWithinApp,
@@ -579,4 +581,29 @@ describe('getMany', () => {
       expect(getResource).not.toHaveBeenCalled();
     },
   );
+});
+
+describe('errorReply', () => {
+  it('carries the proxy code and status next to the unchanged message', () => {
+    expect(
+      errorReply(7, new ProxyError(403, 'scope_denied', 'The proxy refused')),
+    ).toEqual({
+      id: 7,
+      error: 'The proxy refused',
+      errorCode: 'scope_denied',
+      errorStatus: 403,
+    });
+  });
+
+  it('leaves the code out when the proxy sent none', () => {
+    expect(errorReply(1, new ProxyError(502, undefined, 'bad'))).toEqual({
+      id: 1,
+      error: 'bad',
+      errorStatus: 502,
+    });
+  });
+
+  it('adds nothing for other errors', () => {
+    expect(errorReply(2, new Error('nope'))).toEqual({ id: 2, error: 'nope' });
+  });
 });

@@ -24,9 +24,13 @@ export const VirtualizedCollectionList: React.FC<
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    collection.waitForReady().then(() => {
-      setLoading(false);
-    });
+    // A failed fetch ends the loading state; the list then shows no items.
+    collection
+      .waitForReady()
+      .catch(() => undefined)
+      .then(() => {
+        setLoading(false);
+      });
   }, [collection]);
 
   if (loading) {
@@ -52,7 +56,14 @@ function VirtualizedCollectionListInner({
       const newPage = currentPage + 1;
 
       if (isVisible && newPage <= collection.totalPages - 1) {
-        const newItems = await collection.getMembersOnPage(newPage);
+        let newItems: string[];
+
+        try {
+          newItems = await collection.getMembersOnPage(newPage);
+        } catch {
+          return;
+        }
+
         setCurrentPage(newPage);
         setPages(prevPages => new Map(prevPages).set(newPage, newItems));
       }

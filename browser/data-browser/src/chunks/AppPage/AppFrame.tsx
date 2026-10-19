@@ -17,6 +17,7 @@ import {
   isHostRequest,
   isWithinApp,
   type HostReply,
+  errorReply,
 } from './hostStore';
 import { LoaderBlock } from '@components/Loader';
 import { Button } from '@components/Button';
@@ -467,7 +468,7 @@ async function answer(
       ),
     });
   } catch (e) {
-    post({ id: request.id, error: (e as Error).message });
+    post(errorReply(request.id, e));
   }
 }
 

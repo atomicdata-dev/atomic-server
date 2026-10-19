@@ -31,7 +31,10 @@ window.addEventListener('message', event => {
   clearTimeout(settle.timer);
 
   if (message.error) {
-    settle.reject(new Error(message.error));
+    const error = new Error(message.error);
+    if (message.errorCode !== undefined) error.code = message.errorCode;
+    if (message.errorStatus !== undefined) error.status = message.errorStatus;
+    settle.reject(error);
   } else {
     settle.resolve(message.result);
   }

@@ -370,6 +370,7 @@ export class Collection {
       // Reproducible under `ATOMIC_TEST_CPU_THROTTLE=5` via
       // `perf-sidebar-reload.spec.ts`.
       this._waitForReady = this.refresh();
+      this.markReadyHandled();
     }
 
     this.clearPages = this.clearPages.bind(this);
@@ -432,6 +433,15 @@ export class Collection {
     return this._aggregates;
   }
 
+  /**
+   * `_waitForReady` rejects when a connected store fails to fetch a page. Only
+   * callers that await it should see that; a collection nobody awaits must not
+   * raise an unhandled rejection.
+   */
+  private markReadyHandled(): void {
+    this._waitForReady.catch(() => undefined);
+  }
+
   public waitForReady(): Promise<void> {
     return this._waitForReady;
   }
@@ -456,6 +466,7 @@ export class Collection {
       }
 
       this._waitForReady = fetch;
+      this.markReadyHandled();
       await fetch;
     }
 
@@ -616,6 +627,7 @@ export class Collection {
         this._staleTotal = this._totalMembers;
         this.clearPages();
         this._waitForReady = this.fetchPage(0);
+        this.markReadyHandled();
         await this._waitForReady;
         if (!this._refreshPending) break;
       }
@@ -1043,8 +1055,10 @@ export class Collection {
       return;
     }
 
+    // A connected store that cannot fetch the page must say so: an empty page
+    // here would be indistinguishable from a collection with no members.
     if (this.store.serverConnected) {
-      await this.fetchPageFromServer(page).catch(() => undefined);
+      await this.fetchPageFromServer(page);
       this.retryAfterDriveSync();
 
       return;
@@ -1063,7 +1077,7 @@ export class Collection {
     await this.store.waitForServerConnected(3000);
 
     if (this.store.serverConnected) {
-      await this.fetchPageFromServer(page).catch(() => undefined);
+      await this.fetchPageFromServer(page);
       this.retryAfterDriveSync();
     }
   }
