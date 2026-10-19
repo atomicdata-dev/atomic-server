@@ -347,15 +347,36 @@ class AtomicAccountClient {
   Stream<String> chatCompletion(
     List<Map<String, String>> messages, {
     required String model,
+  }) =>
+      completionText(chatCompletionChunks(messages, model: model));
+
+  /// One streamed answer from the account's included AI, chunk by chunk: the
+  /// decoded JSON of each `data:` line of the OpenAI-compatible
+  /// `chat/completions` stream (`choices[0].delta` with `content` and
+  /// `tool_calls`, `finish_reason`, `usage`). [messages] may carry tool calls
+  /// and results, [tools] the functions the model may call (the portal
+  /// passes them on; the caller runs them). Throws with the portal's own
+  /// message when it refuses, and on an error chunk.
+  Stream<Map<String, dynamic>> chatCompletionChunks(
+    List<Map<String, dynamic>> messages, {
+    required String model,
+    List<Map<String, dynamic>>? tools,
   }) async* {
     if (!linked) throw StateError('Sign in first');
-    final request = http.Request(
-        'POST', origin.replace(path: '/api/ai/chat/completions'))
-      ..followRedirects = false
-      ..headers['Content-Type'] = 'application/json'
-      ..headers['Accept'] = 'text/event-stream'
-      ..body =
-          jsonEncode({'model': model, 'messages': messages, 'stream': true});
+    final request =
+        http.Request('POST', origin.replace(path: '/api/ai/chat/completions'))
+          ..followRedirects = false
+          ..headers['Content-Type'] = 'application/json'
+          ..headers['Accept'] = 'text/event-stream'
+          ..body = jsonEncode({
+            'model': model,
+            'messages': messages,
+            'stream': true,
+            if (tools != null && tools.isNotEmpty) ...{
+              'tools': tools,
+              'tool_choice': 'auto',
+            },
+          });
     _authorize(request);
     final http.StreamedResponse response;
     try {
@@ -375,11 +396,31 @@ class AtomicAccountClient {
       if (response.statusCode == 401) message = 'Sign in again to continue';
       throw StateError(message);
     }
-    yield* parseCompletionStream(response.stream.transform(utf8.decoder));
+    yield* parseCompletionChunks(response.stream.transform(utf8.decoder));
   }
 
   /// The text deltas of a server-sent-events completion stream.
-  static Stream<String> parseCompletionStream(Stream<String> chunks) async* {
+  static Stream<String> parseCompletionStream(Stream<String> chunks) =>
+      completionText(parseCompletionChunks(chunks));
+
+  /// The text deltas of decoded completion chunks.
+  static Stream<String> completionText(
+      Stream<Map<String, dynamic>> chunks) async* {
+    await for (final json in chunks) {
+      final choices = json['choices'];
+      final delta = choices is List && choices.isNotEmpty
+          ? (choices.first as Map)['delta']
+          : null;
+      final text = delta is Map ? delta['content'] : null;
+      if (text is String && text.isNotEmpty) yield text;
+    }
+  }
+
+  /// The decoded JSON chunks of a server-sent-events completion stream, up
+  /// to `[DONE]`. Comments (`: OPENROUTER PROCESSING`) and lines that are not
+  /// JSON are skipped; an error chunk throws.
+  static Stream<Map<String, dynamic>> parseCompletionChunks(
+      Stream<String> chunks) async* {
     var buffer = '';
     await for (final chunk in chunks) {
       buffer += chunk;
@@ -391,23 +432,21 @@ class AtomicAccountClient {
         if (!line.startsWith('data:')) continue;
         final data = line.substring(5).trim();
         if (data == '[DONE]') return;
+        Object? json;
         try {
-          final json = jsonDecode(data);
-          final choices = json is Map ? json['choices'] : null;
-          final delta = choices is List && choices.isNotEmpty
-              ? (choices.first as Map)['delta']
-              : null;
-          final text = delta is Map ? delta['content'] : null;
-          if (text is String && text.isNotEmpty) yield text;
-          final error = json is Map ? json['error'] : null;
-          if (error != null) {
-            throw StateError(error is Map
-                ? '${error['message'] ?? 'Included AI failed'}'
-                : '$error');
-          }
+          json = jsonDecode(data);
         } on FormatException {
           // A keep-alive comment or a partial line: nothing to show.
+          continue;
         }
+        if (json is! Map) continue;
+        final error = json['error'];
+        if (error != null) {
+          throw StateError(error is Map
+              ? '${error['message'] ?? 'Included AI failed'}'
+              : '$error');
+        }
+        yield Map<String, dynamic>.from(json);
       }
     }
   }

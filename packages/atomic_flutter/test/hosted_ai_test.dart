@@ -26,6 +26,48 @@ void main() {
     expect(text, 'Hello');
   });
 
+  test('chunks carry tool calls; comments and junk are skipped', () async {
+    const sse = ': OPENROUTER PROCESSING\n\n'
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1",'
+        '"function":{"name":"semantic_search","arguments":"{}"}}]},'
+        '"finish_reason":"tool_calls"}]}\n\n'
+        'data: not json\n\n'
+        'data: [DONE]\n\n';
+    final chunks =
+        await AtomicAccountClient.parseCompletionChunks(Stream.value(sse))
+            .toList();
+    expect(chunks, hasLength(1));
+    expect(chunks.single['choices'][0]['finish_reason'], 'tool_calls');
+  });
+
+  test('tools are sent along with the messages', () async {
+    String? body;
+    final client = AtomicAccountClient('https://portal.example',
+        client: MockClient.streaming((request, bodyStream) async {
+      body = await bodyStream.bytesToString();
+      return http.StreamedResponse(
+          Stream.value(utf8.encode('data: [DONE]\n\n')), 200);
+    }))
+      ..restoreSession(jsonEncode(
+          {'origin': 'https://portal.example', 'token': 'secret-token'}));
+    await client
+        .chatCompletionChunks(
+            [
+              {'role': 'user', 'content': 'Hallo'}
+            ],
+            model: 'm',
+            tools: [
+              {
+                'type': 'function',
+                'function': {'name': 'f', 'parameters': {}}
+              }
+            ])
+        .toList();
+    final json = jsonDecode(body!);
+    expect(json['tools'][0]['function']['name'], 'f');
+    expect(json['tool_choice'], 'auto');
+  });
+
   test('a stream error is thrown, not swallowed', () async {
     final stream = AtomicAccountClient.parseCompletionStream(
         Stream.value('data: {"error":{"message":"No credits left"}}\n\n'));
