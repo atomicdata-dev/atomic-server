@@ -1,18 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColorsExt;
+import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt;
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import 'slide_back_route.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'embed_server.dart';
+import 'warm_resource_web_view.dart';
 
 /// A resource as the web app draws it, without the web app around it: the
 /// bundled renderer (`assets/embed`) in a web view, reading from this device's
@@ -30,7 +27,6 @@ class ResourceView extends StatefulWidget {
 
   /// Where the bundled page comes from. A test swaps it for one that fails
   /// fast instead of starting a real server.
-  @visibleForTesting
   static Future<EmbedServer> Function() serverFactory = EmbedServer.instance;
 
   /// The page itself. A test swaps in a fake that needs no web view: it gets
@@ -42,6 +38,11 @@ class ResourceView extends StatefulWidget {
   /// How long leaving waits for the page to hand over its last edits.
   @visibleForTesting
   static Duration flushTimeout = const Duration(seconds: 2);
+
+  /// How long a closed page is kept (answering the store's last calls)
+  /// before its web view is released.
+  @visibleForTesting
+  static Duration releaseDelay = const Duration(seconds: 3);
 
   /// Answers one call of the page. Replaceable in a test.
   final Future<String> Function(String method, String argsJson)? call;
@@ -84,28 +85,6 @@ abstract class EmbedPage {
   Widget build();
 }
 
-class _WebViewPage implements EmbedPage {
-  final WebViewController controller;
-  _WebViewPage(this.controller);
-
-  @override
-  Future<void> runJavaScript(String script) => controller.runJavaScript(script);
-
-  @override
-  Future<Object> runJavaScriptReturningResult(String script) =>
-      controller.runJavaScriptReturningResult(script);
-
-  // The page owns every touch on it (scrolling a long menu or document must
-  // not be taken over by the swipe back when a finger drifts sideways).
-  @override
-  Widget build() => WebViewWidget(
-        controller: controller,
-        gestureRecognizers: const {
-          Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new),
-        },
-      );
-}
-
 class _ResourceViewState extends State<ResourceView>
     with WidgetsBindingObserver {
   EmbedPage? _page;
@@ -135,6 +114,15 @@ class _ResourceViewState extends State<ResourceView>
   }
 
   Future<void> _start() async {
+    // A page loaded ahead by the shell, when there is one: no page load.
+    final pool = ShellScope.maybeOf(context)?.warm;
+    if (pool != null && widget.path == null && widget.subject.isNotEmpty) {
+      final warm = pool.take();
+      if (warm != null) {
+        _attach(warm, warm: true);
+        return;
+      }
+    }
     final fake = ResourceView.pageFactory;
     if (fake != null) {
       _page = fake(_onMessage);
@@ -142,40 +130,52 @@ class _ResourceViewState extends State<ResourceView>
     }
     try {
       final server = await ResourceView.serverFactory();
-      final origin = server.page.origin;
-      final controller = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setBackgroundColor(Colors.transparent)
-        ..addJavaScriptChannel('AtomicFlutter',
-            onMessageReceived: (m) => _onMessage(m.message))
-        ..setOnConsoleMessage((m) => debugPrint('[embed:js] ${m.message}'))
-        ..setNavigationDelegate(NavigationDelegate(
-          // The page only ever shows its own files; nothing else is opened in it.
-          onNavigationRequest: (request) => request.url.startsWith(origin)
-              ? NavigationDecision.navigate
-              : NavigationDecision.prevent,
-          onPageFinished: (_) {
-            debugPrint(
-                '[embed] page loaded after ${_clock.elapsedMilliseconds} ms');
-            // The page follows the app's light/dark mode for its own 'auto'.
-            _scheme = null;
-            if (mounted) _tellColorScheme();
-          },
-        ))
-        ..loadRequest(server.page.replace(queryParameters: {
+      final page = await WebViewEmbedPage.create(
+        server.page.replace(queryParameters: {
           if (widget.path != null)
             'path': widget.path!
           else
             'subject': widget.subject,
-        }));
-      // Debug builds can be inspected from chrome://inspect.
-      if (kDebugMode && controller.platform is AndroidWebViewController) {
-        await AndroidWebViewController.enableDebugging(true);
+        }),
+        onMessage: _onMessage,
+        onLoaded: _pageLoaded,
+      );
+      if (mounted) {
+        setState(() => _page = page);
+      } else {
+        page.release();
       }
-      if (mounted) setState(() => _page = _WebViewPage(controller));
     } catch (e) {
       if (mounted) setState(() => _error = e);
     }
+  }
+
+  /// Takes a loaded [page] over: its messages come here, it is told the
+  /// colour scheme and which resource to show. Everything a view does with
+  /// its page is set up here, not when the page is made.
+  void _attach(WarmPage page, {required bool warm}) {
+    _warm = warm;
+    _page = page;
+    page.onMessage = _onMessage;
+    page.onLoaded = _pageLoaded;
+    if (warm) {
+      debugPrint('[warm] taken ready=${page is WebViewEmbedPage ? page.age : 0}'
+          ' ms after it started loading');
+      final subject = jsonEncode(widget.subject);
+      // `open` replaces the page's blank first entry, so back leaves the
+      // resource; an older bundle only has `show`.
+      unawaited(page.runJavaScript(
+          'window.atomicEmbed&&(window.atomicEmbed.open||window.atomicEmbed.show)($subject)'));
+    }
+  }
+
+  bool _warm = false;
+
+  void _pageLoaded() {
+    debugPrint('[embed] page loaded after ${_clock.elapsedMilliseconds} ms');
+    // The page follows the app's light/dark mode for its own 'auto'.
+    _scheme = null;
+    if (mounted) _tellColorScheme();
   }
 
   /// The bar's last button becomes this resource's "more" menu (the web app's
@@ -242,10 +242,22 @@ class _ResourceViewState extends State<ResourceView>
     final page = _page;
     if (!_leaving && page != null) {
       _closing.add(page);
-      unawaited(
-          _flush(leaving: true).whenComplete(() => _closing.remove(page)));
+      unawaited(_flush(leaving: true).whenComplete(() {
+        _closing.remove(page);
+        _release(page);
+      }));
+    } else if (page != null) {
+      _release(page);
     }
     super.dispose();
+  }
+
+  /// Drops the web view a little later: the store may still be answering the
+  /// page's last calls.
+  void _release(EmbedPage page) {
+    final releasable = page is ReleasablePage ? page as ReleasablePage : null;
+    if (releasable == null) return;
+    Future<void>.delayed(ResourceView.releaseDelay, releasable.release);
   }
 
   /// Asks the page to hand every pending edit to the store
@@ -303,6 +315,9 @@ class _ResourceViewState extends State<ResourceView>
         _firstRead = false;
         debugPrint('[embed] first read at $started ms, answered in '
             '${_clock.elapsedMilliseconds - started} ms');
+        debugPrint(_warm
+            ? '[warm] open ${_clock.elapsedMilliseconds} ms first content'
+            : '[warm] cold open ${_clock.elapsedMilliseconds} ms first content');
       }
     } catch (e) {
       reply = 'false,${jsonEncode('$e')}';

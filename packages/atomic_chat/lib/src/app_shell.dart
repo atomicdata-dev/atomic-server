@@ -10,6 +10,7 @@ import 'covered_insets_freeze.dart';
 import 'app_bottom_bar.dart';
 import 'models.dart';
 import 'assistant_api.dart';
+import 'warm_resource_web_view.dart';
 import 'slide_back_route.dart';
 
 /// The route names of the pages the bottom bar opens: a page's kind. The bar
@@ -46,6 +47,10 @@ class ShellController extends ChangeNotifier {
   /// Builds the user's page (agent, sync and account), which the host app
   /// owns. It pops with `true` when the person signed out there.
   final WidgetBuilder? profile;
+
+  /// The web page kept loaded for the next resource (see
+  /// [WarmResourceWebView]); null where there is none.
+  WarmResourceWebView? warm;
 
   ShellController({String drive = '', this.profile})
       : drive = ValueNotifier(drive);
@@ -234,6 +239,10 @@ class AppShell extends StatefulWidget {
   /// The first page.
   final Widget home;
 
+  /// The pre-loaded web page; by default one is made on a phone and none
+  /// elsewhere. A test passes its own (or none).
+  final WarmResourceWebView? Function(AssistantApi api)? warmPool;
+
   /// The user's page the Profile button opens (see [ShellController.profile]).
   final WidgetBuilder? profile;
 
@@ -243,6 +252,7 @@ class AppShell extends StatefulWidget {
     required this.drive,
     required this.home,
     this.profile,
+    this.warmPool,
   });
 
   @override
@@ -271,7 +281,18 @@ class _AppShellState extends State<AppShell> {
       _FrozenBottomPadding(child: AppBottomBar(api: widget.api, shell: _shell));
 
   @override
+  void initState() {
+    super.initState();
+    // The shell exists once the person is in and the host's store is open:
+    // load the next resource's page now, while they look at the home.
+    _shell.warm =
+        (widget.warmPool ?? WarmResourceWebView.forPlatform)(widget.api)
+          ?..warmUp();
+  }
+
+  @override
   void dispose() {
+    _shell.warm?.dispose();
     _shell.dispose();
     _barHeight.dispose();
     super.dispose();

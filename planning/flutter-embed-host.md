@@ -111,12 +111,24 @@ Each step ships on its own and has a test that fails without it.
   the entry plus first-use chunks exceed a gzip budget (start: today's 553 kB +
   297 kB) or the total exceeds 16 MB; run in the Flutter workflow (`embed-size` job in `atomic-flutter.yml`). Report the sizes
   in the job summary. Measured: 45 first-use chunks, 926 kB gzip (budget 1 MB), 13.6 MB total.
-- [ ] **4. One warm web view.** A shell-level `EmbedPool` keeps a loaded web view
-  (page ready, Loro WASM compiled) and shows a resource with `show(subject)`
-  instead of a page load; a second one is created lazily so the page below stays
-  visible during the slide-back. Measure first-content time and memory before and
-  after on the Xiaomi test phone (budget: first content < 250 ms for a stored
-  resource).
+- [~] **4. One warm web view.** Built, not yet measured on a phone.
+  `WarmResourceWebView` (`packages/atomic_chat/lib/src/warm_resource_web_view.dart`)
+  is made by `AppShell.initState` (so after login and the host's open_db) and
+  holds ONE hidden web view with `embed.html` loaded and booted. The page posts
+  `{method:'ready'}` on `AtomicFlutter` once up (`embed.tsx`; fallback: poll
+  `typeof window.atomicEmbed`). `ResourceView` takes it (`ShellController.warm`),
+  swaps the channel handler to itself, runs `atomicEmbed.open(subject)` (replaces
+  the blank first history entry so back leaves the resource; falls back to
+  `show`), and the pool starts the next spare after 600 ms (so the open is not
+  competing with a 13 MB load). Not ready, failed, `path` pages (settings) or no
+  pool: the cold path, as before. A taken (or cold) page is released 3 s after the
+  view closes. The spare is dropped after 5 min in the background or on memory
+  pressure, and warmed again on resume. Logs: `[warm] taken ready=...`,
+  `[warm] open N ms first content`, `[warm] cold open N ms first content`.
+  Still open: measure on the Xiaomi (first content < 250 ms, memory with the
+  spare), check that a detached Android web view boots (timers, WASM) and lays
+  out right when attached, and rebuild the bundle (`build_embed.sh`) so `open`
+  and `ready` exist (without them: `show` and polling).
 - [ ] **5. Native views for the hot types.** Registry entries, one at a time,
   each with an escape hatch to the web renderer: AI chat (done), conversations
   (in progress), then table rows list, folder list, file preview. Rule: native

@@ -28,6 +28,7 @@ export 'src/new_document_sheet.dart';
 // Resources: native views, else the embedded web renderer.
 export 'src/native_views.dart';
 export 'src/resource_view.dart';
+export 'src/warm_resource_web_view.dart';
 export 'src/resource_web_view.dart';
 export 'src/embed_server.dart';
 export 'src/resource_row.dart';

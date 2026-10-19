@@ -8,6 +8,8 @@
  *
  * Host API, on `window.atomicEmbed`:
  *   show(subject)     render this resource
+ *   open(subject)     same, replacing the current page in the history (a
+ *                     pre-loaded page: back then leaves the resource)
  *   changed(subjects) these resources changed in the host's store
  *   flush(leaving?)   hand every pending edit to the host; resolves when done
  *
@@ -93,6 +95,7 @@ declare global {
     AtomicFlutter?: { postMessage(message: string): void };
     atomicEmbed?: {
       show(subject: string): void;
+      open(subject: string): void;
       changed(subjects: string[]): void;
       openMenu(): void;
       back(): boolean;
@@ -274,6 +277,13 @@ window.atomicEmbed = {
   show(subject) {
     void router.navigate({ to: '/app/show', search: { subject } });
   },
+  open(subject) {
+    void router.navigate({
+      to: '/app/show',
+      search: { subject },
+      replace: true,
+    });
+  },
   changed(subjects) {
     for (const subject of subjects) void store.getResource(subject);
   },
@@ -316,3 +326,7 @@ createRoot(document.getElementById('root')!).render(
     </StoreContext.Provider>
   </StrictMode>,
 );
+
+// Tells the host the page is up, so it can keep one loaded and hidden and show
+// a resource in it with `open(subject)` instead of loading a page.
+window.AtomicFlutter?.postMessage(JSON.stringify({ method: 'ready' }));
