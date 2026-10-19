@@ -21,7 +21,6 @@ MaterialApp(
       api: const MyAssistantApi(),
       drive: activeDrive,
       onSignOut: signedOut,
-      onOpenGallery: null, // the host's other part; no button when null
     ),
   ),
 );
@@ -66,7 +65,7 @@ Search and New have more choices on touch and hold:
 ## HoldFan
 
 A button with a default action on tap and more on touch-and-hold, after the
-Atomic Canvas colour and width fans. It lives in `atomic_flutter` (no
+colour and width fans of the Atomic drawing tools. It lives in `atomic_flutter` (no
 dependency on this package) and is re-exported here.
 
 ```dart

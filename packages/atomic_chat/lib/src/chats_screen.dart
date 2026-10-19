@@ -52,9 +52,6 @@ class ChatsScreen extends StatefulWidget {
   /// The drive the home opens on; the search looks in it.
   final String drive;
 
-  /// The host's other part (the canvases of atomic.place), opened from the
-  /// app bar; no button when null.
-  final VoidCallback? onOpenGallery;
   final VoidCallback? onSignOut;
 
   /// The user's page; the shell's [ShellController.profile] when null. It
@@ -65,7 +62,6 @@ class ChatsScreen extends StatefulWidget {
     super.key,
     required this.drive,
     required this.api,
-    this.onOpenGallery,
     this.onSignOut,
     this.profile,
   });
@@ -509,14 +505,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
           backgroundColor: c.bgBody,
           appBar: AppTopBar(
             titleWidget: const AtomicWordmark(),
-            actions: [
-              if (widget.onOpenGallery != null)
-                IconButton(
-                  tooltip: 'Canvases',
-                  icon: const Icon(Icons.draw_outlined),
-                  onPressed: widget.onOpenGallery,
-                ),
-            ],
           ),
           body: ListView(
             children: [

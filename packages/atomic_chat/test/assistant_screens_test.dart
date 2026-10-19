@@ -266,8 +266,8 @@ void main() {
           (id: 'p#2', role: 'assistant', text: 'Lisbon.', createdAt: 2),
         ],
       );
-      await tester.pumpWidget(app(
-          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
 
       expect(find.text('Trip plan'), findsOneWidget);
@@ -307,8 +307,8 @@ void main() {
           ),
         ],
       );
-      await tester.pumpWidget(app(
-          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       double y(String t) => tester.getTopLeft(find.text(t)).dy;
       expect(y('Notifications'), lessThan(y('Drives')));
@@ -326,8 +326,8 @@ void main() {
     });
 
     testWidgets('no notifications, no Notifications section', (tester) async {
-      await tester.pumpWidget(app(ChatsScreen(
-          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
       expect(find.text('Notifications'), findsNothing);
       expect(find.text('No notifications'), findsNothing);
@@ -337,8 +337,8 @@ void main() {
       final api = FakeApi(
         chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
       );
-      await tester.pumpWidget(app(
-          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       expect(find.text('A chat'), findsOneWidget);
       await tester.tap(find.text('AI chats'));
@@ -354,8 +354,8 @@ void main() {
       final api = FakeApi(
         chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
       );
-      await tester.pumpWidget(app(
-          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       double y(String t) => tester.getTopLeft(find.text(t)).dy;
       expect(y('Drives'), lessThan(y('AI chats')));
@@ -392,8 +392,8 @@ void main() {
           (id: 'p#1', role: 'user', text: 'Where to?', createdAt: 1),
         ],
       );
-      await tester.pumpWidget(app(
-          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       // The first load shows a spinner until the chats arrive.
       await tester.pump();
       expect(find.byType(CircularProgressIndicator), findsWidgets);
@@ -426,8 +426,8 @@ void main() {
       final api = _SlowChatsApi(
         chatList: [(subject: 'did:ad:1', name: 'Trip plan', lastActivity: 5)],
       );
-      await tester.pumpWidget(app(
-          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pump();
       api.pending.removeAt(0).complete(api.chatList);
       await tester.pumpAndSettle();
@@ -444,25 +444,18 @@ void main() {
     });
 
     testWidgets('says so when there are no chats', (tester) async {
-      await tester.pumpWidget(app(ChatsScreen(
-          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
       expect(find.text('No chats yet'), findsOneWidget);
     });
 
-    testWidgets('reaches the canvas gallery and the search', (tester) async {
-      var gallery = 0;
+    testWidgets('reaches the search', (tester) async {
       await tester.pumpWidget(shellApp(
-        ChatsScreen(
-            drive: 'did:ad:drive',
-            api: FakeApi(),
-            onOpenGallery: () => gallery++),
+        ChatsScreen(drive: 'did:ad:drive', api: FakeApi()),
         brightness: Brightness.dark,
       ));
       await tester.pumpAndSettle();
-
-      await tester.tap(find.byTooltip('Canvases'));
-      expect(gallery, 1);
 
       await tester.tap(find.byTooltip('Search'));
       await tester.pumpAndSettle();
@@ -483,8 +476,8 @@ void main() {
           ),
         ],
       );
-      await tester.pumpWidget(app(
-          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       double y(String t) => tester.getTopLeft(find.text(t)).dy;
       expect(y('Drives'), lessThan(y('Recents')));
@@ -499,8 +492,8 @@ void main() {
       addTearDown(tester.view.reset);
       Future<void> pump(FakeApi api) async {
         await tester.pumpWidget(const SizedBox());
-        await tester.pumpWidget(app(ChatsScreen(
-            drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+        await tester
+            .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
         await tester.pumpAndSettle();
       }
 
@@ -557,8 +550,8 @@ void main() {
         ],
         lastMessages: {'m1': 'See you\n  tomorrow'},
       );
-      await tester.pumpWidget(app(
-          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       expect(find.text('See you tomorrow'), findsOneWidget);
 
@@ -579,8 +572,8 @@ void main() {
             emoji: null
           ),
       ]);
-      await tester.pumpWidget(app(
-          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       expect(find.text('Fav 4'), findsNothing);
       await tester.tap(find.text('Show all'));
@@ -595,8 +588,8 @@ void main() {
         for (var i = 0; i < 6; i++)
           (subject: 'c$i', name: 'Chat $i', lastActivity: now),
       ]);
-      await tester.pumpWidget(app(
-          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       expect(find.text('Chat 3'), findsOneWidget);
       expect(find.text('Chat 4'), findsNothing);
@@ -622,8 +615,8 @@ void main() {
         ],
         activityList: [_activity('a1', 'Plan')],
       );
-      await tester.pumpWidget(app(
-          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       double y(String t) => tester.getTopLeft(find.text(t)).dy;
       expect(y('Recents'), lessThan(y('Activity')));
@@ -632,8 +625,8 @@ void main() {
     });
 
     testWidgets('says so when there is no activity', (tester) async {
-      await tester.pumpWidget(app(ChatsScreen(
-          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
       expect(find.text('No activity yet'), findsOneWidget);
     });
@@ -646,8 +639,7 @@ void main() {
             drive: 'did:ad:drive',
             api: FakeApi(activityList: [
               for (var i = 0; i < n; i++) _activity('a$i', 'Item $i'),
-            ]),
-            onOpenGallery: () {})));
+            ]))));
         await tester.pumpAndSettle();
       }
 
@@ -669,8 +661,8 @@ void main() {
         _activity('gone', 'Old note', kind: 'deleted', actor: null),
         _activity('here', 'Fresh note', kind: 'created'),
       ]);
-      await tester.pumpWidget(app(
-          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       expect(find.text('Someone deleted · 5 min ago'), findsOneWidget);
       ListTile tile(String title) => tester.widget<ListTile>(
@@ -731,8 +723,7 @@ void main() {
           ],
         },
       );
-      await tester.pumpWidget(
-          app(ChatsScreen(drive: 'did:ad:a', api: api, onOpenGallery: () {})));
+      await tester.pumpWidget(app(ChatsScreen(drive: 'did:ad:a', api: api)));
       await tester.pumpAndSettle();
       double y(String t) => tester.getTopLeft(find.text(t)).dy;
       expect(y('Newest a'), lessThan(y('Second b')));
@@ -765,8 +756,7 @@ void main() {
           ],
         },
       );
-      await tester.pumpWidget(
-          app(ChatsScreen(drive: 'did:ad:a', api: api, onOpenGallery: () {})));
+      await tester.pumpWidget(app(ChatsScreen(drive: 'did:ad:a', api: api)));
       await tester.pumpAndSettle();
       ResourceView.serverFactory = () async => throw 'no server in a test';
       await tester.tap(find.text('Alpha').first);
@@ -779,8 +769,8 @@ void main() {
     testWidgets(
         'the bottom bar is one row: search, new chat, profile, settings',
         (tester) async {
-      await tester.pumpWidget(shellApp(ChatsScreen(
-          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester.pumpWidget(
+          shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
       expect(find.byType(TextField), findsNothing);
       final tips = ['Search', 'New chat', 'Profile', 'Settings'];
@@ -800,8 +790,8 @@ void main() {
     });
 
     testWidgets('Search opens the search screen', (tester) async {
-      await tester.pumpWidget(shellApp(ChatsScreen(
-          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester.pumpWidget(
+          shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Search'));
       await tester.pumpAndSettle();
@@ -809,8 +799,8 @@ void main() {
     });
 
     testWidgets('New chat opens a chat', (tester) async {
-      await tester.pumpWidget(shellApp(ChatsScreen(
-          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester.pumpWidget(
+          shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('New chat'));
       await tester.pumpAndSettle();
@@ -819,8 +809,8 @@ void main() {
 
     testWidgets('Settings opens the settings page', (tester) async {
       ResourceView.serverFactory = () async => throw 'no server in a test';
-      await tester.pumpWidget(shellApp(ChatsScreen(
-          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester.pumpWidget(
+          shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Settings'));
       await tester.pumpAndSettle();
@@ -832,8 +822,8 @@ void main() {
     testWidgets('shows the error when the chats cannot be read',
         (tester) async {
       final api = _Failing();
-      await tester.pumpWidget(app(
-          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       expect(find.textContaining('No active drive'), findsOneWidget);
     });
@@ -864,8 +854,8 @@ void main() {
       ], icons: {
         'a1': '🚀'
       });
-      await tester.pumpWidget(app(
-          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       expect(find.text('🦊'), findsOneWidget);
       expect(find.text('🏔'), findsOneWidget);
@@ -1811,10 +1801,8 @@ void main() {
     });
 
     testWidgets('a new chat can be started from the home', (tester) async {
-      await tester.pumpWidget(shellApp(ChatsScreen(
-          drive: 'did:ad:drive',
-          api: FakeApi(ai: ai()),
-          onOpenGallery: () {})));
+      await tester.pumpWidget(
+          shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi(ai: ai()))));
       await tester.pumpAndSettle();
 
       await tester.tap(find.byTooltip('New chat'));
@@ -1893,9 +1881,6 @@ void main() {
         ),
       )));
       await tester.pumpAndSettle();
-      // No gallery callback: no Canvases button.
-      expect(find.byTooltip('Canvases'), findsNothing);
-
       await tester.tap(find.byTooltip('Profile'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sign out'));
@@ -1925,10 +1910,8 @@ void main() {
 
     Future<void> pumpHome(WidgetTester tester) async {
       ResourceView.serverFactory = () async => throw 'no server in a test';
-      await tester.pumpWidget(shellApp(ChatsScreen(
-          drive: 'did:ad:drive',
-          api: FakeApi(recent: [doc]),
-          onOpenGallery: () {})));
+      await tester.pumpWidget(shellApp(
+          ChatsScreen(drive: 'did:ad:drive', api: FakeApi(recent: [doc]))));
       await tester.pumpAndSettle();
     }
 
@@ -2127,8 +2110,8 @@ void main() {
         chat('Old chat',
             now.subtract(const Duration(days: 90)).millisecondsSinceEpoch),
       ]);
-      await tester.pumpWidget(app(
-          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       expect(find.text('Today'), findsNothing);
       await tester.tap(find.text('Show all'));
@@ -2232,8 +2215,8 @@ void main() {
   });
   group('SearchScreen opens fast', () {
     testWidgets('settles within 160 ms, field at the bottom', (tester) async {
-      await tester.pumpWidget(shellApp(ChatsScreen(
-          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester.pumpWidget(
+          shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Search'));
       await tester.pump();
@@ -2298,8 +2281,8 @@ void main() {
 
     testWidgets('Home goes back to the home screen from any page',
         (tester) async {
-      await tester.pumpWidget(shellApp(ChatsScreen(
-          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester.pumpWidget(
+          shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('New chat'));
       await tester.pumpAndSettle();
@@ -2327,8 +2310,8 @@ void main() {
           emoji: null
         ),
       ]);
-      await tester.pumpWidget(shellApp(
-          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester
+          .pumpWidget(shellApp(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
 
       var calls = api.drivesCalls;
