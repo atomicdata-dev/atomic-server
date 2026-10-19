@@ -7,7 +7,7 @@ use crate::api::simple::state::node;
 
 /// One call from the page.
 pub(crate) async fn call(method: &str, args_json: &str) -> Result<String, String> {
-    atomic_lib::host::embed::EmbedHost::new(node()?, crate::host::pusher())
+    atomic_lib::host::embed::EmbedHost::new(node()?, crate::host::pusher(), crate::host::profiles())
         .call(method, args_json)
         .await
 }

@@ -11,8 +11,14 @@
 //! local edit, queued in the outbox and handed to the host's
 //! [`LocalWritePusher`]. There is no raw signing, so a script inside the page
 //! cannot get a signature over anything else.
+//!
+//! Reads: the page's store does not connect to a server, so an agent it shows
+//! (a chat's author, "created by", a member list) that this device does not
+//! hold would be "not found". Those are answered from the host's
+//! [`AgentProfiles`] instead: the profile the connected server has, in memory
+//! only, never written to the store (this device did not sign or verify it).
 
-use super::LocalWritePusher;
+use super::{profiles::AgentProfiles, LocalWritePusher};
 use crate::{
     agents::ForAgent, runtime::AtomicNode, storelike::Query, Db, Resource, Storelike, Subject,
 };
@@ -57,10 +63,11 @@ fn subject_of(store: &Db, raw: &str) -> Subject {
     Subject::from_raw(raw, store.get_base_domain().as_deref())
 }
 
-/// A resource as JSON-AD under the subject it was asked by, plus its Loro
-/// snapshot. Reads the stored row first, like the browser's database does:
-/// decoding the whole CRDT history only to serialise it again is the slow way.
-async fn read_one(store: &Db, raw: &str) -> Json {
+/// A resource from the local store as JSON-AD under the subject it was asked
+/// by, plus its Loro snapshot. Reads the stored row first, like the browser's
+/// database does: decoding the whole CRDT history only to serialise it again
+/// is the slow way.
+async fn read_local(store: &Db, raw: &str) -> Json {
     let subject = subject_of(store, raw);
     let origin = origin(store);
     let resource: Option<Resource> = match store.get_resource_shallow(&subject) {
@@ -73,6 +80,27 @@ async fn read_one(store: &Db, raw: &str) -> Json {
         .and_then(|_| store.get_loro_snapshot(&subject))
         .map(|b| b64(&b));
     json!({ "jsonAd": json_ad, "snapshot": snapshot })
+}
+
+/// Like [`read_local`], and an agent that is not in the local store is
+/// answered with the profile from `profiles` (no snapshot: it is not a
+/// resource of this device). Missing agents of one batch are looked up
+/// together.
+async fn read_many(store: &Db, profiles: &AgentProfiles, raws: &[String]) -> Vec<Json> {
+    let mut rows: Vec<Json> = Vec::with_capacity(raws.len());
+    for raw in raws {
+        rows.push(read_local(store, raw).await);
+    }
+    let missing: Vec<usize> = (0..raws.len())
+        .filter(|&i| rows[i]["jsonAd"].is_null() && subject_of(store, &raws[i]).is_agent_did())
+        .collect();
+    let found = futures::future::join_all(missing.iter().map(|&i| profiles.get(&raws[i]))).await;
+    for (i, profile) in missing.into_iter().zip(found) {
+        if let Some(json_ad) = profile {
+            rows[i]["jsonAd"] = json!(json_ad);
+        }
+    }
+    rows
 }
 
 async fn query(store: &Db, opts: &Json) -> Result<Json, String> {
@@ -282,11 +310,20 @@ fn with_commit_id(commit_json: &str) -> Result<String, String> {
 pub struct EmbedHost {
     node: AtomicNode,
     pusher: Arc<dyn LocalWritePusher>,
+    profiles: AgentProfiles,
 }
 
 impl EmbedHost {
-    pub fn new(node: AtomicNode, pusher: Arc<dyn LocalWritePusher>) -> Self {
-        Self { node, pusher }
+    pub fn new(
+        node: AtomicNode,
+        pusher: Arc<dyn LocalWritePusher>,
+        profiles: AgentProfiles,
+    ) -> Self {
+        Self {
+            node,
+            pusher,
+            profiles,
+        }
     }
 
     /// One call from the page: `method` and its arguments (a JSON array),
@@ -301,13 +338,12 @@ impl EmbedHost {
                 Ok(agent) => json!(agent.subject.to_string()),
                 Err(_) => Json::Null,
             },
-            "getResource" => read_one(store, str_arg(&args, 0)?).await["jsonAd"].clone(),
+            "getResource" => {
+                let raw = vec![str_arg(&args, 0)?.to_string()];
+                read_many(store, &self.profiles, &raw).await[0]["jsonAd"].clone()
+            }
             "getResourcesWithSnapshots" => {
-                let mut rows = Vec::new();
-                for s in strings(&args, 0) {
-                    rows.push(read_one(store, &s).await);
-                }
-                json!(rows)
+                json!(read_many(store, &self.profiles, &strings(&args, 0)).await)
             }
             "getLoroSnapshot" => json!(store
                 .get_loro_snapshot(&subject_of(store, str_arg(&args, 0)?))
@@ -400,7 +436,7 @@ mod tests {
     use crate::urls;
 
     fn host(d: &Device) -> EmbedHost {
-        EmbedHost::new(d.node.clone(), Arc::new(NoPush))
+        EmbedHost::new(d.node.clone(), Arc::new(NoPush), AgentProfiles::none())
     }
 
     async fn ask(host: &EmbedHost, method: &str, args: Json) -> Json {
@@ -440,6 +476,96 @@ mod tests {
             .unwrap()
             .contains(&other_spelling));
         assert!(rows[2]["jsonAd"].is_null());
+    }
+
+    /// Answers one agent's profile and counts the calls.
+    struct Profiles(std::sync::atomic::AtomicUsize, Option<String>);
+
+    #[async_trait::async_trait]
+    impl crate::host::AgentProfileFetcher for Profiles {
+        async fn fetch_agent_resource(&self, _agent: &str) -> Option<String> {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.1.clone()
+        }
+    }
+
+    fn calls(p: &Profiles) -> usize {
+        p.0.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    fn host_with(d: &Device, fetcher: Arc<Profiles>) -> EmbedHost {
+        EmbedHost::new(
+            d.node.clone(),
+            Arc::new(NoPush),
+            AgentProfiles::with_timing(
+                fetcher,
+                std::time::Duration::from_secs(2),
+                std::time::Duration::from_secs(60),
+            ),
+        )
+    }
+
+    #[tokio::test]
+    async fn an_agent_this_device_lacks_is_answered_from_the_server_once() {
+        let d = Device::new().await;
+        let reply = json!({ "@id": "https://server.test/x", urls::NAME: "Dora" }).to_string();
+        let fetcher = Arc::new(Profiles(Default::default(), Some(reply)));
+        let h = host_with(&d, fetcher.clone());
+        let stranger = "atomic:agent:strangerkey";
+
+        let rows = ask(&h, "getResourcesWithSnapshots", json!([[stranger]])).await;
+        let json_ad = rows[0]["jsonAd"].as_str().unwrap();
+        assert!(json_ad.contains("Dora"), "{json_ad}");
+        assert!(json_ad.contains(stranger), "answered under the asked id");
+        assert!(rows[0]["snapshot"].is_null());
+        // getResource, and the other spelling's read, come from the cache.
+        let one = ask(&h, "getResource", json!([stranger])).await;
+        assert!(one.as_str().unwrap().contains("Dora"));
+        assert_eq!(calls(&fetcher), 1);
+        // Never stored as if it were ours.
+        assert!(d
+            .store
+            .get_resource_shallow(&subject_of(&d.store, stranger))
+            .is_err());
+    }
+
+    #[tokio::test]
+    async fn an_unknown_agent_is_not_found_and_not_asked_again_for_a_minute() {
+        let d = Device::new().await;
+        let fetcher = Arc::new(Profiles(Default::default(), None));
+        let h = host_with(&d, fetcher.clone());
+        for _ in 0..3 {
+            let rows = ask(
+                &h,
+                "getResourcesWithSnapshots",
+                json!([["did:ad:agent:nobody"]]),
+            )
+            .await;
+            assert!(rows[0]["jsonAd"].is_null());
+        }
+        assert_eq!(calls(&fetcher), 1);
+    }
+
+    #[tokio::test]
+    async fn local_agents_and_other_subjects_never_ask_the_server() {
+        let d = Device::new().await;
+        let fetcher = Arc::new(Profiles(Default::default(), Some("{}".into())));
+        let h = host_with(&d, fetcher.clone());
+        let me = ask(&h, "agent", json!([])).await;
+        let me = me.as_str().unwrap().to_string();
+        let rows = ask(
+            &h,
+            "getResourcesWithSnapshots",
+            json!([[me, "did:ad:not-here", "https://example.test/nope"]]),
+        )
+        .await;
+        assert!(
+            !rows[0]["jsonAd"].is_null(),
+            "this device's own agent is local"
+        );
+        assert!(rows[1]["jsonAd"].is_null());
+        assert!(rows[2]["jsonAd"].is_null());
+        assert_eq!(calls(&fetcher), 0);
     }
 
     #[tokio::test]
@@ -606,7 +732,7 @@ mod tests {
         use crate::loro::AtomicLoroDoc;
         let d = Device::new().await;
         let pushed = Arc::new(Counting::default());
-        let h = EmbedHost::new(d.node.clone(), pushed.clone());
+        let h = EmbedHost::new(d.node.clone(), pushed.clone(), AgentProfiles::none());
         let doc_subject = d
             .store
             .create_resource(urls::DOCUMENT_V2, &d.drive, "Typed doc", None)

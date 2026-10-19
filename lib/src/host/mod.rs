@@ -27,9 +27,11 @@
 //! - [`LocalWritePusher`]: what happens after a local write is applied and
 //!   queued in the outbox (drain it to a server, hand it to live peers). A
 //!   host without a network passes [`NoPush`].
-//! - [`AgentNameFetcher`]: how the name of an agent this device does not hold
-//!   is looked up (the Flutter host asks the connected server). Lookups run in
-//!   the background and are cached; lists never wait on them.
+//! - [`AgentProfileFetcher`]: how the profile of an agent this device does not
+//!   hold is looked up (the Flutter host asks the connected server).
+//!   [`profiles::AgentProfiles`] caches the results in memory and is shared by
+//!   the lists (names, in the background) and the embedded page (the whole
+//!   profile, with a short wait).
 //!
 //! Native only: hosts run a tokio runtime; the browser has its own store.
 
@@ -38,6 +40,7 @@ pub mod context;
 pub mod conversations;
 pub mod embed;
 pub mod lists;
+pub mod profiles;
 pub mod recents;
 pub mod rows;
 
@@ -62,20 +65,21 @@ impl LocalWritePusher for NoPush {
     async fn push(&self, _response: &CommitResponse) {}
 }
 
-/// Looks up the display name of an agent this device does not hold.
+/// Looks up the profile of an agent this device does not hold.
 #[async_trait]
-pub trait AgentNameFetcher: Send + Sync {
-    /// The agent's name, `None` when it cannot be found (now). The host
-    /// decides how long this may take.
-    async fn fetch(&self, agent: &str) -> Option<String>;
+pub trait AgentProfileFetcher: Send + Sync {
+    /// The agent's resource as JSON-AD (at least its name and public key),
+    /// `None` when it cannot be found (now). [`profiles::AgentProfiles`]
+    /// bounds how long this may take.
+    async fn fetch_agent_resource(&self, agent: &str) -> Option<String>;
 }
 
-/// An [`AgentNameFetcher`] that knows no names.
-pub struct NoNames;
+/// An [`AgentProfileFetcher`] that knows no agents.
+pub struct NoProfiles;
 
 #[async_trait]
-impl AgentNameFetcher for NoNames {
-    async fn fetch(&self, _agent: &str) -> Option<String> {
+impl AgentProfileFetcher for NoProfiles {
+    async fn fetch_agent_resource(&self, _agent: &str) -> Option<String> {
         None
     }
 }

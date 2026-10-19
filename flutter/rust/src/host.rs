@@ -1,20 +1,19 @@
 //! The bridge's binding of `atomic_lib::host` to this process: the store,
 //! recents index and conversation caches live in statics here, a local write
 //! is pushed with [`push_local_write`](crate::api::simple::push_local_write),
-//! and agent names come from the connected server.
+//! and the profiles of agents this device does not hold come from the
+//! connected server (one cache, shared by the lists and the embedded page).
 
 use crate::api::simple::state::{connected_server, db};
 use atomic_lib::{
     commit::CommitResponse,
     host::{
-        conversations::Conversations, recents::RecentsIndex, AgentNameFetcher, LocalWritePusher,
+        conversations::Conversations, profiles::AgentProfiles, recents::RecentsIndex,
+        AgentProfileFetcher, LocalWritePusher,
     },
     Storelike,
 };
 use std::sync::{Arc, OnceLock};
-
-/// How long a background lookup of one agent's name may take.
-const AGENT_NAME_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
 
 /// Hands a local write to the WebSocket session, live peers and paired
 /// devices (`push_local_write`).
@@ -30,24 +29,29 @@ impl LocalWritePusher for BridgePusher {
 }
 
 /// Asks the connected server for an agent, with the library's HTTP client
-/// (which carries the Android TLS setup).
-struct ServerNameFetcher;
+/// (which carries the Android TLS setup). The cache in front of it bounds the
+/// time and remembers failures.
+struct ServerProfileFetcher;
 
 #[async_trait::async_trait]
-impl AgentNameFetcher for ServerNameFetcher {
-    async fn fetch(&self, member: &str) -> Option<String> {
+impl AgentProfileFetcher for ServerProfileFetcher {
+    async fn fetch_agent_resource(&self, member: &str) -> Option<String> {
         let origin = connected_server()?;
         let agent = db().ok()?.get_default_agent().ok();
         let url = format!("{origin}/{member}");
-        let body = tokio::time::timeout(
-            AGENT_NAME_TIMEOUT,
-            atomic_lib::client::fetch_body(&url, atomic_lib::parse::JSON_AD_MIME, agent.as_ref()),
-        )
-        .await
-        .ok()?
-        .ok()?;
-        atomic_lib::host::conversations::name_from_json_ad(&body)
+        atomic_lib::client::fetch_body(&url, atomic_lib::parse::JSON_AD_MIME, agent.as_ref())
+            .await
+            .ok()
     }
+}
+
+/// The profiles of agents this device does not hold, fetched from the
+/// connected server and kept in memory.
+pub(crate) fn profiles() -> AgentProfiles {
+    static PROFILES: OnceLock<AgentProfiles> = OnceLock::new();
+    PROFILES
+        .get_or_init(|| AgentProfiles::new(Arc::new(ServerProfileFetcher)))
+        .clone()
 }
 
 /// The pusher every bridge write goes through.
@@ -65,7 +69,7 @@ pub(crate) fn recents() -> &'static Arc<RecentsIndex> {
 /// Conversations, with their caches of agent names and opened messages.
 pub(crate) fn conversations() -> &'static Conversations {
     static CONVERSATIONS: OnceLock<Conversations> = OnceLock::new();
-    CONVERSATIONS.get_or_init(|| Conversations::new(Arc::new(ServerNameFetcher)))
+    CONVERSATIONS.get_or_init(|| Conversations::new(profiles()))
 }
 
 /// Load the recents index from `dir`, and keep it current for as long as the

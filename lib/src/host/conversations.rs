@@ -7,8 +7,9 @@
 use super::{
     lists::private_drive_list,
     own_commit_opts,
+    profiles::AgentProfiles,
     rows::{name_of, row_resource, with_emoji},
-    AgentNameFetcher, LocalWritePusher,
+    LocalWritePusher,
 };
 use crate::{
     agents::Agent, commit::CommitBuilder, conversation::ConversationKey, errors::AtomicResult,
@@ -16,16 +17,11 @@ use crate::{
 };
 use serde_json::{json, Value as Json};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::sync::Mutex;
 
 /// Shown for a conversation member whose name is not known (yet), instead of
 /// the raw agent id.
 pub const UNKNOWN_MEMBER: &str = "Unknown member";
-
-/// How long a failed lookup is not repeated, so a slow or offline server does
-/// not delay every refresh of the home screen.
-const AGENT_NAME_RETRY: Duration = Duration::from_secs(60);
 
 /// The name in a JSON-AD body: one resource or an array whose first is it.
 pub fn name_from_json_ad(body: &str) -> Option<String> {
@@ -38,9 +34,6 @@ pub fn name_from_json_ad(body: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-/// Names fetched so far (`Ok`) and lookups that failed and when (`Err`).
-type NameCache = HashMap<String, Result<String, Instant>>;
-
 /// A sealed message after opening.
 #[derive(Clone)]
 struct OpenedMessage {
@@ -50,51 +43,21 @@ struct OpenedMessage {
     reply_to: Option<String>,
 }
 
-/// Reads conversations, with the caches that keep it quick: names of agents
-/// this device does not hold (looked up in the background through the host's
-/// [`AgentNameFetcher`]) and messages opened before (a message is sealed
-/// once). A host keeps one for the life of the process.
+/// Reads conversations, with the caches that keep it quick: the profiles of
+/// agents this device does not hold (the host's shared [`AgentProfiles`],
+/// looked up in the background) and messages opened before (a message is
+/// sealed once). A host keeps one for the life of the process.
 pub struct Conversations {
-    names: Arc<Mutex<NameCache>>,
-    fetcher: Arc<dyn AgentNameFetcher>,
+    profiles: AgentProfiles,
     opened: Mutex<HashMap<String, OpenedMessage>>,
 }
 
 impl Conversations {
-    pub fn new(fetcher: Arc<dyn AgentNameFetcher>) -> Self {
+    pub fn new(profiles: AgentProfiles) -> Self {
         Self {
-            names: Default::default(),
-            fetcher,
+            profiles,
             opened: Default::default(),
         }
-    }
-
-    /// The name of an agent this device does not hold, from the cache. Never
-    /// waits on the network: when the name is not cached (and no lookup ran
-    /// in the last minute) a lookup starts in the background and this returns
-    /// empty, so the next refresh of the list has the name.
-    fn fetched_agent_name(&self, member: &str) -> String {
-        if let Some(known) = self.names.lock().ok().and_then(|m| m.get(member).cloned()) {
-            match known {
-                Ok(name) => return name,
-                Err(at) if at.elapsed() < AGENT_NAME_RETRY => return String::new(),
-                Err(_) => {}
-            }
-        }
-        // Mark the lookup as tried now, so concurrent refreshes do not start more.
-        if let Ok(mut names) = self.names.lock() {
-            names.insert(member.to_string(), Err(Instant::now()));
-        }
-        let (member, names, fetcher) =
-            (member.to_string(), self.names.clone(), self.fetcher.clone());
-        tokio::spawn(async move {
-            if let Some(name) = fetcher.fetch(&member).await {
-                if let Ok(mut names) = names.lock() {
-                    names.insert(member, Ok(name));
-                }
-            }
-        });
-        String::new()
     }
 
     /// The display name of a conversation member: the agent resource when
@@ -108,12 +71,11 @@ impl Conversations {
         if !local.is_empty() {
             return local;
         }
-        let fetched = self.fetched_agent_name(member);
-        if fetched.is_empty() {
-            UNKNOWN_MEMBER.to_string()
-        } else {
-            fetched
-        }
+        // Never waits on the network: a missing profile is looked up in the
+        // background, so the next refresh has the name.
+        self.profiles
+            .name_or_prefetch(member)
+            .unwrap_or_else(|| UNKNOWN_MEMBER.to_string())
     }
 
     /// A conversation has no name of its own: its title is who else is in it
@@ -447,10 +409,11 @@ mod tests {
     use crate::conversation::{
         encryption_public_key, open_message as open_sealed, seal_message, Keyring, Member,
     };
-    use crate::host::{test_support::Device, NoNames, NoPush};
+    use crate::host::{test_support::Device, NoPush};
+    use std::{sync::Arc, time::Duration};
 
     fn conversations() -> Conversations {
-        Conversations::new(Arc::new(NoNames))
+        Conversations::new(AgentProfiles::none())
     }
 
     #[test]
@@ -467,16 +430,16 @@ mod tests {
     struct Knows(&'static str);
 
     #[async_trait::async_trait]
-    impl AgentNameFetcher for Knows {
-        async fn fetch(&self, _agent: &str) -> Option<String> {
-            Some(self.0.to_string())
+    impl crate::host::AgentProfileFetcher for Knows {
+        async fn fetch_agent_resource(&self, _agent: &str) -> Option<String> {
+            Some(json!({ urls::NAME: self.0 }).to_string())
         }
     }
 
     #[tokio::test]
     async fn a_name_looked_up_in_the_background_is_there_on_the_next_read() {
         let d = Device::new().await;
-        let c = Conversations::new(Arc::new(Knows("Dora")));
+        let c = Conversations::new(AgentProfiles::new(Arc::new(Knows("Dora"))));
         let stranger = "https://example.test/agent";
         // The first read does not wait for the lookup.
         assert_eq!(c.member_name(&d.store, stranger).await, UNKNOWN_MEMBER);
