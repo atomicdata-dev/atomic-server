@@ -29,6 +29,39 @@ class _SearchScreenState extends State<SearchScreen> {
   Object? _error;
   String _query = '';
 
+  /// What was opened lately: the list while nothing is typed.
+  List<RecentResource> _recent = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecent();
+  }
+
+  Future<void> _loadRecent() async {
+    try {
+      final recent = await widget.api.recentResources(widget.drive);
+      if (mounted) setState(() => _recent = recent);
+    } catch (_) {
+      // Only a convenience: the search itself still works.
+    }
+  }
+
+  /// Opens a resource, notes it as opened, and refreshes the list after.
+  Future<void> _open(String subject, String title) async {
+    widget.api.noteOpened(widget.drive, subject);
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ResourceWebView(
+          api: widget.api,
+          subject: subject,
+          title: title,
+        ),
+      ),
+    );
+    if (mounted) await _loadRecent();
+  }
+
   @override
   void dispose() {
     _debounce?.cancel();
@@ -80,23 +113,29 @@ class _SearchScreenState extends State<SearchScreen> {
             )
           : ListView(
               children: [
+                if (_query.isEmpty && _recent.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Text('Recently opened',
+                        style: TextStyle(
+                            color: c.textSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                  for (final r in _recent)
+                    ResourceRow(
+                      icon: Icons.description_outlined,
+                      title: r.title.isEmpty ? r.subject : r.title,
+                      detail: r.className,
+                      onTap: () => _open(r.subject, r.title),
+                    ),
+                ],
                 for (final hit in _hits)
                   ResourceRow(
                     icon: Icons.description_outlined,
                     title: hit.title.isEmpty ? hit.subject : hit.title,
                     detail: hit.className,
-                    onTap: () {
-                      widget.api.noteOpened(widget.drive, hit.subject);
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => ResourceWebView(
-                            api: widget.api,
-                            subject: hit.subject,
-                            title: hit.title,
-                          ),
-                        ),
-                      );
-                    },
+                    onTap: () => _open(hit.subject, hit.title),
                   ),
               ],
             ),

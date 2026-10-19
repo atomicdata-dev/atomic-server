@@ -283,6 +283,48 @@ void main() {
       expect(find.text('Zebra'), findsNothing);
     });
 
+    testWidgets('an empty query lists what was opened lately', (tester) async {
+      final api = FakeApi(
+        recent: [
+          (
+            subject: 'r1',
+            title: 'Opened doc',
+            className: 'Document',
+            openedAt: 1
+          ),
+        ],
+        hits: [
+          (
+            subject: 'did:ad:9',
+            title: 'Zebra',
+            className: 'Folder',
+            score: 1.0
+          ),
+        ],
+      );
+      await tester
+          .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: api)));
+      await tester.pumpAndSettle();
+      expect(find.text('Recently opened'), findsOneWidget);
+      expect(find.text('Opened doc'), findsOneWidget);
+
+      // Typing swaps the list for the hits; clearing brings it back.
+      await tester.enterText(find.byType(TextField), 'zeb');
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+      expect(find.text('Opened doc'), findsNothing);
+      expect(find.text('Zebra'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), '');
+      await tester.pumpAndSettle();
+      expect(find.text('Opened doc'), findsOneWidget);
+      expect(find.text('Zebra'), findsNothing);
+
+      await tester.tap(find.text('Opened doc'));
+      await tester.pump();
+      expect(api.opened, ['r1']);
+    });
+
     testWidgets('opening a hit is remembered as recently opened',
         (tester) async {
       final api = FakeApi(hits: [
