@@ -1702,7 +1702,10 @@ impl Db {
 
         let mut drives = Vec::with_capacity(subjects.len());
         for subject in subjects {
-            let name = match self.get_resource(&subject.as_str().into()).await {
+            // Stored state only: `get_resource` would go and fetch every drive
+            // this device does not hold (the agent lists dozens of old ones),
+            // one after the other, before the list could be shown.
+            let name = match self.get_resource_shallow(&subject.as_str().into()) {
                 Ok(r) => r.get(urls::NAME).map(|v| v.to_string()).unwrap_or_default(),
                 Err(_) => String::new(),
             };
