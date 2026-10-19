@@ -399,9 +399,7 @@ pub(crate) async fn recent_chats(limit: usize) -> Result<Vec<(String, String, i6
             break;
         }
         // A chat that is gone (or not here yet) is left out, not an error.
-        let Some(resource) =
-            crate::api::assistant::row_resource(&store, &Subject::from(subject.as_str())).await
-        else {
+        let Ok(resource) = store.get_resource(&Subject::from(subject.as_str())).await else {
             continue;
         };
         out.push((subject, name_of(&resource), last));
