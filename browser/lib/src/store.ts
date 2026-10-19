@@ -43,6 +43,7 @@ import {
   ErrorType,
   isTransportError,
   LOCAL_ONLY_NOT_FOUND_MESSAGE,
+  NOT_IN_HOST_STORE_MESSAGE,
   NOT_AVAILABLE_LOCALLY_MESSAGE,
   NOT_AVAILABLE_SERVER_UNREACHABLE_MESSAGE,
 } from './error.js';
@@ -278,6 +279,15 @@ export interface StoreOpts {
   requireOnlineWrites?: boolean;
   /** Where commits go instead of a server, see {@link Store.setCommitTransport}. */
   commitTransport?: CommitTransport;
+  /**
+   * There is no server, and never will be: a host app holds the real store
+   * and answers through the client database (the Flutter app's embedded
+   * renderer). Every read comes from that database, nothing is fetched over
+   * HTTP and no auth cookie is made. Without this, a read that "asks the
+   * server" signed a request through the host (which signs only commits) and
+   * failed the resource it was meant to refresh. Implies `connect: false`.
+   */
+  noServer?: boolean;
 }
 
 export interface StoreSyncStatus {
@@ -935,17 +945,22 @@ export class Store {
   private client: Client;
   public readonly requireOnlineWrites: boolean;
   private commitTransport: CommitTransport | undefined;
+  /** See {@link StoreOpts.noServer}. */
+  public readonly noServer: boolean;
 
   public constructor(opts: StoreOpts = {}) {
     this.requireOnlineWrites = opts.requireOnlineWrites ?? false;
     this.commitTransport = opts.commitTransport;
+    this.noServer = opts.noServer ?? false;
     initOntologies();
     this._resources = new Map();
     this.webSockets = new Map();
     this.subscribers = new Map();
 
     if (opts.serverUrl) {
-      this.setServerUrl(opts.serverUrl, { connect: opts.connect ?? true });
+      this.setServerUrl(opts.serverUrl, {
+        connect: !this.noServer && (opts.connect ?? true),
+      });
     }
 
     if (opts.agent) this.setAgent(opts.agent);
@@ -3969,6 +3984,10 @@ export class Store {
       return true;
     }
 
+    if (this.noServer) {
+      return !!(await this.fetchResourceFromClientDb(subject))?.isReady();
+    }
+
     try {
       const signInfo = this.agent
         ? { agent: this.agent, serverURL: this.getServerUrl() }
@@ -4410,6 +4429,7 @@ export class Store {
     // bounded legacy-account lookup during sign-in). Keep OPFS as an offline
     // fallback, but do not make it a prerequisite for contacting the server.
     if (
+      !this.noServer &&
       /^https?:\/\//.test(subject) &&
       new URL(subject).origin !== new URL(this.serverUrl).origin &&
       !isEmbeddedVocabulary(subject) &&
@@ -4497,13 +4517,18 @@ export class Store {
     // above is authoritative. Without this guard a cache miss would GET
     // the subject from the server (a guaranteed 404 that also leaks
     // local-only subjects onto the wire).
-    if (this.isLocalOnlySubject(subject)) {
+    if (this.noServer || this.isLocalOnlySubject(subject)) {
       await askOnceAttached();
 
       if (!hasLocalData) {
         this.failResource(
           subject,
-          new AtomicError(LOCAL_ONLY_NOT_FOUND_MESSAGE, ErrorType.Transport),
+          this.noServer
+            ? new AtomicError(NOT_IN_HOST_STORE_MESSAGE, ErrorType.NotFound)
+            : new AtomicError(
+                LOCAL_ONLY_NOT_FOUND_MESSAGE,
+                ErrorType.Transport,
+              ),
         );
       }
 
@@ -4758,12 +4783,16 @@ export class Store {
 
     // A server cannot refresh a browser-only resource. In particular, explicit
     // refresh callers must not turn a valid local drive into a server 404.
-    if (this.isLocalOnlySubject(normalizedSubject)) {
+    // Without a server the client database is the authority: "refresh from
+    // the server" is a read from it.
+    if (this.noServer || this.isLocalOnlySubject(normalizedSubject)) {
       const local = this.resources.get(normalizedSubject);
       if (local?.isReady()) return local as Resource<C>;
       const stored = await this.fetchResourceFromClientDb(normalizedSubject);
       if (stored) return stored as Resource<C>;
-      throw new AtomicError(LOCAL_ONLY_NOT_FOUND_MESSAGE, ErrorType.Transport);
+      throw this.noServer
+        ? new AtomicError(NOT_IN_HOST_STORE_MESSAGE, ErrorType.NotFound)
+        : new AtomicError(LOCAL_ONLY_NOT_FOUND_MESSAGE, ErrorType.Transport);
     }
 
     // In-flight dedup. SideBarDrive and DrivePage both call
@@ -5104,7 +5133,7 @@ export class Store {
   private async fetchHistoryAttributionFromServer(
     subject: string,
   ): Promise<HistoryAttribution | null> {
-    if (!this.serverUrl) return null;
+    if (!this.serverUrl || this.noServer) return null;
 
     try {
       const url = new URL('/history-attribution', this.serverUrl);
@@ -6376,7 +6405,7 @@ export class Store {
     this.scheduleOutboxDrain();
 
     if (agent && agent.subject) {
-      if (hasBrowserAPI()) {
+      if (hasBrowserAPI() && !this.noServer) {
         // Fire-and-forget here: this is a side effect on agent change,
         // not a precondition of a specific request. The HTTP request
         // path (`Client.fetchResourceHTTP`) re-installs the cookie if
@@ -6396,7 +6425,7 @@ export class Store {
       // it.
       void this.adoptLegacyAgentIdentity(agent);
     } else {
-      if (hasBrowserAPI()) {
+      if (hasBrowserAPI() && !this.noServer) {
         removeCookieAuthentication();
       }
     }
