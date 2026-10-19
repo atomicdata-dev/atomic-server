@@ -206,6 +206,10 @@ const _pillStyle = TextStyle(fontSize: 15, fontWeight: FontWeight.w600);
 const _pillPadding = EdgeInsets.symmetric(horizontal: 18, vertical: 11);
 const _pillMinHeight = 44.0;
 
+/// The widest the pill's outline gets (the default pill's): the decoration
+/// takes it off the room for the label, so the pill must be that much bigger.
+const _pillBorder = 1.5;
+
 class _HoldFanState<T> extends State<HoldFan<T>>
     with SingleTickerProviderStateMixin {
   late final AnimationController _anim;
@@ -223,6 +227,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
   RenderBox? _overlayBox;
   List<HoldFanItem<T>> _shown = const [];
   List<Rect> _rects = const [];
+  TextStyle _style = _pillStyle;
   Offset _anchor = Offset.zero;
   final ValueNotifier<int?> _hover = ValueNotifier(null);
 
@@ -258,9 +263,11 @@ class _HoldFanState<T> extends State<HoldFan<T>>
         .globalToLocal(box.localToGlobal(box.size.center(Offset.zero)));
     final media = MediaQuery.of(context);
     final scaler = MediaQuery.textScalerOf(context);
-    final sizes = [
-      for (final item in _shown) _pillSize(item.text, scaler),
-    ];
+    // The overlay's Material styles the pill text with the theme's body
+    // style, so measure with that same style or the pills come out too
+    // narrow for their labels.
+    _style = (Theme.of(context).textTheme.bodyMedium ?? const TextStyle())
+        .merge(_pillStyle);
     final bounds = (Offset.zero & overlayBox.size).deflate(8);
     final area = Rect.fromLTRB(
       bounds.left + media.padding.left,
@@ -268,6 +275,10 @@ class _HoldFanState<T> extends State<HoldFan<T>>
       bounds.right - media.padding.right,
       bounds.bottom,
     );
+    final sizes = [
+      for (final item in _shown)
+        _pillSize(item.text, scaler, _style, area.width),
+    ];
     _rects = widget.layout == HoldFanLayout.list
         ? holdFanListLayout(anchor: _anchor, sizes: sizes, bounds: area)
         : holdFanLayout(anchor: _anchor, sizes: sizes, bounds: area);
@@ -278,16 +289,21 @@ class _HoldFanState<T> extends State<HoldFan<T>>
     HapticFeedback.selectionClick();
   }
 
-  Size _pillSize(String text, TextScaler scaler) {
+  Size _pillSize(String text, TextScaler scaler, TextStyle style, double max) {
     final painter = TextPainter(
-      text: TextSpan(text: text, style: _pillStyle),
+      text: TextSpan(text: text, style: style),
       textDirection: Directionality.of(context),
       textScaler: scaler,
       maxLines: 1,
     )..layout();
     final size = Size(
-      painter.width + _pillPadding.horizontal,
-      math.max(_pillMinHeight, painter.height + _pillPadding.vertical),
+      math.min(
+          max,
+          painter.width.ceilToDouble() +
+              _pillPadding.horizontal +
+              _pillBorder * 2),
+      math.max(_pillMinHeight,
+          painter.height + _pillPadding.vertical + _pillBorder * 2),
     );
     painter.dispose();
     return size;
@@ -386,6 +402,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
                             builder: (context, hover, _) => _Pill(
                               key: ValueKey('hold-fan-item-$i'),
                               text: _shown[i].text,
+                              style: _style,
                               hovered: hover == i,
                               isDefault: widget.defaultIndex == i,
                             ),
@@ -411,9 +428,8 @@ class _HoldFanState<T> extends State<HoldFan<T>>
       child: SizedBox(
         width: widget.width ?? widget.size,
         height: widget.size,
-        child: widget.width == null
-            ? Center(child: widget.child)
-            : widget.child,
+        child:
+            widget.width == null ? Center(child: widget.child) : widget.child,
       ),
     );
     if (widget.tooltip != null) {
@@ -461,12 +477,14 @@ class _HoldFanState<T> extends State<HoldFan<T>>
 
 class _Pill extends StatelessWidget {
   final String text;
+  final TextStyle style;
   final bool hovered;
   final bool isDefault;
 
   const _Pill({
     super.key,
     required this.text,
+    required this.style,
     required this.hovered,
     required this.isDefault,
   });
@@ -501,13 +519,17 @@ class _Pill extends StatelessWidget {
             ),
           ],
         ),
-        child: Text(
-          text,
-          maxLines: 1,
-          softWrap: false,
-          overflow: TextOverflow.fade,
-          style: _pillStyle.copyWith(
-            color: hovered ? Colors.white : c.textPrimary,
+        // The pill is as wide as its label; only a label wider than the
+        // screen is shrunk (never cut).
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            text,
+            maxLines: 1,
+            softWrap: false,
+            style: style.copyWith(
+              color: hovered ? Colors.white : c.textPrimary,
+            ),
           ),
         ),
       ),

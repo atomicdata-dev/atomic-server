@@ -149,6 +149,61 @@ void main() {
     expect(picked, ['w']);
   });
 
+  for (final size in [const Size(360, 800), Size(1080 / 3, 2400 / 3)]) {
+    testWidgets('no pill label is clipped at ${size.width} px wide',
+        (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(
+        // Material 3 text styles carry letter spacing, which a plain
+        // measurement of the label would miss.
+        theme:
+            ThemeData(useMaterial3: true, extensions: const [AppColors.light]),
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.bottomCenter,
+            child: HoldFan<String>(
+              tooltip: 'New',
+              onSelected: picked.add,
+              items: const [
+                HoldFanItem('AI chat', 'chat'),
+                HoldFanItem('AI voice', 'voice'),
+                HoldFanItem('Document', 'doc'),
+                HoldFanItem('Other', 'other'),
+              ],
+              child: const Icon(Icons.add),
+            ),
+          ),
+        ),
+      ));
+      final gesture = await hold(tester);
+      for (final label in ['AI chat', 'AI voice', 'Document', 'Other']) {
+        final text = find.text(label);
+        expect(text, findsOneWidget);
+        final r = tester.getRect(text);
+        expect(r.left, greaterThanOrEqualTo(0));
+        expect(r.right, lessThanOrEqualTo(size.width));
+        expect(r.top, greaterThanOrEqualTo(0));
+        expect(r.bottom, lessThanOrEqualTo(size.height));
+        // The label has its natural width inside its pill: nothing is
+        // shrunk and nothing is cut off.
+        final fitted =
+            find.ancestor(of: text, matching: find.byType(FittedBox));
+        final box = tester.renderObject<RenderBox>(text);
+        expect(
+            box.size.width,
+            lessThanOrEqualTo(
+                tester.renderObject<RenderBox>(fitted).size.width));
+        final paragraph = tester.renderObject<RenderParagraph>(text);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        expect(paragraph.debugNeedsLayout, isFalse);
+      }
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+  }
+
   testWidgets('the long-press semantic action lists the choices as a menu',
       (tester) async {
     final semantics = tester.ensureSemantics();
