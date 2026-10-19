@@ -4,8 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'src/rust/frb_generated.dart';
 import 'package:atomic_chat/atomic_chat.dart'
-    show AppShell, AppThemeMode, ChatsScreen;
+    show AppShell, AppThemeMode, ChatsScreen, defaultAttachmentPicker;
 import 'assistant/atomic_assistant_api.dart';
+import 'assistant/file_attachment_picker.dart';
 import 'screens/login_screen.dart';
 import 'screens/pair_screen.dart';
 import 'screens/sync_screen.dart';
@@ -20,6 +21,7 @@ void main() async {
   await AtomicClient.openDb(dir.path);
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   await AppThemeMode.load();
+  defaultAttachmentPicker = const FileSelectorAttachmentPicker();
   runApp(const AtomicApp());
 }
 
