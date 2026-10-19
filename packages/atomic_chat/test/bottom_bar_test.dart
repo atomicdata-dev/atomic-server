@@ -234,8 +234,7 @@ void main() {
     await tester.pumpWidget(_shell(_BarApi()));
     await tester.pumpAndSettle();
     final material = tester.widget<Material>(find
-        .ancestor(
-            of: find.byTooltip('Search'), matching: find.byType(Material))
+        .ancestor(of: find.byTooltip('Search'), matching: find.byType(Material))
         .last);
     expect(material.color, AppColors.light.barSurface);
     expect(material.color, isNot(AppColors.light.bgBody));
