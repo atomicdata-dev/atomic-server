@@ -89,7 +89,7 @@ class _AtomicCanvasAppState extends State<AtomicCanvasApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _loggedIn) {
       _resumeFromSession();
-      _startBackgroundSync(quiet: true);
+      _startBackgroundSync();
     }
   }
 
@@ -101,36 +101,11 @@ class _AtomicCanvasAppState extends State<AtomicCanvasApp>
         final event = await AtomicClient.waitForSyncEvent();
         if (event == null) continue;
 
-        final nodeId = event['remote_node_id'] as String? ?? '';
-        final count = event['resources_imported'] as int? ?? 0;
         final kind = event['kind'] as String? ?? 'sync';
-
         if (kind == 'connected' || kind == 'disconnected') {
           AtomicClient.notifyLivePeersChanged();
-          continue;
         }
-        if (kind == 'sync' && count == 0) continue;
-
-        final ctx = _navKey.currentContext;
-        if (ctx == null || !ctx.mounted) continue;
-
-        final peers = await AtomicClient.getKnownPeers();
-        final peerNorm = AtomicClient.normalizeNodeId(nodeId);
-        final peer = peers
-            .where((p) =>
-                AtomicClient.normalizeNodeId(p['node_id'] ?? '') == peerNorm)
-            .firstOrNull;
-        final name = (peer != null && peer['name']!.isNotEmpty)
-            ? peer['name']!
-            : '${nodeId.substring(0, nodeId.length.clamp(0, 12))}...';
-
-        final message = switch (kind) {
-          'disconnected' => '$name disconnected',
-          _ => '$name synced $count resource${count != 1 ? 's' : ''}',
-        };
-
-        if (!ctx.mounted) continue;
-        _showDebouncedSnack(ctx, '$kind:$nodeId', message);
+        // Syncing and connecting are silent: no toast for routine progress.
       }
     });
   }
@@ -186,7 +161,7 @@ class _AtomicCanvasAppState extends State<AtomicCanvasApp>
   }
 
   /// Auto-sync known peers / pkarr after login (no Settings → Retry needed).
-  void _startBackgroundSync({bool quiet = false}) {
+  void _startBackgroundSync() {
     if (_backgroundSyncRunning) return;
     _backgroundSyncRunning = true;
     Future(() async {
@@ -196,9 +171,9 @@ class _AtomicCanvasAppState extends State<AtomicCanvasApp>
         final ctx = _navKey.currentContext;
         if (ctx == null || !ctx.mounted) return;
 
-        if (report.livePeers > 0 && !quiet) {
-          _showDebouncedSnack(ctx, 'sync:connected', report.message);
-        } else if (report.imported == 0 &&
+        // Only a failure is worth a toast; being connected is the normal case.
+        if (report.livePeers == 0 &&
+            report.imported == 0 &&
             !report.message.contains('No peers online')) {
           _showDebouncedSnack(ctx, 'sync:error', report.message,
               minInterval: const Duration(seconds: 5));
