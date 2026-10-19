@@ -8,7 +8,7 @@ class AtomicIdentity {
   final String? name;
 }
 
-/// Host-owned persistence, authentication and transport for the Canvas UI.
+/// Host-owned persistence, authentication and transport for the settings UI.
 /// Implementations must throw on failure; widgets only update after success.
 /// No database, native bridge, global singleton or audio thread is owned here.
 abstract class AtomicSettingsBackend {

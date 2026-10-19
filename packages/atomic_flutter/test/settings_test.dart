@@ -79,7 +79,7 @@ void main() {
     expect(isLiveAtomicPeer('atomic:node:$id', {'did:ad:node:$id'}), isTrue);
   });
 
-  testWidgets('Canvas dialog works at phone width and switches/creates drives',
+  testWidgets('Settings dialog works at phone width and switches/creates drives',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;

@@ -30,9 +30,9 @@ enum HoldFanLayout {
   list,
 }
 
-/// A button with more than one action, after the Atomic Canvas colour and
-/// width fans: a tap does [onTap], the default action; touching and holding
-/// (a short moment, with a haptic tick) fans [items] out above the
+/// A button with more than one action, after the colour and width fans of
+/// the Atomic drawing tools: a tap does [onTap], the default action; touching
+/// and holding (a short moment, with a haptic tick) fans [items] out above the
 /// button, and the finger, still down, slides onto one (a tick on each
 /// change) and lets go to pick it ([onSelected]). Letting go anywhere else,
 /// or the touch being cancelled, closes the fan without a choice.

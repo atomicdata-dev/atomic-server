@@ -213,7 +213,7 @@ class _AtomicAppState extends State<AtomicApp>
         ),
         useMaterial3: true,
         brightness: Brightness.light,
-        scaffoldBackgroundColor: AppColors.light.canvasBg,
+        scaffoldBackgroundColor: AppColors.light.pageBg,
         extensions: const [AppColors.light],
       ),
       darkTheme: ThemeData(
@@ -223,7 +223,7 @@ class _AtomicAppState extends State<AtomicApp>
         ),
         useMaterial3: true,
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: AppColors.dark.canvasBg,
+        scaffoldBackgroundColor: AppColors.dark.pageBg,
         extensions: const [AppColors.dark],
       ),
       home: !_loggedIn

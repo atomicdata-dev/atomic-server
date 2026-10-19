@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 /// [AppColors.light] or [AppColors.dark] in the app's `ThemeData.extensions`.
 @immutable
 class AppColors extends ThemeExtension<AppColors> {
-  /// Main canvas / scaffold background.
-  final Color canvasBg;
+  /// Page / scaffold background.
+  final Color pageBg;
 
   /// Toolbar, popup, and panel backgrounds.
   final Color panelBg;
@@ -61,7 +61,7 @@ class AppColors extends ThemeExtension<AppColors> {
   /// Error background.
   final Color errorBg;
 
-  /// Gallery back-button background.
+  /// Back-button background.
   final Color backButtonBg;
 
   // Tokens of the web app's `buildTheme` (browser/data-browser/src/styling.tsx),
@@ -92,7 +92,7 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color success;
 
   const AppColors({
-    required this.canvasBg,
+    required this.pageBg,
     required this.panelBg,
     required this.panelShadow,
     required this.iconColor,
@@ -123,7 +123,7 @@ class AppColors extends ThemeExtension<AppColors> {
   });
 
   static const dark = AppColors(
-    canvasBg: Colors.black,
+    pageBg: Colors.black,
     panelBg: Color(0xFF1A1A1A),
     panelShadow: Color(0x0FFFFFFF), // white 6%
     iconColor: Color(0xB3FFFFFF), // white70
@@ -154,7 +154,7 @@ class AppColors extends ThemeExtension<AppColors> {
   );
 
   static const light = AppColors(
-    canvasBg: Color(0xFFF5F5F5),
+    pageBg: Color(0xFFF5F5F5),
     panelBg: Color(0xFFFFFFFF),
     panelShadow: Color(0x1A000000),
     iconColor: Color(0xB3000000),
@@ -195,7 +195,7 @@ class AppColors extends ThemeExtension<AppColors> {
 
   @override
   AppColors copyWith({
-    Color? canvasBg,
+    Color? pageBg,
     Color? panelBg,
     Color? panelShadow,
     Color? iconColor,
@@ -225,7 +225,7 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? success,
   }) {
     return AppColors(
-      canvasBg: canvasBg ?? this.canvasBg,
+      pageBg: pageBg ?? this.pageBg,
       panelBg: panelBg ?? this.panelBg,
       panelShadow: panelShadow ?? this.panelShadow,
       iconColor: iconColor ?? this.iconColor,
@@ -260,7 +260,7 @@ class AppColors extends ThemeExtension<AppColors> {
   AppColors lerp(AppColors? other, double t) {
     if (other is! AppColors) return this;
     return AppColors(
-      canvasBg: Color.lerp(canvasBg, other.canvasBg, t)!,
+      pageBg: Color.lerp(pageBg, other.pageBg, t)!,
       panelBg: Color.lerp(panelBg, other.panelBg, t)!,
       panelShadow: Color.lerp(panelShadow, other.panelShadow, t)!,
       iconColor: Color.lerp(iconColor, other.iconColor, t)!,
