@@ -33,7 +33,7 @@ class _SearchScreenState extends State<SearchScreen> {
   String _query = '';
 
   /// What was opened lately: the list while nothing is typed.
-  List<RecentResource> _recent = const [];
+  List<({String drive, RecentResource resource})> _recent = const [];
 
   @override
   void initState() {
@@ -71,8 +71,19 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _loadRecent() async {
     try {
-      final recent = await widget.api.recentResources(widget.drive);
-      if (mounted) setState(() => _recent = recent);
+      var drives = [for (final d in await widget.api.drives()) d.subject];
+      if (drives.isEmpty) drives = [widget.drive];
+      final lists = await Future.wait([
+        for (final drive in drives)
+          widget.api.recentResources(drive).then(
+                (list) => [for (final r in list) (drive: drive, resource: r)],
+                onError: (Object _) =>
+                    <({String drive, RecentResource resource})>[],
+              ),
+      ]);
+      final merged = [for (final l in lists) ...l]
+        ..sort((a, b) => b.resource.openedAt.compareTo(a.resource.openedAt));
+      if (mounted) setState(() => _recent = merged.take(20).toList());
     } catch (_) {
       // Only a convenience: the search itself still works.
     }
@@ -155,13 +166,13 @@ class _SearchScreenState extends State<SearchScreen> {
                             fontSize: 13,
                             fontWeight: FontWeight.w600)),
                   ),
-                  for (final r in _recent)
+                  for (final (:drive, resource: r) in _recent)
                     ResourceRow(
                       icon: Icons.description_outlined,
                       title: r.title.isEmpty ? r.subject : r.title,
-                      detail: r.className,
+                      detail: _detail(r.className, drive),
                       onTap: () =>
-                          _open(widget.drive, r.subject, r.title, r.className),
+                          _open(drive, r.subject, r.title, r.className),
                     ),
                 ],
                 for (final hit in _hits)
