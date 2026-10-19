@@ -10,6 +10,7 @@ import {
   embedSettingsSections,
   showAppearanceOption,
   showSettingsSection,
+  showWebAI,
   type SettingsSectionId,
 } from './settings';
 import * as embedMode from '../helpers/embedMode';
@@ -167,4 +168,11 @@ it('renders only Appearance, without the chrome options, in the embed', () => {
   expect(screen.queryByText('NavBar position')).toBeNull();
   expect(screen.queryByText('Colorful mode')).toBeNull();
   expect(screen.queryByText('Show Messages panel')).toBeNull();
+});
+
+it('turns the web AI off in the embed only', () => {
+  expect(showWebAI(false)).toBe(true);
+  expect(showWebAI(true)).toBe(false);
+  vi.spyOn(embedMode, 'isEmbedded').mockReturnValue(true);
+  expect(showWebAI()).toBe(false);
 });

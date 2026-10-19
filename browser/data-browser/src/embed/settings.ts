@@ -62,3 +62,13 @@ export function showAppearanceOption(
 export function showMeetingStart(embedded: boolean = isEmbedded()): boolean {
   return !embedded;
 }
+
+/**
+ * Are the web app's AI features on (the "AI chat" creation, "Build with AI",
+ * the AI sidebar)? Not in the embed: the page has no AI provider (no keys, no
+ * server connection for the included AI), so "Build with AI" did nothing at
+ * all when tapped. The app's own native AI chat is the AI on a phone.
+ */
+export function showWebAI(embedded: boolean = isEmbedded()): boolean {
+  return !embedded;
+}

@@ -9,6 +9,7 @@ import {
 import { useProviderAvailability } from './useProviderAvailability';
 import { useHostedAI } from './useHostedAI';
 import { enableHostedAI, type HostedAIStatus } from '@helpers/managed/ai';
+import { showWebAI } from '../../embed/settings';
 
 export const DEFAULT_CHAT_MODEL: AIModelIdentifier = {
   id: '~google/gemini-flash-latest',
@@ -108,7 +109,12 @@ export const AISettingsContext =
 export const AISettingsContextProvider = (
   props: ProviderProps,
 ): JSX.Element => {
-  const [enableAI, setEnableAI] = useLocalStorage('atomic.ai.enabled', true);
+  const [enableAISetting, setEnableAI] = useLocalStorage(
+    'atomic.ai.enabled',
+    true,
+  );
+  // The app's web view has no AI of its own; see `showWebAI`.
+  const enableAI = enableAISetting && showWebAI();
   const [storedMcpServers, setStoredMcpServers] = useLocalStorage<MCPServer[]>(
     'atomic.ai.mcpServers',
     defaultMCPServers,
