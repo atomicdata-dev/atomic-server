@@ -6,3 +6,5 @@ export 'src/server_url.dart';
 
 export 'src/account/client.dart';
 export 'src/account/link_dialog.dart';
+
+export 'src/theme.dart';
