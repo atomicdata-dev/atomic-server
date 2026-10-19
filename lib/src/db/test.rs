@@ -4296,6 +4296,47 @@ async fn deferred_search_entries_are_added_by_index_pending() {
     assert_eq!(store.search_hits("zebrafish", &opts).unwrap().len(), 1);
 }
 
+/// An index an older build left incomplete is rebuilt once per marker, and
+/// not again.
+#[tokio::test]
+#[timeout(120000)]
+async fn search_index_is_rebuilt_once_per_marker() {
+    let store = Db::init_temp("rebuild_once").await.unwrap();
+    let drive =
+        "did:ad:driveONCEaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa==";
+    let subj = "did:ad:once000000000000000000000000000000000000000000000000000000000000000000==";
+    let mut authored = crate::Resource::new(subj.to_string());
+    authored
+        .set_unsafe(urls::PARENT.into(), Value::AtomicUrl(drive.into()))
+        .unwrap();
+    authored
+        .set_unsafe(urls::DRIVE_PROP.into(), Value::AtomicUrl(drive.into()))
+        .unwrap();
+    authored
+        .set_unsafe(urls::NAME.into(), Value::String("axolotl field guide".into()))
+        .unwrap();
+    let state = authored.build_state_doc().unwrap().export_snapshot();
+    crate::sync::ws_apply::apply_state_updates(&store, &[(subj.to_string(), state)], false)
+        .await
+        .unwrap();
+    let opts = crate::client::search::SearchOpts::default();
+    assert_eq!(store.search_hits("axolotl", &opts).unwrap().len(), 1);
+
+    // Lose the index entries, as a store filled by an older build can have.
+    for tree in [
+        crate::db::trees::Tree::SearchDocs,
+        crate::db::trees::Tree::SearchPostings,
+        crate::db::trees::Tree::SearchTrigrams,
+    ] {
+        store.kv.clear_tree(tree).unwrap();
+    }
+    assert!(store.search_hits("axolotl", &opts).unwrap().is_empty());
+
+    assert!(crate::search::rebuild_search_index_once(&store, "t1").unwrap());
+    assert_eq!(store.search_hits("axolotl", &opts).unwrap().len(), 1);
+    assert!(!crate::search::rebuild_search_index_once(&store, "t1").unwrap());
+}
+
 #[tokio::test]
 async fn removing_an_atom_also_removes_rows_an_older_store_wrote() {
     use crate::db::trees::{Method, Operation, Transaction, Tree};

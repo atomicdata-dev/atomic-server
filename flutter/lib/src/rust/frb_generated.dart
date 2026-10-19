@@ -234,7 +234,7 @@ abstract class RustLibApi extends BaseApi {
       {required String serverUrl, required String secret, String? driveHint});
 
   Future<String> crateApiAssistantSearch(
-      {required String drive, required String query, required int limit});
+      {String? drive, required String query, required int limit});
 
   Future<String> crateApiSimpleWsSyncServerOriginToWsUrl(
       {required String origin});
@@ -1865,11 +1865,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @override
   Future<String> crateApiAssistantSearch(
-      {required String drive, required String query, required int limit}) {
+      {String? drive, required String query, required int limit}) {
     return handler.executeNormal(NormalTask(
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        sse_encode_String(drive, serializer);
+        sse_encode_opt_String(drive, serializer);
         sse_encode_String(query, serializer);
         sse_encode_u_32(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,

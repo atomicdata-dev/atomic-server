@@ -2318,7 +2318,7 @@ fn wire__crate__api__assistant__search_impl(
             };
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_drive = <String>::sse_decode(&mut deserializer);
+            let api_drive = <Option<String>>::sse_decode(&mut deserializer);
             let api_query = <String>::sse_decode(&mut deserializer);
             let api_limit = <u32>::sse_decode(&mut deserializer);
             deserializer.end();

@@ -26,6 +26,8 @@ typedef SearchHit = ({
   String subject,
   String title,
   String className,
+  // The drive the hit lives in; '' when unknown.
+  String drive,
   double score
 });
 
@@ -184,8 +186,9 @@ class AtomicClient {
   static Future<List<ChatMessage>> readChat(String subject) async =>
       parseChatMessages(await assistant.readChat(subject: subject));
 
-  static Future<List<SearchHit>> search(String drive, String query,
-          {int limit = 20}) async =>
+  /// Searches every drive; only in [drive] when it is given.
+  static Future<List<SearchHit>> search(String query,
+          {String? drive, int limit = 20}) async =>
       parseHits(
           await assistant.search(drive: drive, query: query, limit: limit));
 
@@ -245,6 +248,7 @@ class AtomicClient {
             subject: e['subject'] as String,
             title: e['title'] as String? ?? '',
             className: e['class_name'] as String? ?? '',
+            drive: e['drive'] as String? ?? '',
             score: (e['score'] as num?)?.toDouble() ?? 0,
           ),
       ];

@@ -6,7 +6,7 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `chat_entries`, `class_name_of`, `name_of`, `own_commit_opts`, `private_drive_list`, `resource_row`
+// These functions are ignored because they are not marked as `pub`: `chat_entries`, `class_name_of`, `drive_of`, `fetch_agent_name`, `fetched_agent_name`, `name_from_json_ad`, `name_of`, `own_commit_opts`, `private_drive_list`, `resource_row`
 
 /// The newest `limit` AI chats of the person (all drives), newest activity first, as JSON
 /// `[{subject, name, last_activity}]` (`last_activity` in ms, 0 when empty).
@@ -52,10 +52,12 @@ Future<String> listConversations({required int limit}) =>
 Future<String> readChat({required String subject}) =>
     RustLib.instance.api.crateApiAssistantReadChat(subject: subject);
 
-/// Full-text search in `drive` (type-ahead on the last word). JSON
-/// `[{subject, title, class_name, score}]`, best first.
+/// Full-text search (type-ahead on the last word) across every drive of this
+/// store, or only in `drive` when given. JSON
+/// `[{subject, title, class_name, drive, score}]`, best first; `drive` is the
+/// drive the hit lives in ("" when unknown).
 Future<String> search(
-        {required String drive, required String query, required int limit}) =>
+        {String? drive, required String query, required int limit}) =>
     RustLib.instance.api
         .crateApiAssistantSearch(drive: drive, query: query, limit: limit);
 

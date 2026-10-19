@@ -26,6 +26,7 @@ class FakeApi extends AssistantApi {
   final List<SearchHit> hits;
   final List<String> asked = [];
   final List<String> opened = [];
+  final List<String> openedDrives = [];
   final HostedAi? ai;
   final List<(String, String, String)> added = [];
   final List<String> created = [];
@@ -62,7 +63,7 @@ class FakeApi extends AssistantApi {
   @override
   Future<List<ChatMessage>> messages(String chat) async => messageList;
   @override
-  Future<List<SearchHit>> search(String drive, String query) async {
+  Future<List<SearchHit>> search(String query, {String? drive}) async {
     asked.add(query);
     return hits;
   }
@@ -83,9 +84,27 @@ class FakeApi extends AssistantApi {
       added.add((chat, role, text));
 
   @override
-  void noteOpened(String drive, String subject) => opened.add(subject);
+  void noteOpened(String drive, String subject) {
+    opened.add(subject);
+    openedDrives.add(drive);
+  }
+
   @override
   String webUrl(String subject) => throw 'Not connected to a server';
+}
+
+/// A fake whose `chats()` answers only when the test completes it.
+class _SlowChatsApi extends FakeApi {
+  final List<Completer<List<ChatSummary>>> pending = [];
+
+  _SlowChatsApi({super.chatList, super.messageList});
+
+  @override
+  Future<List<ChatSummary>> chats() {
+    final c = Completer<List<ChatSummary>>();
+    pending.add(c);
+    return c.future;
+  }
 }
 
 ActivityEntry _activity(String subject, String name,
@@ -142,6 +161,64 @@ void main() {
       expect(find.byType(ChatScreen), findsOneWidget);
       expect(find.text('Where to?'), findsOneWidget);
       expect(find.text('Lisbon.'), findsOneWidget);
+    });
+
+    testWidgets('keeps the old rows while a reload is pending', (tester) async {
+      final api = _SlowChatsApi(
+        chatList: [(subject: 'did:ad:1', name: 'Trip plan', lastActivity: 5)],
+        messageList: [
+          (id: 'p#1', role: 'user', text: 'Where to?', createdAt: 1),
+        ],
+      );
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      // The first load shows a spinner until the chats arrive.
+      await tester.pump();
+      expect(find.byType(CircularProgressIndicator), findsWidgets);
+      api.pending.removeAt(0).complete(api.chatList);
+      await tester.pumpAndSettle();
+      expect(find.text('Trip plan'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      // Open the chat and come back: that reloads the home.
+      await tester.tap(find.text('Trip plan'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatScreen), findsOneWidget);
+      Navigator.of(tester.element(find.byType(ChatScreen))).pop();
+      await tester.pumpAndSettle();
+      expect(api.pending, hasLength(1), reason: 'one reload, still pending');
+
+      // While it is pending the old row stays and nothing spins.
+      expect(find.text('Trip plan'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      api.pending.removeAt(0).complete([
+        (subject: 'did:ad:1', name: 'Trip plan', lastActivity: 5),
+        (subject: 'did:ad:3', name: 'New idea', lastActivity: 9),
+      ]);
+      await tester.pumpAndSettle();
+      expect(find.text('New idea'), findsOneWidget);
+    });
+
+    testWidgets('keeps the old rows when a reload fails', (tester) async {
+      final api = _SlowChatsApi(
+        chatList: [(subject: 'did:ad:1', name: 'Trip plan', lastActivity: 5)],
+      );
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester.pump();
+      api.pending.removeAt(0).complete(api.chatList);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Trip plan'));
+      await tester.pumpAndSettle();
+      Navigator.of(tester.element(find.byType(ChatScreen))).pop();
+      await tester.pumpAndSettle();
+      api.pending.removeAt(0).completeError('offline');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Trip plan'), findsOneWidget);
+      expect(find.text('offline'), findsNothing);
     });
 
     testWidgets('says so when there are no chats', (tester) async {
@@ -449,7 +526,13 @@ void main() {
   group('SearchScreen', () {
     testWidgets('searches as you type, once per pause', (tester) async {
       final api = FakeApi(hits: [
-        (subject: 'did:ad:9', title: 'Zebra', className: 'Folder', score: 1.5),
+        (
+          subject: 'did:ad:9',
+          title: 'Zebra',
+          className: 'Folder',
+          drive: '',
+          score: 1.5
+        ),
       ]);
       await tester
           .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: api)));
@@ -484,6 +567,7 @@ void main() {
             subject: 'did:ad:9',
             title: 'Zebra',
             className: 'Folder',
+            drive: '',
             score: 1.0
           ),
         ],
@@ -515,7 +599,13 @@ void main() {
     testWidgets('opening a hit is remembered as recently opened',
         (tester) async {
       final api = FakeApi(hits: [
-        (subject: 'did:ad:9', title: 'Zebra', className: 'Folder', score: 1.5),
+        (
+          subject: 'did:ad:9',
+          title: 'Zebra',
+          className: 'Folder',
+          drive: '',
+          score: 1.5
+        ),
       ]);
       await tester
           .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: api)));
@@ -526,6 +616,49 @@ void main() {
       await tester.tap(find.text('Zebra'));
       await tester.pump();
       expect(api.opened, ['did:ad:9']);
+    });
+  });
+
+  group('SearchScreen across drives', () {
+    testWidgets('shows the drive of each hit and opens it in that drive',
+        (tester) async {
+      final api = FakeApi(
+        driveList: [
+          (subject: 'did:ad:drive', name: 'Home'),
+          (subject: 'did:ad:work', name: 'Work'),
+        ],
+        hits: [
+          (
+            subject: 'did:ad:a',
+            title: 'Zebra home',
+            className: 'Folder',
+            drive: 'did:ad:drive',
+            score: 2.0
+          ),
+          (
+            subject: 'did:ad:b',
+            title: 'Zebra work',
+            className: 'Document',
+            drive: 'did:ad:work',
+            score: 1.0
+          ),
+        ],
+      );
+      await tester
+          .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: api)));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'zebra');
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Folder · Home'), findsOneWidget);
+      expect(find.text('Document · Work'), findsOneWidget);
+
+      ResourceView.serverFactory = () async => throw 'no server in a test';
+      await tester.tap(find.text('Zebra work'));
+      await tester.pump();
+      expect(api.opened, ['did:ad:b']);
+      expect(api.openedDrives, ['did:ad:work']);
     });
   });
 

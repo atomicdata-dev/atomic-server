@@ -376,13 +376,15 @@ pub async fn read_chat(subject: String) -> Result<String, String> {
     serde_json::to_string(&entries).map_err(|e| e.to_string())
 }
 
-/// Full-text search in `drive` (type-ahead on the last word). JSON
-/// `[{subject, title, class_name, score}]`, best first.
-pub async fn search(drive: String, query: String, limit: u32) -> Result<String, String> {
+/// Full-text search (type-ahead on the last word) across every drive of this
+/// store, or only in `drive` when given. JSON
+/// `[{subject, title, class_name, drive, score}]`, best first; `drive` is the
+/// drive the hit lives in ("" when unknown).
+pub async fn search(drive: Option<String>, query: String, limit: u32) -> Result<String, String> {
     let store = db()?;
     let opts = atomic_lib::client::search::SearchOpts {
         limit: Some(limit),
-        parents: Some(vec![drive]),
+        parents: drive.filter(|d| !d.is_empty()).map(|d| vec![d]),
         ..Default::default()
     };
     let hits = atomic_lib::search::query(store.as_ref(), query.trim(), &opts).map_err(err)?;
@@ -392,16 +394,32 @@ pub async fn search(drive: String, query: String, limit: u32) -> Result<String, 
         let Some(resource) = row_resource(&store, &hit.subject).await else {
             continue;
         };
-        out.push(
-            resource_row(
-                &hit.subject.to_string(),
-                &resource,
-                ("score", json!(hit.score)),
-            )
-            .await,
-        );
+        let mut row = resource_row(
+            &hit.subject.to_string(),
+            &resource,
+            ("score", json!(hit.score)),
+        )
+        .await;
+        row["drive"] = json!(drive_of(store.as_ref(), &resource).await);
+        out.push(row);
     }
     serde_json::to_string(&out).map_err(|e| e.to_string())
+}
+
+/// The drive `resource` lives in: its `drive` property, else the one found by
+/// walking up its parents.
+async fn drive_of(store: &atomic_lib::Db, resource: &Resource) -> String {
+    let mut current = resource.clone();
+    for _ in 0..32 {
+        if let Some(drive) = current.get_drive() {
+            return drive.to_string();
+        }
+        match current.get_parent(store).await {
+            Ok(parent) => current = parent,
+            Err(_) => break,
+        }
+    }
+    String::new()
 }
 
 /// The URL that shows `subject` in the data-browser of the connected server,

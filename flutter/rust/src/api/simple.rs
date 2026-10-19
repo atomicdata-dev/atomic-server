@@ -189,10 +189,36 @@ pub async fn open_db(path: String) -> Result<(), String> {
     set_db(store);
     #[cfg(not(target_arch = "wasm32"))]
     {
+        catch_up_search_index(db()?.clone()).await;
         crate::recents::load(std::path::Path::new(&path));
         crate::recents::spawn_listener(db()?.clone());
     }
     Ok(())
+}
+
+/// Make sure every stored resource is searchable. An index written by an older
+/// build can lack resources that arrived by sync, and nothing else notices: the
+/// library only rebuilds an empty index. Rebuilds once per install (a marker
+/// records it, so later starts cost one key read), then drains resources filed
+/// for deferred indexing.
+#[cfg(not(target_arch = "wasm32"))]
+async fn catch_up_search_index(store: std::sync::Arc<atomic_lib::Db>) {
+    let rebuilder = store.clone();
+    let rebuilt = tokio::task::spawn_blocking(move || {
+        atomic_lib::search::rebuild_search_index_once(&rebuilder, "flutter-1")
+    })
+    .await;
+    match rebuilt {
+        Ok(Ok(true)) => tracing::info!("search index rebuilt"),
+        Ok(Ok(false)) => {}
+        Ok(Err(e)) => tracing::warn!("search index rebuild failed: {e}"),
+        Err(e) => tracing::warn!("search index rebuild panicked: {e}"),
+    }
+    while let Ok(done) = atomic_lib::search::index_pending(&store, 500).await {
+        if done == 0 {
+            break;
+        }
+    }
 }
 
 /// Whether an open error means the file itself is damaged. redb reports that

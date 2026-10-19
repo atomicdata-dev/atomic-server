@@ -10,8 +10,10 @@ class AssistantApi {
   Future<List<ChatSummary>> chats() => AtomicClient.listAiChats();
   Future<List<ChatMessage>> messages(String chat) =>
       AtomicClient.readChat(chat);
-  Future<List<SearchHit>> search(String drive, String query) =>
-      AtomicClient.search(drive, query);
+
+  /// Searches every drive, or only [drive] when given.
+  Future<List<SearchHit>> search(String query, {String? drive}) =>
+      AtomicClient.search(query, drive: drive);
   Future<List<RecentResource>> recentResources(String drive) =>
       AtomicClient.recentResources(drive);
   Future<List<RecentResource>> favorites() => AtomicClient.favorites();

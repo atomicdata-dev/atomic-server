@@ -9,7 +9,8 @@ import 'assistant_api.dart';
 import 'resource_row.dart';
 import 'native_views.dart';
 
-/// Type-ahead search over [drive]; a hit opens in the web view.
+/// Type-ahead search over every drive; a hit opens in its own drive. [drive]
+/// is only the fallback for what has no drive of its own.
 class SearchScreen extends StatefulWidget {
   final AssistantApi api;
   final String drive;
@@ -27,6 +28,7 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   Timer? _debounce;
   List<SearchHit> _hits = const [];
+  List<DriveInfo> _drives = const [];
   Object? _error;
   String _query = '';
 
@@ -37,6 +39,29 @@ class _SearchScreenState extends State<SearchScreen> {
   void initState() {
     super.initState();
     _loadRecent();
+    _loadDrives();
+  }
+
+  Future<void> _loadDrives() async {
+    try {
+      final drives = await widget.api.drives();
+      if (mounted) setState(() => _drives = drives);
+    } catch (_) {
+      // Only names for the rows.
+    }
+  }
+
+  /// "<class> · <drive name>" when there is more than one drive.
+  String _detail(String className, String drive) {
+    final name = _drives.length > 1
+        ? _drives
+            .where((d) => d.subject == drive)
+            .map((d) => d.name)
+            .firstOrNull
+        : null;
+    return [className, if (name != null && name.isNotEmpty) name]
+        .where((t) => t.isNotEmpty)
+        .join(' · ');
   }
 
   Future<void> _loadRecent() async {
@@ -49,13 +74,14 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   /// Opens a resource, notes it as opened, and refreshes the list after.
-  Future<void> _open(String subject, String title, String className) async {
-    widget.api.noteOpened(widget.drive, subject);
+  Future<void> _open(
+      String drive, String subject, String title, String className) async {
+    widget.api.noteOpened(drive, subject);
     await Navigator.of(context).push(
       SlideBackRoute<void>(
         builder: (_) => openResourceView(
             api: widget.api,
-            drive: widget.drive,
+            drive: drive,
             subject: subject,
             title: title,
             className: className),
@@ -80,7 +106,7 @@ class _SearchScreenState extends State<SearchScreen> {
     _debounce = Timer(const Duration(milliseconds: 200), () async {
       final asked = _query;
       try {
-        final hits = await widget.api.search(widget.drive, asked);
+        final hits = await widget.api.search(asked);
         if (mounted && asked == _query) {
           setState(() {
             _hits = hits;
@@ -129,15 +155,20 @@ class _SearchScreenState extends State<SearchScreen> {
                       icon: Icons.description_outlined,
                       title: r.title.isEmpty ? r.subject : r.title,
                       detail: r.className,
-                      onTap: () => _open(r.subject, r.title, r.className),
+                      onTap: () =>
+                          _open(widget.drive, r.subject, r.title, r.className),
                     ),
                 ],
                 for (final hit in _hits)
                   ResourceRow(
                     icon: Icons.description_outlined,
                     title: hit.title.isEmpty ? hit.subject : hit.title,
-                    detail: hit.className,
-                    onTap: () => _open(hit.subject, hit.title, hit.className),
+                    detail: _detail(hit.className, hit.drive),
+                    onTap: () => _open(
+                        hit.drive.isEmpty ? widget.drive : hit.drive,
+                        hit.subject,
+                        hit.title,
+                        hit.className),
                   ),
               ],
             ),

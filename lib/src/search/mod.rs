@@ -371,6 +371,25 @@ pub fn rebuild_search_index(store: &Db) -> AtomicResult<()> {
     build_search_index(store)
 }
 
+/// Rebuild the index once per store for a `marker` (a version tag the caller
+/// owns). An index that was filled by an older build can be missing
+/// resources that [`maybe_rebuild_search_index`] never notices, because it
+/// only looks at an empty index. Returns whether a rebuild ran; later calls
+/// with the same marker cost one key read.
+pub fn rebuild_search_index_once(store: &Db, marker: &str) -> AtomicResult<bool> {
+    let mut key = b"search-rebuilt/".to_vec();
+    key.extend_from_slice(marker.as_bytes());
+    if store.kv.get(Tree::PluginMeta, &key)?.is_some() {
+        return Ok(false);
+    }
+    if store.kv.len(Tree::Resources).unwrap_or(0) > 0 {
+        rebuild_search_index(store)?;
+        mark_search_ready(store)?;
+    }
+    store.kv.insert(Tree::PluginMeta, &key, b"1")?;
+    Ok(true)
+}
+
 fn mark_search_ready(store: &Db) -> AtomicResult<()> {
     store
         .kv

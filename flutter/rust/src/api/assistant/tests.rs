@@ -123,10 +123,10 @@ async fn assistant_list_leaves_out_other_classes() {
 async fn assistant_search_is_scoped_to_the_given_drive() {
     let chat = new_chat("Quokka scoping chat").await;
     let other = "https://example.test/not-this-drive".to_string();
-    let hits = search(other, "quokka".into(), 5).await.unwrap();
+    let hits = search(Some(other), "quokka".into(), 5).await.unwrap();
     assert!(!hits.contains(&chat));
     let drive = shared_drive().await.to_string();
-    let hits = search(drive, "quokka".into(), 5).await.unwrap();
+    let hits = search(Some(drive), "quokka".into(), 5).await.unwrap();
     assert!(hits.contains(&chat));
 }
 
@@ -155,8 +155,12 @@ async fn assistant_lists_the_chats_of_every_drive() {
 async fn assistant_search_finds_a_prefix_with_title_and_class() {
     let chat = new_chat("Zebrafinch migration notes").await;
     let drive = shared_drive().await.to_string();
-    let hits: Vec<Json> =
-        serde_json::from_str(&search(drive.clone(), "zebraf".into(), 5).await.unwrap()).unwrap();
+    let hits: Vec<Json> = serde_json::from_str(
+        &search(Some(drive.clone()), "zebraf".into(), 5)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
     let hit = hits
         .iter()
         .find(|h| h["subject"] == chat.as_str())
@@ -165,7 +169,7 @@ async fn assistant_search_finds_a_prefix_with_title_and_class() {
     assert!(hit["score"].as_f64().unwrap() > 0.0);
     assert!(hit["class_name"].as_str().is_some_and(|c| !c.is_empty()));
 
-    let none = search(drive, "qqqxxnothing".into(), 5).await.unwrap();
+    let none = search(Some(drive), "qqqxxnothing".into(), 5).await.unwrap();
     assert_eq!(none, "[]");
 }
 
@@ -496,4 +500,79 @@ async fn home_lists_do_not_decode_snapshots_per_row() {
         drives.len()
     );
     assert!(rows >= 30);
+
+/// A resource as the server's sync delivers it: a Loro state with a parent but
+/// no `drive` property of its own.
+async fn synced_page(parent: &str, name: &str, with_drive: Option<&str>) -> String {
+    static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+    let store = db().unwrap();
+    let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let subject = format!("did:ad:syncpage{:0>60}{n}==", std::process::id());
+    let mut authored = atomic_lib::Resource::new(subject.clone());
+    authored
+        .set_unsafe(urls::PARENT.into(), Value::AtomicUrl(parent.into()))
+        .unwrap();
+    if let Some(drive) = with_drive {
+        authored
+            .set_unsafe(urls::DRIVE_PROP.into(), Value::AtomicUrl(drive.into()))
+            .unwrap();
+    }
+    authored
+        .set_unsafe(urls::NAME.into(), Value::String(name.into()))
+        .unwrap();
+    let state = authored.build_state_doc().unwrap().export_snapshot();
+    atomic_lib::sync::ws_apply::apply_state_update(store.as_ref(), &subject, &state)
+        .await
+        .unwrap();
+    subject
+}
+
+#[tokio::test]
+async fn assistant_search_finds_resources_delivered_by_sync() {
+    let drive = shared_drive().await.to_string();
+    let page = synced_page(&drive, "Okapi delivered by sync", None).await;
+    let hits: Vec<Json> =
+        serde_json::from_str(&search(Some(drive), "okapi".into(), 5).await.unwrap()).unwrap();
+    assert_eq!(hits.len(), 1, "{hits:?}");
+    assert_eq!(hits[0]["title"], "Okapi delivered by sync");
+    assert!(hits[0]["subject"].as_str().unwrap().ends_with(&page[9..]));
+}
+
+#[tokio::test]
+async fn assistant_search_covers_every_drive_and_names_the_hit_drive() {
+    let first = shared_drive().await.to_string();
+    let second = crate::api::simple::create_drive("Search second drive".into())
+        .await
+        .unwrap();
+    db().unwrap().set_active_drive(&first).unwrap();
+    let here = db()
+        .unwrap()
+        .create_resource(AI_CHAT, &first, "Pangolin in the first drive", None)
+        .await
+        .unwrap();
+    let there = db()
+        .unwrap()
+        .create_resource(AI_CHAT, &second, "Pangolin in the second drive", None)
+        .await
+        .unwrap();
+
+    let hits: Vec<Json> =
+        serde_json::from_str(&search(None, "pangolin".into(), 10).await.unwrap()).unwrap();
+    let drive_of = |subject: &str| {
+        hits.iter()
+            .find(|h| h["subject"] == subject)
+            .map(|h| h["drive"].as_str().unwrap().to_string())
+    };
+    assert_eq!(drive_of(&here).as_deref(), Some(first.as_str()));
+    assert_eq!(drive_of(&there).as_deref(), Some(second.as_str()));
+
+    // Scoping to one drive still works.
+    let only: Vec<Json> = serde_json::from_str(
+        &search(Some(second.clone()), "pangolin".into(), 10)
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(only.len(), 1);
+    assert_eq!(only[0]["subject"], there.as_str());
 }

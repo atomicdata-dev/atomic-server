@@ -8,6 +8,7 @@ import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'chat_screen.dart';
 import 'resource_row.dart';
+import 'resource_view.dart';
 import 'native_views.dart';
 
 /// Items per section on the home; the rest is behind "Show all".
@@ -98,18 +99,38 @@ class _ChatsScreenState extends State<ChatsScreen> {
       ..sort((a, b) => b.resource.openedAt.compareTo(a.resource.openedAt));
   }
 
-  void _reload() => setState(() {
+  bool _reloadQueued = false;
+
+  /// Fetch every section again. Calls in the same frame are one reload; the
+  /// sections keep showing what they have until the new data arrives.
+  void _reload() {
+    if (_reloadQueued) return;
+    _reloadQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _reloadQueued = false;
+      if (!mounted) return;
+      setState(() {
         _chats = widget.api.chats();
         _recents = _loadRecents();
         _favorites = widget.api.favorites();
         _conversations = widget.api.conversations();
         _activity = widget.api.activity(_maxActivity);
       });
+    });
+    // A frame must run for the callback to fire.
+    WidgetsBinding.instance.scheduleFrame();
+  }
+
+  /// Whether `screen` can have changed what the home lists: a "Show all" list
+  /// and a settings page only show things (what is opened from a list
+  /// reloads by itself when it is closed).
+  static bool _changesData(Widget screen) =>
+      !(screen is _ListPage || (screen is ResourceView && screen.path != null));
 
   Future<void> _push(Widget screen) async {
     await Navigator.of(context)
         .push(SlideBackRoute<void>(builder: (_) => screen));
-    if (mounted) _reload();
+    if (mounted && _changesData(screen)) _reload();
   }
 
   Future<void> _settings() async {
@@ -294,7 +315,12 @@ ResourceRow _resourceRow(RecentResource r,
 /// One home section: a header with "Show all" (only when there are more than
 /// [_homeItems]), the first few rows, and the loading, error or empty state
 /// while there is nothing to list.
-class _Section<T> extends StatelessWidget {
+///
+/// Stale while revalidating: when [future] is replaced, the rows of the
+/// previous one stay until the new data is there, so a refresh neither
+/// flashes a spinner nor moves the page. The spinner shows only for the very
+/// first load, and a refresh that fails keeps the old rows without an error.
+class _Section<T> extends StatefulWidget {
   final String title;
   final Future<List<T>> future;
   final String empty;
@@ -315,54 +341,83 @@ class _Section<T> extends StatelessWidget {
   });
 
   @override
+  State<_Section<T>> createState() => _SectionState<T>();
+}
+
+class _SectionState<T> extends State<_Section<T>> {
+  List<T>? _list;
+  Object? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _follow(widget.future);
+  }
+
+  @override
+  void didUpdateWidget(_Section<T> old) {
+    super.didUpdateWidget(old);
+    if (old.future != widget.future) _follow(widget.future);
+  }
+
+  void _follow(Future<List<T>> future) {
+    future.then((list) {
+      if (!mounted || widget.future != future) return;
+      setState(() {
+        _list = list;
+        _error = null;
+      });
+    }, onError: (Object e) {
+      if (!mounted || widget.future != future) return;
+      // Keep what is on screen; an error shows only when there is nothing.
+      if (_list == null) setState(() => _error = e);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    return FutureBuilder<List<T>>(
-      future: future,
-      builder: (context, snapshot) {
-        final list = snapshot.data;
-        if (hideEmpty && (snapshot.hasError || (list?.isEmpty ?? false))) {
-          return const SizedBox.shrink();
-        }
-        final more = list != null && list.length > _homeItems;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              Expanded(child: _Heading(title, c)),
-              // Same size, weight and padding as the heading, so the two sit on
-              // one baseline.
-              if (more)
-                InkWell(
-                  onTap: () => onShowAll(list),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                    child: Text('Show all',
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600)),
-                  ),
-                ),
-            ]),
-            if (snapshot.hasError)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child:
-                    Text('${snapshot.error}', style: TextStyle(color: c.alert)),
-              )
-            else if (list == null)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (list.isEmpty)
-              _Empty(empty, c)
-            else
-              ...rows(list.take(_homeItems).toList()),
-          ],
-        );
-      },
+    final list = _list;
+    final error = list == null ? _error : null;
+    if (widget.hideEmpty && (error != null || (list?.isEmpty ?? false))) {
+      return const SizedBox.shrink();
+    }
+    final more = list != null && list.length > _homeItems;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Expanded(child: _Heading(widget.title, c)),
+          // Same size, weight and padding as the heading, so the two sit on
+          // one baseline.
+          if (more)
+            InkWell(
+              onTap: () => widget.onShowAll(list),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: Text('Show all',
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600)),
+              ),
+            ),
+        ]),
+        if (error != null)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text('$error', style: TextStyle(color: c.alert)),
+          )
+        else if (list == null)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (list.isEmpty)
+          _Empty(widget.empty, c)
+        else
+          ...widget.rows(list.take(_homeItems).toList()),
+      ],
     );
   }
 }
