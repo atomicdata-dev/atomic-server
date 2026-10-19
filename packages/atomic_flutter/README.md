@@ -23,6 +23,11 @@ Canvas's adapter is `flutter/lib/atomic/settings_backend.dart`. Pairing and
 secure sign-in remain host adapters in this first extraction. A future package
 can extract those implementations without coupling this UI to a native ABI.
 
+`AppColors` (`context.appColors`) holds the color tokens of the Atomic apps as
+a `ThemeExtension`; register `AppColors.light` or `AppColors.dark` in the
+theme. The assistant screens built on this package live in
+`packages/atomic_chat`.
+
 Run `flutter analyze` and `flutter test` in this directory.
 
 ## Hosted accounts

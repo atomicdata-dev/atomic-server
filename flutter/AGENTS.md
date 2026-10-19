@@ -60,7 +60,9 @@ Uses sealed `HistoryAction` classes (`StrokeAdded`, `StrokesDeleted`, `StrokesRe
 ```
 lib/
 ├── main.dart                    # App entry, MaterialApp, theme
-├── theme.dart                   # AppColors, Material 3 theme
+├── theme.dart                   # Re-exports AppColors (packages/atomic_flutter)
+├── assistant/
+│   └── atomic_assistant_api.dart  # AssistantApi over the bridge (the screens are in packages/atomic_chat)
 ├── rust_init.dart               # Platform-conditional Rust init
 ├── atomic/
 │   ├── atomic_client.dart       # FFI wrapper (conditional import)

@@ -54,6 +54,20 @@ Each step ships on its own and has a test that fails without it.
   the Dart bindings were not regenerated. Tests moved with the code (each on
   its own in-memory store, `host::test_support::Device`); the bridge keeps
   one end-to-end test per function.
+- [x] **0b. The Dart host parts in a package.** The assistant screens moved
+  from the app to `packages/atomic_chat` (depends on `atomic_flutter`, never on
+  the app or the bridge), so another Flutter app can use them: the shell and
+  bottom bar, home, AI chat, conversations, search, `ResourceView` /
+  `EmbedServer` / `ResourceWebView`, the native view registry
+  (`registerNativeView`), voice and `HostedAi`. `AssistantApi` is now an
+  interface; the app implements it over the bridge
+  (`flutter/lib/assistant/atomic_assistant_api.dart`), and the JSON of
+  `atomic_lib::host` is read by `AssistantJson` in the package. App-owned
+  pages are parameters (`AppShell.profile`, `ChatsScreen.onOpenGallery`). The
+  embed bundle stays an app asset (`scripts/build_embed.sh`), served from
+  `EmbedServer.assetRoot`. `AppColors` moved to `atomic_flutter`. Tests moved
+  with the code (`packages/atomic_chat/test`, on fakes); CI runs both packages
+  (`atomic-flutter.yml`).
 - [x] **1. Commit transport and flush.** Store option `commitTransport`,
   `canCommit` for write-side checks, `atomicEmbed.flush()` and the Dart handshake
   before leaving a page. A keystroke now travels: loro-prosemirror commits the
