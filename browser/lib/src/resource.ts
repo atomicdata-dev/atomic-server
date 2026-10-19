@@ -4167,6 +4167,15 @@ export class Resource<C extends OptionalClass = any> {
       throw new Error('Binary values (Uint8Array) cannot be set via set().');
     }
 
+    // Removal comes before validation: no datatype accepts `undefined`, so
+    // validating first made the documented removal throw (#2315).
+    if (value === undefined) {
+      // `remove` emits the `LocalChange` for this property.
+      this.remove(prop);
+
+      return;
+    }
+
     // The datatype this set() learned (passed in, or fetched to validate).
     // Used below to tag the value at write time: an object is stored in Loro
     // as a JSON string, and without its `json` tag every read before the
@@ -4206,13 +4215,6 @@ export class Resource<C extends OptionalClass = any> {
           throw e;
         }
       }
-    }
-
-    if (value === undefined) {
-      // `remove` emits the `LocalChange` for this property.
-      this.remove(prop);
-
-      return;
     }
 
     // Write to Loro only — cache is rebuilt lazily on next get()
