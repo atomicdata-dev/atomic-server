@@ -31,6 +31,7 @@ class AppBottomBar extends StatelessWidget {
     return Material(
       color: c.bgBody,
       child: SafeArea(
+        top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
           child: ListenableBuilder(
