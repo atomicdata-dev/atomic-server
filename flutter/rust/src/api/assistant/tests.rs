@@ -386,7 +386,7 @@ async fn conversations_are_titled_by_the_other_members() {
     let list: Vec<Json> = serde_json::from_str(&list_conversations(10).await.unwrap()).unwrap();
     assert_eq!(list.len(), 2);
     assert_eq!(list[0]["subject"], convo.as_str());
-    assert_eq!(list[0]["title"], "https://example.test/agent");
+    assert_eq!(list[0]["title"], UNKNOWN_MEMBER);
     assert_eq!(list[1]["title"], "Only you");
 }
 
@@ -425,4 +425,14 @@ async fn activity_follows_creates_and_deletes_and_skips_chats() {
     let entry = list.iter().find(|a| a.subject == folder).unwrap();
     assert_eq!(entry.kind, "deleted");
     assert_eq!(entry.name, "Activity folder");
+}
+
+#[test]
+fn agent_name_is_read_from_json_ad() {
+    let body = format!(r#"{{"{}":"Ada","@id":"x"}}"#, urls::NAME);
+    assert_eq!(name_from_json_ad(&body).as_deref(), Some("Ada"));
+    let arr = format!(r#"[{{"{}":"Bo"}}]"#, urls::SHORTNAME);
+    assert_eq!(name_from_json_ad(&arr).as_deref(), Some("Bo"));
+    assert_eq!(name_from_json_ad(r#"{"@id":"x"}"#), None);
+    assert_eq!(name_from_json_ad("nope"), None);
 }

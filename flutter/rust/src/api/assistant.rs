@@ -225,6 +225,75 @@ pub async fn list_favorites(limit: u32) -> Result<String, String> {
     serde_json::to_string(&out).map_err(|e| e.to_string())
 }
 
+/// Shown for a conversation member whose name is not known (yet), instead of
+/// the raw agent id.
+pub(crate) const UNKNOWN_MEMBER: &str = "Unknown member";
+
+/// How long the list waits for one agent's name before showing the fallback.
+const AGENT_NAME_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+/// How long a failed lookup is not repeated, so a slow or offline server does
+/// not delay every refresh of the home screen.
+const AGENT_NAME_RETRY: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// Names fetched so far (`Ok`) and lookups that failed and when (`Err`).
+static AGENT_NAMES: std::sync::Mutex<
+    Option<std::collections::HashMap<String, Result<String, std::time::Instant>>>,
+> = std::sync::Mutex::new(None);
+
+/// The name of an agent this device does not hold, fetched from the connected
+/// server with the library's HTTP client (which carries the Android TLS
+/// setup). Empty when offline, not connected, slow, or the agent has no name.
+async fn fetched_agent_name(member: &str) -> String {
+    if let Some(known) = AGENT_NAMES
+        .lock()
+        .ok()
+        .and_then(|g| g.as_ref().and_then(|m| m.get(member).cloned()))
+    {
+        match known {
+            Ok(name) => return name,
+            Err(at) if at.elapsed() < AGENT_NAME_RETRY => return String::new(),
+            Err(_) => {}
+        }
+    }
+    let name = fetch_agent_name(member).await.unwrap_or_default();
+    if let Ok(mut guard) = AGENT_NAMES.lock() {
+        let entry = if name.is_empty() {
+            Err(std::time::Instant::now())
+        } else {
+            Ok(name.clone())
+        };
+        guard
+            .get_or_insert_with(Default::default)
+            .insert(member.to_string(), entry);
+    }
+    name
+}
+
+async fn fetch_agent_name(member: &str) -> Option<String> {
+    let origin = connected_server()?;
+    let agent = db().ok()?.get_default_agent().ok();
+    let url = format!("{origin}/{member}");
+    let body = tokio::time::timeout(
+        AGENT_NAME_TIMEOUT,
+        atomic_lib::client::fetch_body(&url, atomic_lib::parse::JSON_AD_MIME, agent.as_ref()),
+    )
+    .await
+    .ok()?
+    .ok()?;
+    name_from_json_ad(&body)
+}
+
+/// The name in a JSON-AD body: one resource or an array whose first is it.
+fn name_from_json_ad(body: &str) -> Option<String> {
+    let json: Json = serde_json::from_str(body).ok()?;
+    let resource = json.as_array().and_then(|a| a.first()).unwrap_or(&json);
+    [urls::NAME, urls::SHORTNAME]
+        .iter()
+        .find_map(|p| resource.get(*p).and_then(|v| v.as_str()))
+        .filter(|n| !n.is_empty())
+        .map(str::to_string)
+}
+
 /// The person's conversations (DMs and group chats), as JSON
 /// `[{subject, title, class_name, opened_at}]`, in the order the private drive
 /// lists them. A conversation has no name of its own: its title is who else is
@@ -246,18 +315,23 @@ pub async fn list_conversations(limit: u32) -> Result<String, String> {
             .ok()
             .and_then(|v| v.to_subjects(None).ok())
             .unwrap_or_default();
-        let mut names = Vec::new();
-        for member in members.iter().filter(|m| **m != me) {
-            let name = match store.get_resource(&Subject::from(member.as_str())).await {
+        let others: Vec<&String> = members.iter().filter(|m| **m != me).collect();
+        let names = futures::future::join_all(others.into_iter().map(|member| async {
+            let local = match store.get_resource(&Subject::from(member.as_str())).await {
                 Ok(agent) => name_of(&agent),
                 Err(_) => String::new(),
             };
-            names.push(if name.is_empty() {
-                member.clone()
+            if !local.is_empty() {
+                return local;
+            }
+            let fetched = fetched_agent_name(member).await;
+            if fetched.is_empty() {
+                UNKNOWN_MEMBER.to_string()
             } else {
-                name
-            });
-        }
+                fetched
+            }
+        }))
+        .await;
         let title = if names.is_empty() {
             "Only you".to_string()
         } else {
