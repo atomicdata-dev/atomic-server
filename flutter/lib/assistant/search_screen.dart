@@ -68,29 +68,38 @@ class _SearchScreenState extends State<SearchScreen> {
         title: TextField(
           autofocus: true,
           decoration: const InputDecoration(
-              hintText: 'Search', border: InputBorder.none),
+            hintText: 'Search',
+            border: InputBorder.none,
+          ),
           onChanged: _changed,
         ),
       ),
       body: _error != null
-          ? Center(child: Text('$_error', style: TextStyle(color: c.alert)))
-          : ListView(children: [
-              for (final hit in _hits)
-                ResourceRow(
-                  icon: Icons.description_outlined,
-                  title: hit.title.isEmpty ? hit.subject : hit.title,
-                  detail: hit.className,
-                  onTap: () {
-                    widget.api.noteOpened(widget.drive, hit.subject);
-                    Navigator.of(context).push(MaterialPageRoute<void>(
-                      builder: (_) => ResourceWebView(
-                          api: widget.api,
-                          subject: hit.subject,
-                          title: hit.title),
-                    ));
-                  },
-                ),
-            ]),
+          ? Center(
+              child: Text('$_error', style: TextStyle(color: c.alert)),
+            )
+          : ListView(
+              children: [
+                for (final hit in _hits)
+                  ResourceRow(
+                    icon: Icons.description_outlined,
+                    title: hit.title.isEmpty ? hit.subject : hit.title,
+                    detail: hit.className,
+                    onTap: () {
+                      widget.api.noteOpened(widget.drive, hit.subject);
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ResourceWebView(
+                            api: widget.api,
+                            subject: hit.subject,
+                            title: hit.title,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            ),
     );
   }
 }

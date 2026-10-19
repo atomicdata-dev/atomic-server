@@ -34,7 +34,8 @@ class _ResourceWebViewState extends State<ResourceWebView> {
       _controller = WebViewController()
         ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..loadRequest(
-            Uri.parse(widget.url ?? widget.api.webUrl(widget.subject)));
+          Uri.parse(widget.url ?? widget.api.webUrl(widget.subject)),
+        );
     } catch (e) {
       _error = e;
     }
@@ -47,11 +48,16 @@ class _ResourceWebViewState extends State<ResourceWebView> {
       backgroundColor: c.bgBody,
       appBar: AppBar(
         backgroundColor: c.bgBody,
-        title: Text(widget.title.isEmpty ? widget.subject : widget.title,
-            maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: Text(
+          widget.title.isEmpty ? widget.subject : widget.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
       body: _controller == null
-          ? Center(child: Text('$_error', style: TextStyle(color: c.alert)))
+          ? Center(
+              child: Text('$_error', style: TextStyle(color: c.alert)),
+            )
           : WebViewWidget(controller: _controller!),
     );
   }

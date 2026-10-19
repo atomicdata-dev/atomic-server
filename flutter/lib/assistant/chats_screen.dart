@@ -68,18 +68,20 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   void _reload() => setState(() {
-        _generation++;
-        _chats = widget.api.chats();
-      });
+    _generation++;
+    _chats = widget.api.chats();
+  });
 
   Future<void> _push(Widget screen) async {
-    await Navigator.of(context)
-        .push(MaterialPageRoute<void>(builder: (_) => screen));
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => screen));
     if (mounted) _reload();
   }
 
   Future<void> _settings() async {
-    final signedOut = await Navigator.of(context).push<bool>(
+    final signedOut =
+        await Navigator.of(context).push<bool>(
           MaterialPageRoute<bool>(builder: (_) => const SyncScreen()),
         ) ??
         false;
@@ -127,63 +129,65 @@ class _ChatsScreenState extends State<ChatsScreen> {
           ),
           body: snapshot.hasError
               ? Center(
-                  child: Text('${snapshot.error}',
-                      style: TextStyle(color: c.alert)),
+                  child: Text(
+                    '${snapshot.error}',
+                    style: TextStyle(color: c.alert),
+                  ),
                 )
               : drives == null || drive == null
-                  ? const Center(child: CircularProgressIndicator())
-                  : Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                          child: TextField(
-                            readOnly: true,
-                            decoration: InputDecoration(
-                              hintText: drives.length > 1
-                                  ? 'Search in ${drive.name}'
-                                  : 'Search',
-                              prefixIcon: const Icon(Icons.search),
-                              filled: true,
-                              fillColor: c.bg1,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(9),
-                                borderSide: BorderSide.none,
-                              ),
-                            ),
-                            onTap: () => _push(SearchScreen(
-                                drive: drive.subject, api: widget.api)),
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                      child: TextField(
+                        readOnly: true,
+                        decoration: InputDecoration(
+                          hintText: drives.length > 1
+                              ? 'Search in ${drive.name}'
+                              : 'Search',
+                          prefixIcon: const Icon(Icons.search),
+                          filled: true,
+                          fillColor: c.bg1,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(9),
+                            borderSide: BorderSide.none,
                           ),
                         ),
-                        _ChatsSection(
-                          chats: _chats,
-                          onOpen: (chat) => _push(ChatScreen(
-                            api: widget.api,
-                            subject: chat?.subject,
-                            title: chat?.name ?? '',
-                          )),
+                        onTap: () => _push(
+                          SearchScreen(drive: drive.subject, api: widget.api),
                         ),
-                        if (drives.length > 1)
-                          _Dots(
-                            count: drives.length,
-                            current: _page,
-                          ),
-                        Expanded(
-                          child: PageView.builder(
-                            controller: _pages,
-                            allowImplicitScrolling: true,
-                            itemCount: drives.length,
-                            onPageChanged: (i) => setState(() => _page = i),
-                            itemBuilder: (_, i) => _OpenedPage(
-                              key: ValueKey(drives[i].subject),
-                              api: widget.api,
-                              drive: drives[i].subject,
-                              generation: _generation,
-                              onOpen: _push,
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
+                    _ChatsSection(
+                      chats: _chats,
+                      onOpen: (chat) => _push(
+                        ChatScreen(
+                          api: widget.api,
+                          subject: chat?.subject,
+                          title: chat?.name ?? '',
+                        ),
+                      ),
+                    ),
+                    if (drives.length > 1)
+                      _Dots(count: drives.length, current: _page),
+                    Expanded(
+                      child: PageView.builder(
+                        controller: _pages,
+                        allowImplicitScrolling: true,
+                        itemCount: drives.length,
+                        onPageChanged: (i) => setState(() => _page = i),
+                        itemBuilder: (_, i) => _OpenedPage(
+                          key: ValueKey(drives[i].subject),
+                          api: widget.api,
+                          drive: drives[i].subject,
+                          generation: _generation,
+                          onOpen: _push,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
         );
       },
     );
@@ -216,8 +220,10 @@ class _ChatsSection extends StatelessWidget {
             if (snapshot.hasError)
               Padding(
                 padding: const EdgeInsets.all(16),
-                child:
-                    Text('${snapshot.error}', style: TextStyle(color: c.alert)),
+                child: Text(
+                  '${snapshot.error}',
+                  style: TextStyle(color: c.alert),
+                ),
               )
             else if (list == null)
               const Padding(
@@ -227,15 +233,18 @@ class _ChatsSection extends StatelessWidget {
             else if (list.isEmpty)
               _Empty('No chats yet', c)
             else
-              for (final chat in list.take(_homeChats))
+              for (final (i, chat) in list.take(_homeChats).indexed) ...[
+                // A group's label goes above its first chat only, so a group
+                // without chats has no label.
+                if (i == 0 ||
+                    chatGroup(chat.lastActivity) !=
+                        chatGroup(list[i - 1].lastActivity))
+                  _GroupLabel(chatGroup(chat.lastActivity), c),
                 ResourceRow(
-                  icon: Icons.chat_bubble_outline,
                   title: chat.name.isEmpty ? 'Untitled chat' : chat.name,
-                  detail: chat.lastActivity == 0
-                      ? null
-                      : timeAgo(chat.lastActivity),
                   onTap: () => onOpen(chat),
                 ),
+              ],
           ],
         );
       },
@@ -256,8 +265,10 @@ class _Dots extends StatelessWidget {
     if (count > 8) {
       return Padding(
         padding: const EdgeInsets.only(top: 4),
-        child: Text('${current + 1} / $count',
-            style: TextStyle(color: c.textSecondary, fontSize: 12)),
+        child: Text(
+          '${current + 1} / $count',
+          style: TextStyle(color: c.textSecondary, fontSize: 12),
+        ),
       );
     }
     return Padding(
@@ -303,8 +314,9 @@ class _OpenedPage extends StatefulWidget {
 
 class _OpenedPageState extends State<_OpenedPage>
     with AutomaticKeepAliveClientMixin {
-  late Future<List<RecentResource>> _recent =
-      widget.api.recentResources(widget.drive);
+  late Future<List<RecentResource>> _recent = widget.api.recentResources(
+    widget.drive,
+  );
 
   @override
   bool get wantKeepAlive => true;
@@ -341,16 +353,19 @@ class _OpenedPageState extends State<_OpenedPage>
               ResourceRow(
                 icon: Icons.description_outlined,
                 title: r.title.isEmpty ? r.subject : r.title,
-                detail: [r.className, timeAgo(r.openedAt)]
-                    .where((t) => t.isNotEmpty)
-                    .join(' · '),
+                detail: [
+                  r.className,
+                  timeAgo(r.openedAt),
+                ].where((t) => t.isNotEmpty).join(' · '),
                 onTap: () {
                   widget.api.noteOpened(widget.drive, r.subject);
-                  widget.onOpen(ResourceWebView(
-                    api: widget.api,
-                    subject: r.subject,
-                    title: r.title,
-                  ));
+                  widget.onOpen(
+                    ResourceWebView(
+                      api: widget.api,
+                      subject: r.subject,
+                      title: r.title,
+                    ),
+                  );
                 },
               ),
           ],
@@ -368,13 +383,30 @@ class _Heading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-        child: Text(text,
-            style: TextStyle(
-                color: c.textSecondary,
-                fontSize: 13,
-                fontWeight: FontWeight.w600)),
-      );
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+    child: Text(
+      text,
+      style: TextStyle(
+        color: c.textSecondary,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
+}
+
+/// The small label over a group of chats: "Today", "This week", ...
+class _GroupLabel extends StatelessWidget {
+  final String text;
+  final AppColors c;
+
+  const _GroupLabel(this.text, this.c);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+    child: Text(text, style: TextStyle(color: c.textSecondary, fontSize: 11)),
+  );
 }
 
 class _Empty extends StatelessWidget {
@@ -385,10 +417,28 @@ class _Empty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.all(32),
-        child:
-            Center(child: Text(text, style: TextStyle(color: c.textSecondary))),
-      );
+    padding: const EdgeInsets.all(32),
+    child: Center(
+      child: Text(text, style: TextStyle(color: c.textSecondary)),
+    ),
+  );
+}
+
+/// The group a chat last active at [ms] falls in, by the local calendar day:
+/// "Today", "Yesterday", "This week" (the last seven days), "This month",
+/// "Earlier".
+String chatGroup(int ms, {DateTime? now}) {
+  if (ms <= 0) return 'Earlier';
+  // Compared as UTC dates, so a daylight-saving change cannot make a day 23 h.
+  DateTime civil(DateTime t) => DateTime.utc(t.year, t.month, t.day);
+  final days = civil(
+    now ?? DateTime.now(),
+  ).difference(civil(DateTime.fromMillisecondsSinceEpoch(ms))).inDays;
+  if (days <= 0) return 'Today';
+  if (days == 1) return 'Yesterday';
+  if (days < 7) return 'This week';
+  if (days < 30) return 'This month';
+  return 'Earlier';
 }
 
 /// "just now", "5 min ago", "3 h ago", "2 d ago", then the date.

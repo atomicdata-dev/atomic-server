@@ -124,8 +124,9 @@ class _ChatScreenState extends State<ChatScreen> {
     });
     try {
       // The chat exists from the first message on, named after it.
-      final chat = _chat ??= await widget.api
-          .newChat(text.length > 40 ? '${text.substring(0, 40)}…' : text);
+      final chat = _chat ??= await widget.api.newChat(
+        text.length > 40 ? '${text.substring(0, 40)}…' : text,
+      );
       await widget.api.addMessage(chat, 'user', text);
       var answer = '';
       await for (final delta in ai.answer(asked)) {
@@ -155,9 +156,11 @@ class _ChatScreenState extends State<ChatScreen> {
       backgroundColor: c.bgBody,
       appBar: AppBar(
         backgroundColor: c.bgBody,
-        title: Text(widget.title.isEmpty
-            ? (_chat == null ? 'New chat' : 'Untitled chat')
-            : widget.title),
+        title: Text(
+          widget.title.isEmpty
+              ? (_chat == null ? 'New chat' : 'Untitled chat')
+              : widget.title,
+        ),
       ),
       body: Column(
         children: [
@@ -198,7 +201,8 @@ class _ChatScreenState extends State<ChatScreen> {
             margin: const EdgeInsets.symmetric(vertical: 4),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.85),
+              maxWidth: MediaQuery.of(context).size.width * 0.85,
+            ),
             decoration: BoxDecoration(
               color: mine ? c.mainSelectedBg : c.bg1,
               borderRadius: BorderRadius.circular(9),
@@ -207,11 +211,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 ? const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2))
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : SelectableText(
                     m.text,
                     style: TextStyle(
-                        color: mine ? c.mainSelectedFg : c.textPrimary),
+                      color: mine ? c.mainSelectedFg : c.textPrimary,
+                    ),
                   ),
           ),
         );
@@ -224,11 +230,13 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _composer(AppColors c) {
     final ai = _ai;
     Widget hint(String text) => Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: Text(text,
-              style: TextStyle(color: c.textSecondary, fontSize: 13),
-              textAlign: TextAlign.center),
-        );
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Text(
+        text,
+        style: TextStyle(color: c.textSecondary, fontSize: 13),
+        textAlign: TextAlign.center,
+      ),
+    );
     if (!_aiLooked) return const SizedBox(height: 8);
     if (ai == null) {
       return SafeArea(child: hint(_error ?? 'No AI is set up on this device.'));
@@ -251,7 +259,9 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               const SizedBox(height: 8),
               FilledButton(
-                  onPressed: _enableAi, child: const Text('Turn on AI')),
+                onPressed: _enableAi,
+                child: const Text('Turn on AI'),
+              ),
               if (_error != null)
                 Text(_error!, style: TextStyle(color: c.alert, fontSize: 12)),
             ],
@@ -268,8 +278,10 @@ class _ChatScreenState extends State<ChatScreen> {
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: Text(_error!,
-                    style: TextStyle(color: c.alert, fontSize: 12)),
+                child: Text(
+                  _error!,
+                  style: TextStyle(color: c.alert, fontSize: 12),
+                ),
               ),
             Row(
               children: [

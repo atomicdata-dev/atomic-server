@@ -14,14 +14,14 @@ class HostedAi {
   HostedAi({
     required this.status,
     required Stream<String> Function(List<Map<String, String>>, String model)
-        stream,
+    stream,
     required Future<Map<String, dynamic>> Function() enable,
-  })  : _stream = stream,
-        _enable = enable;
+  }) : _stream = stream,
+       _enable = enable;
 
   Map<String, dynamic> status;
   final Stream<String> Function(List<Map<String, String>>, String model)
-      _stream;
+  _stream;
   final Future<Map<String, dynamic>> Function() _enable;
 
   /// The provider offers AI to this account and it is switched on.
@@ -40,9 +40,9 @@ class HostedAi {
 
   /// The answer to [history] (oldest first), as it is written.
   Stream<String> answer(List<ChatMessage> history) => _stream([
-        {'role': 'system', 'content': _systemPrompt},
-        for (final m in history) {'role': m.role, 'content': m.text},
-      ], model);
+    {'role': 'system', 'content': _systemPrompt},
+    for (final m in history) {'role': m.role, 'content': m.text},
+  ], model);
 
   /// The linked account's AI, or null when no account is linked or the
   /// provider offers none. Throws when the provider cannot be reached.
@@ -53,8 +53,8 @@ class HostedAi {
     }
     if (saved == null) return null;
     final client = shared.AtomicAccountClient(
-        shared.AtomicAccountClient.sessionOrigin(saved).toString())
-      ..restoreSession(saved);
+      shared.AtomicAccountClient.sessionOrigin(saved).toString(),
+    )..restoreSession(saved);
     final status = await client.aiStatus();
     if (status == null) {
       client.close();
