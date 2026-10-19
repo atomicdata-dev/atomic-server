@@ -383,3 +383,40 @@ async fn conversations_are_titled_by_the_other_members() {
     assert_eq!(list[0]["title"], "https://example.test/agent");
     assert_eq!(list[1]["title"], "Only you");
 }
+
+#[tokio::test]
+async fn activity_follows_creates_and_deletes_and_skips_chats() {
+    let drive = shared_drive().await.to_string();
+    let store = db().unwrap();
+    let mut rx = store.subscribe_events();
+
+    let folder = store
+        .create_resource(urls::FOLDER, &drive, "Activity folder", None)
+        .await
+        .unwrap();
+    let chat = new_chat("Activity chat").await;
+    pump(&mut rx).await;
+
+    let list = list_activity(500).await.unwrap();
+    let entry = list.iter().find(|a| a.subject == folder).unwrap();
+    assert_eq!(entry.kind, "created");
+    assert_eq!(entry.name, "Activity folder");
+    assert!(entry.at > 0);
+    assert!(list.iter().all(|a| a.subject != chat));
+    // The signer comes from the stored commit.
+    let raw = recents::activity(500)
+        .into_iter()
+        .find(|a| a.subject == folder)
+        .unwrap();
+    assert!(raw.actor.is_some());
+
+    store
+        .remove_resource(&folder.as_str().into())
+        .await
+        .unwrap();
+    pump(&mut rx).await;
+    let list = list_activity(500).await.unwrap();
+    let entry = list.iter().find(|a| a.subject == folder).unwrap();
+    assert_eq!(entry.kind, "deleted");
+    assert_eq!(entry.name, "Activity folder");
+}

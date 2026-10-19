@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../src/rust/api/assistant.dart' as assistant;
+import '../src/rust/api/assistant.dart' show ActivityEntry;
 import '../src/rust/api/embed.dart' as embed;
 import 'session.dart';
 import '../src/rust/api/simple.dart' as ffi;
@@ -12,6 +13,7 @@ import '../src/rust/api/simple/types.dart'
 
 export '../src/rust/api/simple/types.dart'
     show AgentInfo, CanvasListItem, VersionMetadata;
+export '../src/rust/api/assistant.dart' show ActivityEntry;
 
 /// An AI chat of the active drive; `lastActivity` is unix ms, 0 when empty.
 typedef ChatSummary = ({String subject, String name, int lastActivity});
@@ -152,6 +154,9 @@ class AtomicClient {
   /// them. `openedAt` is 0.
   static Future<List<RecentResource>> conversations({int limit = 100}) async =>
       parseRecentResources(await assistant.listConversations(limit: limit));
+  /// What changed lately in every drive, newest first, by whom.
+  static Future<List<ActivityEntry>> activity({int limit = 100}) =>
+      assistant.listActivity(limit: limit);
 
   /// Starts an AI chat named [name] in the private drive; returns its subject.
   static Future<String> createAiChat(String name) =>

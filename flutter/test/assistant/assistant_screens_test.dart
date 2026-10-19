@@ -17,6 +17,7 @@ class FakeApi extends AssistantApi {
   final List<RecentResource> recent;
   final List<RecentResource> favoriteList;
   final List<RecentResource> conversationList;
+  final List<ActivityEntry> activityList;
   final List<ChatSummary> chatList;
   final List<ChatMessage> messageList;
   final List<SearchHit> hits;
@@ -31,6 +32,7 @@ class FakeApi extends AssistantApi {
     this.recent = const [],
     this.favoriteList = const [],
     this.conversationList = const [],
+    this.activityList = const [],
     this.ai,
     this.chatList = const [],
     this.messageList = const [],
@@ -43,6 +45,9 @@ class FakeApi extends AssistantApi {
   Future<List<DriveInfo>> drives() async => driveList;
   @override
   Future<List<ChatSummary>> chats() async => chatList;
+  @override
+  Future<List<ActivityEntry>> activity(int limit) async =>
+      activityList.take(limit).toList();
   @override
   Future<List<RecentResource>> recentResources(String drive) async => recent;
   @override
@@ -74,6 +79,18 @@ class FakeApi extends AssistantApi {
   @override
   String webUrl(String subject) => throw 'Not connected to a server';
 }
+
+ActivityEntry _activity(String subject, String name,
+        {String kind = 'changed', String? actor = 'Ann'}) =>
+    ActivityEntry(
+      subject: subject,
+      drive: 'did:ad:drive',
+      kind: kind,
+      at: DateTime.now().millisecondsSinceEpoch - 5 * 60 * 1000 - 5000,
+      actor: actor,
+      name: name,
+      className: 'Document',
+    );
 
 Widget app(Widget home, {Brightness brightness = Brightness.light}) =>
     MaterialApp(
@@ -228,6 +245,75 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Chat 5'), findsOneWidget);
       expect(find.text('Today'), findsOneWidget);
+    });
+
+    testWidgets('Activity sits between Recents and AI Chats', (tester) async {
+      final api = FakeApi(
+        chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
+        recent: [
+          (subject: 'r1', title: 'A doc', className: 'Document', openedAt: 1),
+        ],
+        activityList: [_activity('a1', 'Plan')],
+      );
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      double y(String t) => tester.getTopLeft(find.text(t)).dy;
+      expect(y('Recents'), lessThan(y('Activity')));
+      expect(y('Activity'), lessThan(y('AI Chats')));
+      expect(find.text('Ann changed · 5 min ago'), findsOneWidget);
+    });
+
+    testWidgets('says so when there is no activity', (tester) async {
+      await tester.pumpWidget(app(ChatsScreen(
+          drive: 'did:ad:drive', api: FakeApi(), onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      expect(find.text('No activity yet'), findsOneWidget);
+    });
+
+    testWidgets('activity shows 4, Show all appears only above 4',
+        (tester) async {
+      Future<void> pump(int n) async {
+        await tester.pumpWidget(Container());
+        await tester.pumpWidget(app(ChatsScreen(
+            drive: 'did:ad:drive',
+            api: FakeApi(activityList: [
+              for (var i = 0; i < n; i++) _activity('a$i', 'Item $i'),
+            ]),
+            onOpenGallery: () {})));
+        await tester.pumpAndSettle();
+      }
+
+      await pump(4);
+      expect(find.text('Item 3'), findsOneWidget);
+      expect(find.text('Show all'), findsNothing);
+
+      await pump(6);
+      expect(find.text('Item 3'), findsOneWidget);
+      expect(find.text('Item 4'), findsNothing);
+      await tester.tap(find.text('Show all'));
+      await tester.pumpAndSettle();
+      expect(find.text('Item 5'), findsOneWidget);
+    });
+
+    testWidgets('a deleted entry is not tappable, a changed one opens',
+        (tester) async {
+      final api = FakeApi(activityList: [
+        _activity('gone', 'Old note', kind: 'deleted', actor: null),
+        _activity('here', 'Fresh note', kind: 'created'),
+      ]);
+      await tester.pumpWidget(app(
+          ChatsScreen(drive: 'did:ad:drive', api: api, onOpenGallery: () {})));
+      await tester.pumpAndSettle();
+      expect(find.text('Someone deleted · 5 min ago'), findsOneWidget);
+      ListTile tile(String title) => tester.widget<ListTile>(
+          find.ancestor(of: find.text(title), matching: find.byType(ListTile)));
+      expect(tile('Old note').onTap, isNull);
+
+      ResourceView.serverFactory = () async => throw 'no server in a test';
+      await tester.tap(find.text('Fresh note'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ResourceView), findsOneWidget);
     });
 
     testWidgets('recents merge all drives, newest first', (tester) async {

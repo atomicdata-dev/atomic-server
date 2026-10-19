@@ -28,6 +28,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  ActivityEntry dco_decode_activity_entry(dynamic raw);
+
+  @protected
   AgentInfo dco_decode_agent_info(dynamic raw);
 
   @protected
@@ -50,6 +53,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<ActivityEntry> dco_decode_list_activity_entry(dynamic raw);
 
   @protected
   List<CanvasListItem> dco_decode_list_canvas_list_item(dynamic raw);
@@ -94,6 +100,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
+  ActivityEntry sse_decode_activity_entry(SseDeserializer deserializer);
+
+  @protected
   AgentInfo sse_decode_agent_info(SseDeserializer deserializer);
 
   @protected
@@ -116,6 +125,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<ActivityEntry> sse_decode_list_activity_entry(
+      SseDeserializer deserializer);
 
   @protected
   List<CanvasListItem> sse_decode_list_canvas_list_item(
@@ -164,6 +177,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
+  void sse_encode_activity_entry(ActivityEntry self, SseSerializer serializer);
+
+  @protected
   void sse_encode_agent_info(AgentInfo self, SseSerializer serializer);
 
   @protected
@@ -189,6 +205,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_activity_entry(
+      List<ActivityEntry> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_canvas_list_item(

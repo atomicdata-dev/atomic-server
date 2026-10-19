@@ -31,7 +31,7 @@ pub(crate) fn name_of(resource: &Resource) -> String {
 }
 
 /// The name of a resource's first class, its subject when the class has none.
-async fn class_name_of(resource: &Resource) -> String {
+pub(crate) async fn class_name_of(resource: &Resource) -> String {
     let class = match resource.get(urls::IS_A).map(|v| v.to_subjects(None)) {
         Ok(Ok(classes)) => classes.into_iter().next().unwrap_or_default(),
         _ => String::new(),
@@ -105,6 +105,55 @@ pub async fn list_ai_chats(limit: u32) -> Result<String, String> {
         .map(|(subject, name, last)| json!({ "subject": subject, "name": name, "last_activity": last }))
         .collect();
     serde_json::to_string(&list).map_err(|e| e.to_string())
+}
+
+/// One line of the activity feed.
+pub struct ActivityEntry {
+    pub subject: String,
+    pub drive: String,
+    /// `created`, `changed` or `deleted`.
+    pub kind: String,
+    /// Unix ms.
+    pub at: i64,
+    /// Display name of the agent that did it; `None` when the store does not
+    /// know who, or does not have that agent's resource.
+    pub actor: Option<String>,
+    pub name: String,
+    pub class_name: String,
+}
+
+/// What changed lately in every drive, newest first, by whom. Read from the
+/// recents index, which the store's change events keep.
+pub async fn list_activity(limit: u32) -> Result<Vec<ActivityEntry>, String> {
+    let store = db()?;
+    let mut names: std::collections::HashMap<String, Option<String>> = Default::default();
+    let mut out = Vec::new();
+    for a in recents::activity(limit as usize) {
+        let actor = match &a.actor {
+            None => None,
+            Some(agent) => match names.get(agent) {
+                Some(name) => name.clone(),
+                None => {
+                    let name = match store.get_resource(&Subject::from(agent.as_str())).await {
+                        Ok(r) => Some(name_of(&r)).filter(|n| !n.is_empty()),
+                        Err(_) => None,
+                    };
+                    names.insert(agent.clone(), name.clone());
+                    name
+                }
+            },
+        };
+        out.push(ActivityEntry {
+            subject: a.subject,
+            drive: a.drive,
+            kind: a.kind.as_str().to_string(),
+            at: a.at,
+            actor,
+            name: a.name,
+            class_name: a.class_name,
+        });
+    }
+    Ok(out)
 }
 
 /// Record that this device opened `subject` in `drive`. Local to the device:

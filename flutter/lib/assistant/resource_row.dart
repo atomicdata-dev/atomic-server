@@ -8,14 +8,16 @@ class ResourceRow extends StatelessWidget {
   final IconData? icon;
   final String title;
   final String? detail;
-  final VoidCallback onTap;
+
+  /// Null for a row that is only information.
+  final VoidCallback? onTap;
 
   const ResourceRow({
     super.key,
     this.icon,
     required this.title,
     this.detail,
-    required this.onTap,
+    this.onTap,
   });
 
   @override

@@ -14,6 +14,11 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 Future<String> listAiChats({required int limit}) =>
     RustLib.instance.api.crateApiAssistantListAiChats(limit: limit);
 
+/// What changed lately in every drive, newest first, by whom. Read from the
+/// recents index, which the store's change events keep.
+Future<List<ActivityEntry>> listActivity({required int limit}) =>
+    RustLib.instance.api.crateApiAssistantListActivity(limit: limit);
+
 /// Record that this device opened `subject` in `drive`. Local to the device:
 /// nothing is committed or synced.
 void noteResourceOpened({required String drive, required String subject}) =>
@@ -74,3 +79,54 @@ Future<String> appendChatEntry(
         required String partsJson}) =>
     RustLib.instance.api.crateApiAssistantAppendChatEntry(
         chat: chat, role: role, partsJson: partsJson);
+
+/// One line of the activity feed.
+class ActivityEntry {
+  final String subject;
+  final String drive;
+
+  /// `created`, `changed` or `deleted`.
+  final String kind;
+
+  /// Unix ms.
+  final PlatformInt64 at;
+
+  /// Display name of the agent that did it; `None` when the store does not
+  /// know who, or does not have that agent's resource.
+  final String? actor;
+  final String name;
+  final String className;
+
+  const ActivityEntry({
+    required this.subject,
+    required this.drive,
+    required this.kind,
+    required this.at,
+    this.actor,
+    required this.name,
+    required this.className,
+  });
+
+  @override
+  int get hashCode =>
+      subject.hashCode ^
+      drive.hashCode ^
+      kind.hashCode ^
+      at.hashCode ^
+      actor.hashCode ^
+      name.hashCode ^
+      className.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ActivityEntry &&
+          runtimeType == other.runtimeType &&
+          subject == other.subject &&
+          drive == other.drive &&
+          kind == other.kind &&
+          at == other.at &&
+          actor == other.actor &&
+          name == other.name &&
+          className == other.className;
+}

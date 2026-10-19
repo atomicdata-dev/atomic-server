@@ -16,10 +16,13 @@ const _homeItems = 4;
 /// Most items the merged recents list holds.
 const _maxRecents = 100;
 
+/// Most entries the activity feed holds.
+const _maxActivity = 100;
+
 typedef _Recent = ({String drive, RecentResource resource});
 
-/// Home screen: one scrollable page of small sections (Drives, Recents, AI
-/// Chats), each with its newest few items and a "Show all" for the rest. A
+/// Home screen: one scrollable page of small sections (Drives, Recents, Activity,
+/// AI Chats), each with its newest few items and a "Show all" for the rest. A
 /// section is one [_Section]; adding another is one more entry in the list.
 /// Every section shows as soon as its own data arrives.
 class ChatsScreen extends StatefulWidget {
@@ -48,6 +51,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
   late Future<List<_Recent>> _recents = _loadRecents();
   late Future<List<RecentResource>> _favorites = widget.api.favorites();
   late Future<List<RecentResource>> _conversations = widget.api.conversations();
+  late Future<List<ActivityEntry>> _activity =
+      widget.api.activity(_maxActivity);
 
   /// The most recent drive: the one the home opened on, else the first.
   String _drive = '';
@@ -82,6 +87,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         _recents = _loadRecents();
         _favorites = widget.api.favorites();
         _conversations = widget.api.conversations();
+        _activity = widget.api.activity(_maxActivity);
       });
 
   Future<void> _push(Widget screen) async {
@@ -140,6 +146,23 @@ class _ChatsScreenState extends State<ChatsScreen> {
   /// Favorites and conversations are not tied to one drive: they open in the
   /// current one.
   Widget _homeRow(RecentResource r) => _resourceRow(r, _openResource, _drive);
+  /// "<who> created/changed/deleted · <when>". A deleted resource is gone, so
+  /// its row is not tappable.
+  Widget _activityRow(ActivityEntry a) => ResourceRow(
+        icon: Icons.description_outlined,
+        title: a.name.isEmpty ? a.subject : a.name,
+        detail: '${a.actor ?? 'Someone'} ${a.kind} · ${timeAgo(a.at.toInt())}',
+        onTap: a.kind == 'deleted'
+            ? null
+            : () {
+                widget.api.noteOpened(a.drive, a.subject);
+                _push(ResourceView(
+                    api: widget.api,
+                    drive: a.drive,
+                    subject: a.subject,
+                    title: a.name));
+              },
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -188,6 +211,16 @@ class _ChatsScreenState extends State<ChatsScreen> {
                 onShowAll: (list) =>
                     _push(_ListPage(title: 'Recents', children: [
                   for (final r in list.take(_maxRecents)) _recentRow(r),
+                ])),
+              ),
+              _Section<ActivityEntry>(
+                title: 'Activity',
+                future: _activity,
+                empty: 'No activity yet',
+                rows: (list) => [for (final a in list) _activityRow(a)],
+                onShowAll: (list) =>
+                    _push(_ListPage(title: 'Activity', children: [
+                  for (final a in list.take(_maxActivity)) _activityRow(a),
                 ])),
               ),
               _Section<ChatSummary>(

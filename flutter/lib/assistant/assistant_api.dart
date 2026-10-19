@@ -16,6 +16,8 @@ class AssistantApi {
       AtomicClient.recentResources(drive);
   Future<List<RecentResource>> favorites() => AtomicClient.favorites();
   Future<List<RecentResource>> conversations() => AtomicClient.conversations();
+  Future<List<ActivityEntry>> activity(int limit) =>
+      AtomicClient.activity(limit: limit);
   void noteOpened(String drive, String subject) =>
       AtomicClient.noteResourceOpened(drive, subject);
   Future<String?> agentName() async =>
