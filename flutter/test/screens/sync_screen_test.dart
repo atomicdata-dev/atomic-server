@@ -7,12 +7,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 class _Servers extends shared.AtomicServerBackend {
   final bool managed;
-  _Servers({this.managed = false});
+
+  /// No server in use, but a managed one is known (paired, not switched to).
+  final bool noneActive;
+  _Servers({this.managed = false, this.noneActive = false});
 
   @override
   Future<List<String>> knownServers() async => ['https://node.example'];
   @override
-  Future<String?> activeServer() async => 'https://node.example';
+  Future<String?> activeServer() async =>
+      noneActive ? null : 'https://node.example';
   @override
   Future<shared.ServerInfo> serverInfo(String url) async => shared.ServerInfo(
         managed: managed,
@@ -78,8 +82,8 @@ class _Backend extends shared.AtomicSettingsBackend {
 }
 
 Widget _app(Widget home) => MaterialApp(
-      theme:
-          ThemeData(brightness: Brightness.dark, extensions: const [AppColors.dark]),
+      theme: ThemeData(
+          brightness: Brightness.dark, extensions: const [AppColors.dark]),
       home: home,
     );
 
@@ -136,6 +140,17 @@ void main() {
     await tester.tap(find.text('Link your account'));
     await tester.pumpAndSettle();
     expect(linked, 'https://portal.example');
+  });
+
+  testWidgets('a known managed server offers the link without being active',
+      (tester) async {
+    await tester.pumpWidget(_app(SyncScreen(
+      backend: _Backend(servers: _Servers(managed: true, noneActive: true)),
+      loadAccount: (_) async => null,
+      linkAccount: (context, portal) async {},
+    )));
+    await tester.pumpAndSettle();
+    expect(find.text('Link your account'), findsOneWidget);
   });
 
   testWidgets('a self-hosted server never offers an account', (tester) async {
