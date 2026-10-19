@@ -1,4 +1,4 @@
-import { core, dataBrowser, type NativeChannel } from '@tomic/lib';
+import { dataBrowser, server, type NativeChannel } from '@tomic/lib';
 import baseModels from '@repo-lib-defaults/default_base_models.json';
 import defaultStore from '@repo-lib-defaults/default_store.json';
 
@@ -7,7 +7,7 @@ type JsonAd = Record<string, unknown> & { '@id': string };
 const NAME = 'https://atomicdata.dev/properties/name';
 const PARENT = 'https://atomicdata.dev/properties/parent';
 const IS_A = 'https://atomicdata.dev/properties/isA';
-const DRIVE = core.classes.drive;
+const DRIVE = server.classes.drive;
 const FOLDER = dataBrowser.classes.folder;
 const DESCRIPTION = 'https://atomicdata.dev/properties/description';
 

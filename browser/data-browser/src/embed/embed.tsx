@@ -19,6 +19,7 @@
  *
  * Saving: the store has no server, so its commits go to the host instead
  * (`commitTransport`): signed through the host, applied by `applyCommit`.
+ * Reading: only from the host (`noServer`, `embedStore.ts`).
  */
 import '../helpers/preloadLocale';
 import { StrictMode, useEffect, useState } from 'react';
@@ -31,16 +32,7 @@ import {
   Outlet,
   RouterProvider,
 } from '@tanstack/react-router';
-import {
-  Agent,
-  enableLoro,
-  NativeClientDb,
-  NativeCryptoProvider,
-  Store,
-  StoreContext,
-  type ClientDbWorker,
-  type NativeChannel,
-} from '@tomic/react';
+import { enableLoro, StoreContext, type NativeChannel } from '@tomic/react';
 import {
   enableEmbedMode,
   setHostColorScheme,
@@ -65,6 +57,7 @@ import { styled } from 'styled-components';
 import { createFlutterHost } from './flutterHost';
 import { createMockHost } from './mockHost';
 import { createFlush } from './flush';
+import { createEmbedStore } from './embedStore';
 import { closeTopOverlay } from './overlayBack';
 import { setActionsHost } from './hostActions';
 import { useNativeChatRoom } from './useNativeChatRoom';
@@ -117,30 +110,10 @@ const channel: NativeChannel =
   (window.AtomicFlutter
     ? createFlutterHost(window.AtomicFlutter)
     : createMockHost());
-const db = new NativeClientDb(channel);
-
 // Only the app can open its own screens; the mock host answers nothing to that.
 setActionsHost(window.atomicHost || window.AtomicFlutter ? channel : undefined);
 
-const agentSubject = (await channel
-  .call('agent', [])
-  .catch(() => undefined)) as string | undefined;
-
-const store = new Store({
-  // Never used: nothing here connects. A valid origin is all the store wants.
-  serverUrl: 'https://embed.invalid',
-  connect: false,
-  agent: agentSubject
-    ? new Agent(new NativeCryptoProvider(channel), agentSubject)
-    : undefined,
-  // Edits go to the host, which keeps them and syncs them. Without this the
-  // store, having no server, would only ever save them offline, into a page
-  // database nobody keeps: the typing was gone once the page closed.
-  commitTransport: db.commitTransport,
-});
-
-store.setClientDb(db as unknown as ClientDbWorker);
-await db.waitForInit();
+const { store, db } = await createEmbedStore(channel);
 
 const flush = createFlush(store, db);
 
