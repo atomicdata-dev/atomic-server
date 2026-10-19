@@ -4313,7 +4313,10 @@ async fn search_index_is_rebuilt_once_per_marker() {
         .set_unsafe(urls::DRIVE_PROP.into(), Value::AtomicUrl(drive.into()))
         .unwrap();
     authored
-        .set_unsafe(urls::NAME.into(), Value::String("axolotl field guide".into()))
+        .set_unsafe(
+            urls::NAME.into(),
+            Value::String("axolotl field guide".into()),
+        )
         .unwrap();
     let state = authored.build_state_doc().unwrap().export_snapshot();
     crate::sync::ws_apply::apply_state_updates(&store, &[(subj.to_string(), state)], false)

@@ -540,39 +540,33 @@ async fn assistant_search_finds_resources_delivered_by_sync() {
 
 #[tokio::test]
 async fn assistant_search_covers_every_drive_and_names_the_hit_drive() {
+    // Two drives, as sync delivers them: pages carrying their `drive`. (No
+    // `create_drive`: it moves the active drive under the other tests.)
     let first = shared_drive().await.to_string();
-    let second = crate::api::simple::create_drive("Search second drive".into())
-        .await
-        .unwrap();
-    db().unwrap().set_active_drive(&first).unwrap();
-    let here = db()
-        .unwrap()
-        .create_resource(AI_CHAT, &first, "Pangolin in the first drive", None)
-        .await
-        .unwrap();
-    let there = db()
-        .unwrap()
-        .create_resource(AI_CHAT, &second, "Pangolin in the second drive", None)
-        .await
-        .unwrap();
+    let second = "did:ad:searchsecond0000000000000000000000000000000000000000000000000000==";
+    let here = synced_page(&first, "Pangolin in the first drive", Some(&first)).await;
+    let there = synced_page(second, "Pangolin in the second drive", Some(second)).await;
 
     let hits: Vec<Json> =
         serde_json::from_str(&search(None, "pangolin".into(), 10).await.unwrap()).unwrap();
     let drive_of = |subject: &str| {
         hits.iter()
-            .find(|h| h["subject"] == subject)
-            .map(|h| h["drive"].as_str().unwrap().to_string())
+            .find(|h| h["subject"].as_str().unwrap().ends_with(&subject[9..]))
+            .map(|h| h["drive"].as_str().unwrap().replace("atomic:", "did:ad:"))
     };
-    assert_eq!(drive_of(&here).as_deref(), Some(first.as_str()));
-    assert_eq!(drive_of(&there).as_deref(), Some(second.as_str()));
+    assert_eq!(
+        drive_of(&here).as_deref(),
+        Some(first.replace("atomic:", "did:ad:").as_str())
+    );
+    assert_eq!(drive_of(&there).as_deref(), Some(second));
 
     // Scoping to one drive still works.
     let only: Vec<Json> = serde_json::from_str(
-        &search(Some(second.clone()), "pangolin".into(), 10)
+        &search(Some(second.to_string()), "pangolin".into(), 10)
             .await
             .unwrap(),
     )
     .unwrap();
     assert_eq!(only.len(), 1);
-    assert_eq!(only[0]["subject"], there.as_str());
+    assert!(only[0]["subject"].as_str().unwrap().ends_with(&there[9..]));
 }
