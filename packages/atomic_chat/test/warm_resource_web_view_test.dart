@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'unimplemented_api.dart';
 
@@ -108,6 +109,22 @@ void main() {
     await pumpEventQueue();
     expect(pages, hasLength(2));
     expect(pool.take(), isNull);
+  });
+
+  test('a spare reporting the saved theme sets the app\'s', () async {
+    SharedPreferences.setMockInitialValues({});
+    addTearDown(() => AppThemeMode.mode.value = ThemeMode.system);
+    pool = makePool()..warmUp();
+    await pumpEventQueue();
+    final page = pages.single;
+    page.send(jsonEncode({
+      'id': 3,
+      'method': 'theme',
+      'args': ['dark'],
+    }));
+    await pumpEventQueue();
+    expect(AppThemeMode.mode.value, ThemeMode.dark);
+    expect(page.scripts, contains('window.__atomicReply(3,true,"true")'));
   });
 
   test('a failed start leaves no spare and take opens cold', () async {

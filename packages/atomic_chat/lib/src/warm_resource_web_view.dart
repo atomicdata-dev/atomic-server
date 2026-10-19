@@ -10,6 +10,7 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import 'assistant_api.dart';
 import 'resource_view.dart';
+import 'app_theme.dart';
 
 /// A page that can be released once nobody needs it any more (its web view
 /// dropped). Cold pages and warm pages are both released.
@@ -340,8 +341,13 @@ class WarmResourceWebView with WidgetsBindingObserver {
     if (id is! int || method is! String) return;
     String reply;
     try {
-      final answer =
-          await api.embedCall(method, jsonEncode(request['args'] ?? const []));
+      final args = request['args'];
+      // The page reports the saved theme as it boots, before anyone holds it.
+      final answer = method == 'theme'
+          ? await AppThemeMode.choose(
+                  args is List && args.isNotEmpty ? '${args.first}' : '')
+              .then((_) => 'true')
+          : await api.embedCall(method, jsonEncode(args ?? const []));
       reply = 'true,${jsonEncode(answer)}';
     } catch (e) {
       reply = 'false,${jsonEncode('$e')}';
