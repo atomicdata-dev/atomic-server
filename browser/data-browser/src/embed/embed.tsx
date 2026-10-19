@@ -13,6 +13,10 @@
  *   changed(subjects) these resources changed in the host's store
  *   flush(leaving?)   hand every pending edit to the host; resolves when done
  *
+ * Page to host, besides the store's calls: `openNative(kind, subject, title)`
+ * (`hostActions.ts`) asks the app to show the chat of a meeting or chat room in
+ * its own screen; the answer is whether it did.
+ *
  * Saving: the store has no server, so its commits go to the host instead
  * (`commitTransport`): signed through the host, applied by `applyCommit`.
  */
@@ -62,6 +66,8 @@ import { createFlutterHost } from './flutterHost';
 import { createMockHost } from './mockHost';
 import { createFlush } from './flush';
 import { closeTopOverlay } from './overlayBack';
+import { setActionsHost } from './hostActions';
+import { useNativeChatRoom } from './useNativeChatRoom';
 
 enableEmbedMode();
 
@@ -111,6 +117,9 @@ const channel: NativeChannel =
     ? createFlutterHost(window.AtomicFlutter)
     : createMockHost());
 const db = new NativeClientDb(channel);
+
+// Only the app can open its own screens; the mock host answers nothing to that.
+setActionsHost(window.atomicHost || window.AtomicFlutter ? channel : undefined);
 
 const agentSubject = (await channel
   .call('agent', [])
@@ -200,6 +209,11 @@ const showRoute = createRoute({
 
       return () => window.removeEventListener('atomic-embed-menu', open);
     }, []);
+
+    // A chat room is the app's native chat screen when it has one.
+    useNativeChatRoom(subject, () => {
+      if (history.canGoBack()) history.back();
+    });
 
     if (!subject) {
       return null;
