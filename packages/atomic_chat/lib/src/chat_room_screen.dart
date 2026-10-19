@@ -11,6 +11,7 @@ import 'conversation_screen.dart' show conversationRefresh, messageTime;
 import 'models.dart';
 import 'native_views.dart';
 import 'slide_back_route.dart';
+import 'list_and_field.dart';
 
 /// Messages of one author closer together than this are one group: the author
 /// is named once above it.
@@ -196,12 +197,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     return Scaffold(
       backgroundColor: c.bgBody,
       appBar: AppTopBar(title: widget.title.isEmpty ? 'Chat' : widget.title),
-      body: Column(
-        children: [
-          Expanded(child: _list(c)),
-          _composer(c),
-        ],
-      ),
+      body: ListAndField(list: _list(c), field: _composer(c)),
     );
   }
 

@@ -79,6 +79,18 @@ Future<void> _open(WidgetTester tester, _RoomApi api,
 }
 
 void main() {
+  testWidgets('sideways with the keyboard up, the composer fits',
+      (tester) async {
+    _sideways(tester);
+    await _open(tester, _RoomApi([_msg('1', 'Alice', 'Hi', _t0)]));
+    expect(tester.takeException(), isNull);
+    expect(find.byType(TextField), findsOneWidget);
+    // With the keyboard down again the messages are back.
+    tester.view.viewInsets = FakeViewPadding.zero;
+    await tester.pumpAndSettle();
+    expect(find.text('Hi'), findsOneWidget);
+  });
+
   testWidgets('parses the host JSON into messages and events', (tester) async {
     final parsed = AssistantJson.parseChatRoomMessages(jsonEncode([
       {
@@ -286,4 +298,13 @@ extension on ChatRoomMessage {
         about: about,
         aboutTitle: aboutTitle,
       );
+}
+
+void _sideways(WidgetTester tester) {
+  // The emulator sideways with the keyboard up: about 60 dp for the page.
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = const Size(914, 411);
+  tester.view.padding = const FakeViewPadding(top: 24, left: 42);
+  tester.view.viewInsets = const FakeViewPadding(bottom: 265);
+  addTearDown(tester.view.reset);
 }

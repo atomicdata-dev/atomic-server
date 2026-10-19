@@ -8,6 +8,7 @@ import 'app_top_bar.dart';
 
 import 'models.dart';
 import 'assistant_api.dart';
+import 'list_and_field.dart';
 
 /// How often the open conversation is read again for messages that arrived
 /// through sync. The read is local (opened messages are cached), so it is cheap.
@@ -168,12 +169,7 @@ class _ConversationScreenState extends State<ConversationScreen>
       backgroundColor: c.bgBody,
       appBar: AppTopBar(
           title: widget.title.isEmpty ? 'Conversation' : widget.title),
-      body: Column(
-        children: [
-          Expanded(child: _list(c)),
-          _composer(c),
-        ],
-      ),
+      body: ListAndField(list: _list(c), field: _composer(c)),
     );
   }
 

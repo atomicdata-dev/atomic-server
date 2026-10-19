@@ -12,6 +12,7 @@ import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'resource_row.dart';
 import 'native_views.dart';
+import 'list_and_field.dart';
 
 /// Type-ahead search over every drive; a hit opens in its own drive. [drive]
 /// is only the fallback for what has no drive of its own.
@@ -355,7 +356,8 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  /// Below this height the page shows only the field.
+  /// Below this height the page shows only the field (sideways with the
+  /// keyboard up).
   static const _fieldRoom = 120.0;
 
   late final Widget _field = RepaintBoundary(
@@ -466,27 +468,16 @@ class _SearchScreenState extends State<SearchScreen> {
       body: SafeArea(
         top: false,
         bottom: false,
-        child: LayoutBuilder(builder: (context, box) {
-          // Sideways with the keyboard up there is no room for the list, and
-          // the field alone overflowed the page by a few pixels: then the
-          // field only, scrollable.
-          if (box.maxHeight < _fieldRoom) {
-            return SingleChildScrollView(reverse: true, child: _field);
-          }
-          return Column(
-            children: [
-              Expanded(
-                child: RepaintBoundary(
-                  child: ListenableBuilder(
-                    listenable: _model,
-                    builder: (context, _) => _results(context),
-                  ),
-                ),
-              ),
-              _field,
-            ],
-          );
-        }),
+        child: ListAndField(
+          minHeight: _fieldRoom,
+          list: RepaintBoundary(
+            child: ListenableBuilder(
+              listenable: _model,
+              builder: (context, _) => _results(context),
+            ),
+          ),
+          field: _field,
+        ),
       ),
     );
   }

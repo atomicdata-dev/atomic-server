@@ -13,6 +13,7 @@ import 'fading_text.dart';
 import 'hosted_ai.dart';
 import 'hosted_voice.dart';
 import 'voice.dart';
+import 'list_and_field.dart';
 
 /// SharedPreferences key: speak each new answer aloud.
 
@@ -788,12 +789,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 : 'Untitled chat')
             : widget.title,
       ),
-      body: Column(
-        children: [
-          Expanded(child: _list(c)),
-          _composer(c),
-        ],
-      ),
+      body: ListAndField(list: _list(c), field: _composer(c)),
     );
   }
 
