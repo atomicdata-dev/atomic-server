@@ -59,6 +59,18 @@ void main() {
         isFalse);
   });
 
+  testWidgets('system back on the sign-in step goes to the welcome screen',
+      (tester) async {
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('I have a secret — Sign In'));
+    await tester.pumpAndSettle();
+    expect(find.text('Get Started'), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Get Started'), findsOneWidget);
+  });
+
   testWidgets('Sign in with atomic.place runs the account flow',
       (tester) async {
     var calls = 0;

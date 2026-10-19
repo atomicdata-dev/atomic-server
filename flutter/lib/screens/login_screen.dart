@@ -364,9 +364,31 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // ── Build ───────────────────────────────────────────────────────────
 
+  /// The steps the system back leaves for the welcome screen, as their own
+  /// back arrows do; elsewhere back leaves the app.
+  static const _backToWelcome = {
+    _Step.createAgent,
+    _Step.signIn,
+    _Step.needsSync,
+  };
+
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
+    return PopScope(
+      canPop: !_backToWelcome.contains(_step),
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || _busy) return;
+        setState(() {
+          _step = _Step.welcome;
+          _error = null;
+        });
+      },
+      child: _scaffold(c),
+    );
+  }
+
+  Widget _scaffold(AppColors c) {
     return Scaffold(
       backgroundColor: c.pageBg,
       body: SafeArea(
