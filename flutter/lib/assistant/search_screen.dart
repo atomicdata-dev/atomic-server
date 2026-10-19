@@ -135,59 +135,139 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
+  /// What is listed, best first: the first one is shown nearest the field.
+  List<({String drive, String shown, String subject, String title, String className})>
+      get _items => _query.isEmpty
+          ? [
+              for (final (:drive, resource: r) in _recent)
+                (
+                  drive: drive,
+                  shown: drive,
+                  subject: r.subject,
+                  title: r.title,
+                  className: r.className
+                )
+            ]
+          : [
+              for (final h in _hits)
+                (
+                  drive: h.drive.isEmpty ? widget.drive : h.drive,
+                  shown: h.drive,
+                  subject: h.subject,
+                  title: h.title,
+                  className: h.className
+                )
+            ];
+
+  /// Enter / the keyboard's search action opens the best hit.
+  void _openBest() {
+    final items = _items;
+    if (items.isEmpty) return;
+    final i = items.first;
+    _open(i.drive, i.subject, i.title, i.className);
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
+    final items = _items;
+    final results = _error != null
+        ? Center(child: Text('$_error', style: TextStyle(color: c.alert)))
+        : ListView(
+            // Best first, drawn from the bottom up: nearest the thumb.
+            reverse: true,
+            children: [
+              for (var n = 0; n < items.length; n++)
+                _row(c, items[n], top: n == 0),
+              if (_query.isEmpty && _recent.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Text('Recently opened',
+                      style: TextStyle(
+                          color: c.textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600)),
+                ),
+            ],
+          );
     return Scaffold(
       backgroundColor: c.bgBody,
-      appBar: AppBar(
-        backgroundColor: c.bgBody,
-        title: TextField(
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Search',
-            border: InputBorder.none,
-          ),
-          onChanged: _changed,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            Expanded(child: results),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'Back',
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () {
+                        // Straight back, even with the keyboard open.
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                    Expanded(
+                      child: TextField(
+                        autofocus: true,
+                        textInputAction: TextInputAction.search,
+                        // Keeps the keyboard (and focus) after Enter.
+                        onEditingComplete: () {},
+                        onSubmitted: (_) => _openBest(),
+                        onChanged: _changed,
+                        decoration: InputDecoration(
+                          hintText: 'Search',
+                          filled: true,
+                          fillColor: c.bg1,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(9),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-      body: _error != null
-          ? Center(
-              child: Text('$_error', style: TextStyle(color: c.alert)),
-            )
-          : ListView(
-              children: [
-                if (_query.isEmpty && _recent.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                    child: Text('Recently opened',
-                        style: TextStyle(
-                            color: c.textSecondary,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600)),
-                  ),
-                  for (final (:drive, resource: r) in _recent)
-                    ResourceRow(
-                      icon: Icons.description_outlined,
-                      title: r.title.isEmpty ? r.subject : r.title,
-                      detail: _detail(r.className, drive),
-                      onTap: () =>
-                          _open(drive, r.subject, r.title, r.className),
-                    ),
-                ],
-                for (final hit in _hits)
-                  ResourceRow(
-                    icon: Icons.description_outlined,
-                    title: hit.title.isEmpty ? hit.subject : hit.title,
-                    detail: _detail(hit.className, hit.drive),
-                    onTap: () => _open(
-                        hit.drive.isEmpty ? widget.drive : hit.drive,
-                        hit.subject,
-                        hit.title,
-                        hit.className),
-                  ),
-              ],
-            ),
+    );
+  }
+
+  Widget _row(
+    AppColors c,
+    ({
+      String drive,
+      String shown,
+      String subject,
+      String title,
+      String className
+    }) i, {
+    required bool top,
+  }) {
+    final row = ResourceRow(
+      icon: Icons.description_outlined,
+      title: i.title.isEmpty ? i.subject : i.title,
+      detail: _detail(i.className, i.shown),
+      onTap: () => _open(i.drive, i.subject, i.title, i.className),
+    );
+    if (!top) return row;
+    // The one Enter opens.
+    return Container(
+      key: const Key('search-top-hit'),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        border: Border.all(color: c.main, width: 1.5),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: row,
     );
   }
 }

@@ -672,6 +672,111 @@ void main() {
     });
   });
 
+  group('SearchScreen thumb layout', () {
+    SearchHit hit(String id, String title, double score) => (
+          subject: 'did:ad:$id',
+          title: title,
+          className: 'Folder',
+          drive: '',
+          score: score
+        );
+
+    Future<void> type(WidgetTester tester, String text) async {
+      await tester.enterText(find.byType(TextField), text);
+      await tester.pump(const Duration(milliseconds: 250));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('field at the bottom, best hit lowest and outlined',
+        (tester) async {
+      final api = FakeApi(hits: [hit('1', 'Best', 2), hit('2', 'Second', 1)]);
+      await tester
+          .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: api)));
+      await type(tester, 'b');
+
+      final field = tester.getTopLeft(find.byType(TextField)).dy;
+      final best = tester.getTopLeft(find.text('Best')).dy;
+      final second = tester.getTopLeft(find.text('Second')).dy;
+      expect(field, greaterThan(best));
+      expect(best, greaterThan(second));
+
+      final box =
+          tester.widget<Container>(find.byKey(const Key('search-top-hit')));
+      final border = (box.decoration! as BoxDecoration).border! as Border;
+      expect(border.top.width, 1.5);
+      expect(
+          find.descendant(
+              of: find.byKey(const Key('search-top-hit')),
+              matching: find.text('Best')),
+          findsOneWidget);
+      expect(find.byKey(const Key('search-top-hit')), findsOneWidget);
+    });
+
+    testWidgets('Enter opens the best hit', (tester) async {
+      final api = FakeApi(hits: [hit('1', 'Best', 2), hit('2', 'Second', 1)]);
+      ResourceView.serverFactory = () async => throw 'no server in a test';
+      await tester
+          .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: api)));
+      await type(tester, 'b');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(api.opened, ['did:ad:1']);
+      expect(find.byType(ResourceView), findsOneWidget);
+    });
+
+    testWidgets('Enter without hits opens nothing', (tester) async {
+      final api = FakeApi();
+      await tester
+          .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: api)));
+      await type(tester, 'nothing');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pump();
+      expect(api.opened, isEmpty);
+      expect(find.byType(ResourceView), findsNothing);
+    });
+
+    testWidgets('the back arrow pops in one tap with the keyboard open',
+        (tester) async {
+      final api = FakeApi();
+      await tester.pumpWidget(app(Builder(
+        builder: (context) => TextButton(
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => SearchScreen(drive: 'did:ad:drive', api: api))),
+          child: const Text('go'),
+        ),
+      )));
+      await tester.tap(find.text('go'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SearchScreen), findsOneWidget);
+      expect(FocusManager.instance.primaryFocus, isNotNull);
+
+      await tester.tap(find.byTooltip('Back'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SearchScreen), findsNothing);
+    });
+
+    testWidgets('recents: newest at the bottom, outlined', (tester) async {
+      final api = FakeApi(recent: [
+        (subject: 'r2', title: 'Newer', className: 'Document', openedAt: 2),
+        (subject: 'r1', title: 'Older', className: 'Document', openedAt: 1),
+      ]);
+      await tester
+          .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: api)));
+      await tester.pumpAndSettle();
+      final newer = tester.getTopLeft(find.text('Newer')).dy;
+      final older = tester.getTopLeft(find.text('Older')).dy;
+      final heading = tester.getTopLeft(find.text('Recently opened')).dy;
+      expect(newer, greaterThan(older));
+      expect(older, greaterThan(heading));
+      expect(
+          find.descendant(
+              of: find.byKey(const Key('search-top-hit')),
+              matching: find.text('Newer')),
+          findsOneWidget);
+    });
+  });
+
   group('SearchScreen across drives', () {
     testWidgets('shows the drive of each hit and opens it in that drive',
         (tester) async {
