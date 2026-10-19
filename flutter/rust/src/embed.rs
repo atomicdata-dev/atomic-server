@@ -518,7 +518,8 @@ mod tests {
         let signature = ask("signBytes", json!([cert(own)])).await;
         let signature = signature.as_str().unwrap();
         let mine = GenesisCert::new_v2(own, 1_780_000_000_000, [7; 16], None, "", "");
-        mine.verify(signature).expect("a valid signature over the cert");
+        mine.verify(signature)
+            .expect("a valid signature over the cert");
 
         let refused = call("signBytes", &json!([cert([9; 32])]).to_string())
             .await
@@ -529,7 +530,9 @@ mod tests {
     /// Bytes in a commit's `loroUpdate` are standard, padded base64, as the
     /// page's `encodeB64` writes them.
     fn standard_base64(bytes: &[u8]) -> String {
-        let url_safe = atomic_lib::agents::encode_base64(bytes).replace('-', "+").replace('_', "/");
+        let url_safe = atomic_lib::agents::encode_base64(bytes)
+            .replace('-', "+")
+            .replace('_', "/");
         let pad = (4 - url_safe.len() % 4) % 4;
         format!("{url_safe}{}", "=".repeat(pad))
     }
@@ -553,8 +556,8 @@ mod tests {
 
         // The page's view of the document, as it opened it.
         let opened = ask("getResourcesWithSnapshots", json!([[doc_subject]])).await;
-        let snapshot = atomic_lib::agents::decode_base64(opened[0]["snapshot"].as_str().unwrap())
-            .unwrap();
+        let snapshot =
+            atomic_lib::agents::decode_base64(opened[0]["snapshot"].as_str().unwrap()).unwrap();
         let page_doc = AtomicLoroDoc::from_snapshot(&snapshot).unwrap();
         page_doc.set_peer_id(0x5eed).unwrap();
         let before = page_doc.oplog_vv();
@@ -595,7 +598,10 @@ mod tests {
 
         // Opening it again: the typed text is in what the page reads.
         let reopened = ask("getResourcesWithSnapshots", json!([[doc_subject]])).await;
-        assert!(reopened[0]["jsonAd"].as_str().unwrap().contains("Typed doc"));
+        assert!(reopened[0]["jsonAd"]
+            .as_str()
+            .unwrap()
+            .contains("Typed doc"));
         let snapshot =
             atomic_lib::agents::decode_base64(reopened[0]["snapshot"].as_str().unwrap()).unwrap();
         let text = AtomicLoroDoc::from_snapshot(&snapshot)
@@ -629,7 +635,10 @@ mod tests {
             )
             .unwrap();
         draft
-            .set_unsafe(urls::PARENT.into(), atomic_lib::Value::AtomicUrl(drive.into()))
+            .set_unsafe(
+                urls::PARENT.into(),
+                atomic_lib::Value::AtomicUrl(drive.into()),
+            )
             .unwrap();
         let response = draft.save_as_genesis(&maker).await.unwrap();
         let subject = response.commit.subject.to_string();
