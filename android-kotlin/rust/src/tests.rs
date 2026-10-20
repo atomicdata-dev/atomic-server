@@ -15,15 +15,15 @@ fn temp_dir(name: &str) -> std::path::PathBuf {
 }
 
 /// A store with an agent and its private drive, like the end of first run.
-struct Device {
-    db: atomic_lib::Db,
-    node: AtomicNode,
-    drive: String,
-    index: RecentsIndex,
+pub(crate) struct Device {
+    pub(crate) db: atomic_lib::Db,
+    pub(crate) node: AtomicNode,
+    pub(crate) drive: String,
+    pub(crate) index: RecentsIndex,
 }
 
 impl Device {
-    async fn new(name: &str) -> Self {
+    pub(crate) async fn new(name: &str) -> Self {
         let (db, recovery) = store::open_native_store(&temp_dir(name)).await.unwrap();
         assert_eq!(recovery, None);
         let (_agent, drive) = db.setup("Pelican").await.unwrap();

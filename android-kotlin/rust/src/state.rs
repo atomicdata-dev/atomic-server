@@ -3,7 +3,7 @@
 use atomic_lib::{
     commit::CommitResponse,
     host::{
-        conversations::Conversations, profiles::AgentProfiles, recents::RecentsIndex, AgentProfileFetcher,
+        chat_rooms::ChatRooms, conversations::Conversations, profiles::AgentProfiles, recents::RecentsIndex, AgentProfileFetcher,
         LocalWritePusher,
     },
     Storelike,
@@ -115,4 +115,10 @@ pub(crate) fn profiles() -> AgentProfiles {
 pub(crate) fn conversations() -> &'static Conversations {
     static CONVERSATIONS: OnceLock<Conversations> = OnceLock::new();
     CONVERSATIONS.get_or_init(|| Conversations::new(profiles()))
+}
+
+/// Chat rooms and meetings' chats, sharing the agent names of [`profiles`].
+pub(crate) fn chat_rooms() -> &'static ChatRooms {
+    static CHAT_ROOMS: OnceLock<ChatRooms> = OnceLock::new();
+    CHAT_ROOMS.get_or_init(|| ChatRooms::new(profiles()))
 }

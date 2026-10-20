@@ -11,6 +11,7 @@
 uniffi::setup_scaffolding!();
 
 mod api;
+mod chat;
 mod embed;
 mod error;
 mod home;
@@ -22,6 +23,7 @@ mod sync;
 mod sync_api;
 mod types;
 
+pub use chat::*;
 pub use error::CoreError;
 pub use types::*;
 
