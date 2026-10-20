@@ -44,6 +44,7 @@ import { ResourceContextMenu } from '../components/ResourceContextMenu';
 import ResourcePage from '../views/ResourcePage';
 import { BreadCrumbs } from '../components/BreadCrumbs';
 import { CalculatedPageHeight } from '../globalCssVars';
+import { goToFirstEntry } from './resetHistory';
 import { actionPages } from './actionPages';
 import { styled } from 'styled-components';
 import { createFlutterHost } from './flutterHost';
@@ -308,6 +309,9 @@ window.atomicEmbed = {
     void router.navigate({ to: '/app/show', search: { subject } });
   },
   open(subject) {
+    // The warm-up showed other resources here (`show`); none of them is a
+    // place back goes to.
+    goToFirstEntry(history);
     void router.navigate({
       to: '/app/show',
       search: { subject },
