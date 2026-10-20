@@ -259,3 +259,22 @@ pub async fn subscribe_events(listener: Arc<dyn StoreListener>) -> CoreResult<Ar
     });
     Ok(Arc::new(Subscription { task: handle.abort_handle() }))
 }
+
+// ── The embedded renderer ──────────────────────────────────────────────────
+
+/// One call from the embedded page (`NativeClientDb` and the crypto provider
+/// in `browser/lib/src/client-db.native.ts`): `method` and its arguments as a
+/// JSON array, answered as JSON. Reads, signing and applying commits all go
+/// through here; the page holds no store and no secret. An error is the text
+/// the page's promise rejects with.
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn embed_dispatch(method: String, args_json: String) -> CoreResult<String> {
+    Ok(crate::embed::embed()?.call(&method, &args_json).await?)
+}
+
+/// Push store changes to the embedded page: `listener` hears the subjects to
+/// read again, until the subscription is cancelled.
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn subscribe_embed(listener: Arc<dyn EmbedListener>) -> CoreResult<Arc<Subscription>> {
+    Ok(Arc::new(Subscription { task: crate::embed::spawn_pusher(listener)? }))
+}

@@ -11,6 +11,7 @@
 uniffi::setup_scaffolding!();
 
 mod api;
+mod embed;
 mod error;
 mod home;
 mod state;

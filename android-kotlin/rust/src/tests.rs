@@ -139,3 +139,122 @@ async fn a_damaged_store_is_kept_and_replaced() {
     let recovery = recovery.expect("recovery is reported");
     assert!(std::path::Path::new(&recovery.kept_path).exists(), "the damaged file is kept");
 }
+
+// ── The embedded renderer's channel ────────────────────────────────────────
+
+mod embed_channel {
+    use super::*;
+    use crate::embed::{changed_subjects, EchoFilter, Embed};
+    use atomic_lib::{
+        host::{embed::EmbedHost, profiles::AgentProfiles, NoProfiles},
+        DbEvent, Storelike, Subject,
+    };
+    use serde_json::{json, Value as Json};
+    use std::sync::Arc;
+
+    fn embed_of(d: &Device) -> Embed {
+        Embed::new(EmbedHost::new(
+            d.node.clone(),
+            Arc::new(NoPush),
+            AgentProfiles::new(Arc::new(NoProfiles)),
+        ))
+    }
+
+    async fn ask(embed: &Embed, method: &str, args: Json) -> Json {
+        serde_json::from_str(&embed.call(method, &args.to_string()).await.unwrap()).unwrap()
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn the_page_reads_a_resource_from_the_store() {
+        let d = Device::new("embed-read").await;
+        let embed = embed_of(&d);
+        let doc = d.make(urls::DOCUMENT_V2, "Read by the page").await;
+        let rows = ask(&embed, "getResourcesWithSnapshots", json!([[doc, "did:ad:not-here"]])).await;
+        assert!(rows[0]["jsonAd"].as_str().unwrap().contains("Read by the page"));
+        assert!(!rows[0]["snapshot"].as_str().unwrap().is_empty());
+        assert!(rows[1]["jsonAd"].is_null());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn the_page_cannot_get_arbitrary_bytes_signed() {
+        let d = Device::new("embed-sign").await;
+        let embed = embed_of(&d);
+        for payload in ["hello", r#"{"not":"a commit"}"#] {
+            let err = embed.call("sign", &json!([payload]).to_string()).await.unwrap_err();
+            assert!(err.contains("commit"), "{err}");
+        }
+        let err = embed.call("nonsense", "[]").await.unwrap_err();
+        assert!(err.contains("not available"), "{err}");
+        let err = embed.call("getResource", "not json").await.unwrap_err();
+        assert!(!err.is_empty());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_commit_the_page_applied_is_not_echoed_back_to_it() {
+        use atomic_lib::loro::AtomicLoroDoc;
+        let d = Device::new("embed-echo").await;
+        let embed = embed_of(&d);
+        let doc = d.make(urls::DOCUMENT_V2, "Typed doc").await;
+        let subject = Subject::from_raw(&doc, d.db.get_base_domain().as_deref());
+
+        let opened = ask(&embed, "getResourcesWithSnapshots", json!([[doc]])).await;
+        let snapshot = atomic_lib::agents::decode_base64(opened[0]["snapshot"].as_str().unwrap()).unwrap();
+        let page_doc = AtomicLoroDoc::from_snapshot(&snapshot).unwrap();
+        page_doc.set_peer_id(0x5eed).unwrap();
+        let before = page_doc.oplog_vv();
+        page_doc.doc().get_text("documentContent").insert(0, "Typed on the phone").unwrap();
+        page_doc.commit_with_message("e-typing");
+        let update = page_doc.export_updates_since(&before);
+        let std_b64 = {
+            let s = atomic_lib::agents::encode_base64(&update).replace('-', "+").replace('_', "/");
+            format!("{s}{}", "=".repeat((4 - s.len() % 4) % 4))
+        };
+        let previous = d.db.get_resource(&subject).await.unwrap()
+            .get(urls::LAST_COMMIT).map(|v| v.to_string())
+            .unwrap_or_else(|_| "did:ad:commit:earlier".into());
+        let mut commit = json!({
+            urls::IS_A: [urls::COMMIT],
+            urls::SUBJECT: doc,
+            urls::SIGNER: ask(&embed, "agent", json!([])).await,
+            urls::CREATED_AT: atomic_lib::utils::now(),
+            urls::PREVIOUS_COMMIT: previous,
+            urls::LORO_UPDATE: std_b64,
+        });
+        commit[urls::SIGNATURE] = ask(&embed, "sign", json!([commit.to_string()])).await;
+
+        assert!(!embed.echo.is_echo(&doc));
+        assert_eq!(ask(&embed, "applyCommit", json!([commit.to_string()])).await, Json::Null);
+        assert!(embed.echo.is_echo(&doc), "the page's own write is remembered");
+        // Under the other spelling of the same resource too.
+        assert!(embed.echo.is_echo(&doc.replacen("did:ad:", "atomic:", 1)));
+
+        let reopened = ask(&embed, "getResourcesWithSnapshots", json!([[doc]])).await;
+        let snap = atomic_lib::agents::decode_base64(reopened[0]["snapshot"].as_str().unwrap()).unwrap();
+        let text = AtomicLoroDoc::from_snapshot(&snap).unwrap().extract_document_plain_text();
+        assert!(text.contains("Typed on the phone"), "{text:?}");
+    }
+
+    fn changed(subject: &str) -> DbEvent {
+        DbEvent::Changed {
+            subject: Subject::from(subject),
+            delta: None,
+            source_id: None,
+            is_new: false,
+            from_commit: true,
+        }
+    }
+
+    #[test]
+    fn a_burst_of_events_is_one_deduplicated_list_without_the_pages_own_writes() {
+        let echo = EchoFilter::default();
+        echo.wrote("did:ad:mine");
+        let events = [
+            changed("did:ad:a"),
+            changed("did:ad:a"),
+            changed("did:ad:mine"),
+            changed("did:ad:b"),
+            DbEvent::QueryMembershipChanged { query_id: vec![], subject: "q".into(), added: true, source_id: None },
+        ];
+        assert_eq!(changed_subjects(&events, &echo), ["did:ad:a", "did:ad:b"]);
+    }
+}

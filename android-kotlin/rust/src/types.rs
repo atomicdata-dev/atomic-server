@@ -88,3 +88,11 @@ pub struct StoreEvent {
 pub trait StoreListener: Send + Sync {
     fn on_event(&self, event: StoreEvent);
 }
+
+/// Kotlin implements this to push store changes into the embedded page: the
+/// resources (a burst of events, deduplicated, without the page's own writes)
+/// it should read again. Called on a background thread.
+#[uniffi::export(with_foreign)]
+pub trait EmbedListener: Send + Sync {
+    fn on_changed(&self, subjects: Vec<String>);
+}
