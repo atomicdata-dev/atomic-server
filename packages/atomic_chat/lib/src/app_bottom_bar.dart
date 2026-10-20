@@ -14,7 +14,7 @@ import 'resource_view.dart';
 import 'search_screen.dart';
 
 /// What the New button's list offers.
-enum NewChoice { aiChat, aiVoice, document, other }
+enum NewChoice { aiChat, aiVoice, document, chatRoom, drive, other }
 
 /// The web app's full "New" page, in [drive] when given.
 String newResourcePath(String? drive) => drive == null || drive.isEmpty
@@ -280,6 +280,30 @@ class ShellActions {
             ResourceView(api: api, drive: drive, path: newResourcePath(drive)));
   }
 
+  /// The web app's page for a new drive.
+  Future<void> newDrive() => shell.openPage<void>(
+      ShellPage.newResource,
+      (_) => ResourceView(
+          api: api,
+          drive: shell.drive.value,
+          title: 'New drive',
+          path: '/app/new-drive'));
+
+  /// The web app's form for a new chat room (a conversation) in the drive.
+  Future<void> newConversation() {
+    final drive = shell.drive.value;
+    return shell.openPage<void>(
+        ShellPage.newResource,
+        (_) => ResourceView(
+            api: api,
+            drive: drive,
+            title: 'New chat room',
+            path: Uri(path: '/app/new', queryParameters: {
+              'classSubject': chatRoomClass,
+              if (drive.isNotEmpty) 'parentSubject': drive,
+            }).toString()));
+  }
+
   void newOf(BuildContext context, NewChoice choice) {
     switch (choice) {
       case NewChoice.aiChat:
@@ -288,6 +312,10 @@ class ShellActions {
         voiceChat();
       case NewChoice.document:
         newDocument(context);
+      case NewChoice.chatRoom:
+        newConversation();
+      case NewChoice.drive:
+        newDrive();
       case NewChoice.other:
         newOther();
     }
@@ -342,11 +370,16 @@ class ShellActions {
       };
 }
 
-/// What New offers.
+/// The class of a chat room (a conversation), as the web app names it.
+const chatRoomClass = 'https://atomicdata.dev/classes/ChatRoom';
+
+/// What New offers, the most used first.
 const newItems = [
   HoldFanItem('AI chat', NewChoice.aiChat, icon: Icons.chat_bubble_outline),
   HoldFanItem('AI voice', NewChoice.aiVoice, icon: Icons.mic_none),
   HoldFanItem('Document', NewChoice.document, icon: Icons.description_outlined),
+  HoldFanItem('New chat room', NewChoice.chatRoom, icon: Icons.forum_outlined),
+  HoldFanItem('New drive', NewChoice.drive, icon: Icons.folder_outlined),
   HoldFanItem('Other…', NewChoice.other, icon: Icons.add_box_outlined),
 ];
 

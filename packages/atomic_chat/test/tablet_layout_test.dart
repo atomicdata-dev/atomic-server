@@ -232,7 +232,14 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 120));
     var lastTop = -1.0;
-    for (final t in ['AI chat', 'AI voice', 'Document', 'Other…']) {
+    for (final t in [
+      'AI chat',
+      'AI voice',
+      'Document',
+      'New chat room',
+      'New drive',
+      'Other…'
+    ]) {
       final r = tester.getRect(find.text(t));
       expect(r.bottom, lessThan(button.top), reason: t);
       expect(r.right, lessThanOrEqualTo(_landscape.width), reason: t);

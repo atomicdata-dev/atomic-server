@@ -182,7 +182,7 @@ void main() {
   });
 
   group('New (+)', () {
-    testWidgets('a tap lists the four kinds; picking AI chat starts a chat',
+    testWidgets('a tap lists the kinds; picking AI chat starts a chat',
         (tester) async {
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
@@ -191,7 +191,14 @@ void main() {
       // Nothing is made by the tap itself.
       expect(find.byType(ChatScreen), findsNothing);
       final rows = [
-        for (final t in ['AI chat', 'AI voice', 'Document', 'Other…'])
+        for (final t in [
+          'AI chat',
+          'AI voice',
+          'Document',
+          'New chat room',
+          'New drive',
+          'Other…'
+        ])
           tester.getRect(find.text(t)),
       ];
       for (var i = 1; i < rows.length; i++) {
@@ -243,7 +250,14 @@ void main() {
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
       final gesture = await _hold(tester, 'New');
-      for (final t in ['AI chat', 'AI voice', 'Document', 'Other…']) {
+      for (final t in [
+        'AI chat',
+        'AI voice',
+        'Document',
+        'New chat room',
+        'New drive',
+        'Other…'
+      ]) {
         expect(find.text(t), findsOneWidget);
       }
       // Letting go off the list picks nothing.
@@ -356,6 +370,24 @@ void main() {
       expect(find.text('Drive is read-only'), findsOneWidget);
       expect(find.text('New document'), findsOneWidget);
       expect(find.byType(ResourceView), findsNothing);
+    });
+
+    testWidgets('New chat room and New drive open the web forms',
+        (tester) async {
+      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpAndSettle();
+      await _pick(tester, await _hold(tester, 'New'), 'New chat room');
+      var view = tester.widget<ResourceView>(find.byType(ResourceView));
+      expect(view.title, 'New chat room');
+      expect(Uri.parse(view.path!).path, '/app/new');
+      expect(
+          Uri.parse(view.path!).queryParameters['classSubject'], chatRoomClass);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await _pick(tester, await _hold(tester, 'New'), 'New drive');
+      view = tester.widget<ResourceView>(find.byType(ResourceView));
+      expect(view.title, 'New drive');
+      expect(view.path, '/app/new-drive');
     });
 
     testWidgets('Other opens the web New page in the last drive',
