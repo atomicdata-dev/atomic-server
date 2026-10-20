@@ -161,12 +161,12 @@ mod ssrf_guard {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-fn http_client_builder() -> reqwest::ClientBuilder {
+pub(crate) fn http_client_builder() -> reqwest::ClientBuilder {
     reqwest::Client::builder().timeout(std::time::Duration::from_secs(10))
 }
 
 #[cfg(target_arch = "wasm32")]
-fn http_client_builder() -> reqwest::ClientBuilder {
+pub(crate) fn http_client_builder() -> reqwest::ClientBuilder {
     reqwest::Client::builder()
 }
 
