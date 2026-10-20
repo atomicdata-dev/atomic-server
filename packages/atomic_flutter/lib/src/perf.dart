@@ -2,6 +2,7 @@ import 'dart:async' show Timer;
 import 'dart:developer' show Timeline;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/scheduler.dart';
 
 /// Start-up and interaction timing marks, `[perf] <name> <ms> ms` in the log
@@ -49,6 +50,52 @@ class Perf {
     if (kReleaseMode) return;
     Timeline.instantSync('perf:$name', arguments: {'ms': '$ms'});
     debugPrint('[perf] $name $ms ms (span)');
+  }
+
+  /// [now] when the last finger lifted (null before the first tap).
+  static int? _tapAt;
+  static String? _tapName;
+  static bool _watchingTaps = false;
+
+  /// Logs, for every tap, how long until the app had drawn the frame after
+  /// it: `[perf] tap <name> to frame <ms> ms` (the build of that frame
+  /// done; its raster is not included). A handler that blocks the UI thread
+  /// (a sync FFI call, a big decode, a rebuild of everything) shows here. A
+  /// handler names its tap with [tap]; unnamed taps are logged as `tap ?`.
+  static void watchTaps() {
+    if (kReleaseMode || _watchingTaps) return;
+    _watchingTaps = true;
+    if (!_clock.isRunning) start();
+    GestureBinding.instance.pointerRouter.addGlobalRoute((event) {
+      if (event is! PointerUpEvent) return;
+      final at = now;
+      _tapAt = at;
+      _tapName = null;
+      // The tap's handler runs after this (the arena resolves on the up),
+      // and may draw nothing: ask for a frame so the line always comes.
+      SchedulerBinding.instance
+        ..addPostFrameCallback((_) {
+          if (_tapAt != at) return;
+          span('tap ${_tapName ?? '?'} to frame', now - at);
+        })
+        ..scheduleFrame();
+    });
+  }
+
+  /// Names the tap being handled (call it from the handler), for
+  /// [watchTaps]' line and [sinceTap].
+  static void tap(String name) {
+    if (kReleaseMode) return;
+    _tapName = name;
+  }
+
+  /// Logs `[perf] <name> since tap <ms> ms`: the time since the last finger
+  /// lifted, for what a tap started (a page drawn, results shown).
+  static void sinceTap(String name) {
+    if (kReleaseMode) return;
+    final at = _tapAt;
+    if (at == null) return;
+    span('$name since tap', now - at);
   }
 
   static bool _watching = false;

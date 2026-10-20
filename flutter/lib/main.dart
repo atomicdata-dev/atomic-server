@@ -23,6 +23,7 @@ void main() async {
   Perf.start();
   WidgetsFlutterBinding.ensureInitialized();
   Perf.watchFrames();
+  Perf.watchTaps();
   // Independent of the database, so read while it opens.
   final theme = AppThemeMode.load();
   await bootstrap(
