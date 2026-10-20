@@ -93,7 +93,8 @@ use self::{
     kv_store::KvStore,
     prop_val_sub_index::{add_atom_to_prop_val_sub_index, find_in_prop_val_sub_index},
     query_index::{
-        check_if_atom_matches_watched_query_filters, query_sorted_indexed, update_indexed_member,
+        check_if_atom_matches_watched_query_filters, query_sorted_indexed, query_sorted_indexed_page,
+        update_indexed_member,
         IndexIterator,
     },
     val_prop_sub_index::add_atom_to_valpropsub_index,
@@ -4260,6 +4261,21 @@ impl Db {
         }
 
         Ok(outcomes)
+    }
+
+    /// The subjects of one page of a sorted (or multi-filter) query, reading
+    /// only as far into the query index as the page reaches (`offset` +
+    /// `limit`), not every member as [`Storelike::query`] does to count them.
+    /// The first call for a filter builds its index the usual way (a full
+    /// pass); after that a page of the newest 50 of 200 000 costs 50 reads.
+    pub async fn query_page(&self, q: &Query) -> AtomicResult<Vec<Subject>> {
+        if q.expression_filters.is_empty() && requires_query_index(q) {
+            let q_filter = QueryFilter::try_from_query(q)?;
+            if q_filter.is_watched(self) {
+                return Ok(query_sorted_indexed_page(self, q, &q_filter).await?.0);
+            }
+        }
+        Ok(self.query(q).await?.subjects)
     }
 
     async fn query_complex(&self, q: &Query) -> AtomicResult<QueryResult> {
