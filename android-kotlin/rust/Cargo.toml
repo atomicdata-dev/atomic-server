@@ -48,4 +48,5 @@ opt-level = 1
 [profile.release]
 lto = "fat"
 codegen-units = 1
-strip = "symbols"
+# uniffi-bindgen reads its metadata from the symbol table, so symbols must stay.
+strip = "debuginfo"
