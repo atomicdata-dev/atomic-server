@@ -35,7 +35,8 @@ SHA-256: `82a8d7fbff6caff2929c266a1a9483e8893943e9ecb209c2e03976eb9717ba89`.
 
 Uploaded and published to internal testing on 20 October 2026 at 16:25
 Europe/Amsterdam. Play Console reports Available to internal testers.
-Tester-list selection is pending confirmation of the owner account addresses.
+Atomic Internal is selected with the two approved owner accounts. The track is
+Active and the tester configuration has been saved and verified.
 Opt-in: https://play.google.com/apps/internaltest/4700697182889756841
 
 Google temporarily displays `io.ontola.atomic (unreviewed)` until the store
