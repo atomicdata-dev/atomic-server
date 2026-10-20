@@ -343,6 +343,9 @@ void main() {
     }
     // On the phone the resource is the whole screen, over the home.
     expect(find.byType(AppBottomBar), findsOneWidget);
+    // The phone's bar: the menu in Settings' place, not next to it.
+    expect(find.byTooltip('More'), findsOneWidget);
+    expect(find.byTooltip('Settings'), findsNothing);
     expect(tester.getSize(find.byType(ResourceView)).width, _phone.width);
     // Back to the home, the same one.
     await tester.binding.handlePopRoute();
@@ -660,6 +663,14 @@ void main() {
                 .getRect(find.byKey(const ValueKey('section-search-recents')))
                 .left));
         expect(tester.getSize(all), const Size(48, 48));
+        // The buttons sit at the right edge, in every section alike.
+        final list = tester.getRect(find.byType(ChatsScreen));
+        expect(tester.getRect(all).right, closeTo(list.right - 4, 1));
+        expect(
+            tester
+                .getRect(find.byKey(const ValueKey('section-search-activity')))
+                .right,
+            closeTo(list.right - 4, 1));
         await _done(tester);
       });
     }

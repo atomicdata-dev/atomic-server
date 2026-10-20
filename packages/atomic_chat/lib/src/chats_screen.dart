@@ -852,8 +852,14 @@ class _SectionState<T> extends State<_Section<T>>
       height: 48,
       child: Row(children: [
         const SizedBox(width: 8),
-        Flexible(child: _foldHeading(context)),
-        const Spacer(),
+        // The title as wide as it is (and no wider than the room), the
+        // buttons at the right edge.
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: _foldHeading(context),
+          ),
+        ),
         if (onSearch != null)
           _HeadingButton(
             key: ValueKey('section-search-$name'),

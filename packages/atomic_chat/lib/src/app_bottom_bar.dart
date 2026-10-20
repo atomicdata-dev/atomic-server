@@ -60,6 +60,8 @@ class AppBottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
+    // Rebuilt when the window changes layout (the bar itself is kept).
+    final split = ShellScope.layoutOf(context) == ShellLayout.split;
     return Material(
       color: c.barSurface,
       child: SafeArea(
@@ -76,7 +78,6 @@ class AppBottomBar extends StatelessWidget {
                   final onMore = shell.topMenu;
                   final top = shell.topKind;
                   final onUser = _actions.onUser;
-                  final split = shell.split;
                   final list = shell.list.value;
                   final folded = split && shell.listCollapsed.value;
                   final newCurrent =
