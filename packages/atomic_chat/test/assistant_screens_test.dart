@@ -782,7 +782,7 @@ void main() {
       expect(find.byType(ResourceView), findsNothing);
     });
 
-    testWidgets('Favorites shows 4, All lists the rest', (tester) async {
+    testWidgets('Favorites shows 4, Show all lists the rest', (tester) async {
       final api = FakeApi(favoriteList: [
         for (var i = 0; i < 6; i++)
           (
@@ -797,12 +797,13 @@ void main() {
           .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       expect(find.text('Fav 4'), findsNothing);
-      await tester.tap(find.byKey(const ValueKey('section-all-favorites')));
+      await tester
+          .tap(find.byKey(const ValueKey('section-show-all-favorites')));
       await tester.pumpAndSettle();
       expect(find.text('Fav 5'), findsOneWidget);
     });
 
-    testWidgets('a section shows at most 4, All lists the rest',
+    testWidgets('a section shows at most 4, Show all lists the rest',
         (tester) async {
       final now = DateTime.now().millisecondsSinceEpoch;
       final api = FakeApi(chatList: [
@@ -814,9 +815,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Chat 3'), findsOneWidget);
       expect(find.text('Chat 4'), findsNothing);
-      expect(find.byTooltip('All AI chats'), findsOneWidget);
+      expect(find.text('Show all (6)'), findsOneWidget);
 
-      await tester.tap(find.byKey(const ValueKey('section-all-chats')));
+      await tester.tap(find.byKey(const ValueKey('section-show-all-chats')));
       await tester.pumpAndSettle();
       expect(find.text('Chat 5'), findsOneWidget);
       expect(find.text('Today'), findsOneWidget);
@@ -852,7 +853,7 @@ void main() {
       expect(find.text('No activity from others yet'), findsOneWidget);
     });
 
-    testWidgets('activity shows 4, All appears once there is any',
+    testWidgets('activity shows 4, Show all appears with more than 4',
         (tester) async {
       Future<void> pump(int n) async {
         await tester.pumpWidget(Container());
@@ -865,19 +866,44 @@ void main() {
       }
 
       await pump(0);
-      expect(find.byKey(const ValueKey('section-all-activity')), findsNothing);
+      expect(find.textContaining('Show all'), findsNothing);
 
       await pump(4);
       expect(find.text('Item 3'), findsOneWidget);
-      expect(
-          find.byKey(const ValueKey('section-all-activity')), findsOneWidget);
+      expect(find.textContaining('Show all'), findsNothing);
 
       await pump(6);
       expect(find.text('Item 3'), findsOneWidget);
       expect(find.text('Item 4'), findsNothing);
-      await tester.tap(find.byKey(const ValueKey('section-all-activity')));
+      await tester.tap(find.byKey(const ValueKey('section-show-all-activity')));
       await tester.pumpAndSettle();
       expect(find.text('Item 5'), findsOneWidget);
+    });
+
+    testWidgets(
+        'headings are a title and a chevron: no search, + or list '
+        'buttons', (tester) async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final api = FakeApi(
+        chatList: [
+          for (var i = 0; i < 6; i++)
+            (subject: 'c$i', name: 'Chat $i', lastActivity: now),
+        ],
+        activityList: [_activity('a1', 'Plan')],
+      );
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
+      await tester.pumpAndSettle();
+      expect(find.byType(IconButton), findsNothing);
+      expect(find.byIcon(Icons.search), findsNothing);
+      expect(find.byIcon(Icons.add), findsNothing);
+      expect(find.byIcon(Icons.format_list_bulleted), findsNothing);
+      // The Activity filter stays.
+      expect(find.byType(ShowMineChip), findsOneWidget);
+      // The Show all row is a 48 dp row at the rows' 16 dp inset.
+      final row = find.byKey(const ValueKey('section-show-all-chats'));
+      expect(tester.getSize(row).height, 48);
+      expect(tester.getTopLeft(find.text('Show all (6)')).dx, 16);
     });
 
     testWidgets('a deleted entry is not tappable, a changed one opens',
@@ -2471,7 +2497,7 @@ void main() {
           .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       expect(find.text('Today'), findsNothing);
-      await tester.tap(find.byKey(const ValueKey('section-all-chats')));
+      await tester.tap(find.byKey(const ValueKey('section-show-all-chats')));
       await tester.pumpAndSettle();
       expect(find.text('Today'), findsOneWidget);
       expect(find.text('Earlier'), findsOneWidget);

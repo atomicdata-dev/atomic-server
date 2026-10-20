@@ -3,10 +3,8 @@ import 'package:atomic_flutter/atomic_flutter.dart'
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'app_bottom_bar.dart';
 import 'app_top_bar.dart';
 import 'home_sections.dart';
-import 'search_screen.dart';
 
 import 'models.dart';
 import 'slide_back_route.dart';
@@ -18,7 +16,7 @@ import 'resource_view.dart';
 import 'native_views.dart';
 import 'new_document_sheet.dart';
 
-/// Items per section on the home; the rest is behind the All button.
+/// Items per section on the home; the rest is behind its "Show all" row.
 const _homeItems = 4;
 
 /// Most items the merged recents list holds.
@@ -36,16 +34,15 @@ class _SectionAction {
   const _SectionAction(this.op, this.section);
 }
 
-/// How a section folds, what its heading's hold menu offers, and the
-/// buttons at its right (search, new; All comes from the section itself).
+/// How a section folds, what its heading's hold menu offers, and the control
+/// at its right, if any (the activity's "Show mine" filter).
 typedef _Fold = ({
   bool collapsed,
   VoidCallback onToggle,
   List<HoldFanItem<_SectionAction>> menu,
   ValueChanged<_SectionAction> onMenu,
   HomeSection section,
-  VoidCallback? onSearch,
-  Widget? plus,
+  Widget? trailing,
   ValueChanged<int> onCount,
 });
 
@@ -59,9 +56,9 @@ String activityVerb(String kind) => switch (kind) {
 
 /// Home screen: one scrollable page of small sections (Drives, Recents, Activity,
 /// AI Chats), each with its newest few items. A section's heading folds it on
-/// a tap and arranges the sections on a hold; at its right are small buttons
-/// to search that kind of thing, make a new one, and list all of them (in the
-/// detail pane on a tablet, a page of its own on a phone). A section is one
+/// a tap and arranges the sections on a hold. Below the first few items a
+/// "Show all" row lists all of them (in the detail pane on a tablet, a page of
+/// its own on a phone). Search and New are the bar's. A section is one
 /// [_Section]; adding another is one more entry in the list. Every section
 /// shows as soon as its own data arrives.
 class ChatsScreen extends StatefulWidget {
@@ -466,20 +463,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   WidgetBuilder? get _profile => widget.profile ?? _shell?.profile;
 
-  ShellActions? get _actions =>
-      _shell == null ? null : ShellActions(widget.api, _shell!);
-
-  /// A section's search: for its kind of resource where search knows it.
-  void _search(SearchKind kind) {
-    final actions = _actions;
-    if (actions != null) {
-      actions.search(of: kind);
-      return;
-    }
-    Navigator.of(context)
-        .push(SearchScreen.route(drive: _drive, api: widget.api, kind: kind));
-  }
-
   /// A section's full list: in the detail pane next to the home (where the
   /// resources open), a page of its own on a phone. Opened once. The rows are
   /// built when they scroll into view, from [item].
@@ -510,51 +493,13 @@ class _ChatsScreenState extends State<ChatsScreen> {
     Navigator.of(context).push(SlideBackRoute<void>(builder: page));
   }
 
-  /// A section's "new": what it lists, made fresh; for the activity its
-  /// "Show mine". Null where that makes no sense (notifications, favorites)
-  /// or there is no shell.
-  Widget? _plusFor(HomeSection id) {
-    final actions = _actions;
-    if (actions == null) return null;
-    Widget button(String tooltip, VoidCallback onPressed) => _HeadingButton(
-        key: ValueKey('section-new-${id.name}'),
-        tooltip: tooltip,
-        icon: Icons.add,
-        onPressed: onPressed);
-    return switch (id) {
-      // Not a "new": the feed's own switch.
-      HomeSection.activity => Padding(
+  /// The control at the right of a section's heading: only the activity's
+  /// "Show mine" filter.
+  Widget? _trailingFor(HomeSection id) => id == HomeSection.activity
+      ? Padding(
           padding: const EdgeInsets.only(left: 4, right: 8),
-          child: ShowMineChip(value: _mine, onChanged: _setMine)),
-      HomeSection.drives => button('New drive', actions.newDrive),
-      HomeSection.chats => button('New AI chat', actions.newChat),
-      HomeSection.messages => button('New chat room', actions.newConversation),
-      // Anything: the same list as the bar's New.
-      HomeSection.recents => HoldFan<NewChoice>(
-          key: ValueKey('section-new-${id.name}'),
-          tooltip: 'Make something new',
-          tapOpensMenu: true,
-          holdDuration: newHold,
-          items: newItems,
-          onSelected: (choice) => actions.newOf(context, choice),
-          child:
-              Icon(Icons.add, size: 24, color: context.appColors.textSecondary),
-        ),
-      HomeSection.notifications || HomeSection.favorites => null,
-    };
-  }
-
-  /// What a section's Search looks for; null: no search button.
-  static SearchKind? _searchKind(HomeSection id) => switch (id) {
-        HomeSection.drives => SearchKind.drives,
-        HomeSection.chats => SearchKind.chats,
-        HomeSection.messages => SearchKind.messages,
-        HomeSection.recents ||
-        HomeSection.activity ||
-        HomeSection.favorites =>
-          SearchKind.any,
-        HomeSection.notifications => null,
-      };
+          child: ShowMineChip(value: _mine, onChanged: _setMine))
+      : null;
 
   Future<void> _settings() async {
     final profile = _profile;
@@ -733,15 +678,13 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   /// One section of the home, with the layout's fold state and hold menu.
   Widget _sectionFor(HomeSection id, AppColors c) {
-    final kind = _searchKind(id);
     final fold = (
       collapsed: _layout.collapsed.contains(id),
       onToggle: () => _setLayout(_layout.toggleCollapsed(id)),
       menu: _menuFor(id),
       onMenu: _applyAction,
       section: id,
-      onSearch: kind == null ? null : () => _search(kind),
-      plus: _plusFor(id),
+      trailing: _trailingFor(id),
       onCount: (n) => _noteCount(id, n),
     );
     final key = _sectionKeys[id] ??= GlobalKey<_SectionState<dynamic>>();
@@ -777,6 +720,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
           future: _recents,
           empty: 'Nothing opened yet',
           rows: (list) => [for (final r in list) _recentRow(r)],
+          total: (list) => list.length.clamp(0, _maxRecents),
           onShowAll: (list) {
             final shown = list.take(_maxRecents).toList();
             _openAll(id, shown.length, (i) => _recentRow(shown[i]));
@@ -790,6 +734,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
           future: _activity,
           empty: _mine ? 'Nothing changed yet' : 'No activity from others yet',
           rows: (list) => [for (final a in list) _activityRow(a)],
+          total: (list) => list.length.clamp(0, _maxActivity),
           onShowAll: (list) {
             final shown = list.take(_maxActivity).toList();
             _openAll(id, shown.length, (i) => _activityRow(shown[i]));
@@ -892,9 +837,9 @@ ResourceRow _resourceRow(RecentResource r,
       onTap: () => onOpen(drive, r),
     );
 
-/// One home section: a heading with its buttons (search, new, all), the
-/// first [_homeItems] rows, and the loading, error or empty state
-/// while there is nothing to list.
+/// One home section: a heading, the first [_homeItems] rows, a "Show all"
+/// row when there are more, and the loading, error or empty state while
+/// there is nothing to list.
 ///
 /// Stale while revalidating: when [future] is replaced, the rows of the
 /// previous one stay until the new data is there, so a refresh neither
@@ -914,6 +859,9 @@ class _Section<T> extends StatefulWidget {
   final List<Widget> Function(List<T>) rows;
   final void Function(List<T>) onShowAll;
 
+  /// How many rows the full list holds, when fewer than the section has.
+  final int Function(List<T>)? total;
+
   /// Show nothing at all (no heading) while there is nothing to list, while
   /// it is still being read, and when the data cannot be read.
   final bool hideEmpty;
@@ -926,6 +874,7 @@ class _Section<T> extends StatefulWidget {
     required this.empty,
     required this.rows,
     required this.onShowAll,
+    this.total,
     this.hideEmpty = false,
   });
 
@@ -968,7 +917,7 @@ class _SectionState<T> extends State<_Section<T>>
     });
   }
 
-  /// Opens the section's full list (the heading's All button), if it has rows.
+  /// Opens the section's full list (the "Show all" row), if it has rows.
   void showAll() {
     final list = _list;
     if (list != null && list.isNotEmpty) widget.onShowAll(list);
@@ -1016,13 +965,11 @@ class _SectionState<T> extends State<_Section<T>>
     );
   }
 
-  /// The heading row: the title at the left, the section's buttons at the
-  /// right (only those that make sense for it).
-  Widget _headingRow(BuildContext context, List<T>? list) {
+  /// The heading row: the title at the left, the section's filter (if any)
+  /// at the right.
+  Widget _headingRow(BuildContext context) {
     final fold = widget.fold;
-    final name = fold.section.name;
-    final onSearch = fold.onSearch;
-    final plus = fold.plus;
+    final trailing = fold.trailing;
     // 48 dp like the bar's buttons (more with a large font), with room
     // above it between sections; the title at the rows' 16 dp inset.
     return Padding(
@@ -1031,29 +978,14 @@ class _SectionState<T> extends State<_Section<T>>
         constraints: const BoxConstraints(minHeight: 48),
         child: Row(children: [
           const SizedBox(width: 8),
-          // The title as wide as it is (and no wider than the room), the
-          // buttons at the right edge.
+          // The title as wide as it is (and no wider than the room).
           Expanded(
             child: Align(
               alignment: Alignment.centerLeft,
               child: _foldHeading(context),
             ),
           ),
-          if (onSearch != null)
-            _HeadingButton(
-              key: ValueKey('section-search-$name'),
-              tooltip: 'Search ${widget.title}',
-              icon: Icons.search,
-              onPressed: onSearch,
-            ),
-          if (plus != null) plus,
-          if (list != null && list.isNotEmpty)
-            _HeadingButton(
-              key: ValueKey('section-all-$name'),
-              tooltip: 'All ${widget.title}',
-              icon: Icons.format_list_bulleted,
-              onPressed: () => widget.onShowAll(list),
-            ),
+          if (trailing != null) trailing,
           const SizedBox(width: 4),
         ]),
       ),
@@ -1075,7 +1007,7 @@ class _SectionState<T> extends State<_Section<T>>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _headingRow(context, list),
+        _headingRow(context),
         if (widget.fold.collapsed)
           const SizedBox.shrink()
         else if (error != null)
@@ -1092,36 +1024,45 @@ class _SectionState<T> extends State<_Section<T>>
           _Empty(widget.empty, c)
         else
           ...widget.rows(list.take(_homeItems).toList()),
+        if (!widget.fold.collapsed &&
+            error == null &&
+            list != null &&
+            list.length > _homeItems)
+          _ShowAllRow(
+            key: ValueKey('section-show-all-${widget.fold.section.name}'),
+            count: widget.total?.call(list) ?? list.length,
+            onTap: () => widget.onShowAll(list),
+          ),
       ],
     );
   }
 }
 
-/// A small icon button at the right of a section's heading: a 24 dp icon in
-/// a 48 dp target, in the heading's quiet colour.
-class _HeadingButton extends StatelessWidget {
-  final String tooltip;
-  final IconData icon;
-  final VoidCallback onPressed;
+/// The last row of a section with more than [_homeItems] rows: "Show all (N)",
+/// at the rows' inset and 48 dp high.
+class _ShowAllRow extends StatelessWidget {
+  final int count;
+  final VoidCallback onTap;
 
-  const _HeadingButton({
-    super.key,
-    required this.tooltip,
-    required this.icon,
-    required this.onPressed,
-  });
+  const _ShowAllRow({super.key, required this.count, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => IconButton(
-        tooltip: tooltip,
-        onPressed: onPressed,
-        color: context.appColors.textSecondary,
-        style: IconButton.styleFrom(
-          minimumSize: const Size(48, 48),
-          fixedSize: const Size(48, 48),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text('Show all ($count)',
+                  style: TextStyle(
+                      color: context.appColors.main,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600)),
+            ),
+          ),
         ),
-        icon: Icon(icon, size: 24),
       );
 }
 

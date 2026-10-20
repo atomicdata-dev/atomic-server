@@ -33,6 +33,16 @@ FakeApi _api() => FakeApi(recent: [
       _r('did:ad:notes', 'Notes'),
     ]);
 
+/// Six recents: more than a section shows, so it has a Show all row.
+FakeApi _manyApi() => FakeApi(recent: [
+      _r('did:ad:plans', 'Plans'),
+      _r('did:ad:a', 'Alpha'),
+      _r('did:ad:b', 'Beta'),
+      _r('did:ad:c', 'Gamma'),
+      _r('did:ad:notes', 'Notes'),
+      _r('did:ad:e', 'Epsilon'),
+    ]);
+
 Widget _shell(FakeApi api) => app(AppShell(
       api: api,
       drive: 'did:ad:drive',
@@ -587,17 +597,18 @@ void main() {
     });
   });
 
-  group('section buttons', () {
+  group('section headings and Show all', () {
     for (final (name, size) in [
       ('portrait', _portrait),
       ('landscape', _landscape),
     ]) {
-      testWidgets('$name: All lists the section in the detail pane',
+      testWidgets('$name: Show all lists the section in the detail pane',
           (tester) async {
         _size(tester, size);
-        await tester.pumpWidget(_shell(_api()));
+        await tester.pumpWidget(_shell(_manyApi()));
         await _settle(tester);
-        await tester.tap(find.byKey(const ValueKey('section-all-recents')));
+        await tester
+            .tap(find.byKey(const ValueKey('section-show-all-recents')));
         await _settle(tester);
         final list = tester.getRect(find.byType(ChatsScreen));
         // A page in the detail pane, titled, next to the home.
@@ -620,12 +631,12 @@ void main() {
       });
     }
 
-    testWidgets('a phone: All is a page of its own with a back button',
+    testWidgets('a phone: Show all is a page of its own with a back button',
         (tester) async {
       _size(tester, _phone);
-      await tester.pumpWidget(_shell(_api()));
+      await tester.pumpWidget(_shell(_manyApi()));
       await _settle(tester);
-      await tester.tap(find.byKey(const ValueKey('section-all-recents')));
+      await tester.tap(find.byKey(const ValueKey('section-show-all-recents')));
       await _settle(tester);
       expect(
           find.descendant(
@@ -635,37 +646,19 @@ void main() {
       await _done(tester);
     });
 
-    testWidgets('Search on AI chats searches chats; on Drives drives',
-        (tester) async {
-      _size(tester, _landscape);
-      await tester.pumpWidget(_shell(_api()));
-      await _settle(tester);
-      await tester.tap(find.byKey(const ValueKey('section-search-drives')));
-      await _settle(tester);
-      expect(find.byType(SearchScreen), findsOneWidget);
-      expect(find.byKey(const Key('search-kind')), findsOneWidget);
-      expect(_controller(tester).search.kind, SearchKind.drives);
-      // The kind chip lets go of the kind.
-      await tester.tap(find.byTooltip('Search everything'));
-      await _settle(tester);
-      expect(find.byKey(const Key('search-kind')), findsNothing);
-      await _done(tester);
-    });
-
-    testWidgets('+ on Recents lists the kinds; on AI chats a new chat',
-        (tester) async {
+    testWidgets(
+        'headings have no search, + or list buttons; <= 4 rows no '
+        'Show all', (tester) async {
       _size(tester, _portrait);
       await tester.pumpWidget(_shell(_api()));
       await _settle(tester);
-      await tester.tap(find.byKey(const ValueKey('section-new-recents')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 120));
-      expect(find.text('Document'), findsOneWidget);
-      await tester.tapAt(const Offset(5, 5));
-      await _settle(tester);
-      expect(find.byKey(const ValueKey('section-new-activity')), findsNothing);
-      expect(find.byKey(const ValueKey('section-new-notifications')),
-          findsNothing);
+      Finder inHome(Finder f) =>
+          find.descendant(of: find.byType(ChatsScreen), matching: f);
+      expect(inHome(find.byType(IconButton)), findsNothing);
+      expect(inHome(find.byIcon(Icons.search)), findsNothing);
+      expect(inHome(find.byIcon(Icons.add)), findsNothing);
+      expect(inHome(find.byIcon(Icons.format_list_bulleted)), findsNothing);
+      expect(find.textContaining('Show all'), findsNothing);
       await _done(tester);
     });
 
@@ -684,21 +677,8 @@ void main() {
         await _settle(tester);
         expect(tester.takeException(), isNull);
         final heading = find.byKey(const ValueKey('section-heading-recents'));
-        final all = find.byKey(const ValueKey('section-all-recents'));
-        expect(
-            tester.getRect(heading).right,
-            lessThanOrEqualTo(tester
-                .getRect(find.byKey(const ValueKey('section-search-recents')))
-                .left));
-        expect(tester.getSize(all), const Size(48, 48));
-        // The buttons sit at the right edge, in every section alike.
-        final list = tester.getRect(find.byType(ChatsScreen));
-        expect(tester.getRect(all).right, closeTo(list.right - 4, 1));
-        expect(
-            tester
-                .getRect(find.byKey(const ValueKey('section-new-chats')))
-                .right,
-            closeTo(list.right - 4, 1));
+        expect(heading, findsOneWidget);
+        expect(tester.getSize(heading).height, 48);
         await _done(tester);
       });
     }

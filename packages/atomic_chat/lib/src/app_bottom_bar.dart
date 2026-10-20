@@ -244,7 +244,7 @@ class AppBottomBar extends StatelessWidget {
   }
 }
 
-/// What the bar's buttons (and the home's section buttons) do.
+/// What the bar's buttons do.
 class ShellActions {
   final AssistantApi api;
   final ShellController shell;
@@ -280,30 +280,6 @@ class ShellActions {
             ResourceView(api: api, drive: drive, path: newResourcePath(drive)));
   }
 
-  /// The web app's page for a new drive.
-  Future<void> newDrive() => shell.openPage<void>(
-      ShellPage.newResource,
-      (_) => ResourceView(
-          api: api,
-          drive: shell.drive.value,
-          title: 'New drive',
-          path: '/app/new-drive'));
-
-  /// The web app's form for a new chat room (a conversation) in the drive.
-  Future<void> newConversation() {
-    final drive = shell.drive.value;
-    return shell.openPage<void>(
-        ShellPage.newResource,
-        (_) => ResourceView(
-            api: api,
-            drive: drive,
-            title: 'New chat room',
-            path: Uri(path: '/app/new', queryParameters: {
-              'classSubject': chatRoomClass,
-              if (drive.isNotEmpty) 'parentSubject': drive,
-            }).toString()));
-  }
-
   void newOf(BuildContext context, NewChoice choice) {
     switch (choice) {
       case NewChoice.aiChat:
@@ -318,7 +294,7 @@ class ShellActions {
   }
 
   /// Search opens fast: the keyboard comes up with it. [scope] searches one
-  /// drive, [of] one kind of resource (a home section's search). Next to the
+  /// drive, [of] one kind of resource. Next to the
   /// detail pane it is the list pane that searches (unfolded if need be).
   ///
   /// The button (no [scope]) always starts over: a search that is open, or
@@ -365,14 +341,6 @@ class ShellActions {
         null => null,
       };
 }
-
-/// The class of a chat room (a conversation), as the web app names it.
-const chatRoomClass = 'https://atomicdata.dev/classes/ChatRoom';
-
-/// How long a hold on a New outside the bar (the home's Recents) takes
-/// before the list opens for the drag; the bar's opens as the finger goes
-/// down.
-const newHold = Duration(milliseconds: 150);
 
 /// What New offers.
 const newItems = [
