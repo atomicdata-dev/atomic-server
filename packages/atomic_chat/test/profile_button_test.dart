@@ -41,8 +41,9 @@ void main() {
     expect(find.byType(ProfileAvatar), findsNothing);
   });
 
-  testWidgets('a wide bar: avatar initial and the name', (tester) async {
-    _size(tester, const Size(1280, 800));
+  testWidgets('a wide phone bar: avatar initial and the name', (tester) async {
+    // Next to the pages (600 dp and up) every slot is the same: no name.
+    _size(tester, const Size(560, 900));
     await tester.pumpWidget(_shell(_Api(const ProfileIdentity(name: 'Joep'))));
     await tester.pump();
     await tester.pump();
@@ -112,7 +113,7 @@ void main() {
   });
 
   testWidgets('updates after the profile is edited', (tester) async {
-    _size(tester, const Size(1280, 800));
+    _size(tester, const Size(560, 900));
     final api = _Api(const ProfileIdentity(name: 'Joep'));
     await tester.pumpWidget(_shell(api));
     await tester.pump();

@@ -140,74 +140,86 @@ class AppBottomBar extends StatelessWidget {
                           icon: const Icon(Icons.settings_outlined),
                         ),
                       );
+                      final buttons = <Widget>[
+                        _Current(
+                          current: homeCurrent,
+                          label: 'Home',
+                          child: IconButton(
+                            tooltip: 'Home',
+                            onPressed: onHome,
+                            icon: _barIcon(
+                                context,
+                                homeCurrent ? Icons.home : Icons.home_outlined,
+                                homeCurrent),
+                          ),
+                        ),
+                        _Current(
+                          current: searchCurrent,
+                          label: 'Search',
+                          child: _SearchButton(
+                            api: api,
+                            current: searchCurrent,
+                            onSearch: _openSearch,
+                          ),
+                        ),
+                        _Current(
+                          current: newCurrent,
+                          label: 'New',
+                          child: HoldFan<NewChoice>(
+                            tooltip: 'New',
+                            selected: newCurrent,
+                            tapOpensMenu: true,
+                            // The list at once; a drag from + picks.
+                            opensOnDown: true,
+                            items: newItems,
+                            onSelected: (choice) => _new(context, choice),
+                            child: _barIcon(context, Icons.add, newCurrent),
+                          ),
+                        ),
+                        _Current(
+                          current: top == ShellPage.profile,
+                          label: 'Profile',
+                          child: _ProfileButton(
+                            shell: shell,
+                            current: top == ShellPage.profile,
+                            // Next to the pages every slot is the same.
+                            wide: roomy && !split,
+                            onPressed: onUser,
+                          ),
+                        ),
+                        if (split) ...[
+                          settings,
+                          // Room for it whether or not a resource is open: the
+                          // other buttons do not move.
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            child: more ?? const SizedBox(width: 48),
+                          ),
+                          // Under the thumb, where the button that opens
+                          // it again is when it is folded.
+                          IconButton(
+                            tooltip: 'Close sidebar',
+                            onPressed: () => shell.setListCollapsed(true),
+                            icon: const Icon(Icons.menu_open),
+                          ),
+                        ] else
+                          // The only button that changes with the page.
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            child: more ?? settings,
+                          ),
+                      ];
+                      // Next to the pages: equal slots across the sidebar,
+                      // which fit its narrowest width too.
+                      if (split) {
+                        return Row(children: [
+                          for (final b in buttons)
+                            Expanded(child: Center(child: b)),
+                        ]);
+                      }
                       return Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            _Current(
-                              current: homeCurrent,
-                              label: 'Home',
-                              child: IconButton(
-                                tooltip: 'Home',
-                                onPressed: onHome,
-                                icon: _barIcon(
-                                    context,
-                                    homeCurrent
-                                        ? Icons.home
-                                        : Icons.home_outlined,
-                                    homeCurrent),
-                              ),
-                            ),
-                            _Current(
-                              current: searchCurrent,
-                              label: 'Search',
-                              child: _SearchButton(
-                                api: api,
-                                current: searchCurrent,
-                                onSearch: _openSearch,
-                              ),
-                            ),
-                            _Current(
-                              current: newCurrent,
-                              label: 'New',
-                              child: HoldFan<NewChoice>(
-                                tooltip: 'New',
-                                selected: newCurrent,
-                                tapOpensMenu: true,
-                                // The list at once; a drag from + picks.
-                                opensOnDown: true,
-                                items: newItems,
-                                onSelected: (choice) => _new(context, choice),
-                                child: _barIcon(context, Icons.add, newCurrent),
-                              ),
-                            ),
-                            _Current(
-                              current: top == ShellPage.profile,
-                              label: 'Profile',
-                              child: _ProfileButton(
-                                shell: shell,
-                                current: top == ShellPage.profile,
-                                wide: roomy,
-                                onPressed: onUser,
-                              ),
-                            ),
-                            if (split) ...[
-                              settings,
-                              // Room for it whether or not a resource is open: the
-                              // other buttons do not move.
-                              SizedBox(
-                                width: 48,
-                                child: AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 200),
-                                  child: more ?? const SizedBox.shrink(),
-                                ),
-                              ),
-                            ] else
-                              // The only button that changes with the page.
-                              AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 200),
-                                child: more ?? settings,
-                              ),
-                          ]);
+                          children: buttons);
                     },
                   );
                 }),

@@ -766,7 +766,10 @@ class _SearchScreenState extends State<SearchScreen> {
     child: SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 12, 12),
+        // The palette: the same 12 dp above and below, 16 at the sides.
+        padding: widget.palette
+            ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
+            : const EdgeInsets.fromLTRB(16, 4, 12, 12),
         child: Row(
           children: [
             Expanded(
@@ -824,12 +827,14 @@ class _SearchScreenState extends State<SearchScreen> {
       // Best first, drawn from the bottom up: nearest the thumb. The palette
       // lists from its field on top down.
       reverse: !palette,
+      padding: palette ? const EdgeInsets.symmetric(vertical: 8) : null,
       itemCount: items.length + (heading ? 1 : 0),
       itemBuilder: (context, i) {
         final n = palette ? (heading ? i - 1 : i) : i;
         if (n == items.length || n < 0) {
           return Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            padding:
+                EdgeInsets.fromLTRB(palette ? 24 : 16, palette ? 4 : 12, 16, 4),
             child: Text(_model.kind.heading,
                 style: TextStyle(
                     color: c.textSecondary,
@@ -877,7 +882,7 @@ class _SearchScreenState extends State<SearchScreen> {
       return Material(
         color: c.bgBody,
         child: Column(children: [
-          Padding(padding: const EdgeInsets.only(top: 12), child: _field),
+          _field,
           Divider(
               height: 1, color: Theme.of(context).colorScheme.outlineVariant),
           Expanded(
@@ -931,6 +936,20 @@ class _SearchScreenState extends State<SearchScreen> {
       detail: _detail(i.className, i.shown),
       onTap: () => _open(i.drive, i.subject, i.title, i.className),
     );
+    if (widget.palette) {
+      // Every row at the same inset; the one Enter opens is filled, not
+      // outlined (an outline moved its content).
+      return Padding(
+        key: top ? const Key('search-top-hit') : null,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: Material(
+          color: top ? c.mainSelectedBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(9),
+          clipBehavior: Clip.antiAlias,
+          child: row,
+        ),
+      );
+    }
     if (!top) return row;
     // The one Enter opens.
     return Container(
