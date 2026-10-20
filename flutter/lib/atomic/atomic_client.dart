@@ -189,8 +189,11 @@ class AtomicClient {
           await assistant.resourceIcons(subjects: subjects));
 
   /// What changed lately in every drive, newest first, by whom.
-  static Future<List<ActivityEntry>> activity({int limit = 100}) async => [
-        for (final a in await assistant.listActivity(limit: limit))
+  static Future<List<ActivityEntry>> activity(
+          {int limit = 100, bool includeOwn = false}) async =>
+      [
+        for (final a in await assistant.listActivity(
+            limit: limit, includeOwn: includeOwn))
           ActivityEntry(
             subject: a.subject,
             drive: a.drive,

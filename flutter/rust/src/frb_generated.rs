@@ -1030,11 +1030,14 @@ fn wire__crate__api__assistant__list_activity_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_limit = <u32>::sse_decode(&mut deserializer);
+            let api_include_own = <bool>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, String>(
                     (move || async move {
-                        let output_ok = crate::api::assistant::list_activity(api_limit).await?;
+                        let output_ok =
+                            crate::api::assistant::list_activity(api_limit, api_include_own)
+                                .await?;
                         Ok(output_ok)
                     })()
                     .await,

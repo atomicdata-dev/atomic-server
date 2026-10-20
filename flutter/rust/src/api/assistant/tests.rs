@@ -203,7 +203,7 @@ async fn activity_lists_other_agents_changes_not_the_own() {
         .unwrap();
     pump(&mut rx).await;
     // Made here, by the person: Recents, not Activity.
-    let list = list_activity(500).await.unwrap();
+    let list = list_activity(500, false).await.unwrap();
     assert!(list.iter().all(|a| a.subject != folder));
 
     // Another member renames it.
@@ -214,7 +214,7 @@ async fn activity_lists_other_agents_changes_not_the_own() {
         .unwrap();
     r.save_as(&bob, store.as_ref()).await.unwrap();
     pump(&mut rx).await;
-    let list = list_activity(500).await.unwrap();
+    let list = list_activity(500, false).await.unwrap();
     let entry = list.iter().find(|a| a.subject == folder).unwrap();
     assert_eq!(entry.kind, "changed");
     assert_eq!(entry.name, "Renamed by Bob");

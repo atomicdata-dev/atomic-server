@@ -123,6 +123,19 @@ pub async fn list_activity(
     drive: Option<&str>,
     limit: usize,
 ) -> Vec<ActivityRow> {
+    list_activity_with(store, recents, profiles, drive, limit, false).await
+}
+
+/// [`list_activity`], with the person's own changes too when `include_own`
+/// (the feed's "Show mine"); those are by `You`.
+pub async fn list_activity_with(
+    store: &Db,
+    recents: &RecentsIndex,
+    profiles: &AgentProfiles,
+    drive: Option<&str>,
+    limit: usize,
+    include_own: bool,
+) -> Vec<ActivityRow> {
     let own = store
         .get_default_agent()
         .ok()
@@ -135,7 +148,7 @@ pub async fn list_activity(
             let Some(actor) = a.actor.as_deref() else {
                 return false;
             };
-            if own.as_deref().is_some_and(|own| same_agent(own, actor)) {
+            if !include_own && own.as_deref().is_some_and(|own| same_agent(own, actor)) {
                 return false;
             }
             drive.as_ref().is_none_or(|d| drive_key(&a.drive) == *d)
@@ -169,11 +182,15 @@ pub async fn list_activity(
         .into_iter()
         .map(|a| {
             let actor_subject = a.actor.unwrap_or_default();
-            let actor = names
-                .get(&actor_subject)
-                .cloned()
-                .flatten()
-                .unwrap_or_else(|| short_agent(&actor_subject));
+            let actor = if own.as_deref().is_some_and(|own| same_agent(own, &actor_subject)) {
+                "You".to_string()
+            } else {
+                names
+                    .get(&actor_subject)
+                    .cloned()
+                    .flatten()
+                    .unwrap_or_else(|| short_agent(&actor_subject))
+            };
             ActivityRow {
                 subject: a.subject,
                 drive: a.drive,
@@ -933,6 +950,10 @@ mod tests {
         assert!(list_activity(&d.store, &d.recents, &none, None, 500)
             .await
             .is_empty());
+        // With "Show mine" it is there, by You.
+        let mine = list_activity_with(&d.store, &d.recents, &none, None, 500, true).await;
+        let row = mine.iter().find(|a| a.subject == folder).unwrap();
+        assert_eq!(row.actor, "You");
 
         // Another member edits it, a few times in a row: one entry.
         let bob = crate::agents::Agent::new(Some("Bob")).unwrap();

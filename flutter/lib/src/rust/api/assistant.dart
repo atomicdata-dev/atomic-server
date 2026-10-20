@@ -35,8 +35,12 @@ Future<void> markNotificationRead({required String subject}) =>
 
 /// What changed lately in every drive, newest first, by whom. Read from the
 /// recents index, which the store's change events keep.
-Future<List<ActivityEntry>> listActivity({required int limit}) =>
-    RustLib.instance.api.crateApiAssistantListActivity(limit: limit);
+/// `include_own` adds the person's own changes (the feed's "Show mine"),
+/// by `You`.
+Future<List<ActivityEntry>> listActivity(
+        {required int limit, required bool includeOwn}) =>
+    RustLib.instance.api
+        .crateApiAssistantListActivity(limit: limit, includeOwn: includeOwn);
 
 /// Record that this device opened `subject` in `drive`. Local to the device:
 /// nothing is committed or synced.

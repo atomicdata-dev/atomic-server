@@ -152,7 +152,7 @@ abstract class RustLibApi extends BaseApi {
   Future<void> crateApiSimpleInitApp();
 
   Future<List<ActivityEntry>> crateApiAssistantListActivity(
-      {required int limit});
+      {required int limit, required bool includeOwn});
 
   Future<String> crateApiAssistantListAiChats(
       {required int limit, required int offset});
@@ -991,11 +991,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @override
   Future<List<ActivityEntry>> crateApiAssistantListActivity(
-      {required int limit}) {
+      {required int limit, required bool includeOwn}) {
     return handler.executeNormal(NormalTask(
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_u_32(limit, serializer);
+        sse_encode_bool(includeOwn, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
             funcId: 29, port: port_);
       },
@@ -1004,7 +1005,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         decodeErrorData: sse_decode_String,
       ),
       constMeta: kCrateApiAssistantListActivityConstMeta,
-      argValues: [limit],
+      argValues: [limit, includeOwn],
       apiImpl: this,
     ));
   }
@@ -1012,7 +1013,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiAssistantListActivityConstMeta =>
       const TaskConstMeta(
         debugName: "list_activity",
-        argNames: ["limit"],
+        argNames: ["limit", "includeOwn"],
       );
 
   @override

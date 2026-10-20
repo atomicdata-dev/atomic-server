@@ -75,10 +75,20 @@ pub struct ActivityEntry {
 
 /// What changed lately in every drive, newest first, by whom. Read from the
 /// recents index, which the store's change events keep.
-pub async fn list_activity(limit: u32) -> Result<Vec<ActivityEntry>, String> {
-    // Other agents' changes only (the person's own are Recents), each named:
-    // by the store, the server's profile, or the start of its key.
-    let rows = lists::list_activity(db()?, recents(), &profiles(), None, limit as usize).await;
+/// `include_own` adds the person's own changes (the feed's "Show mine"),
+/// by `You`.
+pub async fn list_activity(limit: u32, include_own: bool) -> Result<Vec<ActivityEntry>, String> {
+    // Other agents' changes (the person's own are Recents, unless asked for),
+    // each named: by the store, the server's profile, or the start of its key.
+    let rows = lists::list_activity_with(
+        db()?,
+        recents(),
+        &profiles(),
+        None,
+        limit as usize,
+        include_own,
+    )
+    .await;
     Ok(rows
         .into_iter()
         .map(|a| ActivityEntry {
