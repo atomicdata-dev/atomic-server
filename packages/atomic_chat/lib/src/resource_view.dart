@@ -170,13 +170,34 @@ class _ResourceViewState extends State<ResourceView>
       // resource; an older bundle only has `show`.
       unawaited(page.runJavaScript(
           'window.atomicEmbed&&(window.atomicEmbed.open||window.atomicEmbed.show)($subject)'));
+      _watchPainted();
     }
   }
 
   bool _warm = false;
   int _traced = 0;
 
+  /// Debug and profile builds: `[perf] resource painted` once the page's
+  /// main area shows the resource's title (two frames after, so it is on
+  /// screen). Without a title, nothing is measured.
+  void _watchPainted() {
+    if (kReleaseMode || widget.title.isEmpty || _paintWatched) return;
+    _paintWatched = true;
+    final title = jsonEncode(widget.title);
+    unawaited(_page
+        ?.runJavaScript('(function(){var t0=Date.now();function c(){'
+            'var m=document.querySelector("main");'
+            'if(m&&m.innerText.indexOf($title)>=0){requestAnimationFrame('
+            'function(){requestAnimationFrame(function(){'
+            'AtomicFlutter.postMessage(\'{"method":"painted"}\')})});return}'
+            'if(Date.now()-t0<20000)setTimeout(c,16)}c()})()')
+        .catchError((_) {}));
+  }
+
+  bool _paintWatched = false;
+
   void _pageLoaded() {
+    _watchPainted();
     debugPrint('[embed] page loaded after ${_clock.elapsedMilliseconds} ms');
     // The page follows the app's light/dark mode for its own 'auto'.
     _scheme = null;
@@ -368,13 +389,8 @@ class _ResourceViewState extends State<ResourceView>
             '(${reply.length} chars)');
       }
       if (firstContent && !kReleaseMode) {
-        // The page has the resource; two animation frames later it has
-        // rendered it (`[perf] resource painted`).
         Perf.span('resource data ${_warm ? 'warm' : 'cold'}',
             _clock.elapsedMilliseconds);
-        unawaited(_page?.runJavaScript('requestAnimationFrame(function(){'
-            'requestAnimationFrame(function(){AtomicFlutter.postMessage('
-            '\'{"method":"painted"}\')})})'));
       }
     } catch (e) {
       debugPrint('[embed] reply to $method not delivered: $e');
