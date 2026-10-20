@@ -73,6 +73,13 @@ Future<void> _done(WidgetTester tester) async {
   await tester.pump(const Duration(seconds: 1));
 }
 
+/// A tap on + lists the kinds; AI chat starts a new chat.
+Future<void> tapNewChat(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('New'));
+  await tester.pump();
+  await tester.tap(find.text('AI chat'));
+}
+
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -217,11 +224,11 @@ void main() {
     expect(find.text('the profile'), findsOneWidget);
     // In place of Settings, not over it.
     expect(_controller(tester).pages, hasLength(1));
-    await tester.tap(find.byTooltip('New chat'));
+    await tapNewChat(tester);
     await _settle(tester);
     expect(find.byType(ChatScreen), findsOneWidget);
     expect(_controller(tester).pages, hasLength(1));
-    expect(find.byKey(const ValueKey('current:New chat')), findsOneWidget);
+    expect(find.byKey(const ValueKey('current:New')), findsOneWidget);
     // Home on the home closes what is open.
     await tester.tap(find.byTooltip('Home'));
     await _settle(tester);
@@ -385,7 +392,7 @@ void main() {
       expect(tester.getSize(button).height, greaterThanOrEqualTo(48),
           reason: tip);
     }
-    for (final tip in ['Search', 'New chat']) {
+    for (final tip in ['Search', 'New']) {
       final fan =
           find.byWidgetPredicate((w) => w is HoldFan && w.tooltip == tip);
       expect(tester.getSize(fan).height, greaterThanOrEqualTo(48), reason: tip);
@@ -397,7 +404,7 @@ void main() {
     _size(tester, const Size(2000, 1200));
     await tester.pumpWidget(_shell(_api()));
     await _settle(tester);
-    await tester.tap(find.byTooltip('New chat'));
+    await tapNewChat(tester);
     await _settle(tester);
     final composer = tester.getRect(find
         .descendant(

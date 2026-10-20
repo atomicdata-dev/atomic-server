@@ -289,6 +289,13 @@ Widget shellApp(ChatsScreen home, {Brightness brightness = Brightness.light}) =>
     app(AppShell(api: home.api, drive: home.drive, home: home),
         brightness: brightness);
 
+/// A tap on + lists the kinds; AI chat starts a new chat.
+Future<void> tapNewChat(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('New'));
+  await tester.pump();
+  await tester.tap(find.text('AI chat'));
+}
+
 void main() {
   group('ChatsScreen', () {
     // On a phone, scrolling the home back up never reached the top: each
@@ -828,14 +835,14 @@ void main() {
       double y(String t) => tester.getTopLeft(find.text(t)).dy;
       expect(y('Recents'), lessThan(y('Activity')));
       expect(y('Activity'), lessThan(y('AI chats')));
-      expect(find.text('Ann changed · 5 min ago'), findsOneWidget);
+      expect(find.text('Ann edited · 5 min ago'), findsOneWidget);
     });
 
     testWidgets('says so when there is no activity', (tester) async {
       await tester
           .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
-      expect(find.text('No activity yet'), findsOneWidget);
+      expect(find.text('No activity from others yet'), findsOneWidget);
     });
 
     testWidgets('activity shows 4, Show all appears only above 4',
@@ -871,7 +878,7 @@ void main() {
       await tester
           .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
-      expect(find.text('Someone deleted · 5 min ago'), findsOneWidget);
+      expect(find.text('Unknown member deleted · 5 min ago'), findsOneWidget);
       ListTile tile(String title) => tester.widget<ListTile>(
           find.ancestor(of: find.text(title), matching: find.byType(ListTile)));
       expect(tile('Old note').onTap, isNull);
@@ -980,7 +987,7 @@ void main() {
           shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
       expect(find.byType(TextField), findsNothing);
-      final tips = ['Search', 'New chat', 'Profile', 'Settings'];
+      final tips = ['Search', 'New', 'Profile', 'Settings'];
       for (final t in tips) {
         expect(find.byTooltip(t), findsOneWidget);
       }
@@ -1009,7 +1016,7 @@ void main() {
       await tester.pumpWidget(
           shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen), findsOneWidget);
     });
@@ -2129,7 +2136,7 @@ void main() {
           shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi(ai: ai()))));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen), findsOneWidget);
       expect(find.text('Message'), findsOneWidget);
@@ -2334,18 +2341,18 @@ void main() {
     testWidgets('buttons keep their order: search, new chat, profile, last',
         (tester) async {
       await pumpHome(tester);
-      expect(x(tester, 'Search'), lessThan(x(tester, 'New chat')));
-      expect(x(tester, 'New chat'), lessThan(x(tester, 'Profile')));
+      expect(x(tester, 'Search'), lessThan(x(tester, 'New')));
+      expect(x(tester, 'New'), lessThan(x(tester, 'Profile')));
       expect(x(tester, 'Profile'), lessThan(x(tester, 'Settings')));
       final xs = [
-        for (final t in ['Search', 'New chat', 'Profile']) x(tester, t)
+        for (final t in ['Search', 'New', 'Profile']) x(tester, t)
       ];
 
       await tester.tap(find.text('A doc'));
       await tester.pumpAndSettle();
       expect(x(tester, 'Profile'), lessThan(x(tester, 'More')));
       expect([
-        for (final t in ['Search', 'New chat', 'Profile']) x(tester, t)
+        for (final t in ['Search', 'New', 'Profile']) x(tester, t)
       ], xs);
     });
 
@@ -2361,7 +2368,7 @@ void main() {
       expect(find.byTooltip('Settings'), findsNothing);
 
       // Another page over the resource: no menu of its own, so Settings.
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen), findsOneWidget);
       expect(find.byTooltip('Settings'), findsOneWidget);
@@ -2643,7 +2650,7 @@ void main() {
       await tester.pumpWidget(
           shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen), findsOneWidget);
       // Home sits first in the row.

@@ -116,6 +116,15 @@ class HoldFan<T> extends StatefulWidget {
     this.width,
   });
 
+  /// Back: closes the list that is open, if any, and says whether there was
+  /// one. The shell asks before it pops a page.
+  static bool dismissOpenMenu() {
+    final open = _openList;
+    if (open == null || !open._open) return false;
+    open._close();
+    return true;
+  }
+
   @override
   State<HoldFan<T>> createState() => _HoldFanState<T>();
 }
@@ -225,8 +234,11 @@ const _rowIcon = 24.0;
 const _rowGap = 14.0;
 const _rowMinWidth = 176.0;
 
+/// The list that is open now, if any (there is one at a time).
+_HoldFanState<dynamic>? _openList;
+
 class _HoldFanState<T> extends State<HoldFan<T>>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with SingleTickerProviderStateMixin {
   late final AnimationController _anim;
 
   @override
@@ -268,18 +280,10 @@ class _HoldFanState<T> extends State<HoldFan<T>>
   }
 
   void _removeEntry() {
-    if (_entry != null) WidgetsBinding.instance.removeObserver(this);
+    if (identical(_openList, this)) _openList = null;
     _entry?.remove();
     _entry?.dispose();
     _entry = null;
-  }
-
-  /// Back closes an open menu instead of leaving the page.
-  @override
-  Future<bool> didPopRoute() async {
-    if (_entry == null || !_open) return false;
-    _close();
-    return true;
   }
 
   void _start(LongPressStartDetails details) =>
@@ -364,7 +368,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
     _hover.value = null;
     _entry = OverlayEntry(builder: _buildFan);
     overlay.insert(_entry!);
-    WidgetsBinding.instance.addObserver(this);
+    _openList = this;
     _anim.forward(from: 0);
     HapticFeedback.selectionClick();
   }

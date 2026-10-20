@@ -496,7 +496,8 @@ void main() {
       expect(find.text('Document'), findsNothing);
     });
 
-    testWidgets('a tap outside and back close it without a choice',
+    testWidgets(
+        'a tap outside and dismissOpenMenu (back) close it without a choice',
         (tester) async {
       await tester.pumpWidget(menuApp());
       await tester.tap(find.byIcon(Icons.add));
@@ -507,7 +508,7 @@ void main() {
       await tester.tap(find.byIcon(Icons.add));
       await tester.pump();
       expect(find.text('AI chat'), findsOneWidget);
-      await tester.binding.handlePopRoute();
+      expect(HoldFan.dismissOpenMenu(), isTrue);
       await tester.pumpAndSettle();
       expect(find.text('AI chat'), findsNothing);
       expect(picked, isEmpty);

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt;
+import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt, HoldFan;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -612,7 +612,11 @@ class _AppShellState extends State<AppShell> {
         ),
         // Android back pops the pages first and leaves the app on the home.
         child: NavigatorPopHandler(
-          onPopWithResult: (_) => _shell.navigatorKey.currentState?.maybePop(),
+          onPopWithResult: (_) {
+            // Back closes an open New (or Search) list before a page.
+            if (HoldFan.dismissOpenMenu()) return;
+            _shell.navigatorKey.currentState?.maybePop();
+          },
           child: Column(children: [
             // The bar stays laid out at full height; the keyboard covers it
             // and the pages get the keyboard minus the bar's height.

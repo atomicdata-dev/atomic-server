@@ -87,6 +87,13 @@ Future<void> _settle(WidgetTester tester) async {
 bool _current(String label) =>
     find.byKey(ValueKey('current:$label')).evaluate().isNotEmpty;
 
+/// A tap on + lists the kinds; AI chat starts a new chat.
+Future<void> tapNewChat(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('New'));
+  await tester.pump();
+  await tester.tap(find.text('AI chat'));
+}
+
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -153,14 +160,12 @@ void main() {
       wide(tester);
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
-      for (final (tooltip, item) in [
-        ('New chat', 'AI chat'),
-        ('Search', 'All drives')
-      ]) {
+      for (final tooltip in ['New', 'Search']) {
         final button = tester.getRect(find
             .byWidgetPredicate((w) => w is HoldFan && w.tooltip == tooltip));
         final gesture = await _hold(tester, tooltip);
-        final pill = tester.getRect(find.text(item).last);
+        final pill =
+            tester.getRect(find.byKey(const ValueKey('hold-fan-item-0')));
         // Right of the rail's button, level with it.
         expect(pill.left, greaterThan(button.right), reason: tooltip);
         expect(pill.left - button.right, lessThan(60), reason: tooltip);
@@ -174,30 +179,115 @@ void main() {
   });
 
   group('New (+)', () {
-    testWidgets('a tap still opens a new chat; holding offers the four kinds',
+    testWidgets('a tap lists the four kinds; picking AI chat starts a chat',
         (tester) async {
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
-      final gesture = await _hold(tester, 'New chat');
-      for (final t in ['AI chat', 'AI voice', 'Document', 'Other']) {
+      await tester.tap(find.byTooltip('New'));
+      await tester.pump();
+      // Nothing is made by the tap itself.
+      expect(find.byType(ChatScreen), findsNothing);
+      final rows = [
+        for (final t in ['AI chat', 'AI voice', 'Document', 'Other…'])
+          tester.getRect(find.text(t)),
+      ];
+      for (var i = 1; i < rows.length; i++) {
+        expect(rows[i].top, greaterThan(rows[i - 1].top), reason: 'order');
+      }
+      final bar = tester.getRect(find.byTooltip('New'));
+      expect(rows.last.bottom, lessThan(bar.top), reason: 'above the +');
+      for (final r in rows) {
+        expect(r.left, greaterThanOrEqualTo(0));
+        expect(r.right, lessThanOrEqualTo(360));
+      }
+      await tester.tap(find.text('AI chat'));
+      await tester.pumpAndSettle();
+      final chat = tester.widget<ChatScreen>(find.byType(ChatScreen));
+      expect(chat.subject, isNull);
+      expect(chat.voiceMode, isFalse);
+      expect(find.text('AI chat'), findsNothing);
+    });
+
+    testWidgets('a tap outside closes the list and starts nothing',
+        (tester) async {
+      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('New'));
+      await tester.pump();
+      await tester.tapAt(const Offset(180, 60));
+      await tester.pumpAndSettle();
+      expect(find.text('AI chat'), findsNothing);
+      expect(find.byType(ChatScreen), findsNothing);
+    });
+
+    testWidgets('back closes the list and keeps the page', (tester) async {
+      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('New'));
+      await tester.pump();
+      expect(find.text('AI chat'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('AI chat'), findsNothing);
+      expect(_controller(tester).topKind, ShellPage.settings);
+    });
+
+    testWidgets(
+        'holding lists the kinds and the drag picks the one under '
+        'the finger', (tester) async {
+      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpAndSettle();
+      final gesture = await _hold(tester, 'New');
+      for (final t in ['AI chat', 'AI voice', 'Document', 'Other…']) {
         expect(find.text(t), findsOneWidget);
       }
+      // Letting go off the list picks nothing.
       await gesture.moveTo(const Offset(1, 1));
       await gesture.up();
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen), findsNothing);
+      expect(find.text('AI chat'), findsNothing);
 
-      await tester.tap(find.byTooltip('New chat'));
-      await tester.pumpAndSettle();
+      await _pick(tester, await _hold(tester, 'New'), 'AI chat');
       final chat = tester.widget<ChatScreen>(find.byType(ChatScreen));
       expect(chat.subject, isNull);
       expect(chat.voiceMode, isFalse);
     });
 
+    testWidgets('AI chat from inside a chat with messages is a fresh chat',
+        (tester) async {
+      final api = _BarApi(
+        ai: HostedAi(
+          status: {'enabled': true, 'consent': true, 'model': 'm'},
+          stream: (messages, model) => Stream.value('ok'),
+          enable: () async => {},
+        ),
+      );
+      await tester.pumpWidget(_shell(api));
+      await tester.pumpAndSettle();
+      await tapNewChat(tester);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Hi');
+      await tester.pump();
+      await tester.tap(find.byTooltip('Send'));
+      await tester.pumpAndSettle();
+      await tapNewChat(tester);
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatScreen, skipOffstage: false), findsNWidgets(2));
+      final top = tester.widget<ChatScreen>(find.byType(ChatScreen));
+      expect(top.subject, isNull);
+      // And again on that empty one: no third chat, its field gets the cursor.
+      await tapNewChat(tester);
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatScreen, skipOffstage: false), findsNWidgets(2));
+    });
+
     testWidgets('AI voice opens a new chat in voice mode', (tester) async {
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
-      await _pick(tester, await _hold(tester, 'New chat'), 'AI voice');
+      await _pick(tester, await _hold(tester, 'New'), 'AI voice');
       final chat = tester.widget<ChatScreen>(find.byType(ChatScreen));
       expect(chat.voiceMode, isTrue);
       expect(chat.subject, isNull);
@@ -211,7 +301,7 @@ void main() {
       final api = _BarApi();
       await tester.pumpWidget(_shell(api));
       await tester.pumpAndSettle();
-      await _pick(tester, await _hold(tester, 'New chat'), 'Document');
+      await _pick(tester, await _hold(tester, 'New'), 'Document');
       expect(find.text('New document'), findsOneWidget);
       // The last used drive is preselected.
       expect(
@@ -240,7 +330,7 @@ void main() {
       final api = _BarApi()..createError = 'Drive is read-only';
       await tester.pumpWidget(_shell(api));
       await tester.pumpAndSettle();
-      await _pick(tester, await _hold(tester, 'New chat'), 'Document');
+      await _pick(tester, await _hold(tester, 'New'), 'Document');
       await tester.tap(find.text('Create'));
       await tester.pumpAndSettle();
       expect(find.text('Drive is read-only'), findsOneWidget);
@@ -254,7 +344,7 @@ void main() {
           {newResourceDriveKey: 'did:ad:work'});
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
-      await _pick(tester, await _hold(tester, 'New chat'), 'Other');
+      await _pick(tester, await _hold(tester, 'New'), 'Other…');
       final view = tester.widget<ResourceView>(find.byType(ResourceView));
       expect(Uri.parse(view.path!).path, '/app/new');
       expect(Uri.parse(view.path!).queryParameters['parentSubject'],
@@ -351,7 +441,7 @@ void main() {
       await tester.tap(find.byTooltip('Search'));
       await tester.pumpAndSettle();
       expect(iconColor('Search'), AppColors.light.main);
-      expect(iconColor('New chat'), isNot(AppColors.light.main));
+      expect(iconColor('New'), isNot(AppColors.light.main));
       // No dot widget (a small circle) is drawn under the current button.
       expect(
           find.byWidgetPredicate((w) =>
@@ -374,9 +464,9 @@ void main() {
       expect(_current('Search'), isTrue);
       expect(_current('Home'), isFalse);
 
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
-      expect(_current('New chat'), isTrue);
+      expect(_current('New'), isTrue);
       expect(_current('Search'), isFalse);
 
       await tester.tap(find.byTooltip('Profile'));
@@ -403,9 +493,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ResourceView), findsOneWidget);
       // Choosing AI chat from the fan while a new chat is on top: the same.
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
-      await _pick(tester, await _hold(tester, 'New chat'), 'AI chat');
+      await _pick(tester, await _hold(tester, 'New'), 'AI chat');
       expect(find.byType(ChatScreen), findsOneWidget);
     });
 
@@ -432,9 +522,9 @@ void main() {
     testWidgets('a double tap pushes once', (tester) async {
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pump(const Duration(milliseconds: 50));
-      await tester.tap(find.byTooltip('New chat'), warnIfMissed: false);
+      await tester.tap(find.byTooltip('New'), warnIfMissed: false);
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen, skipOffstage: false), findsOneWidget);
       // And a quick tap on another button right after a push is ignored too.
@@ -458,14 +548,14 @@ void main() {
       );
       await tester.pumpWidget(_shell(api));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'Hi');
       await tester.pump();
       await tester.tap(find.byTooltip('Send'));
       await tester.pumpAndSettle();
-      expect(_current('New chat'), isFalse);
-      await tester.tap(find.byTooltip('New chat'));
+      expect(_current('New'), isFalse);
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen, skipOffstage: false), findsNWidgets(2));
     });
@@ -493,7 +583,7 @@ void main() {
         final api = _SlowChatApi(ai: ai());
         await tester.pumpWidget(_shell(api));
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('New chat'));
+        await tapNewChat(tester);
         await tester.pumpAndSettle();
         await tester.enterText(find.byType(TextField), 'Hi there');
         await tester.pump();
@@ -501,7 +591,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
         expect(find.text('Hi there'), findsOneWidget);
 
-        await tester.tap(find.byTooltip('New chat'));
+        await tapNewChat(tester);
         await tester.pumpAndSettle();
         // A new, empty chat is the one shown.
         expect(find.text('New chat'), findsWidgets);
@@ -518,11 +608,11 @@ void main() {
         (tester) async {
       await tester.pumpWidget(_shell(_BarApi(ai: ai())));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pump();
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen, skipOffstage: false), findsOneWidget);
       // Its field has the cursor.
@@ -533,9 +623,9 @@ void main() {
     testWidgets('on a voice chat it opens a typed one', (tester) async {
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
-      await _pick(tester, await _hold(tester, 'New chat'), 'AI voice');
+      await _pick(tester, await _hold(tester, 'New'), 'AI voice');
       expect(_controller(tester).topKind, ShellPage.voiceChat);
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       expect(_controller(tester).topKind, ShellPage.newChat);
       expect(tester.widget<ChatScreen>(find.byType(ChatScreen).last).voiceMode,

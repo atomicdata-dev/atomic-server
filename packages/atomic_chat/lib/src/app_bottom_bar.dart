@@ -11,7 +11,7 @@ import 'new_document_sheet.dart';
 import 'resource_view.dart';
 import 'search_screen.dart';
 
-/// What the New button's fan offers.
+/// What the New button's list offers.
 enum NewChoice { aiChat, aiVoice, document, other }
 
 /// The web app's full "New" page, in [drive] when given.
@@ -20,20 +20,21 @@ String newResourcePath(String? drive) => drive == null || drive.isEmpty
     : Uri(path: '/app/new', queryParameters: {'parentSubject': drive})
         .toString();
 
-/// Most drives the Search button's fan lists by name.
-const _fanDrives = 4;
+/// Most drives the Search button's list names.
+const _listDrives = 4;
 
 /// The one row at the bottom of the app, within the thumb's reach, the same on
-/// every page and never moving with them: home (the atomic.place mark), search, a new chat, the user (agent,
+/// every page and never moving with them: home (the atomic.place mark), search, new (a list), the user (agent,
 /// sync and account) and, last, settings, or the "more" menu of the resource
 /// the page on top shows. Back is the system back and the swipe from the left
 /// edge.
 ///
 /// The button of the page on top is shown as the current one (in the main
 /// colour) and does nothing; a page of the bar is never opened twice (see
-/// [ShellController.open]). Search and New have more choices on touch and
-/// hold ([HoldFan]): Search in one drive; a voice chat, a document or anything
-/// else the web app makes.
+/// [ShellController.open]). A tap on New lists what to make: an AI chat (always
+/// a fresh one), a voice chat, a document or anything else the web app makes;
+/// holding it opens the same list and the finger drags to a choice
+/// ([HoldFan]). Search has the drives on touch and hold.
 class AppBottomBar extends StatelessWidget {
   final AssistantApi api;
   final ShellController shell;
@@ -42,7 +43,6 @@ class AppBottomBar extends StatelessWidget {
 
   _ShellActions get _actions => _ShellActions(api, shell);
 
-  void _newChat() => _actions.newChat();
   void _new(BuildContext context, NewChoice choice) =>
       _actions.newOf(context, choice);
   Future<void> _openSearch({String? scope}) => _actions.search(scope: scope);
@@ -92,12 +92,12 @@ class AppBottomBar extends StatelessWidget {
                     ),
                     _Current(
                       current: newCurrent,
-                      label: 'New chat',
+                      label: 'New',
                       child: HoldFan<NewChoice>(
-                        tooltip: 'New chat',
+                        tooltip: 'New',
                         selected: newCurrent,
-                        // Always a new chat (on an empty one: its field).
-                        onTap: _newChat,
+                        tapOpensMenu: true,
+                        holdDuration: _newHold,
                         items: _newItems,
                         onSelected: (choice) => _new(context, choice),
                         child: _barIcon(context, Icons.add, newCurrent),
@@ -321,13 +321,13 @@ class AppNavRail extends StatelessWidget {
                   ),
                   _RailItem(
                     label: 'New',
-                    name: 'New chat',
                     current: newCurrent,
                     child: HoldFan<NewChoice>(
-                      tooltip: 'New chat',
+                      tooltip: 'New',
                       selected: newCurrent,
                       layout: HoldFanLayout.side,
-                      onTap: actions.newChat,
+                      tapOpensMenu: true,
+                      holdDuration: _newHold,
                       items: _newItems,
                       onSelected: (choice) => actions.newOf(context, choice),
                       child: _barIcon(context, Icons.add, newCurrent),
@@ -362,11 +362,14 @@ class AppNavRail extends StatelessWidget {
   }
 }
 
+/// How long a hold on New takes before the list opens for the drag.
+const _newHold = Duration(milliseconds: 250);
+
 const _newItems = [
-  HoldFanItem('AI chat', NewChoice.aiChat),
-  HoldFanItem('AI voice', NewChoice.aiVoice),
-  HoldFanItem('Document', NewChoice.document),
-  HoldFanItem('Other', NewChoice.other),
+  HoldFanItem('AI chat', NewChoice.aiChat, icon: Icons.chat_bubble_outline),
+  HoldFanItem('AI voice', NewChoice.aiVoice, icon: Icons.mic_none),
+  HoldFanItem('Document', NewChoice.document, icon: Icons.description_outlined),
+  HoldFanItem('Other…', NewChoice.other, icon: Icons.add_box_outlined),
 ];
 
 /// A rail button with its name under it, both in the main colour when its
@@ -374,14 +377,11 @@ const _newItems = [
 class _RailItem extends StatelessWidget {
   final String label;
 
-  /// The button's name where it differs from the [label] shown (the bar's).
-  final String? name;
   final bool current;
   final Widget child;
 
   const _RailItem({
     required this.label,
-    this.name,
     required this.current,
     required this.child,
   });
@@ -392,7 +392,7 @@ class _RailItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        _Current(current: current, label: name ?? label, child: child),
+        _Current(current: current, label: label, child: child),
         ExcludeSemantics(
           child: Text(
             label,
@@ -460,8 +460,8 @@ class _Current extends StatelessWidget {
   }
 }
 
-/// Search: a tap searches every drive; holding offers the drives used last
-/// (and the rest in a list) to search only one.
+/// Search: a tap searches every drive; holding lists the drives used last
+/// (and the rest in a sheet) to search only one.
 class _SearchButton extends StatefulWidget {
   final AssistantApi api;
   final bool current;
@@ -479,7 +479,7 @@ class _SearchButton extends StatefulWidget {
   State<_SearchButton> createState() => _SearchButtonState();
 }
 
-/// The fan's value for "every drive" and for the list of the rest.
+/// The list's value for "every drive" and for the list of the rest.
 const _allDrives = '';
 const _moreDrives = '\u0000more';
 
@@ -497,7 +497,7 @@ class _SearchButtonState extends State<_SearchButton> {
       final drives = await drivesByRecent(widget.api);
       if (mounted) setState(() => _drives = drives);
     } catch (_) {
-      // The fan offers every drive only.
+      // The list offers every drive only.
     }
   }
 
@@ -544,10 +544,11 @@ class _SearchButtonState extends State<_SearchButton> {
       onOpen: _load,
       items: [
         const HoldFanItem('All drives', _allDrives),
-        for (final d in drives.take(_fanDrives))
+        for (final d in drives.take(_listDrives))
           HoldFanItem(d.name.isEmpty ? 'Untitled drive' : d.name, d.subject,
               emoji: d.emoji),
-        if (drives.length > _fanDrives) const HoldFanItem('More…', _moreDrives),
+        if (drives.length > _listDrives)
+          const HoldFanItem('More…', _moreDrives),
       ],
       onSelected: _pick,
       child: _barIcon(context, Icons.search, widget.current),
