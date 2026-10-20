@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'app_top_bar.dart';
+import 'home_sections.dart' show HomeSection;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models.dart';
@@ -1050,17 +1051,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    return Scaffold(
-      backgroundColor: c.bgBody,
-      appBar: AppTopBar(
-        title: widget.title.isEmpty
-            ? (_chat == null
-                ? (widget.voiceMode ? 'Voice chat' : 'New chat')
-                : 'Untitled chat')
-            : widget.title,
-      ),
-      body: ListAndField(list: _list(c), field: _composer(c)),
-    );
+    return SectionBack(
+        section: HomeSection.chats,
+        child: Scaffold(
+          backgroundColor: c.bgBody,
+          appBar: AppTopBar(
+            title: widget.title.isEmpty
+                ? (_chat == null
+                    ? (widget.voiceMode ? 'Voice chat' : 'New chat')
+                    : 'Untitled chat')
+                : widget.title,
+          ),
+          body: ListAndField(list: _list(c), field: _composer(c)),
+        ));
   }
 
   Widget _list(AppColors c) {

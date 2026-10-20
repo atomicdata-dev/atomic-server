@@ -5,6 +5,7 @@ import 'package:atomic_flutter/atomic_flutter.dart'
 import 'package:flutter/material.dart';
 
 import 'app_top_bar.dart';
+import 'home_sections.dart' show HomeSection;
 import 'chat_window.dart';
 import 'assistant_api.dart';
 import 'conversation_screen.dart' show conversationRefresh, messageTime;
@@ -260,20 +261,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    return Scaffold(
-      backgroundColor: c.bgBody,
-      appBar: AppTopBar(
-        title: _title.isEmpty ? 'Chat' : _title,
-        actions: [
-          IconButton(
-            tooltip: 'Rename',
-            icon: const Icon(Icons.edit_outlined),
-            onPressed: _rename,
+    return SectionBack(
+        section: HomeSection.messages,
+        child: Scaffold(
+          backgroundColor: c.bgBody,
+          appBar: AppTopBar(
+            title: _title.isEmpty ? 'Chat' : _title,
+            actions: [
+              IconButton(
+                tooltip: 'Rename',
+                icon: const Icon(Icons.edit_outlined),
+                onPressed: _rename,
+              ),
+            ],
           ),
-        ],
-      ),
-      body: ListAndField(list: _list(c), field: _composer(c)),
-    );
+          body: ListAndField(list: _list(c), field: _composer(c)),
+        ));
   }
 
   Widget _list(AppColors c) {

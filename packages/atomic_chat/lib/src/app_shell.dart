@@ -391,7 +391,8 @@ class ShellController extends ChangeNotifier {
 
   /// [open] with the page sliding in from the right.
   Future<T?> openPage<T>(String kind, WidgetBuilder builder) => open<T>(kind,
-      (settings) => SlideBackRoute<T>(builder: builder, settings: settings));
+      (settings) => SlideBackRoute<T>(
+          builder: builder, settings: settings, instant: split));
 
   /// Back to the first page.
   void goHome() =>

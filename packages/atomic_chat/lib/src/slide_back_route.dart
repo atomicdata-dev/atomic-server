@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 
+import 'app_shell.dart' show ShellLayout, ShellScope;
 import 'covered_insets_freeze.dart';
 
 /// A page that slides in from the right over the page it was opened from, and
@@ -14,12 +15,15 @@ import 'covered_insets_freeze.dart';
 class SlideBackRoute<T> extends PageRouteBuilder<T> {
   SlideBackRoute(
       {required WidgetBuilder builder, super.settings, bool instant = false})
-      : super(
+      : _instant = instant,
+        super(
           pageBuilder: (context, _, __) =>
               CoveredInsetsFreeze(child: builder(context)),
           transitionDuration: instant ? Duration.zero : duration,
           reverseTransitionDuration: instant ? Duration.zero : duration,
         );
+
+  final bool _instant;
 
   /// How long the slide in and out takes.
   static const duration = Duration(milliseconds: 150);
@@ -41,7 +45,9 @@ class SlideBackRoute<T> extends PageRouteBuilder<T> {
       Animation<double> secondaryAnimation, Widget child) {
     return AnimatedBuilder(
       animation: animation,
-      child: _SwipeBack(route: this, child: child),
+      // Next to a list there is nothing to swipe back to: a horizontal
+      // drag claiming the page would fight its vertical scrolling.
+      child: _instant ? child : _SwipeBack(route: this, child: child),
       builder: (context, child) {
         final t = _byHand
             ? animation.value
@@ -158,7 +164,15 @@ class _SwipeBackState extends State<_SwipeBack> {
   }
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
+  Widget build(BuildContext context) =>
+      // Next to a list (the detail pane) there is no page below to swipe
+      // back to, and a horizontal drag claiming the whole page fights the
+      // vertical scrolling of everything in it.
+      ShellScope.layoutOf(context) == ShellLayout.split
+          ? widget.child
+          : _swipe();
+
+  Widget _swipe() => GestureDetector(
         behavior: HitTestBehavior.translucent,
         onHorizontalDragStart: _start,
         onHorizontalDragUpdate: _update,

@@ -4,6 +4,7 @@ import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt, Perf;
 import 'package:flutter/material.dart';
 import 'app_top_bar.dart';
+import 'home_sections.dart' show HomeSection;
 import 'chat_window.dart';
 
 import 'models.dart';
@@ -184,12 +185,14 @@ class _ConversationScreenState extends State<ConversationScreen>
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    return Scaffold(
-      backgroundColor: c.bgBody,
-      appBar: AppTopBar(
-          title: widget.title.isEmpty ? 'Conversation' : widget.title),
-      body: ListAndField(list: _list(c), field: _composer(c)),
-    );
+    return SectionBack(
+        section: HomeSection.messages,
+        child: Scaffold(
+          backgroundColor: c.bgBody,
+          appBar: AppTopBar(
+              title: widget.title.isEmpty ? 'Conversation' : widget.title),
+          body: ListAndField(list: _list(c), field: _composer(c)),
+        ));
   }
 
   Widget _list(AppColors c) {
