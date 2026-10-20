@@ -58,7 +58,7 @@ class AccountScreenshotTest {
 
     private val settings = SettingsState(
         loading = false,
-        profile = place.atomic.app.kotlin.core.OwnProfile("did:ad:agent:" + "x".repeat(40), "Joep", "", null, null),
+        profile = place.atomic.app.kotlin.core.OwnProfile("did:ad:agent:" + "x".repeat(40), "Joep", "", null, null, null),
         deviceName = "Pixel 9",
         peerId = id,
         serverConnected = true,

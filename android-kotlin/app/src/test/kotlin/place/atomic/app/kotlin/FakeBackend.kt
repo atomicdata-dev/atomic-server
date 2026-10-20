@@ -43,14 +43,14 @@ const val HOME = "did:ad:home"
  * The Rust core as the screens see it. Like the real store, it knows no agent
  * after a "restart" (a new instance) until [resume] loads one from a secret.
  */
-class FakeBackend : Backend {
+open class FakeBackend : Backend {
     var agent: AgentInfo? = null
     var driveHere = true
     var activeDrive: String? = null
     var resumeStatus = ResumeStatus.READY
     var resumeError: Exception? = null
     var drivesList = listOf(DriveRow(HOME, "Pelican's Drive", null), DriveRow("did:ad:other", "Ontola", null))
-    var profile = OwnProfile("did:ad:agent:pelican", "Pelican", "Likes reeds", null, null)
+    var profile = OwnProfile("did:ad:agent:pelican", "Pelican", "Likes reeds", null, null, null)
     var peersList = listOf<PeerRow>()
     var info = ServerInfo(null, "0.41.0", false, null)
     var usage: DriveUsage? = DriveUsage("Pelican's Drive", 12u, 2048u, 4096u)
@@ -102,6 +102,9 @@ class FakeBackend : Backend {
         return "did:ad:new"
     }
 
+    /** Files by their subject, for the profile picture. */
+    val files = mutableMapOf<String, ByteArray>()
+    override suspend fun readFileBytes(file: String): ByteArray? = files[file]
     override suspend fun ownProfile() = profile
     override suspend fun setOwnProfile(name: String, description: String) {
         calls += "profile:$name:$description"
