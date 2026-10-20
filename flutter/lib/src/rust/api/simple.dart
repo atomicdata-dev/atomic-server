@@ -74,6 +74,11 @@ AgentInfo agentFromSecret({required String secret}) =>
 Future<String> getOwnProfile() =>
     RustLib.instance.api.crateApiSimpleGetOwnProfile();
 
+/// The bytes of a File resource (a profile picture) when this device holds
+/// them; `None` when the File or its bytes are not here (yet) or too large.
+Future<Uint8List?> readFileBytes({required String file}) =>
+    RustLib.instance.api.crateApiSimpleReadFileBytes(file: file);
+
 /// Save this device's agent's profile: a commit by the agent on its own
 /// resource, stored here and synced like any other edit. An empty
 /// `description` removes it; `icon` is the subject of a File for the picture
