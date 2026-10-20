@@ -556,8 +556,17 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   final ValueNotifier<double> _barHeight = ValueNotifier(0);
 
   /// The same bar in both layouts, the width of the window.
-  late final Widget _bar =
-      _FrozenBottomPadding(child: AppBottomBar(api: widget.api, shell: _shell));
+  /// Keyed: in the split layout it moves between the foot of the list pane
+  /// and a compact bar over the pages (list folded) without being rebuilt.
+  final GlobalKey _barKey = GlobalKey(debugLabel: 'bar');
+  late final Widget _bar = KeyedSubtree(
+    key: _barKey,
+    child: _MeasureHeight(
+      height: _barHeight,
+      child: _FrozenBottomPadding(
+          child: AppBottomBar(api: widget.api, shell: _shell)),
+    ),
+  );
 
   /// The pages: the navigator, with the warm page under it. The whole room
   /// above the bar on a phone, the detail pane next to the list.
@@ -678,8 +687,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
     final Widget pages = switch (layout) {
       ShellLayout.bar => _pages,
-      ShellLayout.split =>
-        _SplitPanes(shell: _shell, list: _listPane, detail: _pages),
+      ShellLayout.split => _SplitPanes(
+          shell: _shell,
+          list: _listPane,
+          detail: _pages,
+          bar: _bar,
+          barHeight: _barHeight),
     };
     return ShellScope(
       controller: _shell,
@@ -702,12 +715,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
             if (HoldFan.dismissOpenMenu()) return;
             _shell.navigatorKey.currentState?.maybePop();
           },
-          child: Column(children: [
-            // The bar stays laid out at full height; the keyboard covers it
-            // and the pages get the keyboard minus the bar's height.
-            Expanded(child: _PagesInset(barHeight: _barHeight, child: pages)),
-            _MeasureHeight(height: _barHeight, child: _bar),
-          ]),
+          child: layout == ShellLayout.split
+              // The bar is under the list pane only (see _SplitPanes).
+              ? pages
+              : Column(children: [
+                  // The bar stays laid out at full height; the keyboard covers
+                  // it and the pages get the keyboard minus the bar's height.
+                  Expanded(
+                      child: _PagesInset(barHeight: _barHeight, child: pages)),
+                  _bar,
+                ]),
         ),
       ),
     );
@@ -724,7 +741,8 @@ double listPaneWidth(double room, {double? dragged}) {
       .toDouble();
 }
 
-const _minList = 280.0;
+/// Room for the bar's six 48 dp slots and its padding.
+const _minList = 304.0;
 const _maxDragged = 520.0;
 const _minDetail = 280.0;
 
@@ -740,10 +758,17 @@ class _SplitPanes extends StatefulWidget {
   final Widget list;
   final Widget detail;
 
+  /// The bottom bar: at the foot of the list pane, or, with the list folded
+  /// away, a compact bar at the bottom of the pages.
+  final Widget bar;
+  final ValueListenable<double> barHeight;
+
   const _SplitPanes({
     required this.shell,
     required this.list,
     required this.detail,
+    required this.bar,
+    required this.barHeight,
   });
 
   @override
@@ -793,11 +818,34 @@ class _SplitPanesState extends State<_SplitPanes>
     setState(() => _dragging = (w + d.delta.dx).clamp(0.0, room - _minDetail));
   }
 
-  void _dragEnd(double room) {
+  /// A fling faster than this (dp/s) opens or folds the list whatever the
+  /// distance.
+  static const _fling = 300.0;
+
+  void _dragEnd(double room, double velocity) {
     final w = _dragging;
     setState(() => _dragging = null);
     if (w == null) return;
     final shell = widget.shell;
+    final full = listPaneWidth(room, dragged: shell.listWidth.value);
+    if (shell.listCollapsed.value) {
+      // Opening from the edge: follows the finger, then settles open (past a
+      // third of the way, or flung right) or back.
+      _open.value = (w / full).clamp(0.0, 1.0);
+      if (velocity > _fling || (velocity > -_fling && w > full / 3)) {
+        shell.setListCollapsed(false);
+        _open.animateTo(1, curve: Curves.easeOutCubic);
+      } else {
+        _open.animateTo(0, curve: Curves.easeOutCubic);
+      }
+      return;
+    }
+    if (velocity < -_fling && w < full) {
+      // Flung left: fold from where the finger left it.
+      _open.value = (w / full).clamp(0.0, 1.0);
+      shell.setListCollapsed(true);
+      return;
+    }
     if (w < _minList * 0.6) {
       // From where the finger left it.
       final full = listPaneWidth(room, dragged: shell.listWidth.value);
@@ -851,7 +899,16 @@ class _SplitPanesState extends State<_SplitPanes>
                                 enabled: !gone,
                                 child: ExcludeFocus(
                                   excluding: gone,
-                                  child: widget.list,
+                                  // Above the bar, which the keyboard covers.
+                                  child: ValueListenableBuilder<double>(
+                                    valueListenable: widget.barHeight,
+                                    builder: (context, bar, _) => Padding(
+                                      padding: EdgeInsets.only(bottom: bar),
+                                      child: _PagesInset(
+                                          barHeight: widget.barHeight,
+                                          child: widget.list),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -860,18 +917,81 @@ class _SplitPanesState extends State<_SplitPanes>
                       ),
                       _PaneDivider(shown: !gone),
                       Expanded(
-                        child: _Pane(removeLeft: !gone, child: widget.detail),
+                        // Full height; with the list folded it ends above the
+                        // compact bar (eased in with the fold).
+                        child: _DetailInset(
+                          barHeight: widget.barHeight,
+                          folded: 1 - _open.value,
+                          // Laid out at the width it will have once the list
+                          // has moved, and clipped to what shows: its web
+                          // view is not resized on every frame (no blank
+                          // strip); a resize by the divider does resize it.
+                          child: LayoutBuilder(builder: (context, box) {
+                            final resizing =
+                                dragging != null && !shell.listCollapsed.value;
+                            final target = shell.listCollapsed.value
+                                ? room
+                                : room - full - 1;
+                            final w = resizing ? box.maxWidth : target;
+                            return ClipRect(
+                              child: OverflowBox(
+                                alignment: Alignment.centerLeft,
+                                minWidth: w,
+                                maxWidth: w,
+                                child: _Pane(
+                                    removeLeft: !gone, child: widget.detail),
+                              ),
+                            );
+                          }),
+                        ),
                       ),
                     ],
                   ),
                 ),
+                if (!gone)
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: shown,
+                    child: ClipRect(
+                      child: OverflowBox(
+                        alignment: Alignment.bottomRight,
+                        minHeight: 0,
+                        minWidth: listFull,
+                        maxWidth: listFull,
+                        child: widget.bar,
+                      ),
+                    ),
+                  )
+                else
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints:
+                            const BoxConstraints(maxWidth: compactBarWidth),
+                        child: Material(
+                          elevation: 6,
+                          color: context.appColors.barSurface,
+                          clipBehavior: Clip.antiAlias,
+                          shape: const RoundedRectangleBorder(
+                              borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(16))),
+                          child: widget.bar,
+                        ),
+                      ),
+                    ),
+                  ),
                 _PaneHandle(
                   at: shown,
                   collapsed: shell.listCollapsed.value,
                   onTap: _toggle,
                   onDragStart: () => _dragStart(full),
                   onDragUpdate: (d) => _dragUpdate(d, room),
-                  onDragEnd: () => _dragEnd(room),
+                  onDragEnd: (v) => _dragEnd(room, v),
                 ),
               ]);
             },
@@ -879,6 +999,47 @@ class _SplitPanesState extends State<_SplitPanes>
         },
       );
     });
+  }
+}
+
+/// The widest the compact bar over the pages gets (list pane folded).
+const compactBarWidth = 420.0;
+
+/// The detail pane's room: all of the window's height, except that with the
+/// list folded ([folded] 1) it ends above the compact bar, and then sees the
+/// keyboard minus the bar's height (the keyboard covers the bar).
+class _DetailInset extends StatelessWidget {
+  final ValueListenable<double> barHeight;
+  final double folded;
+  final Widget child;
+
+  const _DetailInset(
+      {required this.barHeight, required this.folded, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    return ValueListenableBuilder<double>(
+      valueListenable: barHeight,
+      child: child,
+      builder: (context, bar, child) {
+        final reserved = bar * folded;
+        return Padding(
+          padding: EdgeInsets.only(bottom: reserved),
+          child: MediaQuery(
+            data: media.copyWith(
+              padding: media.padding
+                  .copyWith(bottom: media.padding.bottom * (1 - folded)),
+              viewPadding: media.viewPadding
+                  .copyWith(bottom: media.viewPadding.bottom * (1 - folded)),
+              viewInsets: media.viewInsets.copyWith(
+                  bottom: math.max(0, media.viewInsets.bottom - reserved)),
+            ),
+            child: child!,
+          ),
+        );
+      },
+    );
   }
 }
 
@@ -892,7 +1053,7 @@ class _PaneHandle extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDragStart;
   final GestureDragUpdateCallback onDragUpdate;
-  final VoidCallback onDragEnd;
+  final ValueSetter<double> onDragEnd;
 
   const _PaneHandle({
     required this.at,
@@ -904,6 +1065,9 @@ class _PaneHandle extends StatelessWidget {
   });
 
   static const _strip = 16.0;
+
+  /// The width of the edge strip that opens a folded list.
+  static const edgeStrip = 24.0;
   static const _tab = Size(24, 48);
   static const _target = Size(48, 64);
 
@@ -916,8 +1080,8 @@ class _PaneHandle extends StatelessWidget {
           behavior: HitTestBehavior.translucent,
           onHorizontalDragStart: (_) => onDragStart(),
           onHorizontalDragUpdate: onDragUpdate,
-          onHorizontalDragEnd: (_) => onDragEnd(),
-          onHorizontalDragCancel: onDragEnd,
+          onHorizontalDragEnd: (d) => onDragEnd(d.primaryVelocity ?? 0),
+          onHorizontalDragCancel: () => onDragEnd(0),
           child: child,
         );
     return Positioned.fill(
@@ -930,6 +1094,19 @@ class _PaneHandle extends StatelessWidget {
               top: 0,
               bottom: 0,
               width: _strip,
+              child: drag(const SizedBox.expand()),
+            ),
+          // Folded: a strip along the window's left edge opens the list with
+          // one drag that follows the finger. It starts beyond the system
+          // gesture inset (Android's back swipe owns the very edge) and is
+          // a Flutter widget above the pages' web view, so the web view's
+          // own horizontal scrolling is not touched elsewhere.
+          if (collapsed)
+            Positioned(
+              left: MediaQuery.systemGestureInsetsOf(context).left,
+              top: 0,
+              bottom: 0,
+              width: edgeStrip,
               child: drag(const SizedBox.expand()),
             ),
           Positioned(

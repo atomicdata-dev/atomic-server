@@ -141,10 +141,10 @@ void main() {
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
       Rect? anchor;
-      // A tablet: the same bar, the width of the window, with the menu
+      // A tablet: the same bar, the width of the list pane, with the menu
       // after Settings.
       expect(find.byType(AppBottomBar), findsOneWidget);
-      expect(tester.getSize(find.byType(AppBottomBar)).width, 900);
+      expect(tester.getSize(find.byType(AppBottomBar)).width, 360);
       final route = _controller(tester).top!;
       _controller(tester).registerMenu(route, (a) => anchor = a);
       await tester.pumpAndSettle();

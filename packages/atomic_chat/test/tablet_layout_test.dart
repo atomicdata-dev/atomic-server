@@ -134,9 +134,9 @@ void main() {
       final api = _api();
       await tester.pumpWidget(_shell(api));
       await _settle(tester);
-      // The phone's bar, the width of the window, at the bottom.
+      // The bar is under the list pane only, as wide as it.
       final bar = tester.getRect(find.byType(AppBottomBar));
-      expect(bar.width, size.width);
+      expect(bar.left, 0);
       expect(bar.bottom, size.height);
       expect(_controller(tester).layout, ShellLayout.split);
       // Nothing opened yet.
@@ -145,6 +145,7 @@ void main() {
       expect(list.left, 0);
       expect(list.width, inInclusiveRange(320, 400));
       expect(list.bottom, bar.top);
+      expect(bar.width, list.width);
 
       // A row opens in the detail pane, next to the list, and is marked.
       await tester.tap(find.text('Plans'));
@@ -152,6 +153,8 @@ void main() {
       final detail = tester.getRect(find.byType(ResourceView));
       expect(detail.left, greaterThan(list.right));
       expect(detail.right, size.width);
+      // The pages run to the bottom of the window.
+      expect(detail.bottom, size.height);
       expect(find.text('Notes'), findsOneWidget);
       ListTile tile(String title) => tester.widget<ListTile>(
           find.ancestor(of: find.text(title), matching: find.byType(ListTile)));
@@ -444,6 +447,106 @@ void main() {
         .first);
     expect(composer.width, ReadableWidth.maxWidth);
     await _done(tester);
+  });
+
+  group('the bar is under the list pane only', () {
+    for (final (name, size) in [
+      ('portrait', _portrait),
+      ('landscape', _landscape),
+    ]) {
+      testWidgets('$name: the bar is as wide as the list, the pages are full',
+          (tester) async {
+        _size(tester, size);
+        await tester.pumpWidget(_shell(_api()));
+        await _settle(tester);
+        await tester.tap(find.text('Plans'));
+        await _settle(tester);
+        final bar = tester.getRect(find.byType(AppBottomBar));
+        final list = tester.getRect(find.byType(ChatsScreen));
+        expect(bar.left, 0);
+        expect(bar.width, list.width);
+        expect(bar.bottom, size.height);
+        final detail = tester.getRect(find.byType(ResourceView));
+        expect(detail.bottom, size.height);
+        expect(detail.right, size.width);
+        // Folded: a compact bar floats at the bottom of the pages; they end
+        // above it.
+        await tester.tap(find.byKey(const Key('list-toggle')));
+        await _settle(tester);
+        final compact = tester.getRect(find.byType(AppBottomBar));
+        expect(compact.width, lessThanOrEqualTo(420));
+        expect(compact.bottom, size.height);
+        expect(compact.center.dx, closeTo(size.width / 2, 1));
+        expect(tester.getRect(find.byType(ResourceView)).bottom,
+            closeTo(compact.top, 1));
+        // A resize keeps the fold and the bar.
+        tester.view.physicalSize = (size.flipped) * 2;
+        await _settle(tester);
+        expect(_controller(tester).listCollapsed.value, isTrue);
+        expect(find.byType(AppBottomBar), findsOneWidget);
+        await _done(tester);
+      });
+    }
+  });
+
+  group('the folded list opens with one gesture', () {
+    Future<void> folded(WidgetTester tester) async {
+      _size(tester, _landscape);
+      await tester.pumpWidget(_shell(_api()));
+      await _settle(tester);
+      await tester.tap(find.byKey(const Key('list-toggle')));
+      await _settle(tester);
+      expect(_controller(tester).listCollapsed.value, isTrue);
+    }
+
+    testWidgets('a drag from the edge follows the finger and opens',
+        (tester) async {
+      await folded(tester);
+      final g = await tester.startGesture(const Offset(10, 300));
+      await g.moveBy(const Offset(100, 0));
+      await tester.pump();
+      await g.moveBy(const Offset(100, 0));
+      await tester.pump();
+      // The list is as wide as the finger went.
+      expect(tester.getRect(find.byType(ChatsScreen).hitTestable()).right,
+          closeTo(200, 30));
+      await g.up();
+      await _settle(tester);
+      expect(_controller(tester).listCollapsed.value, isFalse);
+      expect(tester.getRect(find.byType(ChatsScreen)).width, 400);
+      await _done(tester);
+    });
+
+    testWidgets('a short drag settles back folded', (tester) async {
+      await folded(tester);
+      final g = await tester.startGesture(const Offset(10, 300));
+      await g.moveBy(const Offset(40, 0));
+      await tester.pump(const Duration(milliseconds: 300));
+      await g.moveBy(const Offset(40, 0));
+      await tester.pump(const Duration(milliseconds: 300));
+      await g.up();
+      await _settle(tester);
+      expect(_controller(tester).listCollapsed.value, isTrue);
+      expect(find.byType(ChatsScreen).hitTestable(), findsNothing);
+      await _done(tester);
+    });
+
+    testWidgets('a fling opens it', (tester) async {
+      await folded(tester);
+      // 90 dp in 40 ms: far short of a third of the list, but a fling.
+      await tester.timedDragFrom(const Offset(10, 300), const Offset(90, 0),
+          const Duration(milliseconds: 40));
+      expect(_controller(tester).listCollapsed.value, isFalse);
+      await _done(tester);
+    });
+
+    testWidgets('a tap on the tab opens it', (tester) async {
+      await folded(tester);
+      await tester.tap(find.byTooltip('Show list'));
+      await _settle(tester);
+      expect(_controller(tester).listCollapsed.value, isFalse);
+      await _done(tester);
+    });
   });
 
   group('the list pane folds away', () {

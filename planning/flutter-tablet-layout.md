@@ -18,8 +18,31 @@ logical pixels):
 | Width | Layout | What it is |
 | --- | --- | --- |
 | < 600 | `bar` | The phone: pages in one navigator above the bottom bar. |
-| >= 600 | `split` | The same bottom bar, the window's width; above it a list pane (home or search) and a detail pane with the pages. |
+| >= 600 | `split` | A list pane (home or search) with the bottom bar at its foot, and a detail pane with the pages, full height. |
 
+- **Bar under the sidebar only** (2026-10-20, Joep: a full-width bar wastes
+  room in landscape): in `split` the bar is at the foot of the list pane,
+  exactly its width (`_SplitPanes` positions it; one keyed instance, so it
+  is not rebuilt when it moves). The list pane's minimum is 304 dp (six 48
+  dp slots incl. the resource's ⋮, plus padding). The profile button shows
+  the name next to the avatar when the bar is >= 400 dp wide (the default
+  sidebar at 1000+ dp windows), else the avatar only. The detail pane runs
+  to the bottom of the window. **Folded**: the bar floats at the bottom
+  centre of the pages as a compact bar (<= 420 dp, rounded top, elevation 6)
+  and the pages end above it (`_DetailInset`, eased with the fold; simplest
+  choice: a permanent inset while folded, no auto-hide). Keyboard: the
+  bar is covered by it as on the phone; the list pane sees the keyboard
+  minus the bar's height, the detail pane the whole keyboard (folded: minus
+  the bar's height).
+- **Reopening in one gesture**: a tap on the tab, or a drag that starts at
+  the left edge (a 24 dp strip, `_PaneHandle.edgeStrip`, starting beyond
+  `MediaQuery.systemGestureInsets.left` so Android's back swipe keeps the
+  very edge; it is a Flutter widget above the pages' web view) and follows
+  the finger: the list width tracks it, then settles (<= 140 ms) open past
+  a third of the width or on a fling > 300 dp/s, else back folded. A fling
+  left on the divider strip folds it. While the list moves, the pages are
+  laid out at the width they will have and clipped (no per-frame web view
+  resize, no blank strip); only dragging the divider to resize resizes them.
 - **Bar**: Home, Search, +, Profile, Settings, and on a tablet the
   resource's ⋮ after Settings (on the phone ⋮ takes Settings' place). On a
   wide window the buttons are a centred group (at most 560 dp; a 48 dp slot
@@ -63,7 +86,11 @@ logical pixels):
 
 ## Done
 
-- [x] Rail removed (`AppNavRail`, `HoldFanLayout.side`), bar full width.
+- [x] Rail removed (`AppNavRail`, `HoldFanLayout.side`), bar full width
+  (later: only under the list pane, see above).
+- [x] Profile button: avatar (picture, emoji, initial) and name from
+  `AssistantApi.ownIdentity`, cached in `ShellController.identity`,
+  refreshed on resume and when the profile page is left or entered.
 - [x] Collapsible, resizable list pane, remembered per device.
 - [x] Section buttons, heading wash, All in the detail pane.
 - [x] + opens on pointer down, drag-select without waiting.
