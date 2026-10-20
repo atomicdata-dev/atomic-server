@@ -420,22 +420,63 @@ never synced, a connected one drains it). redb then stores 519 MB plus
 
 ### Phase 3: the same data in the app
 
-**Status (2026-10-20):** the tooling is in (`3987c34be` bridge
-`import_ai_chat`, `ffb1e4954` Perf marks `chats all painted`, `chats page`,
-`chat data`/`chat painted`, `65bb1a49c` `perf_android.sh --seed-chats N
+**Status (2026-10-20):** tooling in (`3987c34be` bridge `import_ai_chat`,
+`ffb1e4954` Perf marks `chats all painted`, `chats page`, `chat data` /
+`chat painted`, `65bb1a49c` + `531b05013` `perf_android.sh --seed-chats N
 [--chat-scale S]` with the `allchats`, `typing` and `bigchat` steps and PSS
-per stage). The emulator run did not happen: the Mac had 1.9-2.0 GB free,
-under the 3 GB a profile build plus the seeded store needs. To run it:
+per stage) and run once on the emulator.
 
 ```
-df -h /                      # >= 3 GB free
 ~/Library/Android/sdk/emulator/emulator -avd Phone_A35 -no-snapshot-save -no-boot-anim -no-audio &
 cd flutter && mise exec flutter@3.44 -- flutter build apk --profile --target-platform android-arm64
 scripts/perf_android.sh -s emulator-5554 -a build/app/outputs/flutter-apk/app-profile.apk \
-  --seed-chats 1000 --chat-scale 0.5 --only size -n 1          # once: ~350 MB store
-scripts/perf_android.sh -s emulator-5554 -n 3 \
-  --only cold,allchats,typing,bigchat,memory -o stress.md
+  --seed-chats 1000 --chat-scale 0.5 --only size -n 1
+scripts/perf_android.sh -s emulator-5554 -n 3 --only cold,allchats,typing,bigchat,memory
 ```
+
+**Data:** 1000 chats at scale 0.5 (half the host run's text, for the
+emulator's 1.2 GB free `/data`): 39 842 messages, 35.7 MB of text, a 470 MB
+store, on top of the identity's earlier test data (30 documents, a few
+chats). Seeding through `import_ai_chat` took 401 s (31 s for the first
+100 chats, 93 s for the last 100: ~10 ms per message once the store is
+big; only the seed pays it).
+
+**Results** (Phone_A35 AVD, Android 15 arm64, M5 Pro host, profile build,
+median of 3, min-max):
+
+| What | Median | Min-max |
+| --- | --- | --- |
+| Cold: Home painted (ms since process start) | 3363 | 3266-5505 |
+| Cold: db open mark (store opened, ms since start) | 2377 | 2361-4868 (28 ms after `documents dir`) |
+| Cold: each Home list (chats, recents, drives, ...) | 79-100 ms | 51-109 |
+| All AI chats: page made → first frame | 10 ms | 9-11 |
+| All AI chats: slowest 50-chat page load | 34 ms | 22-460 (first run) |
+| All AI chats scroll (12 flings, 400 rows paged in): janky | 18 % | 6-26 % |
+| ... build p90 / p99 | 4.4 / 8.9 ms | |
+| ... raster p90 / p99 | 17.5 / 22.1 ms | raster-bound: emulated GL, as on Home (6.5 % earlier) |
+| Search all drives, 1st key after cold start ("b"): keystroke → drawn | 43 ms | 31-535 (Rust 16-59) |
+| Search all drives, keys 2-6 ("bu" … "budget") | 16-24 ms | 11-27 (Rust 5-11) |
+| Search AI chats chip, 1st key ("k") | 44 ms | 37-111 (Rust 17-92) |
+| Search AI chats chip, keys 2-10 ("ku" … "kubernetes") | 18-29 ms | 13-39 (Rust 2-18) |
+| Open a seeded chat (36-56 messages): data / painted | 5-8 / 27-48 ms | |
+| Scroll an open chat: janky / raster p90 | 19 % / 17.5 ms | build p90 2.5 ms |
+| App PSS: after start / after All / after search / after opening chats | 252 / 234 / 233 / 236 MB | earlier (30 docs): 220 MB |
+| Store on the device | 470 MB | |
+
+**Reading:** with 1000 chats the app behaves like it did with 30
+documents. Start-up is no slower (Home painted 3.3 s against 3.26 s before;
+the store opens in ~30 ms; the cost is still `main` → `documents dir`), the
+All list pages lazily and paints in 10 ms, every keystroke after the first
+draws in 11-39 ms, a chat opens in under 50 ms, and PSS stays at ~235 MB
+(redb's 48 MiB cache). Jank while scrolling is raster time on the
+emulator's GL (build p90 2-5 ms), the same as Home before; it needs the
+phone to judge. Two one-offs, both on the first run after seeding: the
+first keystroke drew in 535 ms (Rust 59 ms; the rest is the first build of
+the results list) and one page load took 460 ms (cold store). No UI
+hotspot that this data points at; nothing changed in the UI for it.
+
+Still to do on the Xiaomi phone: the same two commands (`-s <serial>`, a
+throwaway identity), for real raster numbers.
 
 The plan it implements (kept for the record):
 
