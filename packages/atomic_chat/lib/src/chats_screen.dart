@@ -1019,6 +1019,16 @@ class _ChatsPage extends StatefulWidget {
 typedef _ChatEntry = Object;
 
 class _ChatsPageState extends State<_ChatsPage> {
+  /// Since the page was made, for the `chats all painted` mark.
+  final Stopwatch _opened = Stopwatch()..start();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => Perf.span(
+        'chats all painted ${_chats.length}', _opened.elapsedMilliseconds));
+  }
+
   late List<ChatSummary> _chats = widget.first;
   late List<_ChatEntry> _entries = _entriesOf(_chats);
 
@@ -1036,9 +1046,12 @@ class _ChatsPageState extends State<_ChatsPage> {
   Future<void> _loadMore() async {
     if (_loading || _done) return;
     _loading = true;
+    final watch = Stopwatch()..start();
     try {
       final page = await widget.api
           .chatsPage(offset: _chats.length, limit: AssistantApi.chatsPageSize);
+      Perf.span('chats page ${_chats.length}+${page.length}',
+          watch.elapsedMilliseconds);
       if (!mounted) return;
       final known = {for (final c in _chats) c.subject};
       setState(() {

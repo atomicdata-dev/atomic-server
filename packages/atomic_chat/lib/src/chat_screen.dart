@@ -1,5 +1,5 @@
 import 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColors, AppColorsExt;
+    show AppColors, AppColorsExt, Perf;
 import 'package:flutter/material.dart';
 import 'dart:async';
 
@@ -525,6 +525,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (mounted) setState(() => _noSpeechHint = false);
   }
 
+  /// Since the screen was made, for the `chat data` / `chat painted` marks.
+  final Stopwatch _opened = Stopwatch()..start();
+
   Future<void> _readMessages() async {
     final chat = _chat;
     if (chat == null) {
@@ -539,6 +542,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           _loaded = true;
           _loadError = null;
         });
+        Perf.span('chat data ${messages.length}', _opened.elapsedMilliseconds);
+        WidgetsBinding.instance.addPostFrameCallback((_) => Perf.span(
+            'chat painted ${messages.length}', _opened.elapsedMilliseconds));
         if (messages.isEmpty) _readPicker();
       }
     } catch (e) {
