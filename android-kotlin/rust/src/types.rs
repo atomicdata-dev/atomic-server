@@ -194,6 +194,10 @@ pub struct OwnProfile {
     pub description: String,
     pub emoji: Option<String>,
     pub image_url: Option<String>,
+    /// The subject of the picture's File, when the profile has one; its bytes
+    /// come from `read_file_bytes` (the web app's pictures are blobs without a
+    /// download URL).
+    pub icon_file: Option<String>,
 }
 
 /// Something that happened on the sync side: a device connected, went away, or

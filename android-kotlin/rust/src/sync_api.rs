@@ -237,6 +237,7 @@ pub async fn own_profile() -> CoreResult<OwnProfile> {
         description: text("description").unwrap_or_default(),
         emoji: text("emoji"),
         image_url: text("imageUrl"),
+        icon_file: text("iconFile"),
     })
 }
 
