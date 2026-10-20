@@ -13207,3 +13207,7 @@ msgstr ""
 #: src/components/Vault/VaultStorage.tsx
 msgid "The next backup from that browser or app adds them"
 msgstr ""
+
+#: src/components/ConnectDrivePicker.tsx
+msgid "All drives"
+msgstr ""

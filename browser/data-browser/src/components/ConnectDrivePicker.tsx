@@ -9,14 +9,29 @@ export function ConnectDrivePicker({
   subjects,
   selected,
   onToggle,
+  onToggleAll,
 }: {
   subjects: string[];
   selected: string[];
   onToggle: (subject: string, on: boolean) => void;
+  /** Shown above the list when there is more than one drive. */
+  onToggleAll?: (on: boolean) => void;
 }) {
+  const allId = useId();
+
   return (
     <Card>
       <List>
+        {onToggleAll && subjects.length > 1 && (
+          <Option>
+            <Checkbox
+              id={allId}
+              checked={subjects.every(s => selected.includes(s))}
+              onChange={onToggleAll}
+            />
+            <label htmlFor={allId}>All drives</label>
+          </Option>
+        )}
         {subjects.map(subject => (
           <DriveOption
             key={subject}
