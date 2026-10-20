@@ -95,4 +95,15 @@ class ServerUrlTest {
         assertEquals("localhost:9883", serverLabel("http://localhost:9883"))
         assertEquals("a.example", serverLabel("https://a.example"))
     }
+
+    @Test
+    fun theAccountSessionIsSealedLikeTheSecretAndForgottenOnSignOut() {
+        val kv = MapKeyValue()
+        val store = SessionStore(kv, ReverseBox())
+        store.saveAccountSession("""{"origin":"https://atomic.place","cookie":"abc"}""")
+        assertFalse(kv.map.values.any { it.contains("abc") })
+        assertEquals("""{"origin":"https://atomic.place","cookie":"abc"}""", SessionStore(kv, ReverseBox()).accountSession())
+        store.clear()
+        assertNull(store.accountSession())
+    }
 }

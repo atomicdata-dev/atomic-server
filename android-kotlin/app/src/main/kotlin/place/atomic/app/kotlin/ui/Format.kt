@@ -72,3 +72,33 @@ fun timeAgo(ms: Long, now: Long = System.currentTimeMillis(), zone: ZoneId = Zon
         else -> LocalDate.ofInstant(Instant.ofEpochMilli(ms), zone).toString()
     }
 }
+
+private val MONTHS = listOf(
+    "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December",
+)
+
+private fun dayOf(ms: Long, zone: ZoneId) = Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
+
+/** "Today", "Yesterday" or the date, for a separator above the first message of a day. */
+fun dayLabel(ms: Long, now: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()): String {
+    val day = dayOf(ms, zone)
+    val today = dayOf(now, zone)
+    val diff = java.time.temporal.ChronoUnit.DAYS.between(day, today)
+    if (diff == 0L) return "Today"
+    if (diff == 1L) return "Yesterday"
+    val date = "${day.dayOfMonth} ${MONTHS[day.monthValue - 1]}"
+    return if (day.year == today.year) date else "$date ${day.year}"
+}
+
+/** Whether two times (ms) are on different days. */
+fun otherDay(a: Long, b: Long, zone: ZoneId = ZoneId.systemDefault()) = dayOf(a, zone) != dayOf(b, zone)
+
+/** "14:05" for today, "3 Oct 14:05" for another day this year, with the year for an older one. */
+fun messageTime(ms: Long, now: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()): String {
+    val at = Instant.ofEpochMilli(ms).atZone(zone)
+    val today = dayOf(now, zone)
+    val clock = "%02d:%02d".format(at.hour, at.minute)
+    if (at.toLocalDate() == today) return clock
+    val date = "${at.dayOfMonth} ${MONTHS[at.monthValue - 1].take(3)}"
+    return if (at.year == today.year) "$date $clock" else "$date ${at.year} $clock"
+}

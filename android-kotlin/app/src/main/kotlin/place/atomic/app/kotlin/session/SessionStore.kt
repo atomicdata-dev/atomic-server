@@ -44,8 +44,19 @@ class SessionStore(private val kv: KeyValue, private val box: SecretBox) {
     }
 
     fun clear() {
-        listOf(KEY_SECRET, KEY_SERVER, KEY_DRIVE).forEach { kv.putString(it, null) }
+        listOf(KEY_SECRET, KEY_SERVER, KEY_DRIVE, KEY_ACCOUNT).forEach { kv.putString(it, null) }
     }
+
+    // ── The linked atomic.place account (its AI) ──
+
+    /**
+     * The account's session at the portal, a cookie or token for one origin: as
+     * sensitive as the secret, so it is sealed the same way (Flutter keeps it in
+     * secure storage too). `null` when no account is linked.
+     */
+    fun accountSession(): String? = kv.getString(KEY_ACCOUNT)?.let(box::open)?.takeIf { it.isNotEmpty() }
+
+    fun saveAccountSession(session: String?) = kv.putString(KEY_ACCOUNT, session?.let(box::seal))
 
     // ── Servers: one active, the others remembered so switching is a tap ──
 
@@ -80,6 +91,7 @@ class SessionStore(private val kv: KeyValue, private val box: SecretBox) {
         private const val KEY_SECRET = "atomic_agent_secret_sealed"
         private const val KEY_SERVER = "atomic_server_url"
         private const val KEY_DRIVE = "atomic_drive"
+        private const val KEY_ACCOUNT = "atomic_account_session_sealed"
         private const val KEY_SERVERS = "atomic_known_servers"
 
         fun isResumableDrive(drive: String?): Boolean =
