@@ -58,7 +58,11 @@ import { styled } from 'styled-components';
 import { createFlutterHost } from './flutterHost';
 import { createMockHost } from './mockHost';
 import { createFlush } from './flush';
-import { createEmbedStore, registerEmbedActions } from './embedStore';
+import {
+  adoptDriveOf,
+  createEmbedStore,
+  registerEmbedActions,
+} from './embedStore';
 import { closeTopOverlay } from './overlayBack';
 import { reportShown, setActionsHost } from './hostActions';
 import { useNativeChatRoom } from './useNativeChatRoom';
@@ -232,7 +236,23 @@ const showRoute = createRoute({
       return () => reportShown(undefined);
     }, [subject]);
 
-    if (!subject) {
+    // The drive first: the rows of a table are asked of the host's per-drive
+    // index, and a list built before the drive is known stays empty.
+    const [driveOf, setDriveOf] = useState<string>();
+
+    useEffect(() => {
+      let live = true;
+
+      void adoptDriveOf(store, subject).then(() => {
+        if (live) setDriveOf(subject);
+      });
+
+      return () => {
+        live = false;
+      };
+    }, [subject]);
+
+    if (!subject || driveOf !== subject) {
       return null;
     }
 

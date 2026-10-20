@@ -959,6 +959,58 @@ mod tests {
         panic!("the applied commit was not handed to the pusher");
     }
 
+    /// A table's rows, listed the way the page's `useTableData` does: children
+    /// of the table, narrowed to its classtype, sorted, one page at a time.
+    #[tokio::test]
+    async fn a_tables_rows_are_listed_by_parent_and_class() {
+        let d = Device::new().await;
+        let h = host(&d);
+        let class = d
+            .store
+            .create_resource(urls::CLASS, &d.drive, "Row class", None)
+            .await
+            .unwrap();
+        let table = d
+            .store
+            .create_resource(
+                urls::TABLE,
+                &d.drive,
+                "A table",
+                Some(vec![(
+                    urls::CLASSTYPE_PROP,
+                    crate::Value::AtomicUrl(class.clone().into()),
+                )]),
+            )
+            .await
+            .unwrap();
+        for i in 0..3 {
+            d.store
+                .create_resource(&class, &table, &format!("Row {i}"), None)
+                .await
+                .unwrap();
+        }
+        // A non-row child (a view) must not be listed.
+        d.store
+            .create_resource(urls::FOLDER, &table, "Not a row", None)
+            .await
+            .unwrap();
+        let result = ask(
+            &h,
+            "query",
+            json!([{
+                "property": urls::PARENT,
+                "value": table,
+                "filters": [{ "property": urls::IS_A, "value": class }],
+                "drive": d.drive,
+                "limit": 30,
+                "includeResources": true,
+            }]),
+        )
+        .await;
+        assert_eq!(result["count"], 3, "{result}");
+        assert_eq!(result["subjects"].as_array().unwrap().len(), 3);
+    }
+
     /// A resource made in the page ("New resource") arrives as a genesis
     /// commit, in the `Client.postCommit` body: no `@id`.
     #[tokio::test]
