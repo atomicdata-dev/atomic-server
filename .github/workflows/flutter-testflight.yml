@@ -13,6 +13,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 60
     env:
+      ATOMIC_CARGO_TARGET_DIR: ${{ github.workspace }}/flutter/rust/target
       HAS_APP_STORE_CONNECT_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +33,7 @@ jobs:
         with:
           workspaces: flutter/rust
           key: flutter-ios
+          cache-on-failure: true
       - name: Build embedded renderer
         run: bash flutter/scripts/build_embed.sh
       - name: Get Flutter packages
