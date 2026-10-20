@@ -1,4 +1,5 @@
 import 'chat_parts.dart';
+import 'chat_window.dart';
 import 'hosted_ai.dart';
 import 'models.dart';
 
@@ -116,6 +117,43 @@ abstract class AssistantApi {
   /// the text parts with [addMessage].
   Future<void> addEntry(String chat, String role, List<ChatPart> parts) =>
       addMessage(chat, role, ChatEntry.textOf(parts));
+
+  // Windows of long chats (see [ChatWindow]): the newest [limit] items
+  // before the cursor [before] (null: the newest of all), and the items
+  // after a `newest` cursor. A host that reads a chat whole can leave these:
+  // they cut the whole list, with positions in it for cursors.
+
+  /// A window of an AI chat's messages.
+  Future<ChatPage<ChatEntry>> chatEntriesPage(String chat,
+          {String? before, int limit = 50}) async =>
+      pageOfAll(await chatEntries(chat), before, limit);
+
+  /// The messages of an AI chat after [after].
+  Future<ChatPage<ChatEntry>> chatEntriesAfter(String chat, String after,
+          {int limit = 100}) async =>
+      afterOfAll(await chatEntries(chat), after, limit);
+
+  /// A window of a meeting's or chat room's lines.
+  Future<ChatPage<ChatRoomMessage>> chatRoomMessagesPage(String subject,
+          {String? before, int limit = 50}) async =>
+      pageOfAll(await chatRoomMessages(subject), before, limit);
+
+  /// The lines of a meeting or chat room after [after].
+  Future<ChatPage<ChatRoomMessage>> chatRoomMessagesAfter(
+          String subject, String after,
+          {int limit = 100}) async =>
+      afterOfAll(await chatRoomMessages(subject), after, limit);
+
+  /// A window of a conversation's messages (only those are decrypted).
+  Future<ChatPage<ConversationMessage>> conversationMessagesPage(String subject,
+          {String? before, int limit = 50}) async =>
+      pageOfAll(await conversationMessages(subject), before, limit);
+
+  /// The messages of a conversation after [after].
+  Future<ChatPage<ConversationMessage>> conversationMessagesAfter(
+          String subject, String after,
+          {int limit = 100}) async =>
+      afterOfAll(await conversationMessages(subject), after, limit);
 
   /// Readable text of [subject] (for an AI's context), at most [maxChars].
   Future<String> resourceText(String subject, {int maxChars = 4000});

@@ -13,6 +13,7 @@ import 'ai_tools.dart';
 import 'attachments.dart';
 import 'resource_row.dart';
 import 'chat_parts.dart';
+import 'chat_window.dart';
 import 'markdown_view.dart';
 import 'tool_step.dart';
 import 'native_views.dart';
@@ -99,9 +100,23 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _input = TextEditingController();
   final _focus = FocusNode();
   String? _chat;
-  List<ChatEntry> _messages = const [];
-  Object? _loadError;
-  bool _loaded = false;
+
+  /// The window of the chat on screen: its newest messages, older ones read
+  /// as the list scrolls up, and the ones written here added at the end
+  /// (see [ChatWindow]). A chat can be very long; only this is held.
+  late final ChatWindow<ChatEntry> _window = ChatWindow(
+    readPage: (before, limit) =>
+        widget.api.chatEntriesPage(_chat!, before: before, limit: limit),
+    // Only this screen writes the chat while it is open: nothing to poll.
+    readAfter: null,
+    idOf: (m) => m.id,
+  );
+  late final _keeper = ChatScrollKeeper(_window);
+  bool _far = false;
+  List<ChatEntry> get _messages => _window.items;
+  Object? get _loadError => _window.error;
+  bool _noChatYet = false;
+  bool get _loaded => _window.loaded || _noChatYet;
 
   /// The AI of the linked account, once looked up; null when there is none.
   HostedAi? _ai;
@@ -213,6 +228,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void dispose() {
     _flush?.cancel();
     _sub?.cancel();
+    _window.removeListener(_windowChanged);
+    _window.dispose();
+    _keeper.dispose();
     _input.removeListener(_inputChanged);
     WidgetsBinding.instance.removeObserver(this);
     _listenSession++;
@@ -528,33 +546,31 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// Since the screen was made, for the `chat data` / `chat painted` marks.
   final Stopwatch _opened = Stopwatch()..start();
 
+  void _windowChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// "Jump to latest" shows once scrolled up by more than a screen.
+  void _scrolled() {
+    final far = _keeper.farFromBottom;
+    if (far != _far) setState(() => _far = far);
+  }
+
   Future<void> _readMessages() async {
+    _window.addListener(_windowChanged);
+    _keeper.controller.addListener(_scrolled);
     final chat = _chat;
     if (chat == null) {
-      setState(() => _loaded = true);
+      setState(() => _noChatYet = true);
       return;
     }
-    try {
-      final messages = await widget.api.chatEntries(chat);
-      if (mounted) {
-        setState(() {
-          _messages = messages;
-          _loaded = true;
-          _loadError = null;
-        });
-        Perf.span('chat data ${messages.length}', _opened.elapsedMilliseconds);
-        WidgetsBinding.instance.addPostFrameCallback((_) => Perf.span(
-            'chat painted ${messages.length}', _opened.elapsedMilliseconds));
-        if (messages.isEmpty) _readPicker();
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loadError = e;
-          _loaded = true;
-        });
-      }
-    }
+    await _window.open();
+    if (!mounted || _window.error != null) return;
+    final messages = _window.items;
+    Perf.span('chat data ${messages.length}', _opened.elapsedMilliseconds);
+    WidgetsBinding.instance.addPostFrameCallback((_) => Perf.span(
+        'chat painted ${messages.length}', _opened.elapsedMilliseconds));
+    if (messages.isEmpty) _readPicker();
   }
 
   /// A new chat is for writing: the field gets the cursor as soon as it can.
@@ -730,11 +746,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final name = text.isNotEmpty
         ? text
         : (userParts.whereType<FilePart>().first.filename ?? 'Attachment');
-    final asked = [..._messages, userMessage];
+    _window.add(userMessage);
+    // What the model reads: the window (the newest messages at least); the
+    // AI cuts a long one to its latest part.
+    final asked = _window.items;
+    if (_keeper.controller.hasClients) _keeper.controller.jumpTo(0);
     setState(() {
       _sending = true;
       _error = null;
-      _messages = asked;
       _partial = [];
     });
     // Written in: New makes another chat from now on, also while the chat
@@ -831,7 +850,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             await widget.api.addEntry(chat, 'assistant', saved);
           }
         });
-        if (mounted) _messages = [..._messages, reply];
+        if (mounted) _window.add(reply);
       }
       if (mounted) {
         setState(() {
@@ -939,15 +958,37 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             id: 'partial', role: 'assistant', createdAt: 0, parts: _partial!),
     ];
     if (shown.isEmpty) return _noAi ? _noAiState(c) : _picker(c);
-    return LayoutBuilder(
+    final ids = [for (final m in shown) m.id];
+    final at = {for (var i = 0; i < ids.length; i++) ids[i]: i};
+    final list = LayoutBuilder(
       builder: (context, box) => ListView.builder(
+        controller: _keeper.controller,
         reverse: true,
         padding: const EdgeInsets.all(16),
-        itemCount: shown.length,
+        itemCount: shown.length + (_window.hasOlder ? 1 : 0),
+        findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
         itemBuilder: (context, i) {
-          final m = shown[shown.length - 1 - i];
+          if (i == shown.length) {
+            // The top: older messages are being read.
+            return const Padding(
+              padding: EdgeInsets.all(12),
+              child: Center(
+                  child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))),
+            );
+          }
+          _keeper.built(i);
+          final index = shown.length - 1 - i;
+          final m = shown[index];
           final mine = m.role == 'user';
-          return Align(
+          final newDay = m.createdAt > 0 &&
+              (index == 0 && !_window.hasOlder ||
+                  index > 0 &&
+                      shown[index - 1].createdAt > 0 &&
+                      otherDay(shown[index - 1].createdAt, m.createdAt));
+          final bubble = Align(
             alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
             child: Container(
               margin: const EdgeInsets.symmetric(vertical: 4),
@@ -963,9 +1004,32 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               child: _bubble(c, m, mine),
             ),
           );
+          return KeyedSubtree(
+            key: ValueKey(m.id),
+            child: newDay
+                ? Column(children: [
+                    DaySeparator(dayLabel(m.createdAt), color: c.textSecondary),
+                    bubble,
+                  ])
+                : bubble,
+          );
         },
       ),
     );
+    return Stack(children: [
+      list,
+      if (_far)
+        Positioned(
+          right: 12,
+          bottom: 12,
+          child: JumpToLatest(
+              unseen: 0,
+              onPressed: () async {
+                await _keeper.jumpToLatest();
+                if (mounted) setState(() => _far = false);
+              }),
+        ),
+    ]);
   }
 
   /// What a message shows: its text in Markdown, its tool calls as steps.

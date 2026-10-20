@@ -119,6 +119,32 @@ class AtomicAssistantApi extends AssistantApi {
   Future<List<ChatEntry>> chatEntries(String chat) =>
       AtomicClient.readChatEntries(chat);
   @override
+  Future<ChatPage<ChatEntry>> chatEntriesPage(String chat,
+          {String? before, int limit = 50}) =>
+      AtomicClient.readChatEntriesPage(chat, before: before, limit: limit);
+  @override
+  Future<ChatPage<ChatEntry>> chatEntriesAfter(String chat, String after,
+          {int limit = 100}) =>
+      AtomicClient.readChatEntriesAfter(chat, after, limit: limit);
+  @override
+  Future<ChatPage<ChatRoomMessage>> chatRoomMessagesPage(String subject,
+          {String? before, int limit = 50}) =>
+      AtomicClient.readChatRoomPage(subject, before: before, limit: limit);
+  @override
+  Future<ChatPage<ChatRoomMessage>> chatRoomMessagesAfter(
+          String subject, String after, {int limit = 100}) =>
+      AtomicClient.readChatRoomAfter(subject, after, limit: limit);
+  @override
+  Future<ChatPage<ConversationMessage>> conversationMessagesPage(
+          String subject,
+          {String? before,
+          int limit = 50}) =>
+      AtomicClient.readConversationPage(subject, before: before, limit: limit);
+  @override
+  Future<ChatPage<ConversationMessage>> conversationMessagesAfter(
+          String subject, String after, {int limit = 100}) =>
+      AtomicClient.readConversationAfter(subject, after, limit: limit);
+  @override
   Future<void> addEntry(String chat, String role, List<ChatPart> parts) =>
       AtomicClient.appendChatEntryParts(chat, role, parts);
   @override

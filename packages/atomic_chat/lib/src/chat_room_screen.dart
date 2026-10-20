@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'app_top_bar.dart';
+import 'chat_window.dart';
 import 'assistant_api.dart';
 import 'conversation_screen.dart' show conversationRefresh, messageTime;
 import 'models.dart';
@@ -98,10 +98,18 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     }
   }
 
-  final _scroll = ScrollController();
-  List<ChatRoomMessage> _messages = const [];
-  Object? _loadError;
-  bool _loaded = false;
+  /// The window of the room on screen: the newest lines, older ones read
+  /// as the list scrolls up (see [ChatWindow]).
+  late final ChatWindow<ChatRoomMessage> _window = ChatWindow(
+    readPage: (before, limit) => widget.api
+        .chatRoomMessagesPage(widget.subject, before: before, limit: limit),
+    readAfter: (after, limit) =>
+        widget.api.chatRoomMessagesAfter(widget.subject, after, limit: limit),
+    idOf: (m) => m.id,
+  );
+  late final _keeper = ChatScrollKeeper(_window);
+  ScrollController get _scroll => _keeper.controller;
+  bool _far = false;
   bool _hadText = false;
   bool _foreground = true;
   bool _reading = false;
@@ -120,6 +128,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _input.addListener(_inputChanged);
+    _window.addListener(_windowChanged);
+    _scroll.addListener(_scrolled);
     _read();
     _timer = Timer.periodic(conversationRefresh, (_) => _tick());
   }
@@ -131,7 +141,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     _input.removeListener(_inputChanged);
     _focus.dispose();
     _input.dispose();
-    _scroll.dispose();
+    _window.removeListener(_windowChanged);
+    _window.dispose();
+    _keeper.dispose();
     super.dispose();
   }
 
@@ -153,26 +165,26 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     _read();
   }
 
+  void _windowChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// "Jump to latest" shows once scrolled up by more than a screen.
+  void _scrolled() {
+    final far = _keeper.farFromBottom;
+    if (far != _far) setState(() => _far = far);
+  }
+
+  /// What arrived since the newest line read; shown at once when at the
+  /// bottom, otherwise counted on the "Jump to latest" button.
   Future<void> _read() async {
     if (_reading) return;
     _reading = true;
     try {
-      final messages = await widget.api.chatRoomMessages(widget.subject);
-      if (!mounted) return;
-      if (!listEquals(messages, _messages) || !_loaded || _loadError != null) {
-        setState(() {
-          _messages = messages;
-          _loaded = true;
-          _loadError = null;
-        });
-      }
-    } catch (e) {
-      // A failed refresh keeps what is on screen.
-      if (mounted && !_loaded) {
-        setState(() {
-          _loadError = e;
-          _loaded = true;
-        });
+      if (!_window.loaded) {
+        await _window.open();
+      } else {
+        await _window.poll(atBottom: _keeper.atBottom);
       }
     } finally {
       _reading = false;
@@ -215,6 +227,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       try {
         await widget.api.sendChatRoomMessage(widget.subject, text);
         await _read();
+        // Your own message shows where you are writing: at the bottom.
+        if (_window.unseen > 0 || _window.detached) {
+          await _keeper.jumpToLatest();
+        }
       } catch (e) {
         if (mounted) {
           setState(() => _error = "Couldn't send: $e");
@@ -260,17 +276,20 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   }
 
   Widget _list(AppColors c) {
-    if (_loadError != null) {
+    final loadError = _window.error;
+    if (loadError != null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text('$_loadError',
+          child: Text('$loadError',
               textAlign: TextAlign.center, style: TextStyle(color: c.alert)),
         ),
       );
     }
-    if (!_loaded) return const Center(child: CircularProgressIndicator());
-    final shown = [..._messages, ..._pending];
+    if (!_window.loaded) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final shown = [..._window.items, ..._pending];
     if (shown.isEmpty) {
       return Center(
         child: Text('No messages yet',
@@ -284,24 +303,69 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         a.mine == b.mine &&
         a.author == b.author &&
         (b.createdAt - a.createdAt).abs() <= _groupGap.inMilliseconds;
-    return ListView.builder(
+    final ids = [for (final m in shown) m.id];
+    final at = {for (var i = 0; i < ids.length; i++) ids[i]: i};
+    final list = ListView.builder(
       controller: _scroll,
       reverse: true,
       padding: const EdgeInsets.all(16),
-      itemCount: shown.length,
+      itemCount: shown.length + (_window.hasOlder ? 1 : 0),
+      findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
       itemBuilder: (context, i) {
+        if (i == shown.length) {
+          // The top: older lines are being read.
+          return const Padding(
+            padding: EdgeInsets.all(12),
+            child: Center(
+                child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))),
+          );
+        }
+        _keeper.built(i);
         final index = shown.length - 1 - i;
         final m = shown[index];
-        if (m.kind == ChatRoomKind.event) return _eventRow(c, m);
-        final first = index == 0 || !sameGroup(shown[index - 1], m);
-        final last =
-            index == shown.length - 1 || !sameGroup(m, shown[index + 1]);
-        return _bubble(c, m,
-            header: first,
-            time: last ? messageTime(m.createdAt) : null,
-            gapAbove: first);
+        final Widget row;
+        if (m.kind == ChatRoomKind.event) {
+          row = _eventRow(c, m);
+        } else {
+          final first = index == 0 || !sameGroup(shown[index - 1], m);
+          final last =
+              index == shown.length - 1 || !sameGroup(m, shown[index + 1]);
+          row = _bubble(c, m,
+              header: first,
+              time: last ? messageTime(m.createdAt) : null,
+              gapAbove: first);
+        }
+        final newDay = index == 0 && !_window.hasOlder ||
+            index > 0 && otherDay(shown[index - 1].createdAt, m.createdAt);
+        return KeyedSubtree(
+          key: ValueKey(m.id),
+          child: newDay
+              ? Column(children: [
+                  DaySeparator(dayLabel(m.createdAt), color: c.textSecondary),
+                  row,
+                ])
+              : row,
+        );
       },
     );
+    final unseen = _window.unseen;
+    return Stack(children: [
+      list,
+      if (_far || unseen > 0)
+        Positioned(
+          right: 12,
+          bottom: 12,
+          child: JumpToLatest(
+              unseen: unseen,
+              onPressed: () async {
+                await _keeper.jumpToLatest();
+                if (mounted) setState(() => _far = false);
+              }),
+        ),
+    ]);
   }
 
   String _nameOf(ChatRoomMessage m) =>

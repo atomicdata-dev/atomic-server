@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'app_top_bar.dart';
+import 'chat_window.dart';
 
 import 'models.dart';
 import 'assistant_api.dart';
@@ -44,9 +44,17 @@ class _ConversationScreenState extends State<ConversationScreen>
     with WidgetsBindingObserver {
   final _input = TextEditingController();
   final _focus = FocusNode();
-  List<ConversationMessage> _messages = const [];
-  Object? _loadError;
-  bool _loaded = false;
+
+  /// The window of the conversation on screen: the newest messages, older
+  /// ones read as the list scrolls up (see [ChatWindow]).
+  late final ChatWindow<ConversationMessage> _window = ChatWindow(
+    readPage: (before, limit) => widget.api
+        .conversationMessagesPage(widget.subject, before: before, limit: limit),
+    readAfter: (after, limit) => widget.api
+        .conversationMessagesAfter(widget.subject, after, limit: limit),
+    idOf: (m) => m.id,
+  );
+  late final _scroll = ChatScrollKeeper(_window);
   bool _hadText = false;
   bool _foreground = true;
   bool _reading = false;
@@ -70,13 +78,18 @@ class _ConversationScreenState extends State<ConversationScreen>
     unawaited(widget.api.followConversation(widget.subject).then((_) {
       if (mounted) _read();
     }, onError: (Object _) {}));
-    _read();
+    _window.addListener(_windowChanged);
+    unawaited(_window.open());
+    _scroll.controller.addListener(_scrolled);
     _timer = Timer.periodic(conversationRefresh, (_) => _tick());
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _window.removeListener(_windowChanged);
+    _window.dispose();
+    _scroll.dispose();
     WidgetsBinding.instance.removeObserver(this);
     _input.removeListener(_inputChanged);
     _focus.dispose();
@@ -102,27 +115,28 @@ class _ConversationScreenState extends State<ConversationScreen>
     _read();
   }
 
+  void _windowChanged() {
+    if (mounted) setState(() {});
+  }
+
+  bool _far = false;
+
+  /// "Jump to latest" shows once scrolled up by more than a screen.
+  void _scrolled() {
+    final far = _scroll.farFromBottom;
+    if (far != _far) setState(() => _far = far);
+  }
+
+  /// What arrived since the newest message read; shown at once when at the
+  /// bottom, otherwise counted on the "Jump to latest" button.
   Future<void> _read() async {
     if (_reading) return;
     _reading = true;
     try {
-      final messages = await widget.api.conversationMessages(widget.subject);
-      if (!mounted) return;
-      final changed = !listEquals(messages, _messages);
-      if (changed || !_loaded || _loadError != null) {
-        setState(() {
-          _messages = messages;
-          _loaded = true;
-          _loadError = null;
-        });
-      }
-    } catch (e) {
-      // A failed refresh keeps what is on screen.
-      if (mounted && !_loaded) {
-        setState(() {
-          _loadError = e;
-          _loaded = true;
-        });
+      if (!_window.loaded) {
+        await _window.open();
+      } else {
+        await _window.poll(atBottom: _scroll.atBottom);
       }
     } finally {
       _reading = false;
@@ -151,6 +165,10 @@ class _ConversationScreenState extends State<ConversationScreen>
       try {
         await widget.api.sendConversationMessage(widget.subject, text);
         await _read();
+        // Your own message shows where you are writing: at the bottom.
+        if (_window.unseen > 0 || _window.detached) {
+          await _scroll.jumpToLatest();
+        }
       } catch (e) {
         if (mounted) {
           setState(() => _error = "Couldn't send: $e");
@@ -174,17 +192,20 @@ class _ConversationScreenState extends State<ConversationScreen>
   }
 
   Widget _list(AppColors c) {
-    if (_loadError != null) {
+    final loadError = _window.error;
+    if (loadError != null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text('$_loadError',
+          child: Text('$loadError',
               textAlign: TextAlign.center, style: TextStyle(color: c.alert)),
         ),
       );
     }
-    if (!_loaded) return const Center(child: CircularProgressIndicator());
-    final shown = [..._messages, ..._pending];
+    if (!_window.loaded) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    final shown = [..._window.items, ..._pending];
     if (shown.isEmpty) {
       return Center(
         child: Text('No messages yet',
@@ -201,22 +222,64 @@ class _ConversationScreenState extends State<ConversationScreen>
         a.mine == b.mine &&
         a.author == b.author &&
         (b.createdAt - a.createdAt).abs() <= _groupGap.inMilliseconds;
-    return ListView.builder(
+    final ids = [for (final m in shown) m.id];
+    final at = {for (var i = 0; i < ids.length; i++) ids[i]: i};
+    final list = ListView.builder(
+      controller: _scroll.controller,
       reverse: true,
       padding: const EdgeInsets.all(16),
-      itemCount: shown.length,
+      itemCount: shown.length + (_window.hasOlder ? 1 : 0),
+      findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
       itemBuilder: (context, i) {
+        if (i == shown.length) {
+          // The top: older messages are being read.
+          return const Padding(
+            padding: EdgeInsets.all(12),
+            child: Center(
+                child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))),
+          );
+        }
+        _scroll.built(i);
         final index = shown.length - 1 - i;
         final m = shown[index];
         final first = index == 0 || !sameGroup(shown[index - 1], m);
         final last =
             index == shown.length - 1 || !sameGroup(m, shown[index + 1]);
-        return _bubble(c, m,
+        final newDay = index == 0 && !_window.hasOlder ||
+            index > 0 && otherDay(shown[index - 1].createdAt, m.createdAt);
+        final bubble = _bubble(c, m,
             name: group && !m.mine && first ? _nameOf(m) : null,
             time: last ? messageTime(m.createdAt) : null,
             gapAbove: first);
+        return KeyedSubtree(
+          key: ValueKey(m.id),
+          child: newDay
+              ? Column(children: [
+                  DaySeparator(dayLabel(m.createdAt), color: c.textSecondary),
+                  bubble,
+                ])
+              : bubble,
+        );
       },
     );
+    final unseen = _window.unseen;
+    return Stack(children: [
+      list,
+      if (_far || unseen > 0)
+        Positioned(
+          right: 12,
+          bottom: 12,
+          child: JumpToLatest(
+              unseen: unseen,
+              onPressed: () async {
+                await _scroll.jumpToLatest();
+                if (mounted) setState(() => _far = false);
+              }),
+        ),
+    ]);
   }
 
   String _nameOf(ConversationMessage m) =>

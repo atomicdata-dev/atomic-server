@@ -7,6 +7,7 @@ import 'package:atomic_chat/atomic_chat.dart'
         AssistantJson,
         ChatEntry,
         ChatMessage,
+        ChatPage,
         ChatPart,
         ChatRoomMessage,
         ChatSummary,
@@ -246,6 +247,66 @@ class AtomicClient {
   static Future<List<ChatMessage>> readChat(String subject) async =>
       AssistantJson.parseChatMessages(
           await assistant.readChat(subject: subject));
+
+  /// A window of an AI chat: the newest [limit] messages before [before]
+  /// (null: the newest of all), with cursors for the windows around it.
+  static Future<ChatPage<ChatEntry>> readChatEntriesPage(String subject,
+          {String? before, int limit = 50}) async =>
+      AssistantJson.parsePage(
+          await assistant.readChatPage(
+              subject: subject, before: before, limit: limit),
+          'entries',
+          AssistantJson.parseChatEntries);
+
+  /// The messages of an AI chat after the cursor [after].
+  static Future<ChatPage<ChatEntry>> readChatEntriesAfter(
+          String subject, String after,
+          {int limit = 100}) async =>
+      AssistantJson.parsePage(
+          await assistant.readChatAfter(
+              subject: subject, after: after, limit: limit),
+          'entries',
+          AssistantJson.parseChatEntries);
+
+  /// A window of a meeting or chat room (see [readChatEntriesPage]).
+  static Future<ChatPage<ChatRoomMessage>> readChatRoomPage(String subject,
+          {String? before, int limit = 50}) async =>
+      AssistantJson.parsePage(
+          await assistant.readChatRoomPage(
+              subject: subject, before: before, limit: limit),
+          'messages',
+          AssistantJson.parseChatRoomMessages);
+
+  /// The lines of a meeting or chat room after the cursor [after].
+  static Future<ChatPage<ChatRoomMessage>> readChatRoomAfter(
+          String subject, String after,
+          {int limit = 100}) async =>
+      AssistantJson.parsePage(
+          await assistant.readChatRoomAfter(
+              subject: subject, after: after, limit: limit),
+          'messages',
+          AssistantJson.parseChatRoomMessages);
+
+  /// A window of a conversation; only its messages are decrypted.
+  static Future<ChatPage<ConversationMessage>> readConversationPage(
+          String subject,
+          {String? before,
+          int limit = 50}) async =>
+      AssistantJson.parsePage(
+          await assistant.readConversationPage(
+              subject: subject, before: before, limit: limit),
+          'messages',
+          AssistantJson.parseConversationMessages);
+
+  /// The messages of a conversation after the cursor [after].
+  static Future<ChatPage<ConversationMessage>> readConversationAfter(
+          String subject, String after,
+          {int limit = 100}) async =>
+      AssistantJson.parsePage(
+          await assistant.readConversationAfter(
+              subject: subject, after: after, limit: limit),
+          'messages',
+          AssistantJson.parseConversationMessages);
 
   /// Every message of an AI chat with all its parts, oldest first.
   static Future<List<ChatEntry>> readChatEntries(String subject) async =>

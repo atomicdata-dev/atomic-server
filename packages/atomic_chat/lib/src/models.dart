@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'chat_parts.dart';
+import 'chat_window.dart';
 
 /// An AI chat of the active drive; `lastActivity` is unix ms, 0 when empty.
 typedef ChatSummary = ({String subject, String name, int lastActivity});
@@ -149,6 +150,17 @@ List<DriveInfo> visibleDrives(List<DriveInfo> all, {String? active}) {
 /// The JSON the host's store answers with (`atomic_lib::host`), read into the
 /// types above. A host whose store speaks this JSON can use these directly.
 abstract final class AssistantJson {
+  /// A window `{<field>: [...], older, newest, more}` from the host, its
+  /// items read with [parse] (one of the list parsers below).
+  static ChatPage<T> parsePage<T>(
+      String json, String field, List<T> Function(String) parse) {
+    final m = jsonDecode(json) as Map;
+    return ChatPage<T>(parse(jsonEncode(m[field] ?? const [])),
+        older: m['older'] as String?,
+        newest: m['newest'] as String?,
+        more: m['more'] == true);
+  }
+
   static String? _emoji(Map e) {
     final v = e['emoji'];
     return v is String && v.isNotEmpty ? v : null;

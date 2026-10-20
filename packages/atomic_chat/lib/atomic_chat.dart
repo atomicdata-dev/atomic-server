@@ -10,6 +10,7 @@ export 'package:atomic_flutter/atomic_flutter.dart'
 export 'src/assistant_api.dart';
 export 'src/models.dart';
 export 'src/chat_parts.dart';
+export 'src/chat_window.dart';
 export 'src/hosted_ai.dart';
 export 'src/ai_tools.dart';
 

@@ -84,7 +84,11 @@ class _MarkdownViewState extends State<MarkdownView> {
         renderer: r,
       );
     } else {
-      final blocks = _doc.update(widget.text);
+      // A finished message's parse is shared through a small cache: a row
+      // scrolled out of a long chat and back is not parsed again.
+      final blocks = widget.streaming
+          ? _doc.update(widget.text)
+          : _parsed(widget.text).blocks;
       final live = blocks.toSet();
       _built.removeWhere((b, _) => !live.contains(b));
       final children = <Widget>[];
@@ -107,6 +111,20 @@ class _MarkdownViewState extends State<MarkdownView> {
     body = DefaultTextStyle(style: base, child: body);
     return widget.selectable ? SelectionArea(child: body) : body;
   }
+}
+
+/// Parses of finished messages, the most recently used last.
+final _parseCache = <String, MarkdownDocument>{};
+const _parseCacheSize = 256;
+
+MarkdownDocument _parsed(String text) {
+  final hit = _parseCache.remove(text);
+  final doc = hit ?? (MarkdownDocument()..update(text));
+  _parseCache[text] = doc;
+  if (_parseCache.length > _parseCacheSize) {
+    _parseCache.remove(_parseCache.keys.first);
+  }
+  return doc;
 }
 
 /// Builds the widgets of blocks.
