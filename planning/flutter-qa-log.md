@@ -174,7 +174,8 @@ and whether it was fixed (commit) or not.
 - 2026-10-20 (performance round): after the app was killed (force-stop,
   `install -r`, an ANR), its store would not open three times: a redb
   assertion (`raw_file_len >= header.layout().len()`) panics in `open_db`
-  and the app stays black. See "Store lost after a kill" in
+  and the app stays black. **Fixed** (second store handle after a
+  same-process relaunch); see "Store lost after a kill" in
   `flutter-performance.md`.
 
 ## On a real device

@@ -131,18 +131,24 @@ What changed (one commit each):
 
 ## Found on the way
 
-- **Store lost after a kill** (high): three times in this session the app's
-  redb store could not be opened after the process was killed (force-stop by
-  the script, an `install -r`, or the ANR dialog): `PanicException(assertion
-  failed: storage.raw_file_len()? >= header.layout().len())` from
-  `redb::tree_store::page_store::page_manager` in `open_db`, then the app
-  stayed black forever (the panic escapes `main` before `runApp`; only errors
-  containing "corrupt" lead to a fresh store). The header describes a longer
-  file than is on disk. Native stores use redb's own file backend, so this is
-  not the encrypted OPFS backend. Kept copies of the three stores for whoever
-  picks it up (session scratchpad `perf/corrupt/`). Needs: a kill-loop
-  reproduction (`identity_durability`-style test), and `main` must show an
-  error and a way out instead of a black screen.
+- **Store lost after a kill** (fixed): three times the redb store did not
+  open after a kill (`raw_file_len >= header.layout().len()` panic, app black).
+  Root cause: Android re-runs `main` in the same process when it recreates
+  the activity (back out, start again), `open_db` opened a second redb handle
+  on the live file (the APK's Rust is cargokit's `stable`, 1.95, whose std
+  has no file lock on Android, so redb opened without one), `set_db` dropped
+  it, and its drop trimmed the file under the first handle; the first
+  handle's next commit wrote its longer layout into the header and the next
+  kill left a file shorter than its header. Reproduced on the emulator in one
+  try and with an unlocked backend on the host. Fixed: `open_db` keeps an
+  open store, `RedbStore` refuses a second handle per process
+  (`db::recovery::OpenFileGuard`), the open never panics, a damaged store is
+  kept as `atomic.redb.corrupt-<ms>` and repaired on a copy (all three kept
+  stores repair) or replaced by an empty one, the app explains it (recovery
+  screen with Share) and never stays black, and it flushes on background.
+  Emulator kill-loop afterwards: 50 force-stops, 25 of them after a
+  same-process relaunch, 0 failures. Still open: cargokit builds with
+  `stable`, not the repo's pinned toolchain.
 - **ANRs on the emulator** while opening and leaving pages: the main thread
   waits for the RenderThread drawing the web view through emulated GL
   (stacks above). Probably emulator-only; watch for it on the phone.
