@@ -48,6 +48,30 @@ make analyze    # Static analysis
 
 To update the Android device IDs, edit `dev.sh` (`ANDROID1_ID` = tablet, `ANDROID2_ID` = phone).
 
+### Building the Android app
+
+The Rust library is built by cargokit (`rust_builder/cargokit`) during the Gradle build, with the toolchain pinned in the repo's `rust-toolchain.toml` (cargokit used to use rustup's `stable`: std 1.95 has no `File::try_lock` on Android, so redb's file lock silently did nothing). rustup installs that toolchain and the Android targets itself on first use; to do it up front:
+
+```bash
+# from the repo root, so rustup picks up rust-toolchain.toml
+rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+```
+
+Debug builds keep every ABI (x86_64 emulators). Release and profile APKs are **arm64-v8a only** (the other ABIs' libraries are excluded from the package, `android/app/build.gradle`). Also pass the platform so cargokit builds only that Rust target:
+
+```bash
+flutter build apk --release --target-platform android-arm64
+```
+
+For another ABI, name it and lift the exclusion:
+
+```bash
+flutter build apk --release --target-platform android-arm,android-x64 \
+  --android-project-arg=atomic.allAbis=true
+```
+
+(`--split-per-abi` also works together with `atomic.allAbis`.)
+
 ### Sync / Pairing
 
 Devices sync via [Iroh](https://iroh.computer) (QUIC peer-to-peer, works through NAT).
