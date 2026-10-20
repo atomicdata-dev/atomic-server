@@ -14,13 +14,24 @@ class AtomicAssistantApi extends AssistantApi {
   @override
   Future<List<DriveInfo>> drives() => AtomicClient.listDrivesWithNames();
   @override
-  Future<List<ChatSummary>> chats() => AtomicClient.listAiChats();
+  Future<List<ChatSummary>> chats() =>
+      AtomicClient.listAiChats(limit: AssistantApi.chatsPageSize);
+  @override
+  Future<List<ChatSummary>> chatsPage(
+          {required int offset, required int limit}) =>
+      AtomicClient.listAiChats(limit: limit, offset: offset);
   @override
   Future<List<ChatMessage>> messages(String chat) =>
       AtomicClient.readChat(chat);
   @override
   Future<List<SearchHit>> search(String query, {String? drive}) =>
       AtomicClient.search(query, drive: drive);
+  @override
+  Future<List<SearchHit>> searchClasses(String query,
+          {String? drive, required List<String> classes}) =>
+      AtomicClient.search(query, drive: drive, classes: classes);
+  @override
+  Future<void> warmSearch() => AtomicClient.warmSearch();
   @override
   Future<List<RecentResource>> recentResources(String drive) =>
       AtomicClient.recentResources(drive);

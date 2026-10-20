@@ -12,14 +12,38 @@ abstract class AssistantApi {
   /// The agent's drives worth showing (see [visibleDrives]).
   Future<List<DriveInfo>> drives();
 
-  /// The person's newest AI chats, across all drives.
+  /// How many chats [chats] returns at most, and the size of the pages the
+  /// full list is read in ([chatsPage]).
+  static const chatsPageSize = 50;
+
+  /// The person's newest AI chats, across all drives (the first
+  /// [chatsPageSize]).
   Future<List<ChatSummary>> chats();
+
+  /// [limit] chats after the [offset] newest ones, newest first; fewer than
+  /// [limit] means there are no more. A host that cannot page lists only
+  /// [chats].
+  Future<List<ChatSummary>> chatsPage(
+          {required int offset, required int limit}) async =>
+      offset == 0 ? chats() : const [];
 
   /// The text messages of an AI chat, oldest first.
   Future<List<ChatMessage>> messages(String chat);
 
   /// Searches every drive, or only [drive] when given.
   Future<List<SearchHit>> search(String query, {String? drive});
+
+  /// [search] for only resources of one of [classes] (`drive`, `aichat`,
+  /// `conversation`, `chatroom`), chosen before the result limit, so a query
+  /// whose best hits are documents still finds a chat. A host that cannot
+  /// filter searches everything; the screen drops the rest.
+  Future<List<SearchHit>> searchClasses(String query,
+          {String? drive, required List<String> classes}) =>
+      search(query, drive: drive);
+
+  /// Reads the search index once so the first keystroke is not cold; called
+  /// after the home is drawn. Best effort.
+  Future<void> warmSearch() async {}
 
   /// What this device opened lately in [drive], newest first.
   Future<List<RecentResource>> recentResources(String drive);

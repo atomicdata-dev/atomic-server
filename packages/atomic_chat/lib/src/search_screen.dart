@@ -31,6 +31,15 @@ enum SearchKind {
 
   const SearchKind(this.label, this.hint, this.heading);
 
+  /// The classes the host's search keeps for this kind (see
+  /// [AssistantApi.searchClasses]); empty for [any].
+  List<String> get classes => switch (this) {
+        any => const [],
+        drives => const ['drive'],
+        chats => const ['aichat'],
+        messages => const ['conversation', 'chatroom'],
+      };
+
   /// Whether a resource of [className] (a shortname or class URL) is of this
   /// kind.
   bool matches(String className) {
@@ -141,6 +150,9 @@ class _SearchModel extends ChangeNotifier {
   /// The query [hits] answer (they lag the field while a search runs); empty
   /// before the first answer, and the list shows the recents until then.
   String hitsFor = '';
+
+  /// The kind [hits] were searched for (the host keeps only that kind).
+  SearchKind hitsKind = SearchKind.any;
 
   /// Whether the list shows the recently opened instead of hits: nothing
   /// typed, or no answer yet (no empty frame between the two lists).
@@ -276,6 +288,8 @@ class _SearchScreenState extends State<SearchScreen> {
               : ShellPage.searchIn(_model.scope!));
     }
     _model.changed();
+    // The hits so far are of the kind only: everything is searched again.
+    if (_model.query.isNotEmpty && !_searching) unawaited(_search());
   }
 
   /// A drive in the results is a filter, not a page: the search goes on
@@ -361,17 +375,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 emoji: d.emoji
               )
           ],
-        SearchKind.chats => [
-            for (final c in await widget.api.chats())
-              (
-                drive: widget.drive,
-                shown: '',
-                subject: c.subject,
-                title: c.name.isEmpty ? 'Untitled chat' : c.name,
-                className: 'ai-chat',
-                emoji: null
-              )
-          ],
+        SearchKind.chats => await _loadChats(kind),
         SearchKind.messages => [
             for (final c in await widget.api.conversations())
               (
@@ -389,6 +393,34 @@ class _SearchScreenState extends State<SearchScreen> {
       _model.changed();
     } catch (_) {
       // Only a convenience: the search itself still works.
+    }
+  }
+
+  /// Every AI chat, newest first: the first page shows at once, the rest
+  /// joins it as the pages arrive (a thousand chats are twenty pages).
+  Future<List<_Item>> _loadChats(SearchKind kind) async {
+    final items = <_Item>[];
+    final known = <String>{};
+    while (true) {
+      final page = await widget.api.chatsPage(
+          offset: known.length, limit: AssistantApi.chatsPageSize * 4);
+      for (final c in page) {
+        if (!known.add(c.subject)) continue;
+        items.add((
+          drive: widget.drive,
+          shown: '',
+          subject: c.subject,
+          title: c.name.isEmpty ? 'Untitled chat' : c.name,
+          className: 'ai-chat',
+          emoji: null
+        ));
+      }
+      if (!mounted || kind != _model.kind) return items;
+      final last = page.length < AssistantApi.chatsPageSize * 4;
+      if (last) return items;
+      // Show what there is, then go on reading.
+      _model.ofKind = List.of(items);
+      _model.changed();
     }
   }
 
@@ -471,16 +503,31 @@ class _SearchScreenState extends State<SearchScreen> {
       while (mounted && _model.query.isNotEmpty) {
         final query = _model.query;
         final scope = _model.scope;
-        if (query == _model.hitsFor && _model.error == null) break;
+        final kind = _model.kind;
+        if (query == _model.hitsFor &&
+            kind == _model.hitsKind &&
+            _model.error == null) {
+          break;
+        }
         final asked = _typed.elapsedMilliseconds;
         try {
-          final hits = await widget.api.search(query, drive: scope);
+          // The kind is chosen in the index, before the result limit.
+          final classes = kind.classes;
+          final hits = classes.isEmpty
+              ? await widget.api.search(query, drive: scope)
+              : await widget.api
+                  .searchClasses(query, drive: scope, classes: classes);
           if (!mounted) return;
-          // Stale: the text or the drive changed while it ran. The loop
-          // searches the new one.
-          if (query != _model.query || scope != _model.scope) continue;
+          // Stale: the text, the drive or the kind changed while it ran. The
+          // loop searches the new one.
+          if (query != _model.query ||
+              scope != _model.scope ||
+              kind != _model.kind) {
+            continue;
+          }
           _model.hits = hits;
           _model.hitsFor = query;
+          _model.hitsKind = kind;
           _model.error = null;
           _model.changed();
           if (!kReleaseMode) {
@@ -491,7 +538,11 @@ class _SearchScreenState extends State<SearchScreen> {
           }
         } catch (e) {
           if (!mounted) return;
-          if (query != _model.query || scope != _model.scope) continue;
+          if (query != _model.query ||
+              scope != _model.scope ||
+              kind != _model.kind) {
+            continue;
+          }
           _model.error = e;
           _model.hitsFor = query;
           _model.changed();

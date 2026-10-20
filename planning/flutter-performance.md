@@ -404,7 +404,7 @@ never synced, a connected one drains it). redb then stores 519 MB plus
       A compaction of a 1 GB store, when it is due, runs before the app
       draws. Consider compacting on the phone only while charging / in the
       background, or with a time budget.
-- [ ] **redb's read cache is 1 GiB** (`Database::create` defaults,
+- [x] **redb's read cache is 1 GiB** (fixed: `RedbStore::new_file_with_cache` / `Db::init_redb_file_with_cache`; the bridge opens with 48 MiB, the server keeps the default) (`Database::create` defaults,
       `db::recovery::create_database`): whatever the app reads stays cached,
       up to the store's size (RSS 204 MB after Home + search + one rescan,
       870 MB after a full walk). A phone wants 32-64 MiB
@@ -412,7 +412,7 @@ never synced, a connected one drains it). redb then stores 519 MB plus
 - [ ] **Store size is ~10x the text** (above). The copy in the resource row
       (to confirm) and the slack of large values look like the cheap wins;
       the outbox shrinks once synced.
-- [ ] The first keystroke after start reads the search trees cold (9-62 ms on
+- [x] (`warm_search`, called after the home's first frame) The first keystroke after start reads the search trees cold (9-62 ms on
       the Mac). Warming them in the background after Home is drawn would hide
       it.
 - [ ] 3-letter queries are the slowest warm case (5-10 ms): the one-edit
@@ -463,3 +463,15 @@ Waits for a go-ahead (emulator builds conflict with other agents and disk).
      query whose best 20 are documents shows no chat. Pass the class to Rust
      (`SearchOpts.filter_pairs` isA = AiChat, measured 1.4-2.0 ms) through a
      `class` parameter on the bridge's `search`.
+
+### App-side scale fixes (done)
+
+- "All" lists build rows lazily (`ListView.builder`); the AI chats' list pages
+  through `list_ai_chats(limit, offset)` (50 per page, the next page when
+  scrolled within 10 rows of the end), so all 1000 chats are reachable.
+  Recents (100 merged opened) and Activity (100) are capped by design;
+  Messages is capped at 100 conversations by the host (its list is cut before
+  it is sorted, so an offset is not meaningful yet).
+- Search kind chips (Drives, AI chats, Messages) pass their classes to the
+  host's `search(.., classes)`: the filter runs in the index before the limit.
+  The chats chip lists every chat before typing (pages of 200).

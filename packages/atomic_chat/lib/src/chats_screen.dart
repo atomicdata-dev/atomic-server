@@ -126,6 +126,11 @@ class _ChatsScreenState extends State<ChatsScreen> {
   void initState() {
     super.initState();
     if (!kReleaseMode) _markLoaded();
+    // Once the home is drawn: read the search index so the first keystroke is
+    // not the first read.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.api.warmSearch().catchError((Object _) {});
+    });
     HomeLayout.load().then((layout) {
       if (mounted) setState(() => _layout = layout);
     });
@@ -339,9 +344,27 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   /// A section's full list: in the detail pane next to the home (where the
-  /// resources open), a page of its own on a phone. Opened once.
-  void _openAll(HomeSection id, List<Widget> rows) {
-    Widget page(BuildContext _) => _ListPage(title: id.title, children: rows);
+  /// resources open), a page of its own on a phone. Opened once. The rows are
+  /// built when they scroll into view, from [item].
+  void _openAll(HomeSection id, int count, Widget Function(int) item) =>
+      _openPage(
+          id, (_) => _ListPage(title: id.title, count: count, item: item));
+
+  /// The AI chats' full list: pages of chats from the host, the next one
+  /// read when the list is scrolled near its end, so every chat is reachable.
+  /// [first] is what the home already has.
+  void _openAllChats(HomeSection id, List<ChatSummary> first, AppColors c) =>
+      _openPage(
+          id,
+          (_) => _ChatsPage(
+                title: id.title,
+                api: widget.api,
+                first: first,
+                colors: c,
+                row: _chatRow,
+              ));
+
+  void _openPage(HomeSection id, WidgetBuilder page) {
     final shell = _shell;
     if (shell != null && shell.navigatorKey.currentState != null) {
       shell.openPage<void>(ShellPage.listOf(id.name), page);
@@ -591,7 +614,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
           hideEmpty: true,
           rows: (list) => [for (final n in list) _notificationRow(n)],
           onShowAll: (list) =>
-              _openAll(id, [for (final n in list) _notificationRow(n)]),
+              _openAll(id, list.length, (i) => _notificationRow(list[i])),
         );
       case HomeSection.drives:
         return _Section<DriveInfo>(
@@ -602,7 +625,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
           empty: 'No drives yet',
           rows: (list) => [for (final d in list) _driveRow(d)],
           onShowAll: (list) =>
-              _openAll(id, [for (final d in list) _driveRow(d)]),
+              _openAll(id, list.length, (i) => _driveRow(list[i])),
         );
       case HomeSection.recents:
         return _Section<_Recent>(
@@ -612,9 +635,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
           future: _recents,
           empty: 'Nothing opened yet',
           rows: (list) => [for (final r in list) _recentRow(r)],
-          onShowAll: (list) => _openAll(id, [
-            for (final r in list.take(_maxRecents)) _recentRow(r),
-          ]),
+          onShowAll: (list) {
+            final shown = list.take(_maxRecents).toList();
+            _openAll(id, shown.length, (i) => _recentRow(shown[i]));
+          },
         );
       case HomeSection.activity:
         return _Section<ActivityEntry>(
@@ -624,9 +648,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
           future: _activity,
           empty: 'No activity from others yet',
           rows: (list) => [for (final a in list) _activityRow(a)],
-          onShowAll: (list) => _openAll(id, [
-            for (final a in list.take(_maxActivity)) _activityRow(a),
-          ]),
+          onShowAll: (list) {
+            final shown = list.take(_maxActivity).toList();
+            _openAll(id, shown.length, (i) => _activityRow(shown[i]));
+          },
         );
       case HomeSection.chats:
         return _Section<ChatSummary>(
@@ -636,12 +661,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
           future: _chats,
           empty: 'No chats yet',
           rows: (list) => [for (final chat in list) _chatRow(chat)],
-          onShowAll: (list) => _openAll(id, [
-            for (final (label, group) in groupChatsByAge(list)) ...[
-              _Heading(label, c),
-              for (final chat in group) _chatRow(chat),
-            ],
-          ]),
+          onShowAll: (list) => _openAllChats(id, list, c),
         );
       case HomeSection.favorites:
         return _Section<RecentResource>(
@@ -653,7 +673,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
           hideEmpty: true,
           rows: (list) => [for (final r in list) _homeRow(r)],
           onShowAll: (list) =>
-              _openAll(id, [for (final r in list) _homeRow(r)]),
+              _openAll(id, list.length, (i) => _homeRow(list[i])),
         );
       case HomeSection.messages:
         return _Section<ConversationRow>(
@@ -665,7 +685,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
           hideEmpty: true,
           rows: (list) => [for (final r in list) _conversationRow(r)],
           onShowAll: (list) =>
-              _openAll(id, [for (final r in list) _conversationRow(r)]),
+              _openAll(id, list.length, (i) => _conversationRow(list[i])),
         );
     }
   }
@@ -945,12 +965,15 @@ class _HeadingButton extends StatelessWidget {
       );
 }
 
-/// A full-height page listing everything of one section.
+/// A full-height page listing everything of one section: [count] rows, each
+/// built by [item] only when it scrolls into view.
 class _ListPage extends StatelessWidget {
   final String title;
-  final List<Widget> children;
+  final int count;
+  final Widget Function(int index) item;
 
-  const _ListPage({required this.title, required this.children});
+  const _ListPage(
+      {required this.title, required this.count, required this.item});
 
   @override
   Widget build(BuildContext context) {
@@ -959,7 +982,130 @@ class _ListPage extends StatelessWidget {
       backgroundColor: c.bgBody,
       appBar: AppTopBar(title: title),
       body: SafeArea(
-          top: false, bottom: false, child: ListView(children: children)),
+          top: false,
+          bottom: false,
+          child: ListView.builder(
+              itemCount: count, itemBuilder: (_, i) => item(i))),
+    );
+  }
+}
+
+/// How close to the end of the chats (in rows) the next page is read.
+const _chatsPrefetch = 10;
+
+/// The AI chats' full list: [first] (what the home read), then pages from the
+/// host as the list is scrolled within [_chatsPrefetch] rows of its end, under
+/// headings by age. Only the rows in view are built.
+class _ChatsPage extends StatefulWidget {
+  final String title;
+  final AssistantApi api;
+  final List<ChatSummary> first;
+  final AppColors colors;
+  final Widget Function(ChatSummary) row;
+
+  const _ChatsPage({
+    required this.title,
+    required this.api,
+    required this.first,
+    required this.colors,
+    required this.row,
+  });
+
+  @override
+  State<_ChatsPage> createState() => _ChatsPageState();
+}
+
+/// A row of the list: a heading (a String) or a chat.
+typedef _ChatEntry = Object;
+
+class _ChatsPageState extends State<_ChatsPage> {
+  late List<ChatSummary> _chats = widget.first;
+  late List<_ChatEntry> _entries = _entriesOf(_chats);
+
+  /// No more pages: the last one was short, or reading one failed.
+  late bool _done = widget.first.length < AssistantApi.chatsPageSize;
+  bool _loading = false;
+
+  static List<_ChatEntry> _entriesOf(List<ChatSummary> chats) => [
+        for (final (label, group) in groupChatsByAge(chats)) ...[
+          label,
+          ...group
+        ],
+      ];
+
+  Future<void> _loadMore() async {
+    if (_loading || _done) return;
+    _loading = true;
+    try {
+      final page = await widget.api
+          .chatsPage(offset: _chats.length, limit: AssistantApi.chatsPageSize);
+      if (!mounted) return;
+      final known = {for (final c in _chats) c.subject};
+      setState(() {
+        _chats = [
+          ..._chats,
+          for (final c in page)
+            if (known.add(c.subject)) c
+        ];
+        _entries = _entriesOf(_chats);
+        if (page.length < AssistantApi.chatsPageSize) _done = true;
+      });
+    } catch (_) {
+      // Keep what is shown; do not ask again in a loop.
+      if (mounted) setState(() => _done = true);
+    } finally {
+      _loading = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    // A spinner row while more may come.
+    final count = _entries.length + (_done ? 0 : 1);
+    return Scaffold(
+      backgroundColor: c.bgBody,
+      appBar: AppTopBar(title: widget.title),
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: ListView.builder(
+          key: const Key('chats-all-list'),
+          itemCount: count,
+          findChildIndexCallback: (key) {
+            if (key is! ValueKey<String>) return null;
+            final i = _entries.indexWhere((e) => switch (e) {
+                  final ChatSummary chat => 'chat-${chat.subject}' == key.value,
+                  final String label => 'heading-$label' == key.value,
+                  _ => false,
+                });
+            return i < 0 ? null : i;
+          },
+          itemBuilder: (context, i) {
+            if (i >= count - _chatsPrefetch) _loadMore();
+            if (i >= _entries.length) {
+              return const Padding(
+                key: ValueKey('chats-loading'),
+                padding: EdgeInsets.all(16),
+                child: Center(
+                    child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2))),
+              );
+            }
+            return switch (_entries[i]) {
+              final ChatSummary chat => KeyedSubtree(
+                  key: ValueKey('chat-${chat.subject}'),
+                  child: widget.row(chat)),
+              final String label => KeyedSubtree(
+                  key: ValueKey('heading-$label'),
+                  child: _Heading(label, widget.colors)),
+              _ => const SizedBox.shrink(),
+            };
+          },
+        ),
+      ),
     );
   }
 }

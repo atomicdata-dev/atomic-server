@@ -121,9 +121,11 @@ class AtomicClient {
   // ── 4b. Assistant reads (AI chats, search, web view) ─────────────────────
   // The JSON of `atomic_lib::host` is read by `AssistantJson` (atomic_chat).
 
-  /// The person's newest AI chats, across all drives.
-  static Future<List<ChatSummary>> listAiChats({int limit = 50}) async =>
-      AssistantJson.parseChats(await assistant.listAiChats(limit: limit));
+  /// The person's newest AI chats, across all drives. [offset] skips that many newer chats, to page through all of them.
+  static Future<List<ChatSummary>> listAiChats(
+          {int limit = 50, int offset = 0}) async =>
+      AssistantJson.parseChats(
+          await assistant.listAiChats(limit: limit, offset: offset));
 
   /// Remember that this device opened [subject]; local, nothing is synced.
   static void noteResourceOpened(String drive, String subject) =>
@@ -245,11 +247,18 @@ class AtomicClient {
       AssistantJson.parseChatEntries(
           await assistant.readChat(subject: subject));
 
-  /// Searches every drive; only in [drive] when it is given.
+  /// Searches every drive; only in [drive] when it is given. With [classes]
+  /// (`drive`, `aichat`, `conversation`, `chatroom`) only resources of those
+  /// classes, chosen before the [limit] cuts the list.
   static Future<List<SearchHit>> search(String query,
-          {String? drive, int limit = 20}) async =>
-      AssistantJson.parseHits(
-          await assistant.search(drive: drive, query: query, limit: limit));
+          {String? drive,
+          int limit = 20,
+          List<String> classes = const []}) async =>
+      AssistantJson.parseHits(await assistant.search(
+          drive: drive, query: query, limit: limit, classes: classes));
+
+  /// Reads the search index once so the first keystroke is not cold.
+  static Future<void> warmSearch() => assistant.warmSearch();
 
   /// Where the connected server's web app shows [subject]. Throws when no
   /// server is connected.
