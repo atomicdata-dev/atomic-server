@@ -211,3 +211,6 @@ val buildEmbed by tasks.registering(Exec::class) {
 }
 
 tasks.matching { it.name.matches(Regex("merge.*Assets")) }.configureEach { dependsOn(buildEmbed) }
+
+// Lint models read the bundled assets too (the release-like benchmark build runs lint vital).
+tasks.matching { it.name.contains("lint", ignoreCase = true) }.configureEach { dependsOn(buildEmbed) }
