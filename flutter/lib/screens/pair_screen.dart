@@ -2,11 +2,21 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:atomic_chat/atomic_chat.dart' show AppTopBar;
+import 'package:atomic_flutter/atomic_flutter.dart'
+    show
+        SyncActionButton,
+        SyncButtonKind,
+        SyncGap,
+        SyncText,
+        SyncTone,
+        SyncToneColors,
+        syncColors;
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../atomic/atomic_client.dart';
 import '../atomic/session.dart';
+import 'scanner_frame.dart';
 
 /// Node identifier prefixes (canonical + legacy).
 const _atomicPrefix = 'atomic:';
@@ -362,9 +372,9 @@ class _PairScreenState extends State<PairScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
+              constraints: const BoxConstraints(maxWidth: 520),
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
                 child: _buildStep(theme),
@@ -394,26 +404,29 @@ class _PairScreenState extends State<PairScreen> {
         return [];
       case _Step.showQr:
         return [
-          TextButton(
+          SyncActionButton(
+            label: 'Cancel',
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
           ),
         ];
       case _Step.done:
         return [
-          FilledButton(
+          SyncActionButton(
+            label: 'Done',
+            kind: SyncButtonKind.primary,
             onPressed: () => Navigator.pop(context, _syncResult?.imported ?? 0),
-            child: const Text('Done'),
           ),
         ];
       case _Step.error:
         return [
-          TextButton(
+          SyncActionButton(
+            label: 'Cancel',
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
           ),
-          const SizedBox(width: 16),
-          TextButton(
+          const SizedBox(width: SyncGap.m),
+          SyncActionButton(
+            label: 'Retry',
+            kind: SyncButtonKind.primary,
             onPressed: () {
               if (_scannedNodeId != null) {
                 _doSync(_scannedNodeId!, _scannedName ?? '');
@@ -421,13 +434,13 @@ class _PairScreenState extends State<PairScreen> {
                 setState(() => _step = _Step.showQr);
               }
             },
-            child: const Text('Retry'),
           ),
         ];
     }
   }
 
   Widget _buildStep(ThemeData theme) {
+    final c = syncColors(context);
     switch (_step) {
       case _Step.loading:
         return const SizedBox(
@@ -442,12 +455,11 @@ class _PairScreenState extends State<PairScreen> {
           key: const ValueKey('qr'),
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Pair Device', style: theme.textTheme.titleMedium),
+            Text('Pair Device', style: SyncText.header(c)),
             const SizedBox(height: 8),
             Text(
               'Show your QR or scan theirs',
-              style: TextStyle(
-                  fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
+              style: SyncText.caption(c),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
@@ -467,24 +479,26 @@ class _PairScreenState extends State<PairScreen> {
             ),
             const SizedBox(height: 6),
             if (_deviceName.isNotEmpty)
-              Text(_deviceName,
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface)),
+              Text(_deviceName, style: SyncText.bodyStrong(c)),
             const SizedBox(height: 8),
-            // Camera scanner (compact)
-            if (_scanController != null)
-              SizedBox(
-                height: 100,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+            // Camera scanner, at the camera's own shape.
+            if (_scanController != null) ...[
+              const SizedBox(height: SyncGap.m),
+              ValueListenableBuilder<MobileScannerState>(
+                valueListenable: _scanController!,
+                builder: (context, state, _) => ScannerFrame(
+                  cameraSize: state.size,
+                  onTorch: () =>
+                      _scanController?.toggleTorch().catchError((_) {}),
+                  onFlip: () =>
+                      _scanController?.switchCamera().catchError((_) {}),
                   child: MobileScanner(
                     controller: _scanController!,
                     onDetect: _onDetect,
                   ),
                 ),
               ),
+            ],
           ],
         );
 
@@ -502,8 +516,7 @@ class _PairScreenState extends State<PairScreen> {
               const SizedBox(height: 16),
               Text(
                 'Connecting to $label',
-                style: TextStyle(
-                    fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
+                style: SyncText.caption(c),
               ),
             ],
           ),
@@ -517,17 +530,17 @@ class _PairScreenState extends State<PairScreen> {
           key: const ValueKey('done'),
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 48),
+            Icon(Icons.check_circle,
+                color: SyncTone.success.color(c), size: 48),
             const SizedBox(height: 12),
-            Text('Paired with $label', style: theme.textTheme.titleMedium),
+            Text('Paired with $label', style: SyncText.header(c)),
             const SizedBox(height: 8),
             // What happened, both directions. "Synced 0 resources" was true of
             // a workspace sent somewhere that had none, and of two devices
             // already holding the same thing — and read as failure for both.
             Text(
               _syncResult?.describe() ?? 'Nothing to sync',
-              style: TextStyle(
-                  fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
+              style: SyncText.caption(c),
             ),
           ],
         );
@@ -537,19 +550,20 @@ class _PairScreenState extends State<PairScreen> {
           key: const ValueKey('error'),
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            Icon(Icons.error_outline, color: SyncTone.error.color(c), size: 48),
             const SizedBox(height: 12),
-            Text('Connection Failed', style: theme.textTheme.titleMedium),
+            Text('Connection Failed', style: SyncText.header(c)),
             const SizedBox(height: 8),
             SelectableText(
               _error ?? 'Unknown error',
-              style: const TextStyle(fontSize: 12, color: Colors.red),
+              style:
+                  SyncText.caption(c).copyWith(color: SyncTone.error.color(c)),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            TextButton.icon(
-              icon: const Icon(Icons.copy, size: 16),
-              label: const Text('Copy error'),
+            SyncActionButton(
+              icon: Icons.copy,
+              label: 'Copy error',
               onPressed: () {
                 Clipboard.setData(
                     ClipboardData(text: _error ?? 'Unknown error'));
