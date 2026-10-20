@@ -23,7 +23,7 @@ app. Android only. Lives in `android-kotlin/`; `flutter/` is not touched.
 - [x] Toolchain + app builds an APK (SDK, NDK, cargo-ndk, UniFFI); not yet run on a device
 - [ ] Store init, onboarding/login, recovery screen
 - [~] Home (built, JVM screenshots only): Drives, Recents, AI Chats, Favorites, Messages (max 4 + show all), search
-- [ ] Resource view in warm WebView (embed)
+- [~] Resource view in warm WebView (embed): built, bundled by Gradle, JVM-tested; never run on a device/emulator
 - [ ] AI chat
 - [ ] Conversations (DM) and meeting chat
 - [ ] Sync / settings (avatar button), pairing

@@ -15,6 +15,11 @@ val uniffiOut = layout.buildDirectory.dir("generated/uniffi/kotlin")
 // pass -PrustRelease=true for the fat-LTO `release` profile.
 val rustRelease = providers.gradleProperty("rustRelease").map(String::toBoolean).orElse(false)
 val rustAbis = listOf("arm64-v8a", "x86_64")
+// The embedded renderer (browser/data-browser/embed.html), built by scripts/build_embed.sh
+// into build output and bundled as assets/embed. -PskipEmbed=true bundles an empty
+// placeholder instead (JVM unit tests and Rust work need no Node).
+val embedOut = layout.buildDirectory.dir("generated/embed/assets")
+val skipEmbed = providers.gradleProperty("skipEmbed").map(String::toBoolean).orElse(false)
 
 android {
     namespace = "place.atomic.app.kotlin"
@@ -49,6 +54,7 @@ android {
     sourceSets.getByName("main") {
         jniLibs.srcDir(jniLibsOut)
         kotlin.srcDir(uniffiOut)
+        assets.srcDir(embedOut)
     }
 
     testOptions { unitTests { isIncludeAndroidResources = true } }
@@ -149,3 +155,32 @@ val uniffiBindgen by tasks.registering(Exec::class) {
 }
 
 tasks.named("preBuild") { dependsOn(uniffiBindgen) }
+
+// ── The embedded renderer, from the repo's own vite embed config ──────────────
+
+val buildEmbed by tasks.registering(Exec::class) {
+    group = "embed"
+    description = "Builds browser/data-browser's embed.html and bundles it as assets/embed."
+    val browser = rootProject.layout.projectDirectory.dir("../browser")
+    val script = rootProject.layout.projectDirectory.file("scripts/build_embed.sh")
+    val out = embedOut.map { it.dir("embed") }
+    inputs.files(fileTree(browser) {
+        include("data-browser/src/**", "data-browser/*.html", "data-browser/vite*.ts", "data-browser/package.json",
+            "lib/src/**", "react/src/**", "pnpm-lock.yaml")
+        exclude("**/node_modules/**", "**/dist/**", "**/dist-embed/**")
+    })
+    inputs.file(script)
+    inputs.property("skip", skipEmbed)
+    outputs.dir(out)
+    doFirst {
+        if (skipEmbed.get()) {
+            out.get().asFile.apply { deleteRecursively(); mkdirs() }
+            File(out.get().asFile, "embed.html").writeText("<!doctype html><title>embed not built</title>")
+            commandLine("true")
+        } else {
+            commandLine("bash", script.asFile.absolutePath, out.get().asFile.absolutePath)
+        }
+    }
+}
+
+tasks.matching { it.name.matches(Regex("merge.*Assets")) }.configureEach { dependsOn(buildEmbed) }

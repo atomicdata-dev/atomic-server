@@ -23,6 +23,8 @@ data class RowItem(
     val className: String = "",
     val emoji: String? = null,
     val trailing: String = "",
+    /** The drive the resource belongs to ("" when unknown); a drive row names itself. */
+    val drive: String = "",
 )
 
 /** Rows of a section that hold at most this many on the Home. */
@@ -38,6 +40,7 @@ fun DriveRow.toItem() = RowItem(
     title = name.ifEmpty { "Untitled drive" },
     className = "drive",
     emoji = emoji,
+    drive = subject,
 )
 
 /** `<drive> · <class> · <when>`, as the Flutter home writes it. */
@@ -45,9 +48,9 @@ fun ResourceRow.toItem(section: Section, driveNames: Map<String, String> = empty
     val title = title.ifEmpty { subject }
     return when (section) {
         Section.Chats -> RowItem(subject, title.ifEmpty { "Untitled chat" }, className = "aichat",
-            emoji = emoji, trailing = if (openedAt > 0) timeAgo(openedAt, now) else "")
+            emoji = emoji, trailing = if (openedAt > 0) timeAgo(openedAt, now) else "", drive = drive)
         Section.Messages -> RowItem(subject, title, detail = preview(detail), className = "conversation",
-            emoji = emoji, trailing = if (openedAt > 0) timeAgo(openedAt, now) else "")
+            emoji = emoji, trailing = if (openedAt > 0) timeAgo(openedAt, now) else "", drive = drive)
         else -> RowItem(
             subject, title,
             detail = listOfNotNull(
@@ -55,7 +58,7 @@ fun ResourceRow.toItem(section: Section, driveNames: Map<String, String> = empty
                 classLabel(className).ifEmpty { null },
                 if (openedAt > 0) timeAgo(openedAt, now) else null,
             ).joinToString(" · "),
-            className = className, emoji = emoji,
+            className = className, emoji = emoji, drive = drive,
         )
     }
 }
@@ -66,4 +69,5 @@ fun SearchHit.toItem(driveNames: Map<String, String> = emptyMap()) = RowItem(
     detail = listOfNotNull(driveNames[drive], classLabel(className).ifEmpty { null }).joinToString(" · "),
     className = className,
     emoji = emoji,
+    drive = drive,
 )
