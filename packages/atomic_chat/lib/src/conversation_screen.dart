@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColors, AppColorsExt;
+    show AppColors, AppColorsExt, Perf;
 import 'package:flutter/material.dart';
 import 'app_top_bar.dart';
 import 'chat_window.dart';
@@ -53,6 +53,7 @@ class _ConversationScreenState extends State<ConversationScreen>
     readAfter: (after, limit) => widget.api
         .conversationMessagesAfter(widget.subject, after, limit: limit),
     idOf: (m) => m.id,
+    onOlderPage: (ms, n) => Perf.span('chat older page $n', ms),
   );
   late final _scroll = ChatScrollKeeper(_window);
   bool _hadText = false;

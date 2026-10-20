@@ -5,7 +5,8 @@
 # results: planning/flutter-performance.md.
 #
 #   scripts/perf_android.sh [-s SERIAL] [-a APK] [-n RUNS] [-o OUT.md] [--seed N]
-#                           [--seed-chats N [--chat-scale S]] [--only LIST]
+#                           [--seed-chats N [--chat-scale S]] [--seed-long N]
+#                           [--only LIST]
 #
 #   -s SERIAL  adb device (default emulator-5554). Never point this at a phone
 #              whose data you care about: it force-stops the app, taps through
@@ -27,17 +28,21 @@
 #              200-4000 chars times --chat-scale, default 1.0) through the
 #              same hook: the stress data of lib/tests/stress_chats.rs. 1000
 #              chats at scale 1.0 is a ~700 MB store; check `df /data` first.
+#   --seed-long N  first make one AI chat of N short messages ("Very long
+#              chat", ~120 chars each; 50 000 is a ~70 MB store) for longchat.
 #   --only L   comma list of steps: cold,warm,scroll,open,search,chat,memory,size,
 #              allchats (All AI chats: painted, page loads, scroll jank),
 #              typing (search per keystroke, cold first one, AI chats chip),
-#              bigchat (open two seeded chats, scroll them)
+#              bigchat (open two seeded chats, scroll them),
+#              longchat (open "Very long chat", fling up through its history,
+#              jump to latest, send with FAKE_AI=1; not in the default list)
 #
 # Reads the app's `[perf]`, `[warm]` and `[chat]` lines in logcat (profile and
 # debug builds print them; see packages/atomic_flutter/lib/src/perf.dart).
 # The app must be signed in (Home showing) before running.
 set -euo pipefail
 
-SERIAL=emulator-5554 APK= RUNS=5 OUT= SEED=0 SEED_CHATS=0 CHAT_SCALE=1.0
+SERIAL=emulator-5554 APK= RUNS=5 OUT= SEED=0 SEED_CHATS=0 CHAT_SCALE=1.0 SEED_LONG=0
 ONLY=cold,warm,scroll,open,search,chat,memory,size,allchats,typing,bigchat
 while [ $# -gt 0 ]; do
   case $1 in
@@ -48,6 +53,7 @@ while [ $# -gt 0 ]; do
     --seed) SEED=$2; shift 2;;
     --seed-chats) SEED_CHATS=$2; shift 2;;
     --chat-scale) CHAT_SCALE=$2; shift 2;;
+    --seed-long) SEED_LONG=$2; shift 2;;
     --only) ONLY=$2; shift 2;;
     -h|--help) sed -n 2,35p "$0"; exit 0;;
     *) echo "unknown argument $1" >&2; exit 2;;
@@ -260,6 +266,18 @@ if [ "$SEED_CHATS" -gt 0 ]; then
   sleep 3
 fi
 
+if [ "$SEED_LONG" -gt 0 ]; then
+  note "seeding one AI chat of $SEED_LONG messages"
+  a shell mkdir -p /sdcard/Android/data/$PKG/files
+  a shell "echo $SEED_LONG > /sdcard/Android/data/$PKG/files/perf_seed_long"
+  start_cold
+  wait_log '\[perf\] perf seed long' 1800 || true
+  log | grep -E '\[perf\] seeded long' | while read -r l; do note "$l"; done
+  put "seed: long chat of $SEED_LONG (ms)" "$(last_ms '\[perf\] perf seed long')"
+  put "seed: store after the long chat (MB)" "$(log | sed -nE 's/.*\[perf\] seeded long.* store ([0-9]+) MB.*/\1/p' | tail -1)"
+  sleep 3
+fi
+
 # ── Cold start ────────────────────────────────────────────────────────────
 marks=("main" "rust init" "documents dir" "db open" "runApp" "first frame" "session loaded" "session restored" "home data" "home painted" "warm ready")
 if step cold || step memory; then
@@ -466,6 +484,60 @@ if step bigchat; then
     [ "$i" = 1 ] && mem_stage "after opening chats"
     back; sleep 1
   done
+fi
+
+# ── One very long chat: open, fling up through history, jump back ───────
+if step longchat; then
+  start_cold; home_ready || true
+  mem_stage "after start (long chat)"
+  for i in $(seq "$RUNS"); do
+    go_home
+    at=$(find_scrolling "Very long chat" contains) || { note "no Very long chat"; break; }
+    a logcat -c
+    a shell input tap $at
+    wait_log '\[perf\] chat painted' 15 || { back; continue; }
+    n=$(log | grep -Eo 'chat painted [0-9]+' | tail -1 | awk '{print $3}')
+    put "long chat: open, data (ms; $n messages in the window)" "$(last_ms '\[perf\] chat data')"
+    put "long chat: open, painted (ms)" "$(last_ms '\[perf\] chat painted')"
+    sleep 1
+    # Fast flings up through the history (finger down): every few pages
+    # an older page is read.
+    a logcat -c
+    for _ in $(seq 30); do a shell input swipe 540 500 540 2000 80; sleep 0.15; done
+    sleep 1
+    wait_log '\[perf\] frames' 10 || true
+    put_frames "long chat fling up"
+    v=$(log | grep -E '\[perf\] chat older page' | sed -E 's/.* ([0-9]+) ms.*/\1/' | sort -n)
+    if [ -n "$v" ]; then
+      put "long chat: older pages read while flinging" "$(wc -l <<<"$v" | tr -d ' ')"
+      put "long chat: older page read, median (ms)" "$(awk '{a[NR]=$1} END {print a[int((NR+1)/2)]}' <<<"$v")"
+      put "long chat: older page read, slowest (ms)" "$(tail -1 <<<"$v")"
+      put "long chat: messages held after flinging" "$(log | grep -Eo 'chat older page [0-9]+' | tail -1 | awk '{print $4}')"
+    fi
+    [ "$i" = 1 ] && mem_stage "after flinging up a long chat"
+    if at=$(find_text "Jump to latest"); then
+      a logcat -c
+      a shell input tap $at; sleep 1.5
+      put_frames "long chat jump to latest" || true
+    else
+      note "no Jump to latest button"
+    fi
+    # Send (FAKE_AI=1): the reply streams in at the bottom.
+    send=$(find_text Send || true)
+    if [ -n "$send" ]; then
+      a shell input tap $(( ${send% *} - 450 )) ${send#* }; sleep 0.5
+      a shell input text "long%schat%s$i"
+      a logcat -c
+      a shell input tap $send
+      if wait_log '\[chat\] .*stream done' 30; then
+        sleep 2
+        put "long chat (fake AI): send to first token (ms)" "$(log | grep -E '\[chat\] \+[0-9]+ms first event' | tail -1 | sed -E 's/.*\+([0-9]+)ms.*/\1/')"
+        put_frames "long chat streaming reply"
+      fi
+    fi
+    back; sleep 0.5; back; sleep 1
+  done
+  mem_stage "after the long chat"
 fi
 
 # ── AI chat (FAKE_AI=1 builds) ────────────────────────────────────────────

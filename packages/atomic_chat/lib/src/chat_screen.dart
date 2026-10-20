@@ -110,6 +110,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // Only this screen writes the chat while it is open: nothing to poll.
     readAfter: null,
     idOf: (m) => m.id,
+    onOlderPage: (ms, n) => Perf.span('chat older page $n', ms),
   );
   late final _keeper = ChatScrollKeeper(_window);
   bool _far = false;

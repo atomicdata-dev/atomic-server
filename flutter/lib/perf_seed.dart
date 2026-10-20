@@ -24,6 +24,51 @@ Future<void> perfSeedIfAsked() async {
   if (kReleaseMode || kIsWeb || !Platform.isAndroid) return;
   await _seedDocuments();
   await _seedChats();
+  await _seedLongChat();
+}
+
+/// One AI chat of N short messages (`perf_seed_long` with `N`): a chat as
+/// long as a busy channel, for scrolling through history
+/// (`perf_android.sh --seed-long N`). About 120 characters a message (one in
+/// twenty a few paragraphs), the newest a minute ago, so the chat is first
+/// on Home. Logs `[perf] perf seed long N`.
+Future<void> _seedLongChat() async {
+  final int count;
+  try {
+    final dir = await getExternalStorageDirectory();
+    if (dir == null) return;
+    final flag = File('${dir.path}/perf_seed_long');
+    if (!flag.existsSync()) return;
+    count = int.tryParse(flag.readAsStringSync().trim()) ?? 50000;
+    flag.deleteSync();
+  } catch (_) {
+    return;
+  }
+  final corpus = _Corpus();
+  final rng = _Rng(7);
+  final watch = Stopwatch()..start();
+  final last = DateTime.now().millisecondsSinceEpoch - 60000;
+  var bytes = 0;
+  final entries = <Map<String, Object>>[];
+  for (var m = 0; m < count; m++) {
+    final len = rng.below(20) == 0 ? rng.range(300, 1000) : rng.range(20, 160);
+    final text = corpus.message(rng, len);
+    bytes += text.length;
+    entries.add({
+      'role': m.isEven ? 'user' : 'assistant',
+      'parts': [
+        {'type': 'text', 'text': text}
+      ],
+      'c': last - (count - 1 - m) * 20000,
+    });
+  }
+  await AtomicClient.importAiChat('Very long chat', jsonEncode(entries));
+  final docs = await getApplicationDocumentsDirectory();
+  final store = File('${docs.path}/atomic.redb');
+  final mb = store.existsSync() ? store.lengthSync() / 1e6 : 0;
+  debugPrint('[perf] seeded long chat: $count messages, '
+      '${(bytes / 1e6).toStringAsFixed(1)} MB text, store ${mb.toStringAsFixed(0)} MB');
+  Perf.span('perf seed long $count', watch.elapsedMilliseconds);
 }
 
 Future<void> _seedDocuments() async {

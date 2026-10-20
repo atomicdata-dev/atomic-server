@@ -77,12 +77,17 @@ class ChatWindow<T> extends ChangeNotifier {
   final int pageSize;
   final int maxItems;
 
+  /// Told how long each older page took to read (ms) and how many items
+  /// the window then holds: for the `chat older page` performance mark.
+  final void Function(int ms, int items)? onOlderPage;
+
   ChatWindow({
     required this.readPage,
     required this.readAfter,
     required this.idOf,
     this.pageSize = 50,
     this.maxItems = 500,
+    this.onOlderPage,
   });
 
   final List<_Chunk<T>> _chunks = [];
@@ -178,6 +183,7 @@ class ChatWindow<T> extends ChangeNotifier {
     if (_loadingOlder || !hasOlder) return;
     _loadingOlder = true;
     _changed();
+    final watch = Stopwatch()..start();
     try {
       final first = _chunks.first;
       final page = await readPage(first.older, pageSize);
@@ -189,6 +195,8 @@ class ChatWindow<T> extends ChangeNotifier {
               for (final i in page.items)
                 if (!known.contains(idOf(i))) i
             ], page.older, page.newest));
+        _items = null;
+        onOlderPage?.call(watch.elapsedMilliseconds, items.length);
       }
     } catch (_) {
       // Tried again on the next scroll.
