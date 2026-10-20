@@ -555,4 +555,132 @@ void main() {
       await _done(tester);
     });
   });
+
+  group('section buttons', () {
+    for (final (name, size) in [
+      ('portrait', _portrait),
+      ('landscape', _landscape),
+    ]) {
+      testWidgets('$name: All lists the section in the detail pane',
+          (tester) async {
+        _size(tester, size);
+        await tester.pumpWidget(_shell(_api()));
+        await _settle(tester);
+        await tester.tap(find.byKey(const ValueKey('section-all-recents')));
+        await _settle(tester);
+        final list = tester.getRect(find.byType(ChatsScreen));
+        // A page in the detail pane, titled, next to the home.
+        final title = find.descendant(
+            of: find.byType(AppTopBar), matching: find.text('Recents'));
+        expect(title, findsOneWidget);
+        expect(tester.getRect(title).left, greaterThan(list.right));
+        expect(_controller(tester).topKind, ShellPage.listOf('recents'));
+        // A row of it opens over it; back returns to the list.
+        await tester.tap(find.text('Notes').last);
+        await _settle(tester);
+        expect(find.byType(ResourceView), findsOneWidget);
+        await tester.binding.handlePopRoute();
+        await _settle(tester);
+        expect(title, findsOneWidget);
+        await tester.binding.handlePopRoute();
+        await _settle(tester);
+        expect(find.byKey(const Key('nothing-open')), findsOneWidget);
+        await _done(tester);
+      });
+    }
+
+    testWidgets('a phone: All is a page of its own with a back button',
+        (tester) async {
+      _size(tester, _phone);
+      await tester.pumpWidget(_shell(_api()));
+      await _settle(tester);
+      await tester.tap(find.byKey(const ValueKey('section-all-recents')));
+      await _settle(tester);
+      expect(
+          find.descendant(
+              of: find.byType(AppTopBar), matching: find.text('Recents')),
+          findsOneWidget);
+      expect(find.byType(BackButton), findsOneWidget);
+      await _done(tester);
+    });
+
+    testWidgets('Search on AI chats searches chats; on Drives drives',
+        (tester) async {
+      _size(tester, _landscape);
+      await tester.pumpWidget(_shell(_api()));
+      await _settle(tester);
+      await tester.tap(find.byKey(const ValueKey('section-search-drives')));
+      await _settle(tester);
+      expect(find.byType(SearchScreen), findsOneWidget);
+      expect(find.byKey(const Key('search-kind')), findsOneWidget);
+      expect(_controller(tester).search.kind, SearchKind.drives);
+      // The kind chip lets go of the kind.
+      await tester.tap(find.byTooltip('Search everything'));
+      await _settle(tester);
+      expect(find.byKey(const Key('search-kind')), findsNothing);
+      await _done(tester);
+    });
+
+    testWidgets('+ on Recents lists the kinds; on AI chats a new chat',
+        (tester) async {
+      _size(tester, _portrait);
+      await tester.pumpWidget(_shell(_api()));
+      await _settle(tester);
+      await tester.tap(find.byKey(const ValueKey('section-new-recents')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 120));
+      expect(find.text('Document'), findsOneWidget);
+      await tester.tapAt(const Offset(5, 5));
+      await _settle(tester);
+      expect(find.byKey(const ValueKey('section-new-activity')), findsNothing);
+      expect(find.byKey(const ValueKey('section-new-notifications')),
+          findsNothing);
+      await _done(tester);
+    });
+
+    for (final (name, size) in [
+      ('a phone', _phone),
+      ('a narrow phone at font 1.3', const Size(360, 740)),
+      ('a tablet list pane at font 1.3', _portrait),
+    ]) {
+      testWidgets('headings fit: $name', (tester) async {
+        _size(tester, size);
+        if (name.contains('1.3')) {
+          tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        }
+        await tester.pumpWidget(_shell(_api()));
+        await _settle(tester);
+        expect(tester.takeException(), isNull);
+        final heading = find.byKey(const ValueKey('section-heading-recents'));
+        final all = find.byKey(const ValueKey('section-all-recents'));
+        expect(
+            tester.getRect(heading).right,
+            lessThanOrEqualTo(tester
+                .getRect(find.byKey(const ValueKey('section-search-recents')))
+                .left));
+        expect(tester.getSize(all), const Size(48, 48));
+        await _done(tester);
+      });
+    }
+
+    testWidgets('a press on a heading washes the title, not the row',
+        (tester) async {
+      _size(tester, _phone);
+      await tester.pumpWidget(_shell(_api()));
+      await _settle(tester);
+      final heading = find.byKey(const ValueKey('section-heading-recents'));
+      final ink = find.descendant(of: heading, matching: find.byType(InkWell));
+      expect(tester.getSize(ink).width, lessThan(_phone.width / 2));
+      expect(tester.widget<InkWell>(ink).borderRadius, isNotNull);
+      // A tap still folds it.
+      await tester.tap(heading);
+      await _settle(tester);
+      expect(find.text('Plans'), findsNothing);
+      await tester.tap(heading);
+      await _settle(tester);
+      expect(find.text('Plans'), findsOneWidget);
+      await _done(tester);
+    });
+  });
 }

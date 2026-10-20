@@ -2,8 +2,10 @@ import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt, HoldFan, HoldFanItem, HoldFanLayout, Perf;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'app_bottom_bar.dart';
 import 'app_top_bar.dart';
 import 'home_sections.dart';
+import 'search_screen.dart';
 
 import 'models.dart';
 import 'slide_back_route.dart';
@@ -14,7 +16,7 @@ import 'resource_row.dart';
 import 'resource_view.dart';
 import 'native_views.dart';
 
-/// Items per section on the home; the rest is behind "Show all".
+/// Items per section on the home; the rest is behind the All button.
 const _homeItems = 4;
 
 /// Most items the merged recents list holds.
@@ -32,12 +34,16 @@ class _SectionAction {
   const _SectionAction(this.op, this.section);
 }
 
-/// How a section folds and what its heading's hold menu offers.
+/// How a section folds, what its heading's hold menu offers, and the
+/// buttons at its right (search, new; All comes from the section itself).
 typedef _Fold = ({
   bool collapsed,
   VoidCallback onToggle,
   List<HoldFanItem<_SectionAction>> menu,
   ValueChanged<_SectionAction> onMenu,
+  HomeSection section,
+  VoidCallback? onSearch,
+  Widget? plus,
 });
 
 typedef _Recent = ({String drive, RecentResource resource});
@@ -49,9 +55,12 @@ String activityVerb(String kind) => switch (kind) {
     };
 
 /// Home screen: one scrollable page of small sections (Drives, Recents, Activity,
-/// AI Chats), each with its newest few items and a "Show all" for the rest. A
-/// section is one [_Section]; adding another is one more entry in the list.
-/// Every section shows as soon as its own data arrives.
+/// AI Chats), each with its newest few items. A section's heading folds it on
+/// a tap and arranges the sections on a hold; at its right are small buttons
+/// to search that kind of thing, make a new one, and list all of them (in the
+/// detail pane on a tablet, a page of its own on a phone). A section is one
+/// [_Section]; adding another is one more entry in the list. Every section
+/// shows as soon as its own data arrives.
 class ChatsScreen extends StatefulWidget {
   final AssistantApi api;
 
@@ -128,7 +137,12 @@ class _ChatsScreenState extends State<ChatsScreen> {
     Perf.once('home start');
     Future.wait<Object?>([
       for (final f in <Future<Object?>>[
-        _drives, _chats, _recents, _favorites, _conversations, _activity,
+        _drives,
+        _chats,
+        _recents,
+        _favorites,
+        _conversations,
+        _activity,
         _notifications,
       ])
         f.then((_) => null, onError: (Object _) => null),
@@ -295,7 +309,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     WidgetsBinding.instance.scheduleFrame();
   }
 
-  /// Whether `screen` can have changed what the home lists: a "Show all" list
+  /// Whether `screen` can have changed what the home lists: a section's list
   /// and a settings page only show things (what is opened from a list
   /// reloads by itself when it is closed).
   static bool _changesData(Widget screen) =>
@@ -309,6 +323,76 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   WidgetBuilder? get _profile => widget.profile ?? _shell?.profile;
+
+  ShellActions? get _actions =>
+      _shell == null ? null : ShellActions(widget.api, _shell!);
+
+  /// A section's search: for its kind of resource where search knows it.
+  void _search(SearchKind kind) {
+    final actions = _actions;
+    if (actions != null) {
+      actions.search(of: kind);
+      return;
+    }
+    Navigator.of(context)
+        .push(SearchScreen.route(drive: _drive, api: widget.api, kind: kind));
+  }
+
+  /// A section's full list: in the detail pane next to the home (where the
+  /// resources open), a page of its own on a phone. Opened once.
+  void _openAll(HomeSection id, List<Widget> rows) {
+    Widget page(BuildContext _) => _ListPage(title: id.title, children: rows);
+    final shell = _shell;
+    if (shell != null && shell.navigatorKey.currentState != null) {
+      shell.openPage<void>(ShellPage.listOf(id.name), page);
+      return;
+    }
+    Navigator.of(context).push(SlideBackRoute<void>(builder: page));
+  }
+
+  /// A section's "new": what it lists, made fresh. Null where that makes no
+  /// sense (activity, notifications, favorites) or there is no shell.
+  Widget? _plusFor(HomeSection id) {
+    final actions = _actions;
+    if (actions == null) return null;
+    Widget button(String tooltip, VoidCallback onPressed) => _HeadingButton(
+        key: ValueKey('section-new-${id.name}'),
+        tooltip: tooltip,
+        icon: Icons.add,
+        onPressed: onPressed);
+    return switch (id) {
+      HomeSection.drives => button('New drive', actions.newDrive),
+      HomeSection.chats => button('New AI chat', actions.newChat),
+      HomeSection.messages => button('New chat room', actions.newConversation),
+      // Anything: the same list as the bar's New.
+      HomeSection.recents => HoldFan<NewChoice>(
+          key: ValueKey('section-new-${id.name}'),
+          tooltip: 'Make something new',
+          tapOpensMenu: true,
+          holdDuration: newHold,
+          items: newItems,
+          onSelected: (choice) => actions.newOf(context, choice),
+          child:
+              Icon(Icons.add, size: 24, color: context.appColors.textSecondary),
+        ),
+      HomeSection.activity ||
+      HomeSection.notifications ||
+      HomeSection.favorites =>
+        null,
+    };
+  }
+
+  /// What a section's Search looks for; null: no search button.
+  static SearchKind? _searchKind(HomeSection id) => switch (id) {
+        HomeSection.drives => SearchKind.drives,
+        HomeSection.chats => SearchKind.chats,
+        HomeSection.messages => SearchKind.messages,
+        HomeSection.recents ||
+        HomeSection.activity ||
+        HomeSection.favorites =>
+          SearchKind.any,
+        HomeSection.notifications => null,
+      };
 
   Future<void> _settings() async {
     final profile = _profile;
@@ -486,11 +570,15 @@ class _ChatsScreenState extends State<ChatsScreen> {
   /// One section of the home, with the layout's fold state and hold menu.
   Widget _sectionFor(HomeSection id, AppColors c) {
     final key = ValueKey(id);
+    final kind = _searchKind(id);
     final fold = (
       collapsed: _layout.collapsed.contains(id),
       onToggle: () => _setLayout(_layout.toggleCollapsed(id)),
       menu: _menuFor(id),
       onMenu: _applyAction,
+      section: id,
+      onSearch: kind == null ? null : () => _search(kind),
+      plus: _plusFor(id),
     );
     switch (id) {
       case HomeSection.notifications:
@@ -502,9 +590,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
           empty: 'No notifications',
           hideEmpty: true,
           rows: (list) => [for (final n in list) _notificationRow(n)],
-          onShowAll: (list) => _push(_ListPage(
-              title: id.title,
-              children: [for (final n in list) _notificationRow(n)])),
+          onShowAll: (list) =>
+              _openAll(id, [for (final n in list) _notificationRow(n)]),
         );
       case HomeSection.drives:
         return _Section<DriveInfo>(
@@ -514,8 +601,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
           future: _drives,
           empty: 'No drives yet',
           rows: (list) => [for (final d in list) _driveRow(d)],
-          onShowAll: (list) => _push(_ListPage(
-              title: id.title, children: [for (final d in list) _driveRow(d)])),
+          onShowAll: (list) =>
+              _openAll(id, [for (final d in list) _driveRow(d)]),
         );
       case HomeSection.recents:
         return _Section<_Recent>(
@@ -525,9 +612,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
           future: _recents,
           empty: 'Nothing opened yet',
           rows: (list) => [for (final r in list) _recentRow(r)],
-          onShowAll: (list) => _push(_ListPage(title: id.title, children: [
+          onShowAll: (list) => _openAll(id, [
             for (final r in list.take(_maxRecents)) _recentRow(r),
-          ])),
+          ]),
         );
       case HomeSection.activity:
         return _Section<ActivityEntry>(
@@ -537,9 +624,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
           future: _activity,
           empty: 'No activity from others yet',
           rows: (list) => [for (final a in list) _activityRow(a)],
-          onShowAll: (list) => _push(_ListPage(title: id.title, children: [
+          onShowAll: (list) => _openAll(id, [
             for (final a in list.take(_maxActivity)) _activityRow(a),
-          ])),
+          ]),
         );
       case HomeSection.chats:
         return _Section<ChatSummary>(
@@ -549,12 +636,12 @@ class _ChatsScreenState extends State<ChatsScreen> {
           future: _chats,
           empty: 'No chats yet',
           rows: (list) => [for (final chat in list) _chatRow(chat)],
-          onShowAll: (list) => _push(_ListPage(title: id.title, children: [
+          onShowAll: (list) => _openAll(id, [
             for (final (label, group) in groupChatsByAge(list)) ...[
               _Heading(label, c),
               for (final chat in group) _chatRow(chat),
             ],
-          ])),
+          ]),
         );
       case HomeSection.favorites:
         return _Section<RecentResource>(
@@ -565,8 +652,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
           empty: 'No favorites yet',
           hideEmpty: true,
           rows: (list) => [for (final r in list) _homeRow(r)],
-          onShowAll: (list) => _push(_ListPage(
-              title: id.title, children: [for (final r in list) _homeRow(r)])),
+          onShowAll: (list) =>
+              _openAll(id, [for (final r in list) _homeRow(r)]),
         );
       case HomeSection.messages:
         return _Section<ConversationRow>(
@@ -577,9 +664,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
           empty: 'No messages yet',
           hideEmpty: true,
           rows: (list) => [for (final r in list) _conversationRow(r)],
-          onShowAll: (list) => _push(_ListPage(
-              title: id.title,
-              children: [for (final r in list) _conversationRow(r)])),
+          onShowAll: (list) =>
+              _openAll(id, [for (final r in list) _conversationRow(r)]),
         );
     }
   }
@@ -640,8 +726,8 @@ ResourceRow _resourceRow(RecentResource r,
       onTap: () => onOpen(drive, r),
     );
 
-/// One home section: a header with "Show all" (only when there are more than
-/// [_homeItems]), the first few rows, and the loading, error or empty state
+/// One home section: a heading with its buttons (search, new, all), the
+/// first [_homeItems] rows, and the loading, error or empty state
 /// while there is nothing to list.
 ///
 /// Stale while revalidating: when [future] is replaced, the rows of the
@@ -666,10 +752,6 @@ class _Section<T> extends StatefulWidget {
   /// it is still being read, and when the data cannot be read.
   final bool hideEmpty;
 
-  /// Most rows "Show all" lists in place (the split layout, where the home
-  /// is the list pane and a page of its own would go to the detail pane).
-  final int maxRows;
-
   const _Section({
     super.key,
     required this.title,
@@ -679,7 +761,6 @@ class _Section<T> extends StatefulWidget {
     required this.rows,
     required this.onShowAll,
     this.hideEmpty = false,
-    this.maxRows = 100,
   });
 
   @override
@@ -693,9 +774,6 @@ class _SectionState<T> extends State<_Section<T>>
   @override
   bool get wantKeepAlive => true;
   Object? _error;
-
-  /// Every row is listed in place (split layout).
-  bool _all = false;
 
   @override
   void initState() {
@@ -723,14 +801,16 @@ class _SectionState<T> extends State<_Section<T>>
     });
   }
 
-  /// The heading: a tap folds the section, a hold opens the menu to move or
-  /// hide sections.
+  /// The heading's title: a tap folds the section, a hold opens the menu to
+  /// move or hide sections. Pressed, a faint rounded wash hugs the title and
+  /// its chevron (not the row), and the chevron turns instead of changing.
   Widget _foldHeading(BuildContext context) {
     final c = context.appColors;
     final fold = widget.fold;
     return HoldFan<_SectionAction>(
-      width: double.infinity,
+      key: ValueKey('section-heading-${fold.section.name}'),
       size: 40,
+      borderRadius: BorderRadius.circular(8),
       tooltip: widget.title,
       menuLabel: 'Arrange sections',
       layout: HoldFanLayout.list,
@@ -739,21 +819,58 @@ class _SectionState<T> extends State<_Section<T>>
       items: fold.menu,
       onSelected: fold.onMenu,
       child: Padding(
-        padding: const EdgeInsets.only(left: 16, top: 8),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Text(widget.title,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Flexible(
+            child: Text(widget.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                     color: c.textSecondary,
                     fontSize: 13,
                     fontWeight: FontWeight.w600)),
-            const SizedBox(width: 4),
-            Icon(fold.collapsed ? Icons.chevron_right : Icons.expand_more,
-                size: 18, color: c.textSecondary),
-          ]),
-        ),
+          ),
+          const SizedBox(width: 2),
+          AnimatedRotation(
+            turns: fold.collapsed ? -0.25 : 0,
+            duration: const Duration(milliseconds: 150),
+            child: Icon(Icons.expand_more, size: 18, color: c.textSecondary),
+          ),
+        ]),
       ),
+    );
+  }
+
+  /// The heading row: the title at the left, the section's buttons at the
+  /// right (only those that make sense for it).
+  Widget _headingRow(BuildContext context, List<T>? list) {
+    final fold = widget.fold;
+    final name = fold.section.name;
+    final onSearch = fold.onSearch;
+    final plus = fold.plus;
+    return SizedBox(
+      height: 48,
+      child: Row(children: [
+        const SizedBox(width: 8),
+        Flexible(child: _foldHeading(context)),
+        const Spacer(),
+        if (onSearch != null)
+          _HeadingButton(
+            key: ValueKey('section-search-$name'),
+            tooltip: 'Search ${widget.title}',
+            icon: Icons.search,
+            onPressed: onSearch,
+          ),
+        if (plus != null) plus,
+        if (list != null && list.isNotEmpty)
+          _HeadingButton(
+            key: ValueKey('section-all-$name'),
+            tooltip: 'All ${widget.title}',
+            icon: Icons.format_list_bulleted,
+            onPressed: () => widget.onShowAll(list),
+          ),
+        const SizedBox(width: 4),
+      ]),
     );
   }
 
@@ -769,33 +886,10 @@ class _SectionState<T> extends State<_Section<T>>
     if (widget.hideEmpty && (error != null || (list?.isEmpty ?? true))) {
       return const SizedBox.shrink();
     }
-    final more = list != null && list.length > _homeItems;
-    // In the list pane next to the detail pane, "Show all" lists the rest in
-    // place: a page of its own would cover what is opened.
-    final inPlace = ShellScope.layoutOf(context) == ShellLayout.split;
-    final all = inPlace && _all;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [
-          Expanded(child: _foldHeading(context)),
-          // Same size, weight and padding as the heading, so the two sit on
-          // one baseline.
-          if (more && !widget.fold.collapsed)
-            InkWell(
-              onTap: inPlace
-                  ? () => setState(() => _all = !_all)
-                  : () => widget.onShowAll(list),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                child: Text(all ? 'Show less' : 'Show all',
-                    style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600)),
-              ),
-            ),
-        ]),
+        _headingRow(context, list),
         if (widget.fold.collapsed)
           const SizedBox.shrink()
         else if (error != null)
@@ -811,10 +905,38 @@ class _SectionState<T> extends State<_Section<T>>
         else if (list.isEmpty)
           _Empty(widget.empty, c)
         else
-          ...widget.rows(list.take(all ? widget.maxRows : _homeItems).toList()),
+          ...widget.rows(list.take(_homeItems).toList()),
       ],
     );
   }
+}
+
+/// A small icon button at the right of a section's heading: a 24 dp icon in
+/// a 48 dp target, in the heading's quiet colour.
+class _HeadingButton extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  const _HeadingButton({
+    super.key,
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+        tooltip: tooltip,
+        onPressed: onPressed,
+        color: context.appColors.textSecondary,
+        style: IconButton.styleFrom(
+          minimumSize: const Size(48, 48),
+          fixedSize: const Size(48, 48),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        icon: Icon(icon, size: 24),
+      );
 }
 
 /// A full-height page listing everything of one section.
