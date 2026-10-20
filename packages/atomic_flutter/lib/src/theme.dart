@@ -37,7 +37,7 @@ class AppColors extends ThemeExtension<AppColors> {
   /// Secondary / label text.
   final Color textSecondary;
 
-  /// Fan overlay dim.
+  /// Overlay dim behind a hold list or menu.
   final Color overlayDim;
 
   /// Hover shadow on buttons.

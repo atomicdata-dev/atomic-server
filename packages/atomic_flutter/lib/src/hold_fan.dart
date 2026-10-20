@@ -7,26 +7,24 @@ import 'package:flutter/services.dart';
 
 import 'theme.dart';
 
-/// One choice of a [HoldFan]: a short text pill, optionally led by an emoji.
+/// One choice of a [HoldFan]: a short label, optionally led by an emoji (or,
+/// in the menu card of [HoldFan.tapOpensMenu], by an [icon]).
 @immutable
 class HoldFanItem<T> {
   final String label;
   final String? emoji;
+  final IconData? icon;
   final T value;
 
-  const HoldFanItem(this.label, this.value, {this.emoji});
+  const HoldFanItem(this.label, this.value, {this.emoji, this.icon});
 
   String get text => emoji == null ? label : '$emoji $label';
 }
 
-/// How a [HoldFan] arranges its choices.
+/// How a [HoldFan] arranges its choices. Always one straight column.
 enum HoldFanLayout {
-  /// Curving away from the button along the arc a thumb sweeps: for a few
-  /// kinds of "new" and for drawing tools.
-  fan,
-
   /// Stacked straight above (or, with no room above, below) the button: for
-  /// choices taken from a list (drives, recent resources, chats).
+  /// choices taken from a list (drives, recent resources, chats, new).
   list,
 
   /// Stacked to the right of the button, the first level with it, going
@@ -36,20 +34,22 @@ enum HoldFanLayout {
   side,
 }
 
-/// A button with more than one action, after the colour and width fans of
-/// the Atomic drawing tools: a tap does [onTap], the default action; touching
-/// and holding (a short moment, with a haptic tick) fans [items] out above the
-/// button, and the finger, still down, slides onto one (a tick on each
-/// change) and lets go to pick it ([onSelected]). Letting go anywhere else,
-/// or the touch being cancelled, closes the fan without a choice. Letting go
-/// where the hold started (the finger never went anywhere, as after a plain
-/// long press) keeps the fan open as a menu: a tap on a pill picks it, a tap
-/// anywhere else closes it.
+/// A button with more than one action. Touching and holding (a short moment,
+/// with a haptic tick) opens [items] as a vertical list next to the button,
+/// and the finger, still down, slides onto one (a tick on each change) and
+/// lets go to pick it ([onSelected]). Letting go anywhere else, or the touch
+/// being cancelled, closes the list without a choice. Letting go where the
+/// hold started (the finger never went anywhere, as after a plain long press)
+/// keeps the list open as a menu: a tap on an item picks it, a tap anywhere
+/// else closes it.
 ///
-/// The fan is drawn in the root [Overlay], over everything, with the page
-/// dimmed a little; the button itself does not move. It opens upwards, the
-/// first item (the default) nearest the thumb, the rest curving towards the
-/// middle of the screen, and stays inside the screen.
+/// A tap does [onTap], the default action, or, with [tapOpensMenu], opens that
+/// same list as a menu (a rounded card, an icon and a label per row) that
+/// stays until an item is tapped, or a tap elsewhere or back closes it.
+///
+/// The list is drawn in the root [Overlay], over everything, with the page
+/// dimmed a little; the button itself does not move. It stays inside the
+/// screen.
 ///
 /// For assistive technology the button has a long-press action
 /// ([menuLabel]) that lists the same choices in a plain menu.
@@ -58,14 +58,19 @@ enum HoldFanLayout {
 class HoldFan<T> extends StatefulWidget {
   final Widget child;
 
-  /// The default action; null leaves the button without a tap (the fan still
-  /// opens on hold).
+  /// The default action; null leaves the button without a tap (the list
+  /// still opens on hold).
   final VoidCallback? onTap;
+
+  /// A tap opens the list (instead of doing [onTap]) as a menu card, the
+  /// rows each an icon and a label, and a hold opens that same card.
+  final bool tapOpensMenu;
 
   final List<HoldFanItem<T>> items;
   final ValueChanged<T> onSelected;
 
-  /// The item marked as the default (what a tap does), or null.
+  /// The item marked as the default (what a tap does), or null. Drawn with
+  /// a stronger outline in the pill list.
   final int? defaultIndex;
 
   /// The button's tooltip and accessible name.
@@ -74,10 +79,10 @@ class HoldFan<T> extends StatefulWidget {
   /// How the choices are laid out.
   final HoldFanLayout layout;
 
-  /// How long to hold before the fan opens.
+  /// How long to hold before the list opens.
   final Duration holdDuration;
 
-  /// Called as the fan opens, before it is laid out from [items].
+  /// Called as the list opens, before it is laid out from [items].
   final VoidCallback? onOpen;
 
   /// The accessible long-press action and the menu's title.
@@ -90,7 +95,7 @@ class HoldFan<T> extends StatefulWidget {
   final double size;
 
   /// Width of the tap target when it is not square (`double.infinity` fills
-  /// the space it is given): for a heading or a row that opens a fan.
+  /// the space it is given): for a heading or a row that opens a list.
   final double? width;
 
   const HoldFan({
@@ -99,9 +104,10 @@ class HoldFan<T> extends StatefulWidget {
     required this.items,
     required this.onSelected,
     this.onTap,
+    this.tapOpensMenu = false,
     this.defaultIndex = 0,
     this.tooltip,
-    this.layout = HoldFanLayout.fan,
+    this.layout = HoldFanLayout.list,
     this.holdDuration = const Duration(milliseconds: 180),
     this.onOpen,
     this.menuLabel = 'More options',
@@ -112,45 +118,6 @@ class HoldFan<T> extends StatefulWidget {
 
   @override
   State<HoldFan<T>> createState() => _HoldFanState<T>();
-}
-
-/// Where the pills of a fan go, in the overlay's coordinates: above
-/// [anchor] (the button's centre), one per size, the first nearest it, each
-/// next one higher and bent further towards the middle of [bounds] along a
-/// circle (the arc a thumb sweeps), kept inside [bounds].
-List<Rect> holdFanLayout({
-  required Offset anchor,
-  required List<Size> sizes,
-  required Rect bounds,
-  double lift = 64,
-  double gap = 12,
-}) {
-  if (sizes.isEmpty) return const [];
-  final towardsMiddle = anchor.dx <= bounds.center.dx ? 1.0 : -1.0;
-  final rises = <double>[];
-  var rise = lift;
-  for (final s in sizes) {
-    rises.add(rise + s.height / 2);
-    rise += s.height + gap;
-  }
-  final radius = math.max(300.0, rises.last + 60);
-  return [
-    for (var i = 0; i < sizes.length; i++)
-      () {
-        final s = sizes[i];
-        final up = rises[i];
-        final bend = radius - math.sqrt(radius * radius - up * up);
-        // The first pill sits right above the button; the rest curve away.
-        final shift = towardsMiddle * (bend + (i == 0 ? 0 : 16));
-        var left = anchor.dx + shift - s.width / 2;
-        var top = anchor.dy - up - s.height / 2;
-        left = left.clamp(
-            bounds.left, math.max(bounds.left, bounds.right - s.width));
-        top = top.clamp(
-            bounds.top, math.max(bounds.top, bounds.bottom - s.height));
-        return Rect.fromLTWH(left, top, s.width, s.height);
-      }(),
-  ];
 }
 
 /// Where the pills of a vertical menu go: one above the other, all as wide as
@@ -217,8 +184,12 @@ List<Rect> holdFanSideLayout({
     top += s.height + gap;
   }
   var shift = 0.0;
-  if (rects.last.bottom > bounds.bottom) shift = bounds.bottom - rects.last.bottom;
-  if (rects.first.top + shift < bounds.top) shift = bounds.top - rects.first.top;
+  if (rects.last.bottom > bounds.bottom) {
+    shift = bounds.bottom - rects.last.bottom;
+  }
+  if (rects.first.top + shift < bounds.top) {
+    shift = bounds.top - rects.first.top;
+  }
   return shift == 0
       ? rects
       : [for (final r in rects) r.shift(Offset(0, shift))];
@@ -248,8 +219,14 @@ const _pillMinHeight = 44.0;
 /// takes it off the room for the label, so the pill must be that much bigger.
 const _pillBorder = 1.5;
 
+const _cardPad = 6;
+const _rowPadding = EdgeInsets.symmetric(horizontal: 16);
+const _rowIcon = 24.0;
+const _rowGap = 14.0;
+const _rowMinWidth = 176.0;
+
 class _HoldFanState<T> extends State<HoldFan<T>>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _anim;
 
   @override
@@ -265,6 +242,9 @@ class _HoldFanState<T> extends State<HoldFan<T>>
   RenderBox? _overlayBox;
   List<HoldFanItem<T>> _shown = const [];
   List<Rect> _rects = const [];
+
+  /// The menu card behind the rows (with [HoldFan.tapOpensMenu]), or null.
+  Rect? _card;
   TextStyle _style = _pillStyle;
   Offset _anchor = Offset.zero;
   final ValueNotifier<int?> _hover = ValueNotifier(null);
@@ -273,10 +253,10 @@ class _HoldFanState<T> extends State<HoldFan<T>>
   Offset _downAt = Offset.zero;
   bool _wandered = false;
 
-  /// The fan stays open after the finger lifted and waits for a tap.
+  /// The list stays open after the finger lifted and waits for a tap.
   bool _sticky = false;
 
-  /// The fan is open and follows the finger.
+  /// The list is open and follows the finger.
   bool get _open => _entry != null && _anim.status != AnimationStatus.reverse;
 
   @override
@@ -288,12 +268,26 @@ class _HoldFanState<T> extends State<HoldFan<T>>
   }
 
   void _removeEntry() {
+    if (_entry != null) WidgetsBinding.instance.removeObserver(this);
     _entry?.remove();
     _entry?.dispose();
     _entry = null;
   }
 
-  void _start(LongPressStartDetails details) {
+  /// Back closes an open menu instead of leaving the page.
+  @override
+  Future<bool> didPopRoute() async {
+    if (_entry == null || !_open) return false;
+    _close();
+    return true;
+  }
+
+  void _start(LongPressStartDetails details) =>
+      _show(finger: details.globalPosition, sticky: false);
+
+  void _tapOpen() => _show(finger: null, sticky: true);
+
+  void _show({required Offset? finger, required bool sticky}) {
     widget.onOpen?.call();
     final items = widget.items;
     if (items.isEmpty || !mounted) return;
@@ -308,13 +302,12 @@ class _HoldFanState<T> extends State<HoldFan<T>>
         .globalToLocal(box.localToGlobal(box.size.center(Offset.zero)));
     // A wide target (a heading): the menu opens over the finger, not over the
     // middle of the row.
-    if (widget.width != null) {
-      _anchor = Offset(
-          overlayBox.globalToLocal(details.globalPosition).dx, _anchor.dy);
+    if (widget.width != null && finger != null) {
+      _anchor = Offset(overlayBox.globalToLocal(finger).dx, _anchor.dy);
     }
-    _downAt = details.globalPosition;
+    _downAt = finger ?? box.localToGlobal(box.size.center(Offset.zero));
     _wandered = false;
-    _sticky = false;
+    _sticky = sticky;
     // The overlay's, not the button's: inside a Scaffold body the top
     // padding is already taken off, and a menu then went under the status
     // bar.
@@ -332,26 +325,72 @@ class _HoldFanState<T> extends State<HoldFan<T>>
       bounds.right - media.padding.right,
       bounds.bottom,
     );
+    final card = widget.tapOpensMenu;
     final sizes = [
       for (final item in _shown)
-        _pillSize(item.text, scaler, _style, area.width),
+        card
+            ? _rowSize(item, scaler, _style, area.width - _cardPad * 2)
+            : _pillSize(item.text, scaler, _style, area.width),
     ];
+    if (card) {
+      // One height for every row, so the column lines up with the rects.
+      final h = sizes.map((s) => s.height).reduce(math.max);
+      for (var i = 0; i < sizes.length; i++) {
+        sizes[i] = Size(sizes[i].width, h);
+      }
+    }
+    final gap = card ? 0.0 : 8.0;
     _rects = switch (widget.layout) {
-      HoldFanLayout.list =>
-        holdFanListLayout(anchor: _anchor, sizes: sizes, bounds: area),
+      HoldFanLayout.list => holdFanListLayout(
+          anchor: _anchor, sizes: sizes, bounds: area, gap: gap),
       HoldFanLayout.side => holdFanSideLayout(
           anchor: _anchor,
           sizes: sizes,
           bounds: area,
-          reach: box.size.width / 2),
-      HoldFanLayout.fan =>
-        holdFanLayout(anchor: _anchor, sizes: sizes, bounds: area),
+          gap: gap,
+          reach: box.size.width / 2 + (card ? _cardPad + 6 : 0)),
     };
+    _card = null;
+    if (card && _rects.isNotEmpty) {
+      // Read top to bottom in the order of the items, also when the list
+      // opens upwards (where the first is the nearest to the button).
+      if (_rects.length > 1 && _rects.first.top > _rects.last.top) {
+        _rects = _rects.reversed.toList();
+      }
+      _card = _rects
+          .reduce((a, b) => a.expandToInclude(b))
+          .inflate(_cardPad.toDouble());
+    }
     _hover.value = null;
     _entry = OverlayEntry(builder: _buildFan);
     overlay.insert(_entry!);
+    WidgetsBinding.instance.addObserver(this);
     _anim.forward(from: 0);
     HapticFeedback.selectionClick();
+  }
+
+  /// A row of the menu card: an icon, the label, 48 high at least.
+  Size _rowSize(
+      HoldFanItem<T> item, TextScaler scaler, TextStyle style, double max) {
+    final painter = TextPainter(
+      text: TextSpan(text: item.label, style: style),
+      textDirection: Directionality.of(context),
+      textScaler: scaler,
+      maxLines: 1,
+    )..layout();
+    final size = Size(
+      math.min(
+          max,
+          math.max(
+              _rowMinWidth,
+              painter.width.ceilToDouble() +
+                  _rowPadding.horizontal +
+                  _rowIcon +
+                  _rowGap)),
+      math.max(48, painter.height + 24),
+    );
+    painter.dispose();
+    return size;
   }
 
   Size _pillSize(String text, TextScaler scaler, TextStyle style, double max) {
@@ -374,12 +413,14 @@ class _HoldFanState<T> extends State<HoldFan<T>>
     return size;
   }
 
+  double get _slop => _card == null ? 10 : 0;
+
   void _move(PointerMoveEvent event) {
     final box = _overlayBox;
     if (!_open || box == null) return;
     if ((event.position - _downAt).distance > kTouchSlop) _wandered = true;
     final local = box.globalToLocal(event.position);
-    final hit = holdFanHit(_rects, local);
+    final hit = holdFanHit(_rects, local, slop: _slop);
     if (hit != _hover.value) {
       _hover.value = hit;
       if (hit != null) HapticFeedback.selectionClick();
@@ -391,7 +432,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
     final box = _overlayBox;
     final hit = box == null
         ? _hover.value
-        : holdFanHit(_rects, box.globalToLocal(event.position));
+        : holdFanHit(_rects, box.globalToLocal(event.position), slop: _slop);
     if (hit == null && !_wandered) {
       // A plain long press: keep the menu up for a tap.
       _sticky = true;
@@ -407,7 +448,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
     if (hit != null && hit < items.length) widget.onSelected(items[hit].value);
   }
 
-  /// A tap while the fan waits as a menu: a pill picks it, elsewhere closes.
+  /// A tap while the list waits as a menu: an item picks it, elsewhere closes.
   void _tapSticky(TapUpDetails details) {
     if (!_sticky) return;
     final box = _overlayBox;
@@ -459,6 +500,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
   }
 
   Widget _buildFan(BuildContext context) {
+    final card = _card;
     final c = context.appColors;
     return IgnorePointer(
       ignoring: !_sticky,
@@ -472,6 +514,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
             animation: _anim,
             builder: (context, _) {
               final t = Curves.easeOutCubic.transform(_anim.value);
+              if (card != null) return _buildCard(context, card, t);
               return Stack(
                 children: [
                   Positioned.fill(
@@ -512,11 +555,71 @@ class _HoldFanState<T> extends State<HoldFan<T>>
     );
   }
 
+  /// The menu card: one rounded surface, a row per item.
+  Widget _buildCard(BuildContext context, Rect card, double t) {
+    final c = context.appColors;
+    final alignment = Alignment(
+      ((_anchor.dx - card.center.dx) / (card.width / 2)).clamp(-1.0, 1.0),
+      ((_anchor.dy - card.center.dy) / (card.height / 2)).clamp(-1.0, 1.0),
+    );
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Opacity(opacity: t, child: ColoredBox(color: c.overlayDim)),
+        ),
+        Positioned.fromRect(
+          rect: card,
+          child: Opacity(
+            opacity: t,
+            child: Transform.scale(
+              scale: 0.92 + 0.08 * t,
+              alignment: alignment,
+              child: Material(
+                key: const ValueKey('hold-fan-card'),
+                color: c.barSurface,
+                elevation: 8,
+                shadowColor: c.panelShadow,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: c.border),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < _rects.length; i++)
+                        SizedBox(
+                          width: _rects[i].width,
+                          height: _rects[i].height,
+                          child: ValueListenableBuilder<int?>(
+                            valueListenable: _hover,
+                            builder: (context, hover, _) => _MenuRow(
+                              key: ValueKey('hold-fan-item-$i'),
+                              item: _shown[i],
+                              style: _style,
+                              hovered: hover == i,
+                              onTap: () => _pick(i),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final hold = widget.items.isNotEmpty;
     Widget target = InkResponse(
-      onTap: widget.onTap,
+      onTap: widget.tapOpensMenu && widget.items.isNotEmpty
+          ? _tapOpen
+          : widget.onTap,
       radius: widget.size / 2,
       child: SizedBox(
         width: widget.width ?? widget.size,
@@ -528,7 +631,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
     if (widget.tooltip != null) {
       target = Tooltip(
         message: widget.tooltip,
-        // A hold opens the fan, not the tooltip.
+        // A hold opens the list, not the tooltip.
         triggerMode: TooltipTriggerMode.manual,
         excludeFromSemantics: true,
         child: target,
@@ -626,6 +729,64 @@ class _Pill extends StatelessWidget {
               color: hovered ? Colors.white : c.textPrimary,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One row of the menu card: an icon (or emoji) and a label, the one under
+/// the finger highlighted.
+class _MenuRow extends StatelessWidget {
+  final HoldFanItem<Object?> item;
+  final TextStyle style;
+  final bool hovered;
+  final VoidCallback onTap;
+
+  const _MenuRow({
+    super.key,
+    required this.item,
+    required this.style,
+    required this.hovered,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    final color = hovered ? c.main : c.textPrimary;
+    return Semantics(
+      button: true,
+      label: item.label,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: hovered ? c.main.withValues(alpha: 0.14) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: _rowPadding,
+          child: Row(children: [
+            SizedBox(
+              width: _rowIcon,
+              child: item.icon != null
+                  ? Icon(item.icon, size: 22, color: color)
+                  : item.emoji != null
+                      ? Text(item.emoji!, style: const TextStyle(fontSize: 18))
+                      : null,
+            ),
+            const SizedBox(width: _rowGap),
+            Expanded(
+              child: Text(
+                item.label,
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+                style: style.copyWith(color: color),
+              ),
+            ),
+          ]),
         ),
       ),
     );
