@@ -125,8 +125,11 @@ Each step ships on its own and has a test that fails without it.
   view closes. The spare is dropped after 5 min in the background or on memory
   pressure, and warmed again on resume. Logs: `[warm] taken ready=...`,
   `[warm] open N ms first content`, `[warm] cold open N ms first content`.
-  Still open: measure on the Xiaomi (first content < 250 ms, memory with the
-  spare), check that a detached Android web view boots (timers, WASM) and lays
+  Emulator (2026-10-20, `planning/flutter-performance.md`): a warm open
+  paints in about 1.3 s (the page's own render about 1.0 s), the spare costs
+  about 150 MB of renderer PSS; the spare now renders the latest recent once
+  while hidden, which took 25% off a warm open. Still open: measure on the
+  Xiaomi (first content < 250 ms, memory with the spare), check that a detached Android web view boots (timers, WASM) and lays
   out right when attached, and rebuild the bundle (`build_embed.sh`) so `open`
   and `ready` exist (without them: `show` and polling).
 - [ ] **5. Native views for the hot types.** Registry entries, one at a time,

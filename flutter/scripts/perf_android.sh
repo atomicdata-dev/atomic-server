@@ -117,9 +117,10 @@ pss_of() { # pid or package -> total PSS in kB
   a shell dumpsys meminfo "$1" 2>/dev/null | tr -d '\r' |
     sed -nE 's/^ *TOTAL PSS: *([0-9]+).*/\1/p; s/^ *TOTAL +([0-9]+) .*/\1/p' | head -1
 }
-renderer_pss() { # every web view renderer process (the app's pages)
+renderer_pss() { # the web view's renderer processes (the app's pages; the
+  # system's webview_service and webview_zygote are shared, not counted)
   local total=0 pid p
-  for pid in $(a shell ps -A -o PID,NAME | tr -d '\r' | awk '/sandboxed_process|webview_service|:privileged_process/ {print $1}'); do
+  for pid in $(a shell ps -A -o PID,NAME | tr -d '\r' | awk '/webview:sandboxed_process/ {print $1}'); do
     p=$(pss_of "$pid"); total=$((total + ${p:-0}))
   done
   echo $total
@@ -257,7 +258,7 @@ if step scroll; then
       a shell input swipe 540 700 540 1900 150
     done
     wait_log '\[perf\] frames' 10 || continue
-    line=$(log | grep -E '\[perf\] frames' | tail -1)
+    line=$(log | grep -E '\[perf\] frames' | tail -1 || true)
     note "$line"
     put "scroll Home: janky frames (%)" "$(sed -E 's/.*janky=([0-9.]+)%.*/\1/' <<<"$line")"
     for k in build raster; do
@@ -336,9 +337,9 @@ if step chat; then
     a logcat -c
     a shell input tap $send
     if ! wait_log '\[chat\] .*stream done' 30; then note "no AI reply (not a FAKE_AI=1 build?)"; back; back; break; fi
-    sleep 2
-    put "AI chat (fake): send to first token (ms)" "$(log | grep -E '\[chat\] \+[0-9]+ms first event' | tail -1 | sed -E 's/.*\+([0-9]+)ms.*/\1/')"
-    line=$(log | grep -E '\[perf\] frames' | tail -1)
+    sleep 3
+    put "AI chat (fake, waits 400 ms itself): send to first token (ms)" "$(log | grep -E '\[chat\] \+[0-9]+ms first event' | tail -1 | sed -E 's/.*\+([0-9]+)ms.*/\1/')"
+    line=$(log | grep -E '\[perf\] frames' | tail -1 || true)
     if [ -n "$line" ]; then
       put "AI chat (fake): janky frames while streaming (%)" "$(sed -E 's/.*janky=([0-9.]+)%.*/\1/' <<<"$line")"
       v=$(sed -E "s/.* build=([0-9.\/]+).*/\1/" <<<"$line"); IFS=/ read -r _ p90 _ p99 <<<"$v"
