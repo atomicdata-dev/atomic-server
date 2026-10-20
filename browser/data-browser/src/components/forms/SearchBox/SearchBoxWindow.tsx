@@ -38,6 +38,9 @@ import { externalOrigin, searchLoadedExternal } from './loadedExternal';
 /**
  * Options shown at the top of the results when the `isA` prop matches a key in this object.
  */
+// Typing one of these starts a subject, not a search.
+const SUBJECT_PREFIXES = ['http:', 'https:', 'atomic:', 'did:'];
+
 const STANDARD_OPTIONS: Record<string, string[]> = {
   [core.classes.property]: [
     core.properties.name,
@@ -234,6 +237,13 @@ export function SearchBoxWindow({
 
     const selected = options[override! ?? selectedIndex!];
 
+    // No results to pick from: take what was typed (a pasted subject).
+    if (!selected) {
+      if (searchValue) onSelect(searchValue);
+
+      return;
+    }
+
     // The selected option is a "Create ..." option.
     if (selected.type === OptionType.CreateOption) {
       createItem(searchValue);
@@ -268,10 +278,7 @@ export function SearchBoxWindow({
   };
 
   const handleChange: React.ChangeEventHandler<HTMLInputElement> = e => {
-    if (
-      e.target.value.startsWith('http:') ||
-      e.target.value.startsWith('https:')
-    ) {
+    if (SUBJECT_PREFIXES.some(prefix => e.target.value.startsWith(prefix))) {
       onChange(e.target.value);
       setValueIsURL(true);
 
