@@ -455,3 +455,20 @@ async fn the_inbox_is_listed_and_a_notification_marked_read_through_the_bridge()
     let found = list.iter().find(|n| n["subject"] == subject).unwrap();
     assert_eq!(found["read"], true);
 }
+
+#[tokio::test]
+async fn an_imported_chat_reads_back_in_order() {
+    shared_drive().await;
+    let entries = json!([
+        { "role": "user", "parts": [{ "type": "text", "text": "Vraag" }], "c": 1_000 },
+        { "role": "assistant", "parts": "[{\"type\":\"text\",\"text\":\"Antwoord\"}]", "c": 2_000 },
+    ]);
+    let chat = import_ai_chat("Imported".into(), entries.to_string())
+        .await
+        .unwrap();
+    let read: Json = serde_json::from_str(&read_chat(chat).await.unwrap()).unwrap();
+    assert_eq!(read[0]["role"], "user");
+    assert_eq!(read[0]["parts"][0]["text"], "Vraag");
+    assert_eq!(read[1]["parts"][0]["text"], "Antwoord");
+    assert_eq!(read[1]["c"], 2_000);
+}

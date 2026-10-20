@@ -275,3 +275,40 @@ pub async fn create_resource_of_class(
     .await
     .map_err(err)
 }
+
+/// Import a whole AI chat at once: an AI chat named `name` in the agent's
+/// private drive with every message of `entries_json`, a JSON array of
+/// `{role, parts, c}` (`parts` as `append_chat_entry` takes them, as an array
+/// or its JSON string; `c` the message's time in ms, now when absent), oldest
+/// first. One commit per 256 messages instead of one per message. Returns the
+/// chat's subject.
+pub async fn import_ai_chat(name: String, entries_json: String) -> Result<String, String> {
+    use atomic_lib::Storelike;
+    let node = node()?;
+    let author = node
+        .db()
+        .get_default_agent()
+        .map_err(err)?
+        .subject
+        .to_string();
+    let raw: Vec<serde_json::Value> = serde_json::from_str(&entries_json).map_err(|e| e.to_string())?;
+    let now = super::simple::state::now_ms();
+    let entries: Vec<atomic_lib::chat_log::Entry> = raw
+        .iter()
+        .map(|e| {
+            let mut entry =
+                atomic_lib::chat_log::Entry::new(author.clone(), "", e["c"].as_i64().unwrap_or(now));
+            let role = e["role"].as_str().unwrap_or("user");
+            let parts = match &e["parts"] {
+                serde_json::Value::String(s) => s.clone(),
+                other => other.to_string(),
+            };
+            entry.extra.insert("role".into(), role.into());
+            entry.extra.insert("parts".into(), parts.as_str().into());
+            entry
+        })
+        .collect();
+    chats::import_ai_chat(&node, pusher().as_ref(), &name, &entries)
+        .await
+        .map_err(err)
+}

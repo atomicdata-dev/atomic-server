@@ -165,6 +165,17 @@ Future<String> createResourceOfClass(
     RustLib.instance.api.crateApiAssistantCreateResourceOfClass(
         drive: drive, classUrl: classUrl, name: name);
 
+/// Import a whole AI chat at once: an AI chat named `name` in the agent's
+/// private drive with every message of `entries_json`, a JSON array of
+/// `{role, parts, c}` (`parts` as `append_chat_entry` takes them, as an array
+/// or its JSON string; `c` the message's time in ms, now when absent), oldest
+/// first. One commit per 256 messages instead of one per message. Returns the
+/// chat's subject.
+Future<String> importAiChat(
+        {required String name, required String entriesJson}) =>
+    RustLib.instance.api
+        .crateApiAssistantImportAiChat(name: name, entriesJson: entriesJson);
+
 /// One line of the activity feed.
 class ActivityEntry {
   final String subject;
