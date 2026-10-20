@@ -111,6 +111,37 @@ void main() {
     expect(pool.take(), isNull);
   });
 
+  test('a ready spare renders the likely next resource, then goes blank',
+      () async {
+    pool = makePool()..showAhead = () async => 'https://x/next';
+    pool.warmUp();
+    await pumpEventQueue();
+    final page = pages.single;
+    expect(page.scripts, isEmpty, reason: 'not before it is up');
+    page.becomeReady();
+    await pumpEventQueue();
+    expect(
+        page.scripts.single,
+        allOf(contains('e.show("https://x/next")'), contains('e.show("")')),
+        reason: 'shown, then blank: an attached page that already shows '
+            'what it is asked for does not paint again');
+    expect(WarmResourceWebView.shownAhead[page], 'https://x/next');
+  });
+
+  test('a page rendered ahead is not noted as opened', () async {
+    pool = makePool()..warmUp();
+    await pumpEventQueue();
+    final page = pages.single;
+    page.send(jsonEncode({
+      'id': 4,
+      'method': 'opened',
+      'args': ['https://x/next']
+    }));
+    await pumpEventQueue();
+    // Answered by the pool itself (the API would have noted it in Recents).
+    expect(page.scripts.single, 'window.__atomicReply(4,true,null)');
+  });
+
   test('a spare reporting the saved theme sets the app\'s', () async {
     SharedPreferences.setMockInitialValues({});
     addTearDown(() => AppThemeMode.mode.value = ThemeMode.system);
@@ -236,13 +267,33 @@ void main() {
       final taken = pages.first;
       expect(taken.handler, isNotNull);
       expect(
-          taken.scripts.any((s) =>
-              s.contains('atomicEmbed.open') && s.contains('"https://x/s"')),
+          taken.scripts.any(
+              (s) => s.contains('e.open') && s.contains('"https://x/s"')),
           isTrue);
       // The colour scheme reaches the taken page like any other.
       expect(taken.scripts.any((s) => s.contains('setColorScheme')), isTrue);
       expect(pages, hasLength(2), reason: 'the next spare is warming');
       expect(pages.last.released, isFalse);
+      await closeAll(tester);
+    });
+
+    testWidgets('a page rendered ahead reads that resource again when taken',
+        (tester) async {
+      pool = makePool()..warmUp();
+      await tester.pump();
+      pages.single.becomeReady();
+      await tester.pump();
+      WarmResourceWebView.shownAhead[pages.single] = 'https://x/ahead';
+      final shell = ShellController(drive: 'd')..warm = pool;
+
+      await openView(tester, shell);
+
+      expect(
+          pages.first.scripts.any((s) =>
+              s.contains('e.changed(["https://x/ahead"])') &&
+              s.contains('"https://x/s"')),
+          isTrue,
+          reason: 'it may have changed while the page was hidden');
       await closeAll(tester);
     });
 

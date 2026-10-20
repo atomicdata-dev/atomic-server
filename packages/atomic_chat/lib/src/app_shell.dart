@@ -12,6 +12,7 @@ import 'app_bottom_bar.dart';
 import 'models.dart';
 import 'assistant_api.dart';
 import 'search_screen.dart';
+import 'native_views.dart';
 import 'warm_resource_web_view.dart';
 import 'slide_back_route.dart';
 
@@ -471,7 +472,19 @@ class _AppShellState extends State<AppShell> {
     // load the next resource's page now, while they look at the home.
     _shell.warm =
         (widget.warmPool ?? WarmResourceWebView.forPlatform)(widget.api)
-          ?..warmUp();
+          ?..showAhead = _likelyNext
+          ..warmUp();
+  }
+
+  /// The latest of Recents, when the page shows it (a native view does not).
+  Future<String?> _likelyNext() async {
+    final drive = _shell.drive.value;
+    if (drive.isEmpty) return null;
+    final recent = await widget.api.recentResources(drive);
+    for (final r in recent) {
+      if (!hasNativeView(r.className)) return r.subject;
+    }
+    return null;
   }
 
   @override

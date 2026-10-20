@@ -223,6 +223,16 @@ class WarmResourceWebView with WidgetsBindingObserver {
   int started = 0;
   int failures = 0;
 
+  /// The resource most likely opened next (the latest of Recents). A ready
+  /// spare renders it once while nobody looks, then goes blank again: the
+  /// page's code has then run once (a page's first render of a document
+  /// took two to three times its next), and that resource is in its store.
+  Future<String?> Function()? showAhead;
+
+  /// What a spare rendered ahead, by page ([showAhead]). Whoever takes the
+  /// page reloads it before showing anything: it may have changed since.
+  static final shownAhead = Expando<String>('shownAhead');
+
   /// A spare exists (loading or ready).
   bool get hasSpare => _warm != null || _starting;
 
@@ -256,6 +266,7 @@ class WarmResourceWebView with WidgetsBindingObserver {
         await page.whenReady;
         debugPrint('[warm] spare ready after ${clock.elapsedMilliseconds} ms');
         Perf.once('warm ready');
+        await _showAhead(page, generation);
       } catch (e) {
         failures++;
         debugPrint('[warm] spare failed: $e');
@@ -266,6 +277,34 @@ class WarmResourceWebView with WidgetsBindingObserver {
         page?.release();
       }
     }());
+  }
+
+  Future<void> _showAhead(WarmPage page, int generation) async {
+    final ahead = showAhead;
+    if (ahead == null) return;
+    String? subject;
+    try {
+      subject = await ahead();
+    } catch (_) {}
+    if (subject == null ||
+        subject.isEmpty ||
+        _disposed ||
+        generation != _generation ||
+        !identical(_warm, page)) {
+      return;
+    }
+    shownAhead[page] = subject;
+    // Rendered, then left for a blank page again: a page attached to the
+    // screen paints only what changes, so it must not already show the
+    // resource it is asked for (it stayed black).
+    try {
+      await page.runJavaScript('(function(e){if(!e)return;'
+          'e.show(${jsonEncode(subject)});var t=Date.now();(function c(){'
+          'var m=document.querySelector("main");'
+          'if((m&&m.innerText.trim())||Date.now()-t>8000){'
+          'setTimeout(function(){e.show("")},300);return}'
+          'setTimeout(c,50)})()})(window.atomicEmbed)');
+    } catch (_) {}
   }
 
   /// The ready spare, now owned by the caller (it must [ReleasablePage.release]
@@ -345,6 +384,11 @@ class WarmResourceWebView with WidgetsBindingObserver {
     String reply;
     try {
       final args = request['args'];
+      // A resource rendered ahead was not opened: not one for Recents.
+      if (method == 'opened') {
+        await page.runJavaScript('window.__atomicReply($id,true,null)');
+        return;
+      }
       // The page reports the saved theme as it boots, before anyone holds it.
       final answer = method == 'theme'
           ? await AppThemeMode.choose(

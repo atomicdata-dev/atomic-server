@@ -166,10 +166,15 @@ class _ResourceViewState extends State<ResourceView>
       debugPrint('[warm] taken ready=${page is WebViewEmbedPage ? page.age : 0}'
           ' ms after it started loading');
       final subject = jsonEncode(widget.subject);
+      // What the spare rendered ahead is read from the store again: it may
+      // have changed while the page was hidden.
+      final ahead = WarmResourceWebView.shownAhead[page];
+      final reload =
+          ahead == null ? '' : 'e.changed&&e.changed([${jsonEncode(ahead)}]);';
       // `open` replaces the page's blank first entry, so back leaves the
       // resource; an older bundle only has `show`.
-      unawaited(page.runJavaScript(
-          'window.atomicEmbed&&(window.atomicEmbed.open||window.atomicEmbed.show)($subject)'));
+      unawaited(page.runJavaScript('(function(e){if(!e)return;$reload'
+          '(e.open||e.show)($subject)})(window.atomicEmbed)'));
       _watchPainted();
     }
   }
