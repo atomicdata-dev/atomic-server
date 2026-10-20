@@ -15,7 +15,7 @@
 //! from the store when it is missing or the listener fell behind.
 
 use super::{
-    chats::chat_entries,
+    chats::chat_last_activity,
     profiles::same_agent,
     rows::{class_name_of, name_of, row_resource, AI_CHAT},
 };
@@ -499,10 +499,7 @@ impl RecentsIndex {
             .await?;
         for subject in &found.subjects {
             let subject = subject.to_string();
-            let last = chat_entries(store, &subject)
-                .await?
-                .last()
-                .map_or(0, |(c, _)| *c);
+            let last = chat_last_activity(store, &subject).await?;
             self.bump_chat(&subject, last);
         }
         self.with(|s| {

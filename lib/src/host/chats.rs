@@ -9,26 +9,50 @@ use crate::{
 };
 use serde_json::{json, Value as Json};
 
+/// The `ChatLog` pages under `chat` with their Loro docs, decoded once each
+/// from the stored snapshot. A full `get_resource` decodes the snapshot too,
+/// and `build_state_doc` on it then exports and re-imports the whole page:
+/// three passes over every message instead of one.
+async fn chat_log_pages(
+    store: &Db,
+    chat: &str,
+) -> AtomicResult<Vec<(String, crate::loro::AtomicLoroDoc)>> {
+    let pages = store
+        .query(&Query::new_prop_val(urls::PARENT, chat))
+        .await?;
+    let mut out = Vec::with_capacity(pages.subjects.len());
+    for subject in &pages.subjects {
+        let page = match store.get_resource_shallow(subject) {
+            Ok(page) => page,
+            // A stored resource without a materialized row.
+            Err(_) => match store.get_resource(subject).await {
+                Ok(page) => page,
+                Err(_) => continue,
+            },
+        };
+        if !crate::hierarchy::is_chat_log(&page) {
+            continue;
+        }
+        let doc = match store.get_loro_snapshot(subject) {
+            Some(snapshot) => AtomicLoroDoc::from_snapshot(&snapshot),
+            None => page.build_state_doc(),
+        };
+        let Ok(doc) = doc else {
+            continue;
+        };
+        out.push((page.get_subject().to_string(), doc));
+    }
+    Ok(out)
+}
+
 /// Every entry of the `ChatLog` pages under `chat`, oldest first (by `c`, then
 /// key), as the entry's own fields plus `id` (`<page>#<key>`). `parts` is
 /// stored as a JSON string and comes out parsed. An entry key that sits on two
 /// pages is listed once. Each entry comes with its time (`c`, 0 when absent).
 pub async fn chat_entries(store: &Db, chat: &str) -> AtomicResult<Vec<(i64, Json)>> {
-    let pages = store
-        .query(&Query::new_prop_val(urls::PARENT, chat))
-        .await?;
     let mut seen = std::collections::HashSet::new();
     let mut out: Vec<(i64, String, Json)> = Vec::new();
-    for subject in &pages.subjects {
-        let Ok(page) = store.get_resource(subject).await else {
-            continue;
-        };
-        if !crate::hierarchy::is_chat_log(&page) {
-            continue;
-        }
-        let Ok(doc) = page.build_state_doc() else {
-            continue;
-        };
+    for (page, doc) in chat_log_pages(store, chat).await? {
         for (key, entry) in doc.entries() {
             if !seen.insert(key.clone()) {
                 continue;
@@ -40,13 +64,28 @@ pub async fn chat_entries(store: &Db, chat: &str) -> AtomicResult<Vec<(i64, Json
                 let parsed = serde_json::from_str(raw).unwrap_or_else(|_| json!([]));
                 fields.insert("parts".into(), parsed);
             }
-            fields.insert("id".into(), json!(format!("{}#{key}", page.get_subject())));
+            fields.insert("id".into(), json!(format!("{page}#{key}")));
             let c = crate::chat_log::entry_created_at(&entry).unwrap_or(0);
             out.push((c, key, Json::Object(fields)));
         }
     }
     out.sort_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));
     Ok(out.into_iter().map(|(c, _, json)| (c, json)).collect())
+}
+
+/// The time (`c`, ms) of the newest entry of `chat`, 0 when it has none.
+/// Reads only the entries' times: no JSON, no parsed parts.
+pub async fn chat_last_activity(store: &Db, chat: &str) -> AtomicResult<i64> {
+    Ok(chat_log_pages(store, chat)
+        .await?
+        .iter()
+        .flat_map(|(_, doc)| {
+            doc.entries()
+                .into_values()
+                .filter_map(|entry| crate::chat_log::entry_created_at(&entry))
+        })
+        .max()
+        .unwrap_or(0))
 }
 
 /// The entries of a chat, oldest first: the fields the web app stores, `id`,
