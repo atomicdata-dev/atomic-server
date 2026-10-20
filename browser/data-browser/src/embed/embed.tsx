@@ -62,6 +62,7 @@ import { createEmbedStore, registerEmbedActions } from './embedStore';
 import { closeTopOverlay } from './overlayBack';
 import { reportShown, setActionsHost } from './hostActions';
 import { useNativeChatRoom } from './useNativeChatRoom';
+import { embedTouchCss } from './touchStyle';
 
 enableEmbedMode();
 registerEmbedActions();
@@ -105,6 +106,10 @@ new MutationObserver(records => {
 const noScrollbars = document.createElement('style');
 noScrollbars.textContent = '::-webkit-scrollbar { display: none; }';
 document.head.append(noScrollbars);
+
+const touchStyle = document.createElement('style');
+touchStyle.textContent = embedTouchCss;
+document.head.append(touchStyle);
 
 declare global {
   interface Window {
