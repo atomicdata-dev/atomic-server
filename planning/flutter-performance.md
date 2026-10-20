@@ -2,7 +2,7 @@
 
 > **Status:** 2026-10-20. Measured on the emulator and the Mac; the owner's
 > phones still to do (below). The round-by-round logs that led here are in
-> PR #2310 (comment "Flutter performance: round logs").
+> git: `git show 72d0a00:planning/flutter-performance.md`.
 
 ## How to measure
 
