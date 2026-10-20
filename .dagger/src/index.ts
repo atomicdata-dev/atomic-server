@@ -1390,6 +1390,13 @@ export class AtomicServer {
       // Integration sources live at the repository root. The browser mounts at
       // /app, and its raw imports resolve these paths from /integrations.
       .withDirectory('/integrations', this.source.directory('integrations'))
+      // `@tomic/plugin`'s export-bindings test reads the Rust example's
+      // manifest and checked-in bindings from the repository root, which
+      // resolves from /app/plugin/src to /plugin-examples.
+      .withDirectory(
+        '/plugin-examples/host-abi-statement',
+        this.source.directory('plugin-examples/host-abi-statement'),
+      )
       // integrations/localthought/tsconfig.json extends the repo-root-relative
       // `../../browser/tsconfig.build.json`. Alias /browser to the /app mount
       // so that relative path resolves.
