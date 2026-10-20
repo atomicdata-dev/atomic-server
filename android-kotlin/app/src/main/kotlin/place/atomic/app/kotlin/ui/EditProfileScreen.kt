@@ -28,7 +28,7 @@ import place.atomic.app.kotlin.errorText
 
 /** Name and description of the agent (Flutter's `EditProfileScreen`). The picture is not editable here. */
 @Composable
-fun EditProfileScreen(profile: OwnProfile, save: suspend (name: String, description: String) -> Unit, onDone: () -> Unit) {
+fun EditProfileScreen(profile: OwnProfile, save: suspend (name: String, description: String) -> Unit, onDone: () -> Unit, image: ByteArray? = null) {
     var name by rememberSaveable { mutableStateOf(profile.name) }
     var description by rememberSaveable { mutableStateOf(profile.description) }
     var saving by rememberSaveable { mutableStateOf(false) }
@@ -59,7 +59,7 @@ fun EditProfileScreen(profile: OwnProfile, save: suspend (name: String, descript
             Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            AgentAvatar(name, Modifier.align(Alignment.CenterHorizontally), emoji = profile.emoji, size = 88.dp)
+            ProfileAvatar(name, Modifier.align(Alignment.CenterHorizontally), emoji = profile.emoji, image = image, size = 88.dp)
             OutlinedTextField(
                 name, { name = it }, Modifier.fillMaxWidth().padding(top = 8.dp).testTag("profile-name"),
                 label = { Text("Name") }, singleLine = true,

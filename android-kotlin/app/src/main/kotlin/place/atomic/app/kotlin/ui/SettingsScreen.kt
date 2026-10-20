@@ -123,7 +123,7 @@ fun SettingsScreen(state: SettingsState, actions: SettingsActions) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                AgentAvatar(name, emoji = state.profile?.emoji, size = 56.dp)
+                ProfileAvatar(name, emoji = state.profile?.emoji, image = state.profileImage, size = 56.dp)
                 Column(Modifier.weight(1f)) {
                     Text(name.ifEmpty { "You" }, style = MaterialTheme.typography.titleLarge)
                     state.profile?.subject?.let { id ->

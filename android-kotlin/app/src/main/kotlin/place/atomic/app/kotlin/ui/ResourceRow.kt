@@ -26,12 +26,12 @@ import place.atomic.app.kotlin.data.RowItem
  * something at the end (when it happened).
  */
 @Composable
-fun ResourceRow(item: RowItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun ResourceRow(item: RowItem, onClick: () -> Unit, modifier: Modifier = Modifier, end: (@Composable () -> Unit)? = null) {
     val atomic = MaterialTheme.atomic
     Row(
         modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(enabled = item.openable, onClick = onClick)
             .heightIn(min = if (item.detail.isEmpty()) 52.dp else 64.dp)
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -60,5 +60,6 @@ fun ResourceRow(item: RowItem, onClick: () -> Unit, modifier: Modifier = Modifie
         if (item.trailing.isNotEmpty()) {
             Text(item.trailing, color = atomic.textSecondary, fontSize = 12.sp, maxLines = 1)
         }
+        end?.invoke()
     }
 }

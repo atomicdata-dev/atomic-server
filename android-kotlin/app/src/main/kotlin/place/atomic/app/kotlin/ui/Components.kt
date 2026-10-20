@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -153,21 +154,47 @@ fun Spinner(modifier: Modifier = Modifier, size: Dp = 18.dp) {
     CircularProgressIndicator(modifier.size(size), strokeWidth = 2.dp)
 }
 
-/** The person's emoji, else their initial, in a circle: the way into settings. */
+/**
+ * The one avatar of the app (Flutter's `ProfileAvatar`): the picture when the
+ * File's [image] bytes are here, else the person's emoji, else their initial,
+ * in a circle. The bytes are decoded at the size drawn, not at the photo's.
+ */
 @Composable
-fun AgentAvatar(name: String, modifier: Modifier = Modifier, emoji: String? = null, size: Dp = 36.dp) {
+fun ProfileAvatar(
+    name: String,
+    modifier: Modifier = Modifier,
+    emoji: String? = null,
+    image: ByteArray? = null,
+    size: Dp = 36.dp,
+    background: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.primaryContainer,
+    foreground: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onPrimaryContainer,
+) {
+    val px = with(androidx.compose.ui.platform.LocalDensity.current) { size.roundToPx() }
+    val bitmap = androidx.compose.runtime.remember(image, px) { image?.let { decodeAvatar(it, px) } }
     Box(
-        modifier.size(size).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+        modifier.size(size).clip(CircleShape).background(background),
         contentAlignment = Alignment.Center,
     ) {
         val text = emoji?.trim().orEmpty().ifEmpty { name.trim().take(1).uppercase().ifEmpty { "?" } }
-        Text(
-            text,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = (size.value * 0.45f).sp,
-        )
+        Text(text, color = foreground, fontWeight = FontWeight.SemiBold, fontSize = (size.value * 0.45f).sp)
+        if (bitmap != null) {
+            androidx.compose.foundation.Image(
+                bitmap, contentDescription = null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            )
+        }
     }
+}
+
+/** [bytes] decoded no larger than [px] across, or null when they are not an image Android decodes. */
+internal fun decodeAvatar(bytes: ByteArray, px: Int): androidx.compose.ui.graphics.ImageBitmap? = try {
+    val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+    var sample = 1
+    while (bounds.outWidth / (sample * 2) >= px && bounds.outHeight / (sample * 2) >= px) sample *= 2
+    val options = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
+    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)?.asImageBitmap()
+} catch (_: Exception) {
+    null
 }
 
 @Composable
