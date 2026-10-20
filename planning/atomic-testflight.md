@@ -16,3 +16,15 @@ Source snapshot: 1302adbfc, from claude/flutter-mobile-app-w8e9wz. Live uncommit
 work is not included. The release work is on codex/atomic-flutter-testflight.
 The incorrectly registered legacy Apple identifier is unused; no build or app
 record was published with it. Do not use it for this release.
+
+## Android / Play continuation
+
+- [x] Reuse permanent application ID `io.ontola.atomic` and the existing Atomic PKCS12 upload key.
+- [x] Replace debug release signing with explicit release configuration; ignore local key files.
+- [x] Add a signed arm64 AAB workflow and native 16 KB alignment verification.
+- [x] Observe the user-created Play Console app, ID 4973792617288465041.
+- [ ] Complete the first Android CI build (initial run 39424359675).
+- [ ] Upload the signed bundle to Play internal testing and verify availability.
+
+Play Console developer: 6245351578543299123. Android-only changes are excluded
+from the iOS push trigger so subsequent Android releases do not also upload an IPA.

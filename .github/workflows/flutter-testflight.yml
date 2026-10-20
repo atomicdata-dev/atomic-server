@@ -2,6 +2,13 @@ name: Atomic Flutter iOS
 on:
   push:
     branches: [codex/atomic-flutter-testflight]
+    paths-ignore:
+      - '.github/workflows/flutter-play.yml'
+      - 'flutter/android/**'
+      - 'flutter/rust_builder/cargokit/gradle/**'
+      - 'flutter/rust_builder/cargokit/build_tool/lib/src/android_environment.dart'
+      - 'flutter/.gitignore'
+      - '**/*.md'
   workflow_dispatch:
 permissions:
   contents: read
