@@ -5311,6 +5311,533 @@ async fn index_keys_migration_rebuilds_old_rows_in_slices() {
     assert!(propvalsub_key(&atom).len() < old_key.len());
 }
 
+/// The drive's event log is written with the commit, in order, and a consumer's
+/// checkpoint survives re-opening the database: nothing is lost, nothing twice.
+#[tokio::test]
+#[timeout(120000)]
+async fn drive_events_survive_a_restart_exactly_once() {
+    use crate::db::drive_events::EventFilter;
+
+    let dir = ".temp/db/drive_events_restart";
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(format!("{dir}/uploads")).unwrap();
+    let uploads = format!("{dir}/uploads");
+    let open = || {
+        Db::init_redb_file(
+            std::path::Path::new(dir),
+            Some("https://localhost".into()),
+            std::path::Path::new(&uploads),
+        )
+    };
+    let store = open().await.unwrap();
+    let agent = store.create_agent(None).await.unwrap();
+    store.set_default_agent(agent);
+    store.populate().await.unwrap();
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    // A drive without an app writes nothing.
+    let quiet = genesis_child(&store, &drive).await;
+    assert!(
+        store.drive_events(drive.as_str(), 0, 100).is_empty(),
+        "{quiet}"
+    );
+    store.enable_drive_events(drive.as_str()).unwrap();
+    let before = store.drive_events(drive.as_str(), 0, 100).len();
+
+    let a = genesis_child(&store, &drive).await;
+    let b = genesis_child(&store, &drive).await;
+    let events = store.drive_events(drive.as_str(), 0, 100);
+    assert_eq!(events.len(), before + 2, "{events:?}");
+    let (ea, eb) = (&events[before], &events[before + 1]);
+    assert_eq!(
+        (ea.subject.as_str(), eb.subject.as_str()),
+        (a.as_str(), b.as_str())
+    );
+    assert!(ea.seq < eb.seq);
+    assert_eq!(ea.parent.as_deref(), Some(drive.as_str()));
+
+    let only_b = EventFilter {
+        subtree: Some(b.to_string()),
+        ..Default::default()
+    };
+    assert!(!only_b.matches(ea, None) && only_b.matches(eb, None));
+    let under_drive = EventFilter {
+        subtree: Some(drive.to_string()),
+        ..Default::default()
+    };
+    let chain = store.event_ancestors(eb.parent.as_deref()).await;
+    assert!(under_drive.matches(eb, chain.as_deref()));
+    assert!(!under_drive.matches(eb, None));
+    let row = serde_json::to_vec(eb).unwrap().len();
+    println!("event row: {row} B");
+
+    store.ack_events(drive.as_str(), "app", ea.seq).unwrap();
+    // The checkpoint never moves back.
+    store.ack_events(drive.as_str(), "app", 0).unwrap();
+    let agent = store.get_default_agent().unwrap();
+    drop(store);
+
+    let store = open().await.unwrap();
+    store.set_default_agent(agent);
+    let c = genesis_child(&store, &drive).await;
+    let checkpoint = store.event_checkpoint(drive.as_str(), "app");
+    assert_eq!(checkpoint, ea.seq);
+    let missed: Vec<_> = store
+        .drive_events(drive.as_str(), checkpoint, 100)
+        .into_iter()
+        .map(|e| e.subject)
+        .collect();
+    assert_eq!(missed, vec![b.to_string(), c.to_string()]);
+}
+
+/// A trigger's edges come from the drive's event log: closing the database
+/// between arrivals loses none, and one handled before a restart is not
+/// delivered again.
+#[tokio::test]
+#[timeout(120000)]
+async fn a_trigger_misses_no_edge_across_a_reopen() {
+    use crate::db::plugin_trigger::{Edge, PluginTrigger, PluginTriggerKey};
+
+    let dir = ".temp/db/trigger_edges_reopen";
+    let _ = std::fs::remove_dir_all(dir);
+    std::fs::create_dir_all(format!("{dir}/uploads")).unwrap();
+    let uploads = format!("{dir}/uploads");
+    // redb's lock outlives a dropped handle for a moment.
+    let open = || async {
+        let mut tries = 0;
+        loop {
+            match Db::init_redb_file(
+                std::path::Path::new(dir),
+                Some("https://localhost".into()),
+                std::path::Path::new(&uploads),
+            )
+            .await
+            {
+                Err(_) if tries < 50 => {
+                    tries += 1;
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                }
+                result => break result,
+            }
+        }
+    };
+    let store = open().await.unwrap();
+    let agent = store.create_agent(None).await.unwrap();
+    store.set_default_agent(agent.clone());
+    store.populate().await.unwrap();
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    let before = genesis_child(&store, &drive).await;
+
+    let key = PluginTriggerKey::new(drive.as_str(), "plugin");
+    let trigger = PluginTrigger::new(
+        crate::db::QueryFilter {
+            filters: vec![crate::storelike::PropVal {
+                property: Some(urls::PARENT.to_string()),
+                value: Some(Value::AtomicUrl(drive.clone())),
+                ..Default::default()
+            }],
+            sort_by: None,
+            drive: drive.as_str().into(),
+        },
+        true,
+        false,
+    )
+    .unwrap();
+    store.set_plugin_trigger(&key, &trigger).unwrap();
+    let a = genesis_child(&store, &drive).await;
+    let b = genesis_child(&store, &drive).await;
+    drop(store);
+
+    let store = open().await.unwrap();
+    store.set_default_agent(agent.clone());
+    let first = store.next_trigger_event(&key, &trigger).unwrap().unwrap();
+    assert_eq!(
+        (first.subject.as_str(), first.edge),
+        (a.as_str(), Edge::Enter)
+    );
+    assert_ne!(first.subject, before.as_str(), "older than the trigger");
+    assert_eq!(store.pending_trigger_events(&key, &trigger).unwrap(), 2);
+    store.acknowledge_plugin_event(&first).unwrap();
+    let c = genesis_child(&store, &drive).await;
+    drop(store);
+
+    let store = open().await.unwrap();
+    let mut seen = Vec::new();
+    while let Some(event) = store.next_trigger_event(&key, &trigger).unwrap() {
+        seen.push(event.subject.clone());
+        store.acknowledge_plugin_event(&event).unwrap();
+    }
+    assert_eq!(seen, vec![b.to_string(), c.to_string()]);
+}
+
+/// A resource that arrives by replication (a synced state update, a bulk
+/// pull) moves the drive's stream and a trigger's edges like a commit does,
+/// and so does everything a recursive removal takes with it.
+#[tokio::test]
+#[timeout(120000)]
+async fn replicated_and_removed_resources_reach_the_event_stream_and_triggers() {
+    use crate::db::plugin_trigger::{Edge, PluginTrigger, PluginTriggerKey};
+
+    let store = Db::init_temp("replication_events").await.unwrap();
+    store.populate().await.unwrap();
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    let key = PluginTriggerKey::new(drive.as_str(), "plugin");
+    let trigger = PluginTrigger::new(
+        crate::db::QueryFilter {
+            filters: vec![crate::storelike::PropVal {
+                property: Some(urls::PARENT.to_string()),
+                value: Some(Value::AtomicUrl(drive.clone())),
+                ..Default::default()
+            }],
+            sort_by: None,
+            drive: drive.as_str().into(),
+        },
+        true,
+        true,
+    )
+    .unwrap();
+    store.set_plugin_trigger(&key, &trigger).unwrap();
+
+    // Replicated in: one row, one enter edge.
+    let mut replicated = Resource::new("atomic:replicated-1".into());
+    replicated
+        .set_unsafe(urls::PARENT.into(), Value::AtomicUrl(drive.clone()))
+        .unwrap();
+    store
+        .persist_replicated_resource(&replicated)
+        .await
+        .unwrap();
+    let events = store.drive_events(drive.as_str(), 0, 100);
+    assert!(
+        events.iter().any(|e| e.subject == "atomic:replicated-1"),
+        "{events:?}"
+    );
+    let entered = store.next_trigger_event(&key, &trigger).unwrap().unwrap();
+    assert_eq!(
+        (entered.subject.as_str(), entered.edge),
+        ("atomic:replicated-1", Edge::Enter)
+    );
+    store.acknowledge_plugin_event(&entered).unwrap();
+
+    // Removed with its child: both are destroyed rows, and the one the trigger
+    // watches leaves.
+    let folder = genesis_child(&store, &drive).await;
+    let inner = genesis_child(&store, &folder).await;
+    let entered = store.next_trigger_event(&key, &trigger).unwrap().unwrap();
+    store.acknowledge_plugin_event(&entered).unwrap();
+    let seen = store.drive_events(drive.as_str(), 0, 1000).len();
+    store.remove_resource(&folder).await.unwrap();
+    let after: Vec<_> = store
+        .drive_events(drive.as_str(), 0, 1000)
+        .into_iter()
+        .skip(seen)
+        .collect();
+    let destroyed: Vec<_> = after
+        .iter()
+        .filter(|e| e.destroyed)
+        .map(|e| e.subject.clone())
+        .collect();
+    assert!(
+        destroyed.contains(&folder.to_string()) && destroyed.contains(&inner.to_string()),
+        "{after:?}"
+    );
+    let left = store.next_trigger_event(&key, &trigger).unwrap().unwrap();
+    assert_eq!(
+        (left.subject.as_str(), left.edge),
+        (folder.as_str(), Edge::Leave)
+    );
+}
+
+/// A peer pushing again what this node already holds (a reconnect) changes
+/// nothing, so the stream does not move; a push that changes one property
+/// says only that property changed.
+#[tokio::test]
+#[timeout(120000)]
+async fn replicating_what_is_already_held_adds_no_event() {
+    let store = Db::init_temp("replication_noop_events").await.unwrap();
+    store.populate().await.unwrap();
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    store.enable_drive_events(drive.as_str()).unwrap();
+
+    let mut replicated = Resource::new("atomic:replicated-noop".into());
+    replicated
+        .set_unsafe(urls::PARENT.into(), Value::AtomicUrl(drive.clone()))
+        .unwrap();
+    replicated
+        .set_unsafe(urls::NAME.into(), Value::String("one".into()))
+        .unwrap();
+    let count = |store: &Db| {
+        store
+            .drive_events(drive.as_str(), 0, 1000)
+            .into_iter()
+            .filter(|e| e.subject == "atomic:replicated-noop")
+            .collect::<Vec<_>>()
+    };
+
+    store
+        .persist_replicated_resource(&replicated)
+        .await
+        .unwrap();
+    assert_eq!(count(&store).len(), 1);
+    store
+        .persist_replicated_resource(&replicated)
+        .await
+        .unwrap();
+    store
+        .persist_replicated_resources(vec![(replicated.clone(), None)])
+        .await
+        .unwrap();
+    assert_eq!(count(&store).len(), 1, "the same state again is not news");
+
+    replicated
+        .set_unsafe(urls::NAME.into(), Value::String("two".into()))
+        .unwrap();
+    store
+        .persist_replicated_resource(&replicated)
+        .await
+        .unwrap();
+    let events = count(&store);
+    assert_eq!(events.len(), 2);
+    assert_eq!(
+        events[1]
+            .props
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        vec![urls::NAME],
+        "only what changed"
+    );
+}
+
+/// Whether a synced Loro state changed anything is decided from the CRDT's
+/// version, not from the projected properties: a rich-text edit that leaves
+/// them alone is still news, and the same state pushed again is not.
+#[tokio::test]
+#[timeout(120000)]
+async fn a_synced_edit_that_leaves_the_properties_alone_still_adds_an_event() {
+    use crate::sync::ws_apply::{persist_update, resolve_update};
+
+    let store = Db::init_temp("replication_loro_version").await.unwrap();
+    store.populate().await.unwrap();
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    store.enable_drive_events(drive.as_str()).unwrap();
+    let subject = "atomic:replicated-text";
+
+    let doc = crate::loro::AtomicLoroDoc::new();
+    doc.set_property(urls::PARENT, &Value::AtomicUrl(drive.clone()))
+        .unwrap();
+    doc.set_property(urls::NAME, &Value::String("Doc".into()))
+        .unwrap();
+    doc.commit_with_message("peer");
+    let push = |bytes: Vec<u8>| {
+        let store = store.clone();
+        async move {
+            let resolved = resolve_update(&store, subject, &bytes)
+                .await
+                .expect("the state resolves");
+            persist_update(&store, subject, resolved).await.unwrap();
+        }
+    };
+    let events = |store: &Db| {
+        store
+            .drive_events(drive.as_str(), 0, 1000)
+            .into_iter()
+            .filter(|e| e.subject == subject)
+            .collect::<Vec<_>>()
+    };
+
+    push(doc.export_snapshot()).await;
+    assert_eq!(events(&store).len(), 1);
+    push(doc.export_snapshot()).await;
+    assert_eq!(events(&store).len(), 1, "the same state again is not news");
+
+    // Text lives in its own container: no projected property moves.
+    doc.doc().get_text("body").insert(0, "hello").unwrap();
+    doc.doc().commit();
+    push(doc.export_snapshot()).await;
+    let after = events(&store);
+    assert_eq!(after.len(), 2, "{after:?}");
+    assert!(
+        after[1].props.iter().all(|p| p == urls::LORO_UPDATE),
+        "no property of the resource differs: {after:?}"
+    );
+    push(doc.export_snapshot()).await;
+    assert_eq!(events(&store).len(), 2);
+}
+
+/// A destroy *commit* takes its children with it. Each child is its own row in
+/// the stream, and the leave edge of each is on its own event rather than
+/// merged into the destroyed parent's.
+#[tokio::test]
+#[timeout(120000)]
+async fn a_destroy_commit_gives_every_child_its_own_event_and_leave_edge() {
+    use crate::db::plugin_trigger::{Edge, PluginTrigger, PluginTriggerKey};
+
+    let store = Db::init_temp("destroy_children_events").await.unwrap();
+    store.populate().await.unwrap();
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    let folder = genesis_child(&store, &drive).await;
+    let mut kids = vec![
+        genesis_child(&store, &folder).await.to_string(),
+        genesis_child(&store, &folder).await.to_string(),
+        genesis_child(&store, &folder).await.to_string(),
+    ];
+    kids.sort();
+    let key = PluginTriggerKey::new(drive.as_str(), "plugin");
+    let trigger = PluginTrigger::new(
+        crate::db::QueryFilter {
+            filters: vec![crate::storelike::PropVal {
+                property: Some(urls::PARENT.to_string()),
+                value: Some(Value::AtomicUrl(folder.clone())),
+                ..Default::default()
+            }],
+            sort_by: None,
+            drive: drive.as_str().into(),
+        },
+        true,
+        true,
+    )
+    .unwrap();
+    store.set_plugin_trigger(&key, &trigger).unwrap();
+    let seen = store.drive_events(drive.as_str(), 0, 1000).len();
+
+    let mut resource = store.get_resource(&folder).await.unwrap();
+    resource.destroy(&store).await.unwrap();
+
+    let destroyed: Vec<String> = store
+        .drive_events(drive.as_str(), 0, 1000)
+        .into_iter()
+        .skip(seen)
+        .filter(|e| e.destroyed)
+        .map(|e| e.subject)
+        .collect();
+    for kid in &kids {
+        assert!(destroyed.contains(kid), "{kid} missing in {destroyed:?}");
+    }
+    assert!(destroyed.contains(&folder.to_string()));
+
+    let mut left = Vec::new();
+    while let Some(event) = store.next_trigger_event(&key, &trigger).unwrap() {
+        assert_eq!(event.edge, Edge::Leave);
+        left.push(event.subject.clone());
+        store.acknowledge_plugin_event(&event).unwrap();
+    }
+    left.sort();
+    assert_eq!(left, kids, "one leave edge per child");
+}
+
+/// Appending finds where the log ended without reading it, and retention
+/// emptying the log does not send the sequence back to 1 (a consumer's
+/// checkpoint would then sit above every new event and miss them).
+#[tokio::test]
+#[timeout(120000)]
+async fn the_event_sequence_outlives_the_rows_retention_removes() {
+    let store = Db::init_temp("event_seq_persisted").await.unwrap();
+    store.populate().await.unwrap();
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    store.enable_drive_events(drive.as_str()).unwrap();
+    genesis_child(&store, &drive).await;
+    genesis_child(&store, &drive).await;
+    let last = store.last_event_seq(drive.as_str());
+    assert!(last >= 2);
+    store.ack_events(drive.as_str(), "slow", 1).unwrap();
+    assert_eq!(
+        store.event_consumers_behind(drive.as_str(), last),
+        vec![("slow".to_string(), 1)]
+    );
+
+    // Retention removed every row.
+    for event in store.drive_events(drive.as_str(), 0, 1000) {
+        let key = format!(
+            "drive-event/v1/{}/{:020}",
+            crate::db::drive_events::pure(drive.as_str()),
+            event.seq
+        );
+        store.kv.remove(Tree::PluginMeta, key.as_bytes()).unwrap();
+    }
+    assert!(store.drive_events(drive.as_str(), 0, 1000).is_empty());
+
+    genesis_child(&store, &drive).await;
+    let events = store.drive_events(drive.as_str(), 0, 1000);
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].seq, last + 1, "continues, does not restart");
+    // And a cursor from before the gap still sees it.
+    assert_eq!(store.drive_events(drive.as_str(), last, 10).len(), 1);
+    assert!(store.drive_events(drive.as_str(), u64::MAX, 10).is_empty());
+}
+
+/// A trigger that was waiting on a proposal in the queue the event stream
+/// replaced would wait for ever: nothing can release it. Startup clears it, and
+/// leaves a trigger whose in-flight record exists alone.
+#[tokio::test]
+#[timeout(120000)]
+async fn a_proposal_whose_event_is_gone_is_cleared_at_startup() {
+    use crate::db::plugin_trigger::{Edge, PluginTrigger, PluginTriggerKey, QueuedEvent};
+
+    let store = Db::init_temp("orphaned_verdicts").await.unwrap();
+    store.populate().await.unwrap();
+    let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
+    let trigger = |waiting: &str| {
+        let mut trigger = PluginTrigger::new(
+            crate::db::QueryFilter {
+                filters: vec![crate::storelike::PropVal {
+                    property: Some(urls::PARENT.to_string()),
+                    value: Some(Value::AtomicUrl(drive.clone())),
+                    ..Default::default()
+                }],
+                sort_by: None,
+                drive: drive.as_str().into(),
+            },
+            true,
+            false,
+        )
+        .unwrap();
+        trigger.pending_verdict = Some(waiting.into());
+        trigger
+    };
+    let orphan = PluginTriggerKey::new(drive.as_str(), "orphan");
+    let live = PluginTriggerKey::new(drive.as_str(), "live");
+    store.set_plugin_trigger(&orphan, &trigger("old")).unwrap();
+    store.set_plugin_trigger(&live, &trigger("new")).unwrap();
+    store
+        .save_plugin_event(&QueuedEvent {
+            id: "1".into(),
+            seq: 1,
+            key: live.clone(),
+            subject: "x".into(),
+            edge: Edge::Enter,
+            at: 0,
+            verdict: Some("new".into()),
+            waiting_for_review: true,
+            authorization: None,
+        })
+        .unwrap();
+    store
+        .kv
+        .insert(
+            Tree::PluginMeta,
+            b"plugin-event/v1/00000000000000000001",
+            b"{}",
+        )
+        .unwrap();
+
+    let cleared = store.drop_orphaned_trigger_verdicts().unwrap();
+    assert_eq!(cleared, vec![orphan.clone()]);
+    let pending = |key: &PluginTriggerKey| {
+        store
+            .get_plugin_trigger(key)
+            .unwrap()
+            .unwrap()
+            .pending_verdict
+    };
+    assert_eq!(pending(&orphan), None);
+    assert_eq!(pending(&live).as_deref(), Some("new"));
+    assert!(store
+        .kv
+        .get(Tree::PluginMeta, b"plugin-event/v1/00000000000000000001")
+        .unwrap()
+        .is_none());
+}
+
 /// Stored bytes of a retained envelope after small edits, measured through
 /// the compressed KV the way the row is written to disk.
 #[tokio::test]

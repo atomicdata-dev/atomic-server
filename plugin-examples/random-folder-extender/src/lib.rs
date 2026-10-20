@@ -1,22 +1,12 @@
 use atomic_plugin::{ClassExtender, Commit, CommitBuilder, Resource};
 use rand::seq::SliceRandom;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
-use waki::Client;
+use serde::Deserialize;
 
 struct RandomFolderExtender;
 
-#[derive(Serialize)]
-struct DiscordWebhookBody {
-    content: String,
-}
-
 #[derive(Deserialize)]
 struct Config {
-    #[serde(rename = "discordWebhookUrl")]
-    discord_webhook_url: String,
-    #[serde(rename = "updateMessage")]
-    update_message: String,
     #[serde(rename = "blacklistedFolderNames")]
     blacklisted_folder_names: Option<Vec<String>>,
 }
@@ -95,44 +85,15 @@ impl ClassExtender for RandomFolderExtender {
         Ok(())
     }
 
-    // Send a message to a Discord webhook when a folder is updated.
+    // Shuffle the name of the folder after every update, as the module's own agent.
+    // The commit this writes does not trigger the hook again.
     fn after_commit(_commit: &Commit, resource: &Resource, _is_new: bool) -> Result<(), String> {
-        // Shuffle the name of the folder
-        let name = get_name_from_folder(resource)?;
-        let shuffled_name = shuffle_string(name);
+        let shuffled_name = shuffle_string(get_name_from_folder(resource)?);
 
-        // Commit the shuffled name to persist the change.
         let mut commit_builder = CommitBuilder::new(resource.subject.clone());
-        commit_builder.set(NAME_PROP.to_string(), shuffled_name.clone().into());
+        commit_builder.set(NAME_PROP.to_string(), shuffled_name.into());
 
-        atomic_plugin::commit(&commit_builder)?;
-
-        // Announce the update to a Discord server.
-        let config = atomic_plugin::get_config::<Config>()
-            .map_err(|_| "Could not parse plugin config".to_string())?;
-        let client = Client::new();
-
-        // verify if the discord webhook url is valid
-        let Ok(_) = url::Url::parse(&config.discord_webhook_url) else {
-            // If the discord webhook url is not valid, we don't send the message.
-            return Ok(());
-        };
-
-        let body = DiscordWebhookBody {
-            content: config
-                .update_message
-                .replace("{{name}}", &shuffled_name)
-                .replace("{{subject}}", &resource.subject),
-        };
-
-        client
-            .post(&config.discord_webhook_url)
-            .header("Content-Type", "application/json")
-            .body(serde_json::to_string(&body).map_err(|e| e.to_string())?)
-            .send()
-            .map_err(|e| e.to_string())?;
-
-        Ok(())
+        atomic_plugin::commit(&commit_builder)
     }
 }
 

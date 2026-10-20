@@ -5,7 +5,10 @@ A helper library that removes a lot of the boilerplate when building AtomicServe
 ## Class Extenders
 
 Atomic Data Classextenders are plugins that can modify the behavior of an Atomic Data class.
-For example you might want to add some custom verification logic to a class
+For example you might want to add some custom verification logic to a class.
+A class extender is a server module on the host ABI (`atomic-host/wit/host.wit`, world `server-module`).
+It reads and writes as its Installation's agent: `get_resource`, `query`, `commit` (planned as `store.apply`), `get_config`
+and `fetch` (by manifest operation, `net.fetch`) go through the same checks as for any app.
 
 ## How to use
 
@@ -23,7 +26,7 @@ impl ClassExtender for MyExtender {
     }
 
     // Prevent commits where the name contains "Tailwind CSS".
-    fn before_commit(commit: &Commit, _snapshot: &Resource) -> Result<(), String> {
+    fn before_commit(commit: &Commit, _snapshot: &Resource, _is_new: bool) -> Result<(), String> {
         let Some(set) = &commit.set else {
             return Ok(());
         };

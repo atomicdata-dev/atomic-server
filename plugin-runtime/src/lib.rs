@@ -68,19 +68,51 @@ globalThis.__atomic = (function () {
     return parsed.ok;
   }
 
-  // Parsed, like `read` and `query`: a plugin wants `res.status` and
-  // `res.body`, not a string it has to remember to parse.
   input.integration = function (request) {
     return JSON.parse(unwrap(__hostAction(JSON.stringify(request))));
   };
-  input.http = function (request) {
-    return JSON.parse(unwrap(__hostFetch(JSON.stringify(request))));
+  // The host ABI (`atomic:host`): the same functions, names and error codes as
+  // every other kind of app. A failure throws an Error with `.code`.
+  function abi(name, ...args) {
+    const r = JSON.parse(__hostAbi(name, JSON.stringify(args)));
+    if (r.error !== undefined) throw Object.assign(new Error(r.error.message), { code: r.error.code });
+    return JSON.parse(r.ok);
+  }
+  globalThis.store = {
+    get: (subject) => abi('store.get', subject),
+    getMany: (subjects) => abi('store.get-many', subjects),
+    query: (spec) => abi('store.query', spec),
+    apply: (intents) => abi('store.apply', intents),
   };
-  input.read = function (subject) {
-    return JSON.parse(unwrap(__hostGetResource(subject)));
+  globalThis.net = { fetch: (request) => abi('net.fetch', request) };
+  globalThis.calls = {
+    providers: (name) => abi('calls.providers', name),
+    describe: (name) => abi('calls.describe', name),
+    call: (name, fn, args, handles = []) => abi('calls.call', name, fn, args, handles),
   };
-  input.query = function (property, value) {
-    return JSON.parse(unwrap(__hostQuery(property, value)));
+
+  // The older `ctx.*` names, as thin shims over the ABI with their old shapes:
+  // `http` takes a URL request, `read` returns JSON-AD, `query` returns
+  // subjects matching an exact string value.
+  input.http = (request) => abi('net.fetch', request);
+  input.read = (subject) => {
+    const { subject: id, propvals } = abi('store.get', subject);
+    return Object.fromEntries([['@id', id], ...propvals.map((pv) => [pv.property, pv.value.val])]);
+  };
+  input.query = (property, value) => {
+    const subjects = [];
+    let cursor = null;
+    do {
+      const page = abi('store.query', {
+        filters: [{ property, op: 'eq', value: { tag: 'string', val: value } }],
+        limit: 500,
+        cursor,
+      });
+      subjects.push(...page.subjects);
+      if (!page.complete && !page.cursor) throw new Error('sandbox query is incomplete');
+      cursor = page.cursor;
+    } while (cursor);
+    return subjects;
   };
 
   return input;
@@ -104,38 +136,28 @@ impl Guest for Component {
             // and a thrown string loses which call failed.
             globals
                 .set(
-                    "__hostFetch",
-                    Function::new(ctx.clone(), |request: String| encode(host::fetch(&request)))
-                        .map_err(|e| e.to_string())?,
-                )
-                .map_err(|e| e.to_string())?;
-
-            globals
-                .set(
-                    "__hostGetResource",
-                    Function::new(ctx.clone(), |subject: String| {
-                        encode(host::get_resource(&subject))
-                    })
-                    .map_err(|e| e.to_string())?,
-                )
-                .map_err(|e| e.to_string())?;
-
-            globals
-                .set(
-                    "__hostQuery",
-                    Function::new(ctx.clone(), |property: String, value: String| {
-                        encode(host::query(&property, &value))
-                    })
-                    .map_err(|e| e.to_string())?,
-                )
-                .map_err(|e| e.to_string())?;
-
-            globals
-                .set(
                     "__hostAction",
                     Function::new(ctx.clone(), |request: String| {
                         encode(host::invoke_action(&request))
                     })
+                    .map_err(|e| e.to_string())?,
+                )
+                .map_err(|e| e.to_string())?;
+
+            globals
+                .set(
+                    "__hostAbi",
+                    Function::new(
+                        ctx.clone(),
+                        |function: String, args: String| match host::abi(&function, &args) {
+                            Ok(value) => encode(Ok(value)),
+                            Err(e) => format!(
+                                "{{\"error\":{{\"code\":{},\"message\":{}}}}}",
+                                serde_json_string(&e.code),
+                                serde_json_string(&e.message)
+                            ),
+                        },
+                    )
                     .map_err(|e| e.to_string())?,
                 )
                 .map_err(|e| e.to_string())?;

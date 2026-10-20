@@ -32,6 +32,7 @@
     "format": "oxfmt -c ../.oxfmtrc.json ./src",
     "lint": "oxlint -c ../.oxlintrc.json . && pnpm format-check",
     "lint-fix": "oxlint -c ../.oxlintrc.json --fix . && pnpm format",
+    "generate-bindings": "node --experimental-strip-types scripts/generate-export-bindings.mjs",
     "start": "tsdown --watch",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm run build"

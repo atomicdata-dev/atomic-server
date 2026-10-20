@@ -234,7 +234,11 @@ pub async fn call(
                 _ => writer.delete(args).await,
             }
         }
-        other => Err(format!("Unknown tool {other}")),
+        // Exports of the drives' apps, named from interface and function.
+        other => match super::exports::call(appstate, req, grant, other, args).await {
+            Some(outcome) => outcome,
+            None => Err(format!("Unknown tool {other}")),
+        },
     }
 }
 

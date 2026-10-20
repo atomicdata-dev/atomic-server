@@ -133,6 +133,14 @@ pub async fn run_due(appstate: &AppState) -> usize {
     let mut ran = 0;
 
     for (key, mut schedule) in due {
+        // Left due for the node that holds the lease (`plugins::lease`).
+        if !appstate
+            .leases
+            .holds(&appstate.store, &key.drive, &key.plugin)
+            .await
+        {
+            continue;
+        }
         if schedule.running || schedule.pending_verdict.is_some() {
             if let Some(at) = schedule.last_run_at {
                 let journal = super::journal::Journal::new(
@@ -463,7 +471,11 @@ async fn run_one(appstate: &AppState, key: &PluginScheduleKey) -> Result<String,
     };
 
     runtime
-        .run_triggered(&source, &input, host)
+        .run_triggered(
+            &source,
+            &input,
+            super::host_abi::JsAbi::new(host, appstate.host_abi.clone()),
+        )
         .await
         .map_err(|e| e.to_string())?
 }

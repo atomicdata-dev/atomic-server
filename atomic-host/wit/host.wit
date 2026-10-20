@@ -1,0 +1,359 @@
+// Draft host ABI, step 1 of planning/host-abi.md. Pre-v1: may change freely.
+//
+// One package for every plugin kind. WIT is the description, not the runtime:
+// Rust components link against it through wasmtime; JS/TS gets generated types
+// and a postMessage client (browser frames) or QuickJS globals (server), with no
+// WASM hop. Names are the same in every language.
+
+package atomic:host@0.1.0;
+
+/// Values and resources. Recursive values (nested objects) cross as JSON text,
+/// because WIT has no recursive types; everything else is typed.
+interface types {
+  type subject = string;
+  /// A property subject, normally `atomic:prop:b3-...`.
+  type property = string;
+
+  variant value {
+    null,
+    boolean(bool),
+    integer(s64),
+    float(f64),
+    %string(string),
+    /// A link to another resource.
+    link(subject),
+    resource-array(list<subject>),
+    /// Nested objects and arrays of mixed values, as JSON text.
+    json(string),
+  }
+
+  record prop-val {
+    property: property,
+    value: value,
+  }
+
+  record %resource {
+    subject: subject,
+    classes: list<subject>,
+    propvals: list<prop-val>,
+  }
+
+  enum severity { error, warning }
+
+  record problem {
+    severity: severity,
+    message: string,
+    subject: option<subject>,
+    property: option<property>,
+  }
+
+  /// Machine-readable failure. `code` is stable; `message` is for people.
+  record error {
+    code: string,
+    message: string,
+  }
+}
+
+/// The kernel: reads, writes, subscriptions. Every call is checked against the
+/// caller's effective grant (installation grant ∩ handles it was given).
+interface store {
+  use types.{subject, property, value, prop-val, %resource, problem, error};
+
+  enum filter-op { eq, ne, lt, lte, gt, gte, contains, exists }
+
+  record filter {
+    property: property,
+    op: filter-op,
+    value: option<value>,
+  }
+
+  record query-spec {
+    /// Members of this class (subclasses included).
+    class: option<subject>,
+    /// Members under this parent.
+    parent: option<subject>,
+    /// All must match.
+    filters: list<filter>,
+    sort-by: option<property>,
+    sort-desc: bool,
+    /// 1..=500.
+    limit: option<u32>,
+    /// From a previous page.
+    cursor: option<string>,
+    /// Return the resources too, not only their subjects.
+    with-resources: bool,
+  }
+
+  record page {
+    subjects: list<subject>,
+    resources: list<%resource>,
+    cursor: option<string>,
+    /// False when the answer may be partial (offline, not yet synced, no
+    /// rights on some members). Never guess: say so.
+    complete: bool,
+  }
+
+  get: func(subject: subject) -> result<%resource, error>;
+  /// Order kept; a missing or forbidden subject is an error in its slot.
+  get-many: func(subjects: list<subject>) -> list<result<%resource, error>>;
+  query: func(q: query-spec) -> result<page, error>;
+  search: func(text: string, class: option<subject>, limit: u32) -> result<list<subject>, error>;
+
+  /// Live updates arrive as `events` with kind `entered` / `left` / `changed`.
+  subscribe: func(q: query-spec) -> result<string, error>;
+  unsubscribe: func(subscription: string);
+
+  record create {
+    /// `local:<name>`; later intents in the same apply may refer to it.
+    local-id: string,
+    parent: subject,
+    classes: list<subject>,
+    set: list<prop-val>,
+  }
+
+  variant intent {
+    create(create),
+    set(tuple<subject, list<prop-val>>),
+    remove(tuple<subject, list<property>>),
+    destroy(subject),
+  }
+
+  enum outcome {
+    /// Written.
+    committed,
+    /// Stored as a proposal for review (unattended run without auto-apply,
+    /// or a grant that only allows proposing).
+    proposed,
+    /// Nothing done: an error problem blocked it.
+    refused,
+  }
+
+  record applied {
+    outcome: outcome,
+    /// `local-id` -> subject, for created resources.
+    created: list<tuple<string, subject>>,
+    problems: list<problem>,
+    /// For `undo`, when committed.
+    undo-token: option<string>,
+  }
+
+  /// One transaction: planned first, all or nothing. The host decides whether
+  /// it is committed or proposed; the caller never chooses a weaker check.
+  apply: func(intents: list<intent>) -> result<applied, error>;
+  undo: func(undo-token: string) -> result<_, error>;
+}
+
+/// One durable stream for everything that wakes an app.
+interface events {
+  use types.{subject, error};
+
+  variant kind {
+    /// A subscribed query gained, lost or changed a member.
+    entered(string),
+    left(string),
+    changed(string),
+    /// A commit on a class the app declared in its manifest.
+    commit(subject),
+    /// A cron or field timer from the manifest, by name.
+    timer(string),
+    /// An inbound webhook, by route name; the raw body is fetched on demand.
+    webhook(string),
+    /// A connection the app needs is missing or expired.
+    connection-needed(string),
+    /// The resource was destroyed (tombstone).
+    destroyed,
+    /// Not an event: `next` looked at rows the app does not want or may not
+    /// read and found nothing. It has no subject, and its cursor is where the
+    /// scan got to; an app that keeps its own cursor passes it to the next
+    /// call, so it advances over what it cannot see. Skip it otherwise.
+    progress,
+  }
+
+  record event {
+    cursor: string,
+    kind: kind,
+    subject: option<subject>,
+    at-ms: u64,
+  }
+
+  /// Which events the app wants. A field that is set must match; an event
+  /// matches the subscription when any filter matches.
+  record filter {
+    /// The resource has this class.
+    class: option<subject>,
+    /// The resource is this one or below it.
+    subtree: option<subject>,
+    /// The commit changed this property.
+    property: option<subject>,
+  }
+
+  /// Replace the app's subscription, durably. Never subscribed: every event of
+  /// the drive the app may read.
+  set-filters: func(filters: list<filter>) -> result<_, error>;
+
+  /// Up to `max` events after `cursor` (none: from the app's checkpoint),
+  /// oldest first, only for resources the app may read.
+  next: func(cursor: option<string>, max: u32) -> result<list<event>, error>;
+  /// Everything up to `cursor` is handled; the host advances the checkpoint.
+  ack: func(cursor: string) -> result<_, error>;
+}
+
+/// The outside world, only as declared in the manifest.
+interface net {
+  use types.{error};
+
+  record header { name: string, value: string }
+
+  record request {
+    /// A manifest operation id. The host knows its origin, method and effect.
+    operation: string,
+    path: string,
+    query: list<tuple<string, string>>,
+    headers: list<header>,
+    body: option<list<u8>>,
+    if-match: option<string>,
+  }
+
+  record response {
+    status: u16,
+    headers: list<header>,
+    body: list<u8>,
+  }
+
+  /// `secret:<name>` in a header value is substituted by the host.
+  fetch: func(req: request) -> result<response, error>;
+}
+
+/// Calls between apps, and what they offer. Built-in services (dialogs,
+/// pickers, navigation) are apps too: `atomic:ui/dialogs@1` and so on.
+interface calls {
+  use types.{subject, error};
+
+  record app-export {
+    /// `atomic:tasks/manage@1`.
+    %interface: string,
+    function: string,
+    description: string,
+    /// JSON Schema of the arguments and the result.
+    input-schema: string,
+    output-schema: string,
+    effect: effect,
+  }
+
+  enum effect { read, write, external, interactive }
+
+  /// A capability handed to the callee for this call only.
+  record handle {
+    scope: subject,
+    rights: list<string>,
+  }
+
+  /// Installed apps in this drive that provide `interface`, preferred first.
+  providers: func(%interface: string) -> list<subject>;
+  describe: func(%interface: string) -> result<list<app-export>, error>;
+
+  /// Arguments and result are JSON, checked by the host against the schemas.
+  /// Generated bindings wrap this in typed functions per interface.
+  call: func(%interface: string, function: string, args: string, handles: list<handle>) -> result<string, error>;
+}
+
+/// What an app implements.
+interface app {
+  use types.{error};
+  use events.{event};
+
+  /// Handle one event. Errors are recorded on the installation's run log.
+  on-event: func(e: event) -> result<_, error>;
+  /// Answer a call to one of the app's declared exports.
+  invoke: func(%interface: string, function: string, args: string) -> result<string, error>;
+}
+
+/// Sandboxed app: script or component. Everything through the host.
+world sandboxed-app {
+  import store;
+  import events;
+  import net;
+  import calls;
+  export app;
+}
+
+/// Who the code runs as, for modules that run inside the server's own commit
+/// and read path and so have no caller to ask.
+interface context {
+  use types.{subject};
+
+  record module-context {
+    /// The Installation this module belongs to. None for a module an operator
+    /// dropped into the server's global directory.
+    installation: option<subject>,
+    /// The agent the module acts as: every `store` call is checked against it
+    /// and `store.apply` is signed by it. None when it has no identity (then
+    /// it reads as the public and writes nothing).
+    agent: option<subject>,
+    /// The Installation's config as JSON text, `{}` when it has none.
+    config: string,
+  }
+
+  get: func() -> module-context;
+}
+
+/// Hooks in the server's commit and read path, for the classes the module
+/// extends. They run as the module's agent (see `context`); a commit the
+/// module's own agent signed does not trigger them, which keeps a module from
+/// reacting to its own writes.
+interface hooks {
+  use types.{subject, %resource, problem, error};
+
+  /// A commit, as the hooks see it.
+  record commit-info {
+    /// The resource the commit is about.
+    subject: subject,
+    signer: subject,
+    /// The commit as JSON-AD.
+    commit-json: string,
+    /// The commit creates the resource.
+    is-new: bool,
+  }
+
+  /// The classes this module extends. Asked once, when the module is loaded.
+  classes: func() -> list<subject>;
+
+  /// Before a commit on one of the classes is stored. `after` is the resource
+  /// as the commit leaves it; the state before is still readable with
+  /// `store.get`. An `error` problem refuses the commit, a `warning` is logged.
+  /// A trap or an out-of-fuel run refuses it too. The commit is not stored yet,
+  /// so the module must not write the same resource here: use `after-commit`.
+  before-commit: func(commit: commit-info, after: %resource) -> list<problem>;
+
+  /// After the commit is stored. A failure is logged and never undoes it.
+  after-commit: func(commit: commit-info, after: %resource) -> result<_, error>;
+
+  /// What an `on-get` answers: the resource, and other resources to send along
+  /// with it (messages of a chat, say).
+  record get-answer {
+    /// Replaces the resource asked for.
+    %resource: %resource,
+    /// Subjects of resources to send with the answer. The host reads each one
+    /// with the same grant as the module's `store.get`; one it may not read is
+    /// left out.
+    referenced: list<subject>,
+  }
+
+  /// Before a resource of one of the classes is returned to `agent`. `query` is
+  /// the query string of the subject asked for (`?before-timestamp=1`), decoded.
+  /// The answer replaces the resource (`none` leaves it as it is); `classes` of
+  /// the answer is ignored, the `is-a` property decides, and so does the subject
+  /// asked for. An error fails the read.
+  on-get: func(r: %resource, agent: subject, query: list<tuple<string, string>>) -> result<option<get-answer>, error>;
+}
+
+/// A module the operator installed: the same `store`, `net` and `calls` as an
+/// app, under its Installation's agent, plus hooks in the commit and read path.
+/// Replaces `atomic:class-extender`.
+world server-module {
+  import store;
+  import net;
+  import calls;
+  import context;
+  export hooks;
+}

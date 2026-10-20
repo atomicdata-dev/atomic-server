@@ -7,23 +7,22 @@ If you are using Rust, you can use the `atomic-plugin` crate to help with some o
 
 ## Class Extenders
 
-Plugins take the form of a class extender.
+Plugins take the form of a class extender, which is a server module on the [host ABI](host-abi.md#a-server-module-hooks-in-the-commit-and-read-path) (world `server-module`).
 A class extender exports a few functions that get called at specific moments by the server.
 
-- `class-url`: Returns a list of class URLs that the plugin extends.
-- `on-resource-get`: Called when a resource is fetched from the server. You can modify the resource in place.
-- `before-commit`: Called before a commit is applied to the server. If you return an error, the commit will be rejected.
+- `classes`: Returns a list of class URLs that the plugin extends.
+- `on-get`: Called when a resource is fetched from the server. You can return an extended version of the resource.
+- `before-commit`: Called before a commit is applied to the server. If you return an error problem, the commit will be rejected.
 - `after-commit`: Called after a commit is applied to the server. Returning an error will not cancel the commit.
 
-They can also access a few functions provided by the server:
+They can also use what the server provides, the same as any app:
 
-- `get-resource`: Returns a resource by subject.
-- `query`: Returns a list of resources that match the query.
-- `get-config`: Returns the JSON config of the plugin.
-- `commit`: Creates and applies a commit signed by the plugin's agent.
+- `store.get` and `store.query`: Read resources, as the plugin's agent.
+- `store.apply`: Create, change or remove resources, signed by the plugin's agent.
+- `context.get`: The JSON config of the plugin and the agent it acts as.
+- `net.fetch`: Call an operation the manifest declares.
 
-<!-- TODO: Update this link to point to develop when the PR is merged -->
-These functions are documented and typed in the [class-extender.wit](https://github.com/ontola/atomic-server/blob/c2a1aaf814e73381e597fc6472bf0dca9689084c/server/wit/class-extender.wit) file.
+These functions are documented and typed in [host.wit](https://github.com/ontola/atomic-server/blob/develop/atomic-host/wit/host.wit).
 You can use this file to generate bindings for your programming language of choice.
 
 ## Namespaces
@@ -46,19 +45,19 @@ The following capabilities are available:
 - `extended-memory`: Allows the plugin to use extended memory.
 - `custom-view`: Allows the plugin to display a custom view in the Data Browser.
 
-Network access is not a capability: declare the exact origins the plugin may reach in `network.origins` (a legacy `network` permission translates into that, and is refused without any origin).
-A class extender that declares at least one origin gets `wasi-http` and the host `fetch`, limited to those origins.
+Network access is not a capability: declare the operations the plugin may call in `operations` (exact endpoints, each with an `effect`) and name the credentials it may send in `secrets`.
+A class extender reaches them with `net.fetch` only; it has no `wasi-http` and no sockets.
 
 > [!NOTE]
-> If your Wasm component imports the `wasi-http` feature without declaring any `network.origins`, the plugin fails to instantiate.
+> If your Wasm component imports `wasi-http`, the plugin fails to instantiate.
 
 ## Access Rights
 
 Each Installation gets its own [agent](../agents.md) that the plugin uses to fetch resources and sign commits.
 By default that agent does not have access to any resources.
-The user can grant access to specific resources on the Installation page.
+The installer grants access to specific parts of the drive with the Installation's `readScope`, `writeScope` and `callScope` (see [Scopes](host-abi.md#scopes)), or by hand on a resource's rights.
 
-Alternatively you can declare the `full-drive-access` capability in the manifest to give the agent full access to the drive.
+Alternatively you can declare the `full-drive-access` capability in the manifest to give the agent full access to the drive, which is the widest scope.
 
 ## The plugin package
 
@@ -121,11 +120,11 @@ Every field except `schemaVersion` is optional; unknown fields and malformed dec
 ```
 
 - `runtime`: `atomic-js/1` (default) or `wasip2/1`. The language of the guest; it says nothing about trust.
-- `world`: the trust boundary. `extension` (default) exports `run`, proposes effects and is user-installable. `server-extension` exports the class-extender hooks, may write, and is operator-installed. A `server-extension` must either run on `wasip2/1` (the component's `class-url` export names its classes) or list its classes in `entrypoints.classExtender`; an `extension` may not declare `classExtender`.
+- `world`: the trust boundary. `extension` (default) exports `run`, proposes effects and is user-installable. `server-extension` is a `server-module` component: it exports the hooks, may write as its Installation's agent, and is operator-installed. A `server-extension` must either run on `wasip2/1` (the component's `hooks.classes` export names its classes) or list its classes in `entrypoints.classExtender`; an `extension` may not declare `classExtender`.
 - `entrypoints`: `run` (default `true` when `entrypoints` is absent, `false` when it is present without `run`), `view` (a package-relative path, requires the `custom-view` capability) and `classExtender` (class URLs, `server-extension` only).
 - `capabilities`: `storage`, `full-drive-access`, `extended-fuel`, `extended-memory`, `custom-view`, each either as a name or as `{name, reason}`. The reason is shown at review. Network access is not a capability: declare destinations instead.
 - `secrets`, `operations`, `actions`: as in schema version 1. Secrets name an exact origin a credential may be sent to; operations are exact endpoints with an `effect` of `read` or `write`; actions reference operations.
-- `network.origins`: exact origins (no wildcards, paths or ports beyond the origin) for packages that call the host `fetch` without an operation id. It never widens what `operations` grant.
+- `network.origins`: exact origins a legacy `plugin.json` declared. Kept so old packages still translate and review; nothing reaches the network through it any more, because a class extender calls `net.fetch` by operation id. Declare `operations`.
 - `configSchema`, `defaultConfig`: objects, as in `plugin.json`.
 - `name`, `namespace`, `version`, `description`, `author`: metadata. `name` and `namespace` must be safe path segments.
 

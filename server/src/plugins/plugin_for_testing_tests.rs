@@ -2,6 +2,7 @@
 //! schema sync where either side renames a field without rebinding it.
 use super::{
     external::{ExternalHost, ExternalIntent, Receipt},
+    host_abi::{code, error, HostError},
     js_runtime::{embedded_runtime, PluginHost, StoreHost},
     store_host::StoreApplyHost,
     sync_session::*,
@@ -39,8 +40,11 @@ struct Host {
 
 #[async_trait::async_trait]
 impl PluginHost for Host {
-    async fn fetch(&mut self, request: String) -> Result<String, String> {
-        let r: Value = serde_json::from_str(&request).unwrap();
+    async fn abi(&mut self, function: &str, args: &str) -> Result<String, HostError> {
+        if function != "net.fetch" {
+            return self.atomic.as_mut().unwrap().abi(function, args).await;
+        }
+        let r: Value = serde_json::from_str::<Vec<Value>>(args).unwrap().remove(0);
         let (operation, method, url) = (
             r["operation"].as_str().unwrap(),
             r["method"].as_str().unwrap(),
@@ -57,15 +61,9 @@ impl PluginHost for Host {
                 {"id":"archive","name":"Archive","owner":"private@example.test"},
             ]),
             "schema" => json!({"id":"field","name":self.provider.lock().unwrap().field}),
-            _ => return Err("unexpected read".into()),
+            _ => return Err(error(code::INTERNAL, "unexpected read")),
         };
         Ok(json!({"status":200,"body":body.to_string()}).to_string())
-    }
-    async fn get_resource(&mut self, subject: String) -> Result<String, String> {
-        self.atomic.as_mut().unwrap().get_resource(subject).await
-    }
-    async fn query(&mut self, property: String, value: String) -> Result<String, String> {
-        self.atomic.as_mut().unwrap().query(property, value).await
     }
 }
 
