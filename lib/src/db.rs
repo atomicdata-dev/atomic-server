@@ -1142,6 +1142,20 @@ impl Db {
         uploads_path: &std::path::Path,
         policy: &compaction::CompactionPolicy,
     ) -> AtomicResult<Db> {
+        Self::init_redb_file_with_cache(path, base_domain, uploads_path, policy, None).await
+    }
+
+    /// `init_redb_file_with_policy` with redb's read cache at `cache_bytes`
+    /// instead of its 1 GiB default. The cache keeps whatever was read, up
+    /// to the store's size; a phone sets tens of MiB.
+    #[cfg(all(feature = "db", not(target_arch = "wasm32")))]
+    pub async fn init_redb_file_with_cache(
+        path: &std::path::Path,
+        base_domain: Option<String>,
+        uploads_path: &std::path::Path,
+        policy: &compaction::CompactionPolicy,
+        cache_bytes: Option<usize>,
+    ) -> AtomicResult<Db> {
         tracing::info!("Opening ReDB database at {:?}", path);
 
         std::fs::create_dir_all(path).map_err(|e| {
@@ -1201,7 +1215,7 @@ impl Db {
         let _ = uploads_path;
 
         let (redb_store, compaction) =
-            redb_store::RedbStore::new_file_with_policy(&redb_path, policy)?;
+            redb_store::RedbStore::new_file_with_options(&redb_path, policy, cache_bytes)?;
 
         let store = Db::from_kv(path.to_path_buf(), Arc::new(redb_store), base_domain);
 

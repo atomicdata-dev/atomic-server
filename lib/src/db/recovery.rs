@@ -85,7 +85,33 @@ fn canonical(path: &Path) -> PathBuf {
 /// `Database::create`, with redb's panics on a damaged file turned into an
 /// error that says so.
 pub fn create_database(path: &Path) -> AtomicResult<Database> {
-    match std::panic::catch_unwind(|| Database::create(path)) {
+    create_database_with_cache(path, None)
+}
+
+/// redb's own read cache default (`Builder::new`): 1 GiB.
+pub const DEFAULT_CACHE_BYTES: usize = 1024 * 1024 * 1024;
+
+/// The builder [`create_database_with_cache`] opens with: redb's defaults,
+/// with the read cache at `cache_bytes` when given. A server wants the
+/// default (the whole working set stays cached); a phone wants tens of MiB,
+/// or whatever it reads stays in memory up to the store's size.
+pub fn database_builder(cache_bytes: Option<usize>) -> (redb::Builder, usize) {
+    let mut builder = Database::builder();
+    let bytes = cache_bytes.unwrap_or(DEFAULT_CACHE_BYTES);
+    if cache_bytes.is_some() {
+        builder.set_cache_size(bytes);
+    }
+    (builder, bytes)
+}
+
+/// [`create_database`] with the read cache at `cache_bytes` (redb's 1 GiB
+/// default when `None`).
+pub fn create_database_with_cache(
+    path: &Path,
+    cache_bytes: Option<usize>,
+) -> AtomicResult<Database> {
+    let (builder, _) = database_builder(cache_bytes);
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| builder.create(path))) {
         Ok(Ok(db)) => Ok(db),
         Ok(Err(e)) if is_damage(&e) => Err(format!(
             "The {DAMAGED_STORE}: redb could not read {}: {e}",
@@ -298,6 +324,43 @@ mod tests {
         assert!(!check.is_short());
         assert!(!check.recovery_required, "a clean close clears the flag");
         assert_eq!(inspect(&dir.join("missing.redb")).unwrap(), None);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn the_cache_size_option_is_applied_and_the_default_kept() {
+        assert_eq!(database_builder(None).1, DEFAULT_CACHE_BYTES);
+        assert_eq!(database_builder(Some(48 << 20)).1, 48 << 20);
+    }
+
+    #[test]
+    fn a_store_far_bigger_than_its_cache_still_reads_back() {
+        let dir = temp_dir("small-cache");
+        let path = dir.join("atomic.redb");
+        let table = redb::TableDefinition::<&[u8], &[u8]>::new("t");
+        // 1 MiB of cache for 16 MiB of data: reads must go to the file.
+        let db = create_database_with_cache(&path, Some(1 << 20)).unwrap();
+        let tx = db.begin_write().unwrap();
+        {
+            let mut t = tx.open_table(table).unwrap();
+            for k in 0..64u32 {
+                t.insert(
+                    k.to_be_bytes().as_slice(),
+                    vec![k as u8; 256 * 1024].as_slice(),
+                )
+                .unwrap();
+            }
+        }
+        tx.commit().unwrap();
+        let tx = db.begin_read().unwrap();
+        let t = tx.open_table(table).unwrap();
+        for k in 0..64u32 {
+            let v = t.get(k.to_be_bytes().as_slice()).unwrap().unwrap();
+            assert!(v.value().iter().all(|b| *b == k as u8));
+        }
+        drop(t);
+        drop(tx);
+        drop(db);
         std::fs::remove_dir_all(dir).ok();
     }
 

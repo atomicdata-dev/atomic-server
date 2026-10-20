@@ -279,6 +279,12 @@ fn describe_file(check: Option<atomic_lib::db::recovery::FileCheck>) -> String {
     }
 }
 
+/// redb's read cache on a phone. Its default (1 GiB) keeps whatever was read,
+/// up to the size of the store, in memory (870 MB of RSS after a full walk of
+/// a 1 GB store); the lists and the search read little and repeatedly.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) const REDB_CACHE_BYTES: usize = 48 * 1024 * 1024;
+
 /// `Db::init_redb_file` with any panic inside it turned into a "damaged"
 /// error: a panic must not escape to the app, which then never draws.
 #[cfg(not(target_arch = "wasm32"))]
@@ -288,8 +294,13 @@ async fn open_store_catching(base_path: &std::path::Path) -> Result<atomic_lib::
     let now = state::now_ms();
     let policy = compaction_check::startup_policy(base_path, now);
     let checks = policy.enabled;
-    let opening =
-        atomic_lib::Db::init_redb_file_with_policy(base_path, None, &uploads_path, &policy);
+    let opening = atomic_lib::Db::init_redb_file_with_cache(
+        base_path,
+        None,
+        &uploads_path,
+        &policy,
+        Some(REDB_CACHE_BYTES),
+    );
     match std::panic::AssertUnwindSafe(opening).catch_unwind().await {
         Ok(Ok(store)) => {
             if checks {
