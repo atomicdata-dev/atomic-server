@@ -582,7 +582,12 @@ pub async fn resume_app_session(
     // now lives only on the needs-sync screen (`sync_connectivity_now`), where
     // there is a loading state for it, not a spinning button.
     if drive_resource_exists(store.as_ref()).await {
-        let _ = ensure_sync_connectivity(store.as_ref()).await;
+        // Iroh comes up in the background: binding and waiting for the relay
+        // (up to 10 s offline) must not hold the home back. Everything that
+        // needs the peer calls `start_peer` itself, which waits for this one.
+        tokio::spawn(async move {
+            let _ = ensure_sync_connectivity(store.as_ref()).await;
+        });
         if let Some(home) = store.get_active_drive() {
             tokio::spawn(follow_listed_drives(home));
         }
@@ -1015,6 +1020,10 @@ fn db_event_to_json(event: atomic_lib::DbEvent) -> String {
 /// Start the Iroh peer node. Returns the NodeID.
 /// Call this before any sync operations.
 pub async fn start_peer() -> Result<String, String> {
+    // One endpoint per process: a second caller (the background start after a
+    // resume, a sync button) waits for the first instead of binding another.
+    static STARTING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    let _starting = STARTING.lock().await;
     tracing::info!("[start_peer] called");
     let store = db()?;
     if let Some(existing) = atomic_lib::sync::peer::get_node_id() {

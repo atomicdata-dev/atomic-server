@@ -20,7 +20,7 @@ tracing-android = "0.2"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 atomic_lib = { path = "../../lib", default-features = false, features = ["db-redb", "iroh", "discovery", "ws"] }
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "time"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "time", "sync"] }
 futures = "0.3"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
