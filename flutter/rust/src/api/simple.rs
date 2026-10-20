@@ -206,16 +206,29 @@ fn is_corruption_error(e: &atomic_lib::errors::AtomicError) -> bool {
 
 #[frb(init)]
 pub fn init_app() {
-    flutter_rust_bridge::setup_default_user_utils();
+    // Not `setup_default_user_utils`: that forwards the `log` crate to logcat
+    // at Trace (rustls, reqwest and iroh wrote ~800 formatted lines per app
+    // start) and sets RUST_BACKTRACE=1, which also makes every `anyhow` error
+    // capture and print a stack (iroh makes them in its retry loops). Panics
+    // keep their backtrace; library errors do not capture one.
+    #[cfg(not(target_family = "wasm"))]
+    if std::env::var_os("RUST_LIB_BACKTRACE").is_none() {
+        std::env::set_var("RUST_LIB_BACKTRACE", "0");
+    }
+    flutter_rust_bridge::setup_backtrace();
+    flutter_rust_bridge::setup_log_to_console(log::LevelFilter::Warn);
 
-    // Initialize tracing → logcat on Android, stderr elsewhere
+    // Initialize tracing → logcat on Android, stderr elsewhere. Loro logs
+    // every encoded block at info.
     #[cfg(target_os = "android")]
     {
         use tracing_subscriber::layer::SubscriberExt;
         use tracing_subscriber::util::SubscriberInitExt;
         let _ = tracing_subscriber::registry()
             .with(tracing_android::layer("atomic").ok())
-            .with(tracing_subscriber::filter::LevelFilter::INFO)
+            .with(tracing_subscriber::filter::EnvFilter::new(
+                "info,loro_internal=warn,swarm_discovery=error",
+            ))
             .try_init();
     }
     #[cfg(not(target_os = "android"))]
