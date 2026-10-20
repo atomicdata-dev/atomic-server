@@ -141,10 +141,11 @@ log reading works on both: `[perf] <name> <ms> ms` is a mark since `Application.
 | --- | --- |
 | `main`, `first frame` | `Perf.start()` in `onCreate`; first draw of the activity window |
 | `db open`, `session restored` | store opened; signed in again from the saved secret |
-| `home start`, `home <list>` (span), `home data` | `HomeViewModel`; `home data` when all five lists are in |
+| `home start`, `home <drives\|activity\|chats\|favorites\|conversations>` (span), `home data` | `HomeViewModel`; `home data` when all five lists are in |
+| `chats all painted N` (span), `chats page A+B` (span) | the AI chats' full list: the frame it first shows N rows; each page of B chats read at offset A |
 | `home painted` | the frame after `home data` |
 | `warm ready` | the embed page said `ready` |
-| `search query` (span), `search keystroke to results` (span) | Rust query; last key to the frame that shows its results |
+| `search query` (span), `search keystroke to results` (span) | Rust query; last key to the frame that shows its results (`SearchPanel`) |
 | `resource painted warm\|cold`, `... since tap`, `resource painted in page ...` | the page's `main` shows the title (JS injected by the bridge, as in Flutter), two frames later |
 | `resource revealed warm\|cold`, `... since tap` | `main[about=subject]` holds more than a loading state (JS from Flutter's `_watchReveal`) |
 | `chat data N`, `chat painted N`, `chat older page N` | native chat screens: first page read, messages on screen, each older page |
@@ -220,7 +221,48 @@ Rust    chat.rs: windowed reads, append_ai_chat_entry, conversations, rooms, sig
   `conversation` and `aichat` (answers `true`, as Flutter); the page reads the resource
   again when the screen closes. Everything else stays `false`.
 
-## Status (stages 1 to 4)
+## Shell, tablet layout and the Flutter UX since the fork (stage 5)
+
+```
+shell/Shell.kt        the signed-in app: PageStack, Home sidebar or Home page, search, dialogs
+shell/Destination.kt  Destination (resource, native chat, List, Settings, Profile, Action), PageStack
+shell/Toasts.kt, BackgroundSync.kt    ToastController; the quiet background sync (AppViewModel owns both)
+ui/SplitPanes.kt, PaneMath.kt         sidebar + pages, rubber band, fold; 600 dp breakpoint
+ui/BottomBar.kt, HoldMenu.kt          the bar; the hold / swipe menu of Home, Search and New
+ui/HomeScreen.kt, SectionsDialog.kt   sections, Show all (N), reveal, Activity pane, sections dialog
+ui/SearchPanel.kt + data/SearchModel.kt, data/IdentityModel.kt, ui/ResourceScreen.kt (EmbedSlot)
+```
+
+- **600 dp is the split** (`SPLIT_FROM_DP`, Flutter's `ShellLayout.splitWidth`), so a Tab S9+ in portrait
+  (about 800 dp) gets the sidebar and the Activity pane, as in Flutter. Sidebar 2/5 of the room, 320 to
+  400; dragged 304 to 520 (pages keep 280), rubber band with a 48 dp overshoot, closing never resisted, a drag
+  under 60% of 304 or a fling left folds it (140 ms). Folded: a 24 dp edge strip beyond the system gesture inset
+  and a round button bottom left. The width is kept in the `atomic_ui` prefs.
+- **The bar** is under every page on a phone (hidden while the keyboard is up) and the foot of the sidebar on a
+  tablet: Home, Search, New share `HoldMenu` (swipe more than 8 dp or hold 150 ms opens the menu, a tap is the
+  button's action; New's tap opens its menu), then the profile (`ProfileAvatar`, picture bytes read from the
+  File resource by `read_file_bytes`) and Settings, plus Close sidebar next to the pages. Bar buttons replace the pages.
+- **Home** has headings without buttons (tap folds, hold opens the sections dialog), 4 rows and "Show all (N)",
+  and Activity with the "Show mine" chip; Recents is gone (the search lists what was opened). An unfolded section is
+  scrolled into view (`revealDelta`). Next to the pages Activity is the pane's home (100 rows). The full AI chat
+  list pages by 50 and reads the next page within 10 rows of the end, under headings by age.
+- **Visited on leave:** a page is noted as opened (Recents, active drive) when it is left, not when tapped
+  (`PageStack.onLeave`).
+- **Search** is a page on a phone and a cmd+K card (<= 640 dp, 70% height) on a tablet. A drive result opens the
+  drive; the icon next to it searches inside it; chips filter by class in the index (before the limit).
+- **Warm open.** The warm WebView used to be attached and detached with every `ResourceScreen` (re-parented,
+  `onResume`, a resize event: the suspected ~500 ms of a warm open). It now stays in the layout (`EmbedSlot`),
+  invisible while no resource is on top, so opening is only the `atomicEmbed.open` route change, as in Flutter, whose
+  warm view stays under the pages. Not measured on a device.
+- **Action pages** (New drive, New chat room, Other) are the web app's own pages in a second, cold embed
+  (`?path=`, which the page reads only on load), released when left.
+- **Toasts** are a top-right (wide) or full-width (phone) host; background sync is quiet for the first failure, speaks
+  from the second in a row with Retry, backs off 20 s to 5 min, 30 s quiet after a dismissal.
+- **Chat screens:** one animated scroll-to-bottom button (scale, hop, double arrow when far, badge); a streaming AI
+  answer is followed, the question put at the top (spacer) and the answer's top held once it fills the screen,
+  until the person drags.
+
+## Status (stages 1 to 5)
 
 Done and checked only by `cargo test`, JVM tests and a successful build (nothing was
 run on a device or emulator here): store init, agent persistence, first run, sign in,
@@ -230,14 +272,14 @@ Stage 4 (AI chat, conversations, rooms, perf marks, benchmark build) is also onl
 JVM-tested and built; see the list of what never ran below.
 
 Not built: linking a device with a code and the account pages of the portal (credits,
-billing, Cloud Vault rows), agent pictures (emoji or initial only), voice input and file
-or photo attachments in the AI chat, pinning the answer's top while it streams (Flutter's
-`AnswerTop` behaviour; here the list follows the end), an own-API-key AI route (Flutter has
-none). Names of other agents come from the connected server.
+billing, Cloud Vault rows), voice input and file
+or photo attachments in the AI chat, an own-API-key AI route (Flutter has none), the
+"Sync page" device search (`peer_search_*`) of Flutter. Names of other agents come from the connected server.
 
 Differences from Flutter that are deliberate or forced:
-- Paging reads through the Rust crate over a whole-chat read and cuts it at the id cursor
-  (`rust/src/chat.rs`): the branch's `atomic_lib` has no `read_chat_page`. Correct, but the
-  read cost grows with the chat; swap it for the lib's page read when it lands.
+- Paging reads the library's windows (`chats::read_chat_page` / `read_chat_after`, and the
+  `ChatRooms` / `Conversations` page reads), with Flutter's opaque cursors; the whole-chat
+  read and the id cursor of stage 4 are gone. AI chats on Home are paged by offset
+  (`ai_chats_page`).
 - The resources attached to a message are kept in the entry's `ctx` as JSON with a title and
   class (Flutter drops them); the web app only reads `type` and `subject`.
