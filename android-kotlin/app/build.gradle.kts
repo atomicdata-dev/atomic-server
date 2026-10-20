@@ -1,0 +1,151 @@
+import java.io.ByteArrayOutputStream
+
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.roborazzi)
+}
+
+val ndkVersion = "27.2.12479018"
+val rustDir = rootProject.layout.projectDirectory.dir("rust")
+val jniLibsOut = layout.buildDirectory.dir("generated/jniLibs")
+val uniffiOut = layout.buildDirectory.dir("generated/uniffi/kotlin")
+// Debug APKs use the Rust `dev` profile (optimised dependencies, quick to compile);
+// pass -PrustRelease=true for the fat-LTO `release` profile.
+val rustRelease = providers.gradleProperty("rustRelease").map(String::toBoolean).orElse(false)
+val rustAbis = listOf("arm64-v8a", "x86_64")
+
+android {
+    namespace = "place.atomic.app.kotlin"
+    compileSdk = 35
+    ndkVersion = this@Build_gradle.ndkVersion
+
+    defaultConfig {
+        applicationId = "place.atomic.app.kotlin"
+        minSdk = 26
+        targetSdk = 35
+        versionCode = 1
+        versionName = "0.1.0"
+        ndk { abiFilters += rustAbis }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildFeatures { compose = true }
+
+    sourceSets.getByName("main") {
+        jniLibs.srcDir(jniLibsOut)
+        kotlin.srcDir(uniffiOut)
+    }
+
+    testOptions { unitTests { isIncludeAndroidResources = true } }
+
+    packaging { jniLibs { useLegacyPackaging = false } }
+}
+
+kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
+
+dependencies {
+    implementation(platform(libs.compose.bom))
+    implementation(libs.compose.ui)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons)
+    implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.kotlinx.coroutines.android)
+    // UniFFI's Kotlin bindings load the Rust library through JNA.
+    implementation("${libs.jna.get()}@aar")
+    debugImplementation(libs.compose.ui.tooling)
+    debugImplementation(libs.compose.ui.test.manifest)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.roborazzi.junit.rule)
+}
+
+roborazzi {
+    outputDir.set(file(System.getenv("ROBORAZZI_OUTPUT_DIR") ?: "build/outputs/roborazzi"))
+}
+
+// ── Rust: cargo-ndk, then UniFFI's Kotlin bindings from the built library ────
+
+val androidHome: String? = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
+
+fun Exec.rustEnvironment() {
+    val sdk = androidHome ?: error("Set ANDROID_HOME to the Android SDK (see android-kotlin/README.md)")
+    environment("ANDROID_HOME", sdk)
+    environment("ANDROID_NDK_HOME", "$sdk/ndk/$ndkVersion")
+    // The target dir is private to this crate, never the shared `build-dir`
+    // of ~/.cargo/config.toml (one lock for every repo, see AGENTS.md).
+    environment("CARGO_BUILD_BUILD_DIR", rustDir.dir("target/build").asFile.absolutePath)
+}
+
+val rustInputs = fileTree(rustDir) { include("src/**", "Cargo.toml", "Cargo.lock", "uniffi.toml") }
+val atomicLibInputs = fileTree(rootProject.layout.projectDirectory.dir("../lib")) { include("src/**", "Cargo.toml") }
+
+val cargoNdk by tasks.registering(Exec::class) {
+    group = "rust"
+    description = "Builds libatomic_kotlin_rust.so for arm64-v8a and x86_64 with cargo-ndk."
+    workingDir = rustDir.asFile
+    rustEnvironment()
+    inputs.files(rustInputs, atomicLibInputs)
+    inputs.property("release", rustRelease)
+    outputs.dir(jniLibsOut)
+    doFirst {
+        val args = mutableListOf("cargo", "ndk", "--platform", "26")
+        rustAbis.forEach { args += listOf("-t", it) }
+        args += listOf("-o", jniLibsOut.get().asFile.absolutePath, "build")
+        if (rustRelease.get()) args += "--release"
+        commandLine(args)
+    }
+    doLast {
+        // cargo-ndk copies every cdylib the build produced; the iroh crates
+        // bring two the app never loads.
+        jniLibsOut.get().asFile.walkTopDown()
+            .filter { it.isFile && it.name != "libatomic_kotlin_rust.so" }
+            .forEach { it.delete() }
+    }
+}
+
+val uniffiBindgen by tasks.registering(Exec::class) {
+    group = "rust"
+    description = "Generates the Kotlin bindings (build/generated/uniffi) from the built library."
+    dependsOn(cargoNdk)
+    workingDir = rustDir.asFile
+    rustEnvironment()
+    inputs.files(rustInputs)
+    inputs.dir(jniLibsOut)
+    outputs.dir(uniffiOut)
+    doFirst {
+        val library = jniLibsOut.get().asFile.resolve("arm64-v8a/libatomic_kotlin_rust.so")
+        commandLine(
+            "cargo", "run", "--quiet", "--features", "cli", "--bin", "uniffi-bindgen", "--",
+            "generate", "--library", library.absolutePath, "--language", "kotlin",
+            "--config", rustDir.file("uniffi.toml").asFile.absolutePath,
+            "--out-dir", uniffiOut.get().asFile.absolutePath, "--no-format",
+        )
+    }
+}
+
+tasks.named("preBuild") { dependsOn(uniffiBindgen) }

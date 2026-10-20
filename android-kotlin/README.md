@@ -48,3 +48,35 @@ cd android-kotlin
 ./gradlew assembleDebug             # cargo-ndk (arm64-v8a, x86_64) + uniffi-bindgen + APK
 ```
 
+Gradle needs `ANDROID_HOME` (or `local.properties`) and reaches the network for
+Maven artifacts. In the cloud container Maven Central answers 429 to the shared
+proxy; a container-local init script (`~/.gradle/init.d`, not in the repo) that
+adds `https://maven-central.storage-download.googleapis.com/maven2/` as first
+repository fixes that. `-PrustRelease=true` builds the Rust core with the
+fat-LTO `release` profile (slow); the default uses the `dev` profile.
+
+## Screenshots without an emulator
+
+`HomeScreenshotTest` (Robolectric + Roborazzi) renders the real `HomeScreen`
+composables with fake data. Output goes outside the repo:
+
+```sh
+SHOTS_DIR=/tmp/claude-0/kotlin-shots ./gradlew testDebugUnitTest -Proborazzi.test.record=true
+```
+
+## Test data in debug builds
+
+`adb shell "echo 30 > /sdcard/Android/data/place.atomic.app.kotlin/files/perf_seed"`,
+then start the app: it makes 30 documents/folders, opens each once, adds three
+AI chats and three favorites (`DebugSeed`, compiled out of release).
+
+## Status (stage 1)
+
+Done: store init (once per process, recovery), agent + drive first run, drives,
+recents, AI chats, favorites, messages, live search, store event callback, Home
+screen with Show all, tablet split layout. Not built: resource view (WebView),
+AI chat, conversations, sync/server connection, settings (avatar is a
+placeholder), pairing. Messages show unknown names for other agents until a
+server is connected. The crate copies the store-opening glue from
+`flutter/rust` because `atomic_flutter_rust` has no `rlib` and cannot be a
+dependency.
