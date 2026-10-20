@@ -468,6 +468,14 @@ pub async fn get_own_profile() -> Result<String, String> {
     crate::host::to_json(&profile)
 }
 
+/// The bytes of a File resource (a profile picture) when this device holds
+/// them; `None` when the File or its bytes are not here (yet) or too large.
+pub async fn read_file_bytes(file: String) -> Result<Option<Vec<u8>>, String> {
+    atomic_lib::host::own_profile::file_bytes(db()?, &file)
+        .await
+        .map_err(err)
+}
+
 /// Save this device's agent's profile: a commit by the agent on its own
 /// resource, stored here and synced like any other edit. An empty
 /// `description` removes it; `icon` is the subject of a File for the picture
