@@ -7,6 +7,7 @@ import 'package:atomic_chat/atomic_chat.dart'
     show AppShell, AppThemeMode, ChatsScreen, defaultAttachmentPicker;
 import 'assistant/atomic_assistant_api.dart';
 import 'assistant/file_attachment_picker.dart';
+import 'bootstrap.dart';
 import 'perf_seed.dart';
 import 'screens/login_screen.dart';
 import 'screens/pair_screen.dart';
@@ -24,32 +25,18 @@ void main() async {
   Perf.watchFrames();
   // Independent of the database, so read while it opens.
   final theme = AppThemeMode.load();
-  await RustLib.init();
-  Perf.mark('rust init');
-  final dir = await getApplicationDocumentsDirectory();
-  Perf.mark('documents dir');
-  // Whatever happens here, the app draws something: an error that escaped
-  // `main` before `runApp` left it black for good.
-  final openError = await _openDb(dir.path);
-  Perf.mark('db open');
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  await theme;
-  defaultAttachmentPicker = const FileSelectorAttachmentPicker();
-  if (openError != null) {
-    runApp(MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: StoreOpenFailedScreen(
-        error: openError,
-        onRetry: () async {
-          final error = await _openDb(dir.path);
-          if (error == null) _runAtomicApp();
-          return error;
-        },
-      ),
-    ));
-    return;
-  }
-  _runAtomicApp();
+  await bootstrap(
+    initRust: RustLib.init,
+    ready: () => theme,
+    documentsPath: () async => (await getApplicationDocumentsDirectory()).path,
+    openDb: _openDb,
+    startApp: () {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      defaultAttachmentPicker = const FileSelectorAttachmentPicker();
+      _runAtomicApp();
+    },
+    mark: Perf.mark,
+  );
 }
 
 /// Open the store; the error as text, or null once it is open.
