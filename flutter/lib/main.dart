@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'src/rust/frb_generated.dart';
 import 'package:atomic_chat/atomic_chat.dart'
-    show AppShell, AppThemeMode, ChatsScreen, defaultAttachmentPicker;
+    show AppShell, AppThemeMode, ChatsScreen, ToastController, ToastHost, defaultAttachmentPicker;
 import 'assistant/atomic_assistant_api.dart';
 import 'assistant/file_attachment_picker.dart';
 import 'bootstrap.dart';
@@ -92,7 +92,9 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
   static const _networkChannel = MethodChannel('app.atomicdata.app/network');
   Timer? _eventPoller;
   bool _backgroundSyncRunning = false;
-  final Map<String, DateTime> _lastSyncSnackAt = {};
+  final _toasts = ToastController();
+  int _syncFailures = 0;
+  Timer? _syncRetry;
 
   @override
   void initState() {
@@ -138,6 +140,8 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     _eventPoller?.cancel();
+    _syncRetry?.cancel();
+    _toasts.dispose();
     AppThemeMode.mode.removeListener(_themeChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -216,42 +220,69 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
     _startBackgroundSync();
   }
 
-  void _showDebouncedSnack(BuildContext ctx, String key, String message,
-      {Duration minInterval = const Duration(seconds: 15)}) {
-    final now = DateTime.now();
-    final last = _lastSyncSnackAt[key];
-    if (last != null && now.difference(last) < minInterval) return;
-    _lastSyncSnackAt[key] = now;
-    ScaffoldMessenger.of(ctx).showSnackBar(
-      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
-    );
+  /// Background sync is quiet about a single failure: a cold radio or a
+  /// device waking from sleep times out once and works on the retry. It
+  /// retries on its own with growing waits and speaks (one small toast, which
+  /// the controller keeps unique and quiet for a while after dismissal) only
+  /// from the [_toastAfterFailures]th failure in a row.
+  static const _toastAfterFailures = 2;
+  static const _syncToastKey = 'sync:error';
+
+  void _syncFailed(String message) {
+    _syncFailures++;
+    debugPrint('Background sync failed ($_syncFailures in a row): $message');
+    if (_syncFailures >= _toastAfterFailures) {
+      _toasts.show(
+        _syncToastKey,
+        message,
+        icon: Icons.sync_problem,
+        actionLabel: 'Retry',
+        onAction: () {
+          _syncFailures = 0;
+          _startBackgroundSync();
+        },
+      );
+    }
+    _scheduleSyncRetry();
+  }
+
+  void _syncSucceeded() {
+    _syncFailures = 0;
+    _syncRetry?.cancel();
+    _toasts.resolve(_syncToastKey);
+  }
+
+  void _scheduleSyncRetry() {
+    _syncRetry?.cancel();
+    if (!_loggedIn) return;
+    // 20 s, 40 s, 80 s … at most 5 min.
+    final seconds =
+        (20 * (1 << (_syncFailures - 1).clamp(0, 4))).clamp(20, 300);
+    _syncRetry = Timer(Duration(seconds: seconds), () {
+      if (mounted && _loggedIn) _startBackgroundSync();
+    });
   }
 
   /// Auto-sync known peers / pkarr after login (no Settings → Retry needed).
   void _startBackgroundSync() {
     if (_backgroundSyncRunning) return;
     _backgroundSyncRunning = true;
+    _syncRetry?.cancel();
     Future(() async {
       try {
         final report = await AtomicClient.syncConnectivityNow();
         if (!mounted) return;
-        final ctx = _navKey.currentContext;
-        if (ctx == null || !ctx.mounted) return;
 
-        // Only a failure is worth a toast; being connected is the normal case.
+        // Only a failure is worth a notice; being connected is the normal case.
         if (report.livePeers == 0 &&
             report.imported == 0 &&
             !report.message.startsWith('No other device found yet')) {
-          _showDebouncedSnack(ctx, 'sync:error', report.message,
-              minInterval: const Duration(seconds: 5));
+          _syncFailed(report.message);
+        } else {
+          _syncSucceeded();
         }
       } catch (e) {
-        debugPrint('Background sync: $e');
-        final ctx = _navKey.currentContext;
-        if (ctx != null && ctx.mounted) {
-          _showDebouncedSnack(ctx, 'sync:error', 'Sync: $e',
-              minInterval: const Duration(seconds: 5));
-        }
+        if (mounted) _syncFailed('Sync: $e');
       } finally {
         _backgroundSyncRunning = false;
       }
@@ -259,6 +290,8 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
   }
 
   void _signedOut() {
+    _syncRetry?.cancel();
+    _syncFailures = 0;
     setState(() {
       _loggedIn = false;
     });
@@ -292,6 +325,8 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
     ));
     return MaterialApp(
       navigatorKey: _navKey,
+      builder: (context, child) =>
+          ToastHost(controller: _toasts, child: child ?? const SizedBox()),
       title: 'atomic.place',
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
