@@ -2,6 +2,7 @@ import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt, Perf;
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'app_top_bar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -107,13 +108,40 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   late final ChatWindow<ChatEntry> _window = ChatWindow(
     readPage: (before, limit) =>
         widget.api.chatEntriesPage(_chat!, before: before, limit: limit),
-    // Only this screen writes the chat while it is open: nothing to poll.
-    readAfter: null,
+    // Only this screen writes the chat while it is open: nothing is polled;
+    // this reads the newest pages back after a far scroll up dropped them.
+    readAfter: (after, limit) =>
+        widget.api.chatEntriesAfter(_chat!, after, limit: limit),
     idOf: (m) => m.id,
     onOlderPage: (ms, n) => Perf.span('chat older page $n', ms),
   );
   late final _keeper = ChatScrollKeeper(_window);
   bool _far = false;
+
+  // Following an answer as it streams in (see [_settle]): the list follows
+  // the growing answer at the bottom while the answer's top is in view;
+  // once the answer fills the screen its top is held there, so it can be
+  // read from its start. A person who scrolls takes over.
+  final _listKey = GlobalKey();
+  final _sentKey = GlobalKey();
+  final _answerKey = GlobalKey();
+
+  /// The question just sent and the answer to it (`partial` while it
+  /// streams), or on opening the chat its newest answer.
+  String? _sentId;
+  String? _answerId;
+
+  /// Following the answer at the bottom.
+  bool _follow = false;
+
+  /// The answer's top reached the top of the list: held there.
+  bool _pinned = false;
+
+  /// Room below the answer so the question can sit at the top of the list
+  /// with the answer growing under it.
+  double _spacer = 0;
+  double? _answerHeight;
+  bool _settleQueued = false;
   List<ChatEntry> get _messages => _window.items;
   Object? get _loadError => _window.error;
   bool _noChatYet = false;
@@ -568,10 +596,92 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     await _window.open();
     if (!mounted || _window.error != null) return;
     final messages = _window.items;
+    // Back in a chat whose newest answer is longer than the screen: open at
+    // its start, not at its end.
+    if (messages.isNotEmpty && messages.last.role == 'assistant') {
+      setState(() => _answerId = messages.last.id);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showAnswerStart());
+    }
     Perf.span('chat data ${messages.length}', _opened.elapsedMilliseconds);
     WidgetsBinding.instance.addPostFrameCallback((_) => Perf.span(
         'chat painted ${messages.length}', _opened.elapsedMilliseconds));
     if (messages.isEmpty) _readPicker();
+  }
+
+  /// The list's box and the top line answers are held at (below the
+  /// list's padding), in global coordinates.
+  (RenderBox, double)? _listBox() {
+    final list = _listKey.currentContext?.findRenderObject();
+    if (list is! RenderBox || !list.hasSize || !list.attached) return null;
+    return (list, list.localToGlobal(Offset.zero).dy + 16);
+  }
+
+  RenderBox? _boxOf(GlobalKey key) {
+    final box = key.currentContext?.findRenderObject();
+    return box is RenderBox && box.hasSize && box.attached ? box : null;
+  }
+
+  /// Scroll so the answer's top is at the top of the list, when it is
+  /// above it (an answer taller than the screen).
+  void _showAnswerStart() {
+    final list = _listBox();
+    final answer = _boxOf(_answerKey);
+    if (list == null || answer == null || !_keeper.controller.hasClients) {
+      return;
+    }
+    final top = answer.localToGlobal(Offset.zero).dy;
+    if (top < list.$2 - 0.5) {
+      final pos = _keeper.controller.position;
+      pos.jumpTo(math.min(pos.maxScrollExtent, pos.pixels + list.$2 - top));
+    }
+  }
+
+  void _queueSettle() {
+    if (_settleQueued) return;
+    _settleQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _settle());
+  }
+
+  /// After each frame while an answer streams in: make room below it so the
+  /// question sits at the top; follow it at the bottom while its top is in
+  /// view; then hold its top there. When the person scrolled away (or the
+  /// top is held), what is on screen stays put as the answer grows (in an
+  /// upside-down list a growing last message pushes everything up).
+  void _settle() {
+    _settleQueued = false;
+    if (!mounted || !_keeper.controller.hasClients) return;
+    final list = _listBox();
+    final answer = _boxOf(_answerKey);
+    if (list == null || answer == null) return;
+    final pos = _keeper.controller.position;
+    final h = answer.size.height;
+    final grew = _answerHeight == null ? 0.0 : h - _answerHeight!;
+    _answerHeight = h;
+    if (_follow && !_pinned) {
+      final sent = _boxOf(_sentKey);
+      if (sent != null && pos.pixels <= 0.5) {
+        final span = answer.localToGlobal(Offset(0, h)).dy -
+            sent.localToGlobal(Offset.zero).dy;
+        final want = math.max(0.0, list.$1.size.height - 32 - span);
+        if ((want - _spacer).abs() > 0.5) {
+          setState(() => _spacer = want);
+          return;
+        }
+      }
+      final top = answer.localToGlobal(Offset.zero).dy;
+      if (top < list.$2 - 0.5) {
+        _pinned = true;
+        pos.jumpTo(pos.pixels + list.$2 - top);
+      }
+    } else if (grew.abs() > 0.01 && pos.pixels > 0.5) {
+      pos.jumpTo(math.min(pos.maxScrollExtent, pos.pixels + grew));
+    }
+  }
+
+  /// A drag by the person ends following the answer.
+  bool _onScrollStart(ScrollStartNotification n) {
+    if (n.dragDetails != null) _follow = false;
+    return false;
   }
 
   /// A new chat is for writing: the field gets the cursor as soon as it can.
@@ -756,6 +866,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _sending = true;
       _error = null;
       _partial = [];
+      // The question goes to the top, the answer grows below it.
+      _sentId = userMessage.id;
+      _answerId = 'partial';
+      _follow = true;
+      _pinned = false;
+      _answerHeight = null;
     });
     // Written in: New makes another chat from now on, also while the chat
     // itself is still being created.
@@ -852,6 +968,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           }
         });
         if (mounted) _window.add(reply);
+        // The saved answer takes the streamed one's place (and its key).
+        _answerId = reply.id;
       }
       if (mounted) {
         setState(() {
@@ -961,60 +1079,72 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (shown.isEmpty) return _noAi ? _noAiState(c) : _picker(c);
     final ids = [for (final m in shown) m.id];
     final at = {for (var i = 0; i < ids.length; i++) ids[i]: i};
+    if (_sending) _queueSettle();
     final list = LayoutBuilder(
-      builder: (context, box) => ListView.builder(
-        controller: _keeper.controller,
-        reverse: true,
-        padding: const EdgeInsets.all(16),
-        itemCount: shown.length + (_window.hasOlder ? 1 : 0),
-        findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
-        itemBuilder: (context, i) {
-          if (i == shown.length) {
-            // The top: older messages are being read.
-            return const Padding(
-              padding: EdgeInsets.all(12),
-              child: Center(
-                  child: SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2))),
+      builder: (context, box) => NotificationListener<ScrollStartNotification>(
+        onNotification: _onScrollStart,
+        child: ListView.builder(
+          key: _listKey,
+          controller: _keeper.controller,
+          reverse: true,
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + _spacer),
+          itemCount: shown.length + (_window.hasOlder ? 1 : 0),
+          findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
+          itemBuilder: (context, i) {
+            if (i == shown.length) {
+              // The top: older messages are being read.
+              return const Padding(
+                padding: EdgeInsets.all(12),
+                child: Center(
+                    child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))),
+              );
+            }
+            _keeper.built(i);
+            final index = shown.length - 1 - i;
+            final m = shown[index];
+            final mine = m.role == 'user';
+            final newDay = m.createdAt > 0 &&
+                (index == 0 && !_window.hasOlder ||
+                    index > 0 &&
+                        shown[index - 1].createdAt > 0 &&
+                        otherDay(shown[index - 1].createdAt, m.createdAt));
+            final bubble = Align(
+              alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                constraints: BoxConstraints(
+                  // An answer may hold code and tables: a little wider.
+                  maxWidth: (box.maxWidth - 32) * (mine ? 0.85 : 0.95),
+                ),
+                decoration: BoxDecoration(
+                  color: mine ? c.mainSelectedBg : c.bg1,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: _bubble(c, m, mine),
+              ),
             );
-          }
-          _keeper.built(i);
-          final index = shown.length - 1 - i;
-          final m = shown[index];
-          final mine = m.role == 'user';
-          final newDay = m.createdAt > 0 &&
-              (index == 0 && !_window.hasOlder ||
-                  index > 0 &&
-                      shown[index - 1].createdAt > 0 &&
-                      otherDay(shown[index - 1].createdAt, m.createdAt));
-          final bubble = Align(
-            alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              constraints: BoxConstraints(
-                // An answer may hold code and tables: a little wider.
-                maxWidth: (box.maxWidth - 32) * (mine ? 0.85 : 0.95),
-              ),
-              decoration: BoxDecoration(
-                color: mine ? c.mainSelectedBg : c.bg1,
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: _bubble(c, m, mine),
-            ),
-          );
-          return KeyedSubtree(
-            key: ValueKey(m.id),
-            child: newDay
-                ? Column(children: [
-                    DaySeparator(dayLabel(m.createdAt), color: c.textSecondary),
-                    bubble,
-                  ])
-                : bubble,
-          );
-        },
+            final keyed = m.id == _answerId
+                ? KeyedSubtree(key: _answerKey, child: bubble)
+                : m.id == _sentId
+                    ? KeyedSubtree(key: _sentKey, child: bubble)
+                    : bubble;
+            return KeyedSubtree(
+              key: ValueKey(m.id),
+              child: newDay
+                  ? Column(children: [
+                      DaySeparator(dayLabel(m.createdAt),
+                          color: c.textSecondary),
+                      keyed,
+                    ])
+                  : keyed,
+            );
+          },
+        ),
       ),
     );
     return Stack(children: [
