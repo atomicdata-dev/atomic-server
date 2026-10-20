@@ -132,6 +132,7 @@ msgstr "AI Agents"
 #: src/components/ConnectAppForm.tsx
 #: src/components/EditLanguagesDialog.tsx
 #: src/components/HostUI/hostUIDialogs.tsx
+#: src/components/MoveResourceDialog.tsx
 #: src/components/ParentPicker/ParentPickerDialog.tsx
 #: src/components/Share/ShareDialog.tsx
 #: src/components/forms/EditFormDialog.tsx
@@ -11136,13 +11137,10 @@ msgid "Could not read storage use."
 msgstr "Could not read storage use."
 
 #. 0: formatBytes(result.bytes_reclaimed)
-#. 0: formatBytes(result.bytes_reclaimed)
-#: src/components/Vault/VaultStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 msgid "Freed {0}."
 msgstr "Freed {0}."
 
-#: src/components/Vault/VaultStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 msgid "Nothing to free."
@@ -11910,6 +11908,7 @@ msgid "A property can't be moved to another ontology."
 msgstr "A property can't be moved to another ontology."
 
 #: src/components/SideBar/useSidebarDnd.ts
+#: src/helpers/moveResource.ts
 msgid "A property can't be moved to another parent."
 msgstr "A property can't be moved to another parent."
 
@@ -13223,3 +13222,36 @@ msgstr "Latest changes from each of {0} browsers and apps"
 #: src/components/Vault/VaultStorage.tsx
 msgid "The next backup from that browser or app adds them"
 msgstr "The next backup from that browser or app adds them"
+
+#: src/actions/resourceActions.tsx
+msgid "Move..."
+msgstr "Move..."
+
+#: src/actions/resourceActions.tsx
+msgid "Move this resource to another parent."
+msgstr "Move this resource to another parent."
+
+#: src/components/MoveResourceDialog.tsx
+#: src/components/MoveResourceDialog.tsx
+msgid "Move"
+msgstr "Move"
+
+#: src/components/MoveResourceDialog.tsx
+msgid "You don't have write access to that location."
+msgstr "You don't have write access to that location."
+
+#: src/components/MoveResourceDialog.tsx
+msgid "Access follows the new parent: who can see or edit this may change."
+msgstr "Access follows the new parent: who can see or edit this may change."
+
+#: src/helpers/moveResource.ts
+msgid "A resource can't be moved into itself."
+msgstr "A resource can't be moved into itself."
+
+#: src/helpers/moveResource.ts
+msgid "A resource can't be moved into something inside it."
+msgstr "A resource can't be moved into something inside it."
+
+#: src/helpers/moveResource.ts
+msgid "Moving to another drive is not supported yet."
+msgstr "Moving to another drive is not supported yet."
