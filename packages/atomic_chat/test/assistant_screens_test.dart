@@ -1445,7 +1445,7 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    testWidgets('field at the bottom, best hit lowest and outlined',
+    testWidgets('field at the bottom, best hit lowest and filled',
         (tester) async {
       final api = FakeApi(hits: [hit('1', 'Best', 2), hit('2', 'Second', 1)]);
       await tester
@@ -1459,9 +1459,9 @@ void main() {
       expect(best, greaterThan(second));
 
       final box =
-          tester.widget<Container>(find.byKey(const Key('search-top-hit')));
-      final border = (box.decoration! as BoxDecoration).border! as Border;
-      expect(border.top.width, 1.5);
+          tester.widget<Material>(find.byKey(const Key('search-top-hit')));
+      expect(box.color, isNotNull);
+      expect(box.shape, isNull);
       expect(
           find.descendant(
               of: find.byKey(const Key('search-top-hit')),
@@ -1717,9 +1717,7 @@ void main() {
           final input = FakeSpeechInput();
           final api = FakeApi(ai: ai());
           await tester.pumpWidget(app(ChatScreen(
-              api: api,
-              speechInput: input,
-              speechOutput: FakeSpeechOutput())));
+              api: api, speechInput: input, speechOutput: FakeSpeechOutput())));
           await tester.pumpAndSettle();
           if (typed.isNotEmpty) {
             await tester.enterText(find.byType(TextField), typed);

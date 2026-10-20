@@ -760,6 +760,39 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  /// The cross at the field's right end, there only while text is.
+  Widget _clearButton(AppColors c) => ValueListenableBuilder<TextEditingValue>(
+        valueListenable: _text,
+        builder: (context, value, _) {
+          final has = value.text.isNotEmpty;
+          return IgnorePointer(
+            ignoring: !has,
+            child: AnimatedOpacity(
+              opacity: has ? 1 : 0,
+              duration: const Duration(milliseconds: 120),
+              child: Semantics(
+                button: true,
+                label: 'Clear search',
+                excludeSemantics: true,
+                child: IconButton(
+                  key: const Key('search-clear'),
+                  tooltip: 'Clear search',
+                  icon: Icon(Icons.close, size: 20, color: c.textSecondary),
+                  onPressed: _clearText,
+                ),
+              ),
+            ),
+          );
+        },
+      );
+
+  void _clearText() {
+    HapticFeedback.lightImpact();
+    _text.clear();
+    _changed('');
+    _focus.requestFocus();
+  }
+
   /// Below this height the page shows only the field (sideways with the
   /// keyboard up).
   static const _fieldRoom = 120.0;
@@ -798,6 +831,9 @@ class _SearchScreenState extends State<SearchScreen> {
                               borderRadius: BorderRadius.circular(9),
                               borderSide: BorderSide.none,
                             ),
+                            suffixIconConstraints: const BoxConstraints(
+                                minWidth: 48, minHeight: 48),
+                            suffixIcon: _clearButton(c),
                           ),
                         ));
               }),
@@ -955,23 +991,28 @@ class _SearchScreenState extends State<SearchScreen> {
         key: top ? const Key('search-top-hit') : null,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
         child: Material(
-          color: top ? c.mainSelectedBg : Colors.transparent,
-          borderRadius: BorderRadius.circular(9),
+          color: top ? _highlight(c) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
           clipBehavior: Clip.antiAlias,
           child: row,
         ),
       );
     }
     if (!top) return row;
-    // The one Enter opens.
-    return Container(
+    // The one Enter opens: a subtle fill behind the unchanged row (no border,
+    // no margin), so its content sits exactly where the others' does.
+    return Material(
       key: const Key('search-top-hit'),
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      decoration: BoxDecoration(
-        border: Border.all(color: c.main, width: 1.5),
-        borderRadius: BorderRadius.circular(9),
-      ),
+      color: _highlight(c),
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
       child: row,
     );
   }
+
+  /// The main colour at 10% (light) / 16% (dark) over the surface.
+  Color _highlight(AppColors c) => Color.alphaBlend(
+      c.main.withValues(
+          alpha: Theme.of(context).brightness == Brightness.dark ? 0.16 : 0.10),
+      c.bgBody);
 }
