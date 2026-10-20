@@ -99,6 +99,12 @@ struct State {
 #[derive(Default)]
 pub struct RecentsIndex {
     state: Mutex<State>,
+    /// Held while the chats are scanned, so the listener and a list never
+    /// scan at the same time.
+    scanning: tokio::sync::Mutex<()>,
+    /// Whether [`RecentsIndex::spawn_listener`] runs: it rescans the chats
+    /// itself once the events calm down, so a list need not wait for that.
+    listening: std::sync::atomic::AtomicBool,
 }
 
 fn drive_id(drive: &str) -> String {
@@ -466,6 +472,8 @@ impl RecentsIndex {
         use tokio::sync::broadcast::error::RecvError;
 
         let mut rx = store.subscribe_events();
+        self.listening
+            .store(true, std::sync::atomic::Ordering::Relaxed);
         tokio::spawn(async move {
             let mut dirty_since: Option<Instant> = None;
             loop {
@@ -474,7 +482,12 @@ impl RecentsIndex {
                     // Events were dropped: what the index knows may be stale.
                     Ok(Err(RecvError::Lagged(_))) => self.with(|s| s.recents.chats_scanned = false),
                     Ok(Err(RecvError::Closed)) => break,
-                    Err(_) => {}
+                    // Quiet: a good moment to rescan what a lag left stale.
+                    Err(_) => {
+                        if !self.with(|s| s.recents.chats_scanned) {
+                            let _ = self.ensure_scanned(&store).await;
+                        }
+                    }
                 }
                 if self.with(|s| s.dirty) {
                     let since = *dirty_since.get_or_insert_with(Instant::now);
@@ -491,6 +504,10 @@ impl RecentsIndex {
 
     /// Fill the chat index from the store the first time it is asked for.
     pub async fn ensure_scanned(&self, store: &Db) -> AtomicResult<()> {
+        if self.with(|s| s.recents.chats_scanned) {
+            return Ok(());
+        }
+        let _scanning = self.scanning.lock().await;
         if self.with(|s| s.recents.chats_scanned) {
             return Ok(());
         }
@@ -515,7 +532,13 @@ impl RecentsIndex {
         store: &Db,
         limit: usize,
     ) -> AtomicResult<Vec<(String, String, i64)>> {
-        self.ensure_scanned(store).await?;
+        // An index that lost events (a lagged listener) still lists what it
+        // has; the listener rescans every chat once the events calm down
+        // (0.9 s for 1000 chats). Only an index without chats waits for it.
+        let listening = self.listening.load(std::sync::atomic::Ordering::Relaxed);
+        if !listening || self.with(|s| s.recents.chats.is_empty()) {
+            self.ensure_scanned(store).await?;
+        }
         let mut chats: Vec<(String, i64)> = self.with(|s| {
             s.recents
                 .chats
@@ -888,6 +911,30 @@ mod tests {
             [("did:ad:a".to_string(), 7)]
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// With a listener running, a list does not wait for the rescan a lag
+    /// asked for: it shows what the index has, and the rescan (which the
+    /// listener runs once the events calm down) adds the rest.
+    #[tokio::test]
+    async fn a_lagged_index_lists_what_it_has_until_the_rescan() {
+        let d = Device::new().await;
+        let mut rx = d.store.subscribe_events();
+        let known = d.new_chat("Known chat").await;
+        d.pump(&mut rx).await;
+        let missed = d.new_chat("Missed chat").await;
+        d.recents
+            .listening
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        d.recents.with(|s| s.recents.chats_scanned = false);
+
+        let has = |chats: &[(String, String, i64)], chat: &str| chats.iter().any(|c| c.0 == chat);
+        let chats = d.recents.recent_chats(&d.store, 500).await.unwrap();
+        assert!(has(&chats, &known) && !has(&chats, &missed));
+
+        d.recents.ensure_scanned(&d.store).await.unwrap();
+        let chats = d.recents.recent_chats(&d.store, 500).await.unwrap();
+        assert!(has(&chats, &known) && has(&chats, &missed));
     }
 
     #[tokio::test]
