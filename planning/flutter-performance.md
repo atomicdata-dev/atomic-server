@@ -289,3 +289,177 @@ identity (`--seed 30` once), and note the device in the result.
 - [ ] PSS of the app and the renderer with the spare, and after 10 opens.
 - [ ] Whether a kill during use ever leaves the store unopenable there.
 - [ ] Release build once: start-up without profile overhead.
+
+## Stress test: 1000 chats (2026-10-20)
+
+Joep: "Make a drive, give it 1000 AI chats with a lot of text, see if search
+and UI are still fast." Phase 1 and 2 (Rust, on the Mac) are done; phase 3
+(the app on a device) is planned below and waits for an emulator slot.
+
+### Method
+
+`lib/tests/stress_chats.rs`, two ignored tests, each in its own process:
+
+```
+STRESS_DIR=<scratch>/stress STRESS_TEXT_SCALE=1.5 \
+  cargo test -p atomic_lib --features db-redb --profile e2e --test stress_chats -- --ignored --nocapture stress_seed
+STRESS_DIR=<scratch>/stress \
+  cargo test -p atomic_lib --features db-redb --profile e2e --test stress_chats -- --ignored --nocapture stress_measure
+```
+
+- **Data**: a private drive and a "Work" drive with 2000 documents and
+  folders (7.6 MB of body text, nested folders), and 1000 AI chats with 20-60
+  messages each (39 505 messages; user 300-2250, assistant 2250-6000 chars at
+  scale 1.5): multilingual prose (en/nl/de/fr/es with a Zipf vocabulary and a
+  40 000-word long tail), headings, lists and code blocks; 106 MB of message
+  text. Ten chats are written one `append_entry` per message (as the app
+  does while chatting), the rest with the new `host::chats::import_ai_chat`
+  (one commit per 256-message page). The recents listener runs during the
+  seeding, as in the app.
+- **Measure**: opens the store the way the bridge's `open_db` does (file,
+  search catch-up, recents load and listener), then the host calls the app
+  makes, 10-20 repetitions each: first call (cold) and median/p95 of the rest.
+  `STRESS_COMPACTION_CHECK=1` adds the startup compaction check,
+  `STRESS_TREES=1` the per-tree size breakdown, `STRESS_REBUILD=1` a full
+  search index rebuild; `stress_reopen` opens and closes the file 3x.
+- **Build**: the `e2e` profile (opt-level 2, no LTO) with debug assertions
+  off for redb, loro and atomic_lib (`--config
+  'profile.e2e.package.<crate>.debug-assertions=false'`); with them on, redb
+  walks every page at open (`mark_allocated_page_for_debug`), which a debug
+  app build also does. The app ships fat-LTO opt-level 3. M-series Mac, warm
+  OS cache; a mid-range phone is roughly 3-5x slower.
+- **Size**: the store is 1.08 GB (775 MB on disk; the cap for this run was
+  1.5 GB, so the text was not scaled down). Deleted after the run.
+
+### Results
+
+Host calls, ms (first = cold, then median / p95), before (`ca1be557d`) and
+after the fixes (`9b773ee4f`):
+
+| What | Before | After |
+| --- | --- | --- |
+| open_db: init_redb_file | 94-1025 (compaction check walks every page), once 60 733 | 12-24 (check weekly: 118) |
+| RSS right after open | 870 MB | 11 MB |
+| Home: `list_ai_chats(4)` after the listener lagged | 1854 (rescan) | 0.13 (rescan in the background) |
+| Home: `list_ai_chats(4)` / `(50)` warm | 0.07 / 0.5 | 0.12 / 0.7 |
+| "All": `list_ai_chats(1000)` (169 KB JSON) | 11 | 9.2 (86 cold) |
+| Chat index rescan (no recents.json) | 1200* | 884*; 830-920 without assertions |
+| search "k" / "b" / "s" (1 letter, all drives) | 8.0 / 9.9 / 11.3 | 1.6 / 2.2 / 2.0 (first 9-33) |
+| search "ku" / "bu" / "se" / "be" (2 letters) | 19.0 / 20.9 / 34.6 / 30.6 | 0.5 / 1.0 / 1.0 / 1.4 |
+| search "kub" / "bud" / "sea" / "ver" (3 letters) | 4.2 / 4.2 / 6.2 / 11.7 | 3.7 / 3.5 / 5.1 / 9.8 (first 10-62) |
+| search full word ("budget", "vergadering") | 3.5 / 3.6 | 3.0 / 3.1 |
+| search two words ("kubernetes dep") | 8.1 | 6.6 |
+| search "b" in one drive / 100 hits | 15.2 / 13.7 | 3.5 / 5.6 |
+| search AI chats only (isA filter in the index), "b" / "budget" | 5.7 / 2.3 | 1.4 / 2.0 |
+| `read_chat` of a 60-message chat (166 KB JSON) | 1.56* | 1.23*; 1.1 without assertions |
+| recents / activity / drives lists | 0.15 / 0.09 / 0.66 | 0.14 / 0.08 / 0.55 |
+| seeding: `append_chat_entry` / `import_ai_chat` | 10.3 ms per message / 1838 messages/s | 7.7 ms / 2391 messages/s |
+
+\* measured with debug assertions on (the first runs); the other numbers
+without.
+
+Targets: search keystroke → results < 50 ms (met with room: worst warm 10 ms,
+worst cold first keystroke 62 ms on the Mac, so expect up to ~200 ms for the
+very first keystroke after a cold start on a phone); Home < 100 ms (met);
+'All' first page < 50 ms (met for the host call; the UI is not lazy, see
+below); open_db < 1.5 s (met, 24 ms; but see compaction).
+
+Store breakdown (`STRESS_TREES=1`, uncompressed values): the 113 MB of
+text is held four times, in the resources' rows (154 MB; probably the last
+commit's `loroUpdate`, which for a page written in one commit is the whole
+snapshot), the Loro snapshots
+(144 MB), the commit envelopes (182 MB) and the outbox (173 MB; this device
+never synced, a connected one drains it). redb then stores 519 MB plus
+503 MB of slack in the pages that hold large values. Search postings are
+5.6 MB: chat text is not indexed.
+
+### Fixes (commits)
+
+- `7c9d8c760` Chats: a chat's pages are decoded once (was get_resource +
+  export + re-import, three passes), and the recents rescan reads only the
+  entry times.
+- `478f299cb` Bridge: the startup compaction check (a walk of every page,
+  which also fills redb's 1 GiB cache with the whole store) runs once a week
+  or when the file grew by a quarter, recorded in `compaction-check` next to
+  the store.
+- `bcd300900` Search: typo variants from three letters on; a single one- or
+  two-letter token scans titles only.
+- `9bfb9adfe` Recents: after a lag the listener rescans the chats once the
+  events calm down; the Home list no longer waits for it (only an empty index
+  does).
+
+### Open findings
+
+- [ ] **Chat text is not searchable.** The index covers titles, descriptions
+      and document bodies (`documentContent`); a `ChatLog` page's entries are
+      not extracted, so a word that only occurs in messages finds nothing
+      (`zephyrquokka`: 0 hits). Indexing it is a product decision: about
+      100 MB more text in the postings for this store, and re-tokenising a
+      page (up to 256 messages) on every appended message unless the indexer
+      learns to add one entry's tokens.
+- [ ] **Startup compaction of a big store blocks the first frame.** The very
+      first measuring open of the first seeded store took 60.7 s inside
+      `init_redb_file` (logs not captured; two later seeds had 1 %
+      reclaimable and did not compact, and the weekly check costs 118 ms).
+      A compaction of a 1 GB store, when it is due, runs before the app
+      draws. Consider compacting on the phone only while charging / in the
+      background, or with a time budget.
+- [ ] **redb's read cache is 1 GiB** (`Database::create` defaults,
+      `db::recovery::create_database`): whatever the app reads stays cached,
+      up to the store's size (RSS 204 MB after Home + search + one rescan,
+      870 MB after a full walk). A phone wants 32-64 MiB
+      (`Builder::set_cache_size`).
+- [ ] **Store size is ~10x the text** (above). The copy in the resource row
+      (to confirm) and the slack of large values look like the cheap wins;
+      the outbox shrinks once synced.
+- [ ] The first keystroke after start reads the search trees cold (9-62 ms on
+      the Mac). Warming them in the background after Home is drawn would hide
+      it.
+- [ ] 3-letter queries are the slowest warm case (5-10 ms): the one-edit
+      neighbourhood of three letters still scans the two-letter prefixes.
+
+### Phase 3: the same data in the app (planned, not run)
+
+Waits for a go-ahead (emulator builds conflict with other agents and disk).
+
+1. **Bridge**: expose `import_ai_chat(name, entries_json) -> subject` in
+   `flutter/rust/src/api/assistant.rs` (calls `host::chats::import_ai_chat`;
+   `entries_json` = `[{role, parts, c}]`), regenerate the bindings
+   (`flutter_rust_bridge_codegen generate`).
+2. **Seed hook** (`flutter/lib/perf_seed.dart`): a second flag file,
+   `perf_seed_chats` containing `N [scale]`, makes N chats with the same
+   generator as the Rust test (port the xorshift + vocabulary to Dart, so a
+   device and the Mac get comparable data; deterministic seed), in batches of
+   10 chats per `Future.wait`, then logs `[perf] perf seed chats N <ms>` and
+   the store size. Debug/profile only, like the existing hook. At scale 1.0
+   the store is ~700 MB: on the emulator check free space first
+   (`adb shell df /data`); use `--chat-scale 0.3` for small devices.
+3. **`scripts/perf_android.sh`**: `--seed-chats N [--chat-scale S]` writes
+   the flag and waits for the log line (timeout 15 min). New `--only` steps:
+   - `chats`: Home → "AI chats" → "All", time tap → list painted (needs a
+     `Perf.span('list all painted')` mark in `chats_screen.dart`), then 8
+     fling swipes down and up, `[perf] frames` janky % and raster/build p99.
+   - `search` with the chat data: type `b`, `u`, `d`, `g`, `e`, `t` one
+     `input text` per keystroke, 300 ms apart, and record `[perf] search
+     query` and `search keystroke to results` per keystroke (the first one
+     cold after start, separately); also with the "AI chats" kind.
+   - `chat`: open the longest chat (60 messages), tap → messages painted,
+     and scroll it.
+   - `memory`: app PSS after seeding, after "All", after 20 searches, after
+     opening 5 chats.
+   - `cold` with the big store: start → Home painted, and once with the
+     compaction check due (`run-as <pkg> rm files/compaction-check` first).
+4. **UI changes these measurements will need** (packages/atomic_chat, other
+   agents' files; not changed here):
+   - `_ListPage` builds every row up front (`ListView(children: rows)`,
+     `chats_screen.dart` ~962) and `_openAll` hands it a finished
+     `List<Widget>`: make it `ListView.builder` over the data.
+   - The Home loads `listAiChats(limit: 50)` and "All" shows those same rows,
+     so 950 of 1000 chats are unreachable from the list. "All" should load
+     its own list (1000 rows is 9 ms and 169 KB in Rust; page with an offset
+     beyond a few thousand).
+   - Search "AI chats" lists `api.chats()` (the same 50) before typing, and
+     while typing keeps only the AI chats among the 20 global hits, so a
+     query whose best 20 are documents shows no chat. Pass the class to Rust
+     (`SearchOpts.filter_pairs` isA = AiChat, measured 1.4-2.0 ms) through a
+     `class` parameter on the bridge's `search`.
