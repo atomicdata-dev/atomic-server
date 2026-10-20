@@ -456,7 +456,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
         onPressed: onPressed);
     return switch (id) {
       // Not a "new": the feed's own switch.
-      HomeSection.activity => ShowMineChip(value: _mine, onChanged: _setMine),
+      HomeSection.activity => Padding(
+          padding: const EdgeInsets.only(left: 4, right: 8),
+          child: ShowMineChip(value: _mine, onChanged: _setMine)),
       HomeSection.drives => button('New drive', actions.newDrive),
       HomeSection.chats => button('New AI chat', actions.newChat),
       HomeSection.messages => button('New chat room', actions.newConversation),
@@ -905,7 +907,7 @@ class _SectionState<T> extends State<_Section<T>>
     final fold = widget.fold;
     return HoldFan<_SectionAction>(
       key: ValueKey('section-heading-${fold.section.name}'),
-      size: 40,
+      size: 48,
       borderRadius: BorderRadius.circular(8),
       tooltip: widget.title,
       menuLabel: 'Arrange sections',
@@ -918,19 +920,21 @@ class _SectionState<T> extends State<_Section<T>>
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Flexible(
+            // A title in proportion to the rows and the bar's 24 dp icons
+            // (it was a 13 sp grey label): 15 sp, nearly the text colour.
             child: Text(widget.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                    color: c.textSecondary,
-                    fontSize: 13,
+                    color: c.textPrimary.withValues(alpha: 0.85),
+                    fontSize: 15,
                     fontWeight: FontWeight.w600)),
           ),
-          const SizedBox(width: 2),
+          const SizedBox(width: 4),
           AnimatedRotation(
             turns: fold.collapsed ? -0.25 : 0,
             duration: const Duration(milliseconds: 150),
-            child: Icon(Icons.expand_more, size: 18, color: c.textSecondary),
+            child: Icon(Icons.expand_more, size: 22, color: c.textSecondary),
           ),
         ]),
       ),
@@ -944,35 +948,40 @@ class _SectionState<T> extends State<_Section<T>>
     final name = fold.section.name;
     final onSearch = fold.onSearch;
     final plus = fold.plus;
-    return SizedBox(
-      height: 48,
-      child: Row(children: [
-        const SizedBox(width: 8),
-        // The title as wide as it is (and no wider than the room), the
-        // buttons at the right edge.
-        Expanded(
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: _foldHeading(context),
+    // 48 dp like the bar's buttons (more with a large font), with room
+    // above it between sections; the title at the rows' 16 dp inset.
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
+        child: Row(children: [
+          const SizedBox(width: 8),
+          // The title as wide as it is (and no wider than the room), the
+          // buttons at the right edge.
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _foldHeading(context),
+            ),
           ),
-        ),
-        if (onSearch != null)
-          _HeadingButton(
-            key: ValueKey('section-search-$name'),
-            tooltip: 'Search ${widget.title}',
-            icon: Icons.search,
-            onPressed: onSearch,
-          ),
-        if (plus != null) plus,
-        if (list != null && list.isNotEmpty)
-          _HeadingButton(
-            key: ValueKey('section-all-$name'),
-            tooltip: 'All ${widget.title}',
-            icon: Icons.format_list_bulleted,
-            onPressed: () => widget.onShowAll(list),
-          ),
-        const SizedBox(width: 4),
-      ]),
+          if (onSearch != null)
+            _HeadingButton(
+              key: ValueKey('section-search-$name'),
+              tooltip: 'Search ${widget.title}',
+              icon: Icons.search,
+              onPressed: onSearch,
+            ),
+          if (plus != null) plus,
+          if (list != null && list.isNotEmpty)
+            _HeadingButton(
+              key: ValueKey('section-all-$name'),
+              tooltip: 'All ${widget.title}',
+              icon: Icons.format_list_bulleted,
+              onPressed: () => widget.onShowAll(list),
+            ),
+          const SizedBox(width: 4),
+        ]),
+      ),
     );
   }
 
