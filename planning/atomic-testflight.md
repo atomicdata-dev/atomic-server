@@ -5,8 +5,8 @@
 - [x] Register io.ontola.atomic with Apple.
 - [x] Create atomic.place in App Store Connect (Apple ID 6824840977).
 - [x] Prepare iOS CI, signing and upload; fix missing RunnerTests Podfile target and minimum iOS version required by mobile_scanner.
-- [ ] Publish the prepared branch to ontola/atomic-server after explicit push approval (automatic approval review blocked the first attempt).
-- [ ] Configure existing App Store Connect credentials for this repository's CI.
+- [x] Publish the prepared side branch to ontola/atomic-server after explicit user approval.
+- [x] Configure the newly generated Atomic CI key for this repository's signing and upload steps.
 - [ ] Run the iOS build, fix concrete failures, upload the signed IPA.
 - [ ] Verify Apple processing, export-compliance status and availability to internal testers.
 

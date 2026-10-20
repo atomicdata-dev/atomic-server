@@ -13,9 +13,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 60
     env:
-      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      HAS_APP_STORE_CONNECT_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -40,18 +38,22 @@ jobs:
         working-directory: flutter
         run: flutter pub get
       - name: Build iOS release
-        if: env.APP_STORE_CONNECT_PRIVATE_KEY == ''
+        if: env.HAS_APP_STORE_CONNECT_KEY != 'true'
         working-directory: flutter
         run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
       - uses: actions/upload-artifact@v4
-        if: env.APP_STORE_CONNECT_PRIVATE_KEY == ''
+        if: env.HAS_APP_STORE_CONNECT_KEY != 'true'
         with:
           name: atomic-ios-unsigned
           path: flutter/build/ios/iphoneos/Runner.app
           if-no-files-found: error
       - name: Prepare temporary Apple signing
+        env:
+        APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+        APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
         id: signing
-        if: env.APP_STORE_CONNECT_PRIVATE_KEY != ''
+        if: env.HAS_APP_STORE_CONNECT_KEY == 'true'
         working-directory: flutter
         run: |
           python3 -m venv "$RUNNER_TEMP/signing-venv"
@@ -78,6 +80,10 @@ jobs:
           path: flutter/build/ios/ipa/*.ipa
           if-no-files-found: error
       - name: Upload to TestFlight
+        env:
+        APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+        APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
         if: steps.signing.outcome == 'success'
         working-directory: flutter
         run: |
@@ -86,6 +92,10 @@ jobs:
           xcrun altool --upload-app --type ios --file build/ios/ipa/*.ipa --apiKey "$APP_STORE_CONNECT_KEY_ID" --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
           echo "atomic.place build ${{ github.run_number }} uploaded to TestFlight; Apple processing is pending." >> "$GITHUB_STEP_SUMMARY"
       - name: Clean up this run's Apple signing
+        env:
+        APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+        APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
         if: always() && steps.signing.outcome != 'skipped'
         working-directory: flutter
         run: |
