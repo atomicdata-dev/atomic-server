@@ -205,6 +205,11 @@ class AtomicClient {
   static Future<String> createAiChat(String name) =>
       assistant.createAiChat(name: name);
 
+  /// Imports a whole AI chat in one go: [entriesJson] is a JSON array of
+  /// `{role, parts, c}`, oldest first. Returns the chat's subject.
+  static Future<String> importAiChat(String name, String entriesJson) =>
+      assistant.importAiChat(name: name, entriesJson: entriesJson);
+
   /// Creates a resource of [classUrl] named [name] ("Untitled" when empty)
   /// in [drive], signed here and synced like any other edit; returns its
   /// subject.

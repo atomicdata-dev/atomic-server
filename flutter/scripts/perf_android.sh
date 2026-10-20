@@ -4,7 +4,8 @@
 # numbers depend on the device; compare runs on the same one. Budgets and past
 # results: planning/flutter-performance.md.
 #
-#   scripts/perf_android.sh [-s SERIAL] [-a APK] [-n RUNS] [-o OUT.md] [--seed N] [--only LIST]
+#   scripts/perf_android.sh [-s SERIAL] [-a APK] [-n RUNS] [-o OUT.md] [--seed N]
+#                           [--seed-chats N [--chat-scale S]] [--only LIST]
 #
 #   -s SERIAL  adb device (default emulator-5554). Never point this at a phone
 #              whose data you care about: it force-stops the app, taps through
@@ -22,14 +23,22 @@
 #              drive through the app's perf seed hook (lib/perf_seed.dart),
 #              and fill "Perf document 0" with a long text (the big document).
 #              Once per install; needs a signed-in identity.
-#   --only L   comma list of steps: cold,warm,scroll,open,search,chat,memory,size
+#   --seed-chats N  first make N AI chats full of text (20-60 messages of
+#              200-4000 chars times --chat-scale, default 1.0) through the
+#              same hook: the stress data of lib/tests/stress_chats.rs. 1000
+#              chats at scale 1.0 is a ~700 MB store; check `df /data` first.
+#   --only L   comma list of steps: cold,warm,scroll,open,search,chat,memory,size,
+#              allchats (All AI chats: painted, page loads, scroll jank),
+#              typing (search per keystroke, cold first one, AI chats chip),
+#              bigchat (open the newest chats, scroll one)
 #
 # Reads the app's `[perf]`, `[warm]` and `[chat]` lines in logcat (profile and
 # debug builds print them; see packages/atomic_flutter/lib/src/perf.dart).
 # The app must be signed in (Home showing) before running.
 set -euo pipefail
 
-SERIAL=emulator-5554 APK= RUNS=5 OUT= SEED=0 ONLY=cold,warm,scroll,open,search,chat,memory,size
+SERIAL=emulator-5554 APK= RUNS=5 OUT= SEED=0 SEED_CHATS=0 CHAT_SCALE=1.0
+ONLY=cold,warm,scroll,open,search,chat,memory,size,allchats,typing,bigchat
 while [ $# -gt 0 ]; do
   case $1 in
     -s) SERIAL=$2; shift 2;;
@@ -37,8 +46,10 @@ while [ $# -gt 0 ]; do
     -n) RUNS=$2; shift 2;;
     -o) OUT=$2; shift 2;;
     --seed) SEED=$2; shift 2;;
+    --seed-chats) SEED_CHATS=$2; shift 2;;
+    --chat-scale) CHAT_SCALE=$2; shift 2;;
     --only) ONLY=$2; shift 2;;
-    -h|--help) sed -n 2,27p "$0"; exit 0;;
+    -h|--help) sed -n 2,35p "$0"; exit 0;;
     *) echo "unknown argument $1" >&2; exit 2;;
   esac
 done
@@ -99,6 +110,37 @@ tap_text() {
 }
 
 back() { a shell input keyevent 4; }
+
+# find_text, scrolling the page down (up to 5 swipes) until it shows.
+find_scrolling() {
+  local at i
+  for i in 0 1 2 3 4 5; do
+    at=$(find_text "$@")
+    if [ -n "$at" ]; then echo "$at"; return 0; fi
+    a shell input swipe 540 1700 540 900 300; sleep 0.8
+  done
+  return 1
+}
+
+# One frame summary line ([perf] frames) into the table under label $1.
+put_frames() {
+  local line; line=$(log | grep -E '\[perf\] frames' | tail -1 || true)
+  [ -n "$line" ] || return 0
+  note "$line"
+  put "$1: janky frames (%)" "$(sed -E 's/.*janky=([0-9.]+)%.*/\1/' <<<"$line")"
+  local k v p50 p90 p95 p99
+  for k in build raster; do
+    v=$(sed -E "s/.* $k=([0-9.\/]+).*/\1/" <<<"$line")
+    IFS=/ read -r p50 p90 p95 p99 <<<"$v"
+    put "$1: $k p90 (ms)" "$p90"; put "$1: $k p99 (ms)" "$p99"
+  done
+}
+
+mem_stage() { # $1 = label: app PSS now, in MB
+  step memory || return 0
+  sleep 2
+  put "memory: app PSS $1 (MB)" "$(pss_of $PKG | awk '{printf "%.0f", $1/1024}')"
+}
 # The home, whatever page is open (the bar's Home button pops back to it);
 # the app brought back to the front when it is not (never a blind back,
 # which leaves the app from its home).
@@ -202,6 +244,20 @@ if (!done) process.exit(1);
 EOF
   a forward --remove tcp:9339 || true
   sleep 4; back; sleep 4
+fi
+
+# ── Seed AI chats ─────────────────────────────────────────────────────────
+if [ "$SEED_CHATS" -gt 0 ]; then
+  note "seeding $SEED_CHATS AI chats at scale $CHAT_SCALE"
+  a shell mkdir -p /sdcard/Android/data/$PKG/files
+  a shell "echo $SEED_CHATS $CHAT_SCALE > /sdcard/Android/data/$PKG/files/perf_seed_chats"
+  start_cold
+  # Progress every 100 chats; the whole run can take minutes.
+  wait_log '\[perf\] perf seed chats' 1800 || true
+  log | grep -E '\[perf\] (seeding chats|seeded)' | while read -r l; do note "$l"; done
+  put "seed: $SEED_CHATS chats (ms)" "$(last_ms '\[perf\] perf seed chats')"
+  put "seed: store after seeding (MB)" "$(log | sed -nE 's/.*\[perf\] seeded .* store ([0-9]+) MB.*/\1/p' | tail -1)"
+  sleep 3
 fi
 
 # ── Cold start ────────────────────────────────────────────────────────────
@@ -324,6 +380,89 @@ if step search; then
     put "search: Rust query (ms)" "$(last_ms '\[perf\] search query')"
     put "search: last keystroke to results drawn (ms)" "$(last_ms '\[perf\] search keystroke to results')"
     back; sleep 0.5; back; sleep 1
+  done
+fi
+
+# ── All AI chats: the paged, lazy list ────────────────────────────────────
+if step allchats; then
+  start_cold; home_ready || true
+  mem_stage "after start"
+  for i in $(seq "$RUNS"); do
+    go_home; sleep 1
+    at=$(find_scrolling "All AI chats") || { note "no All AI chats button"; break; }
+    a logcat -c
+    a shell input tap $at
+    wait_log '\[perf\] chats all painted' 10 || { back; continue; }
+    put "All chats: tap to list painted (ms, page clock)" "$(last_ms '\[perf\] chats all painted')"
+    sleep 1
+    # Fling through the list: every swipe pages in more chats.
+    for _ in 1 2 3 4 5 6 7 8; do a shell input swipe 540 1900 540 400 120; sleep 0.3; done
+    for _ in 1 2 3 4; do a shell input swipe 540 400 540 1900 120; sleep 0.3; done
+    wait_log '\[perf\] frames' 10 || true
+    put_frames "All chats scroll"
+    v=$(log | grep -E '\[perf\] chats page' | sed -E 's/.* ([0-9]+) ms.*/\1/' | sort -n | tail -1)
+    [ -n "$v" ] && put "All chats: slowest page load (ms)" "$v"
+    put "All chats: rows loaded after scrolling" "$(log | grep -Eo 'chats page [0-9]+\+[0-9]+' | tail -1 | awk -F'[ +]' '{print $3 + $4}')"
+    [ "$i" = 1 ] && mem_stage "after scrolling All chats"
+    back; sleep 1
+  done
+fi
+
+# ── Search, one keystroke at a time ───────────────────────────────────────
+type_word() { # $1 = word, $2 = label; one keystroke every 400 ms
+  local w=$1 k
+  for ((k = 0; k < ${#w}; k++)); do
+    a logcat -c
+    a shell input text "${w:$k:1}"
+    if wait_log '\[perf\] search keystroke to results' 5; then
+      put "$2 key $((k + 1)) ('${w:0:$((k + 1))}'): Rust query (ms)" "$(last_ms '\[perf\] search query')"
+      put "$2 key $((k + 1)) ('${w:0:$((k + 1))}'): keystroke to drawn (ms)" "$(last_ms '\[perf\] search keystroke to results')"
+    fi
+    sleep 0.4
+  done
+}
+if step typing; then
+  for i in $(seq "$RUNS"); do
+    # The very first search after a cold start reads the index from disk.
+    start_cold; home_ready || true
+    tap_text Search || break
+    sleep 1.5
+    type_word budget "search (all)"
+    back; sleep 0.5; back; sleep 0.5
+    # The AI chats chip: the section's own search.
+    go_home
+    at=$(find_scrolling "Search AI chats") || { note "no Search AI chats button"; continue; }
+    a shell input tap $at; sleep 1.5
+    type_word kubernetes "search (AI chats)"
+    back; sleep 0.5; back; sleep 0.5
+  done
+  mem_stage "after searching"
+fi
+
+# ── Opening the newest chats, and scrolling one ───────────────────────────
+if step bigchat; then
+  start_cold; home_ready || true
+  for i in $(seq "$RUNS"); do
+    go_home
+    at=$(find_scrolling "All AI chats") || break
+    a shell input tap $at; sleep 1.5
+    # The list's first chat rows, under the first age heading.
+    for y in 420 600; do
+      a logcat -c
+      a shell input tap 540 $y
+      if wait_log '\[perf\] chat painted' 10; then
+        n=$(log | grep -Eo 'chat painted [0-9]+' | tail -1 | awk '{print $3}')
+        put "open chat ($n messages): data (ms)" "$(last_ms '\[perf\] chat data')"
+        put "open chat ($n messages): painted (ms)" "$(last_ms '\[perf\] chat painted')"
+        sleep 1
+        for _ in 1 2 3 4 5 6; do a shell input swipe 540 600 540 1900 120; sleep 0.3; done
+        wait_log '\[perf\] frames' 10 || true
+        put_frames "chat scroll"
+        back; sleep 1
+      fi
+    done
+    [ "$i" = 1 ] && mem_stage "after opening chats"
+    back; sleep 1
   done
 fi
 
