@@ -24,10 +24,14 @@ record was published with it. Do not use it for this release.
 - [x] Add a signed arm64 AAB workflow and native 16 KB alignment verification.
 - [x] Observe the user-created Play Console app, ID 4973792617288465041.
 - [x] Complete the first signed Android CI build: 1.0.0 (1), run 39424359675, artifact 12266865399. All six native arm64 libraries pass 16 KB alignment checks.
-- [ ] Upload the signed bundle to Play internal testing and verify availability.
+- [x] Upload and publish signed bundle 1.0.0 (1) to Play internal testing (20 October 2026, 16:25 Europe/Amsterdam).
+- [ ] Save Atomic Internal tester access for the owner after confirmation of the exact email addresses.
 
 Play Console developer: 6245351578543299123. Android-only changes are excluded
 from the iOS push trigger so subsequent Android releases do not also upload an IPA.
 
 First bundle SHA-256: `82a8d7fbff6caff2929c266a1a9483e8893943e9ecb209c2e03976eb9717ba89`.
-Play upload is pending; no Android release has been submitted from this workflow.
+Play Console reports Available to internal testers. Tester selection remains pending.
+Opt-in: https://play.google.com/apps/internaltest/4700697182889756841
+The approved play-ci serviceaccount authenticated, but the reviews API returns 403;
+automated publishing permissions have not yet been verified or configured.
