@@ -15,6 +15,7 @@ import 'chat_screen.dart';
 import 'resource_row.dart';
 import 'resource_view.dart';
 import 'native_views.dart';
+import 'new_document_sheet.dart';
 
 /// Items per section on the home; the rest is behind the All button.
 const _homeItems = 4;
@@ -251,7 +252,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
         : drives.first.subject;
     _driveNames = {for (final d in drives) d.subject: d.name};
     if (mounted) _shell?.drive.value = _drive;
-    return drives;
+    // The most recently visited first.
+    return sortDrivesByRecent(widget.api, drives);
   }
 
   /// What was opened lately in every drive, newest first.
@@ -322,6 +324,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
       _reloadQueued = false;
       if (!mounted) return;
       setState(() {
+        // First: the recents read the drives.
+        _drives = _loadDrives();
         _chats = widget.api.chats();
         _recents = _loadRecents();
         _favorites = widget.api.favorites();
@@ -343,8 +347,23 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   /// Opens [screen]: pushed over the home on a phone, in the detail pane
   /// next to it on a tablet. [subject] is what it shows, to mark its row.
-  Future<void> _push(Widget screen, {String? subject}) async {
-    await openFromList<void>(context, (_) => screen, subject: subject);
+  Future<void> _push(Widget screen,
+      {String? subject, VoidCallback? onLeave}) async {
+    await openFromList<void>(context, (_) => screen,
+        subject: subject, onLeave: onLeave);
+    if (mounted && _changesData(screen)) _reload();
+  }
+
+  /// Opens [subject] of [drive] and notes the visit once it is left: the
+  /// lists (Recents, the drives' order) do not move under the finger that
+  /// opened it, only when the person goes on.
+  Future<void> _visit(Widget screen,
+      {required String drive, required String subject}) async {
+    await openFromList<void>(context, (_) => screen, subject: subject,
+        onLeave: () {
+      widget.api.noteOpened(drive, subject);
+      noteDriveVisited(drive);
+    });
     if (mounted && _changesData(screen)) _reload();
   }
 
@@ -470,14 +489,14 @@ class _ChatsScreenState extends State<ChatsScreen> {
       subject: chat?.subject);
 
   void _openResource(String drive, RecentResource r) {
-    widget.api.noteOpened(drive, r.subject);
-    _push(
+    _visit(
         openResourceView(
             api: widget.api,
             drive: drive,
             subject: r.subject,
             title: r.title,
             className: r.className),
+        drive: drive,
         subject: r.subject);
   }
 
@@ -494,7 +513,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
                 drive: d.subject,
                 subject: d.subject,
                 title: d.name),
-            subject: d.subject),
+            subject: d.subject,
+            // The drives' order follows the visit once it is left.
+            onLeave: () => noteDriveVisited(d.subject)),
       );
 
   Widget _chatRow(ChatSummary chat) => ResourceRow(
@@ -551,10 +572,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
       }, onError: (Object _) {});
     }
     if (n.about.isEmpty) return;
-    widget.api.noteOpened(_drive, n.about);
-    _push(
+    _visit(
         openResourceView(
             api: widget.api, drive: _drive, subject: n.about, title: ''),
+        drive: _drive,
         subject: n.about);
   }
 
@@ -589,14 +610,14 @@ class _ChatsScreenState extends State<ChatsScreen> {
         onTap: a.kind == 'deleted'
             ? null
             : () {
-                widget.api.noteOpened(a.drive, a.subject);
-                _push(
+                _visit(
                     openResourceView(
                         api: widget.api,
                         drive: a.drive,
                         subject: a.subject,
                         title: a.name,
                         className: a.className),
+                    drive: a.drive,
                     subject: a.subject);
               },
       );

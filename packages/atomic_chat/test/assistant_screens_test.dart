@@ -452,6 +452,9 @@ void main() {
       await tester.tap(find.text('Polle in Team chat'));
       await tester.pump();
       expect(api.markedRead, ['n1']);
+      // Noted once the page is left (no list moves under the finger).
+      expect(api.opened, isEmpty);
+      await _leave(tester);
       expect(api.opened, ['did:ad:teamchat']);
       await tester.pump(const Duration(milliseconds: 500));
     });
@@ -747,8 +750,11 @@ void main() {
       ResourceView.serverFactory = () async => throw 'no server in a test';
       await tester.tap(find.text('Alice, Bob'));
       await tester.pumpAndSettle();
-      expect(api.opened, ['m1']);
       expect(find.byType(ResourceView), findsOneWidget);
+      // Noted once the page is left (no list moves under the finger).
+      expect(api.opened, isEmpty);
+      await _leave(tester);
+      expect(api.opened, ['m1']);
     });
 
     testWidgets('Messages rows show the newest message and open natively',
@@ -956,6 +962,9 @@ void main() {
       ResourceView.serverFactory = () async => throw 'no server in a test';
       await tester.tap(find.text('Second b'));
       await tester.pump();
+      // Noted once the page is left (no list moves under the finger).
+      expect(api.opened, isEmpty);
+      await _leave(tester);
       expect(api.opened, ['b3']);
     });
 
@@ -1329,6 +1338,9 @@ void main() {
       ResourceView.serverFactory = () async => throw 'no server in a test';
       await tester.tap(find.text('Opened doc'));
       await tester.pump();
+      // Noted once the page is left (no list moves under the finger).
+      expect(api.opened, isEmpty);
+      await _leave(tester);
       expect(api.opened, ['r1']);
     });
 
@@ -1352,6 +1364,9 @@ void main() {
 
       await tester.tap(find.text('Zebra'));
       await tester.pump();
+      // Noted once the page is left (no list moves under the finger).
+      expect(api.opened, isEmpty);
+      await _leave(tester);
       expect(api.opened, ['did:ad:9']);
     });
   });
@@ -1406,8 +1421,11 @@ void main() {
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
-      expect(api.opened, ['did:ad:1']);
       expect(find.byType(ResourceView), findsOneWidget);
+      // Noted once the page is left (no list moves under the finger).
+      expect(api.opened, isEmpty);
+      await _leave(tester);
+      expect(api.opened, ['did:ad:1']);
     });
 
     testWidgets('Enter without hits opens nothing', (tester) async {
@@ -1514,6 +1532,9 @@ void main() {
       ResourceView.serverFactory = () async => throw 'no server in a test';
       await tester.tap(find.text('Zebra work'));
       await tester.pump();
+      // Noted once the page is left (no list moves under the finger).
+      expect(api.opened, isEmpty);
+      await _leave(tester);
       expect(api.opened, ['did:ad:b']);
       expect(api.openedDrives, ['did:ad:work']);
     });
@@ -2737,4 +2758,12 @@ class _SlowNotifications extends FakeApi {
   _SlowNotifications(this.pending);
   @override
   Future<List<NotificationItem>> notifications() => pending;
+}
+
+/// Leaves the page on top: what was opened is noted as visited then.
+Future<void> _leave(WidgetTester tester) async {
+  await tester.pump(const Duration(milliseconds: 500));
+  await tester.binding.handlePopRoute();
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
 }

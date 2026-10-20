@@ -170,7 +170,8 @@ void main() {
       expect(tile('Plans').selected, isFalse);
       expect(tile('Notes').selected, isTrue);
       expect(_controller(tester).pages, hasLength(1));
-      expect(api.opened, ['did:ad:plans', 'did:ad:notes']);
+      // Plans counts as visited once Notes took its place; Notes is open.
+      expect(api.opened, ['did:ad:plans']);
 
       // A page of the bar in its place: no row is marked.
       await tester.tap(find.byTooltip('Settings'));
@@ -1052,6 +1053,72 @@ void main() {
       await _done(tester);
     });
   });
+
+  group('lists move when a page is left, not when it opens', () {
+    setUp(resetDriveVisits);
+
+    List<String> order(WidgetTester tester, List<String> titles) {
+      final tops = {
+        for (final t in titles)
+          t: tester
+              .getRect(find
+                  .descendant(
+                      of: find.byType(ChatsScreen), matching: find.text(t))
+                  .first)
+              .top
+      };
+      return titles.toList()..sort((a, b) => tops[a]!.compareTo(tops[b]!));
+    }
+
+    testWidgets('Recents: still while a row is open, then the visit counts',
+        (tester) async {
+      _size(tester, _landscape);
+      final api = _VisitApi();
+      await tester.pumpWidget(_shell(api));
+      await _settle(tester);
+      expect(order(tester, ['Plans', 'Notes']), ['Plans', 'Notes']);
+      await tester.tap(find.text('Notes'));
+      await _settle(tester);
+      // Open next to the list, which did not move.
+      expect(find.byType(ResourceView), findsOneWidget);
+      expect(order(tester, ['Plans', 'Notes']), ['Plans', 'Notes']);
+      // On to the next: Notes was visited.
+      await tester.tap(find.text('Plans'));
+      await _settle(tester);
+      expect(order(tester, ['Plans', 'Notes']), ['Notes', 'Plans']);
+      await _done(tester);
+    });
+
+    testWidgets('drives: the last visited first, also after a restart',
+        (tester) async {
+      _size(tester, _landscape);
+      final api = _VisitApi();
+      await tester.pumpWidget(_shell(api));
+      await _settle(tester);
+      expect(order(tester, ['Alpha', 'Beta']), ['Alpha', 'Beta']);
+      await tester.tap(find.text('Beta'));
+      await _settle(tester);
+      // Not while it is open.
+      expect(order(tester, ['Alpha', 'Beta']), ['Alpha', 'Beta']);
+      await tester.binding.handlePopRoute();
+      await _settle(tester);
+      expect(order(tester, ['Alpha', 'Beta']), ['Beta', 'Alpha']);
+      await tester.tap(find.text('Alpha'));
+      await _settle(tester);
+      await tester.binding.handlePopRoute();
+      await _settle(tester);
+      expect(order(tester, ['Alpha', 'Beta']), ['Alpha', 'Beta']);
+
+      // A fresh start reads the visits from the device.
+      await _done(tester);
+      resetDriveVisits();
+      await warmDriveVisits();
+      await tester.pumpWidget(_shell(_VisitApi()));
+      await _settle(tester);
+      expect(order(tester, ['Alpha', 'Beta']), ['Alpha', 'Beta']);
+      await _done(tester);
+    });
+  });
 }
 
 class _IdentityApi extends FakeApi {
@@ -1064,4 +1131,38 @@ class _IdentityApi extends FakeApi {
 
   @override
   Future<ProfileIdentity?> ownIdentity() async => who;
+}
+
+/// Recents as the host keeps them: what was noted as opened goes on top.
+class _VisitApi extends FakeApi {
+  final List<RecentResource> _recent = [
+    _r('did:ad:plans', 'Plans'),
+    _r('did:ad:notes', 'Notes'),
+  ];
+  int _clock = 10;
+
+  _VisitApi()
+      : super(driveList: const [
+          (subject: 'did:ad:a', name: 'Alpha', emoji: null),
+          (subject: 'did:ad:b', name: 'Beta', emoji: null),
+        ]);
+
+  @override
+  Future<List<RecentResource>> recentResources(String drive) async =>
+      drive == 'did:ad:a' ? List.of(_recent) : const [];
+
+  @override
+  void noteOpened(String drive, String subject) {
+    super.noteOpened(drive, subject);
+    final i = _recent.indexWhere((r) => r.subject == subject);
+    if (i < 0) return;
+    final r = _recent.removeAt(i);
+    _recent.insert(0, (
+      subject: r.subject,
+      title: r.title,
+      className: r.className,
+      openedAt: ++_clock,
+      emoji: null
+    ));
+  }
 }

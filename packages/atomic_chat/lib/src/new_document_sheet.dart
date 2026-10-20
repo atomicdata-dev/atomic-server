@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,16 +30,62 @@ Future<void> _rememberDrive(String drive) async {
   } catch (_) {}
 }
 
-/// The person's drives, the one with the most recently opened resource first
-/// (drives nothing was opened in keep their order, last).
-Future<List<DriveInfo>> drivesByRecent(AssistantApi api) async {
-  final drives = await api.drives();
+/// SharedPreferences key: when each drive was last visited (left), as
+/// JSON `{drive: unix ms}`, on this device.
+const driveVisitsKey = 'drive_visited_at';
+
+/// When each drive was last visited on this device, as read so far (the
+/// lists never wait for the device's settings: [warmDriveVisits] reads them
+/// when the app starts).
+Map<String, int> _visits = {};
+Future<void>? _visitsRead;
+
+/// Reads the visits from the device's settings, once.
+Future<void> warmDriveVisits() => _visitsRead ??= () async {
+      try {
+        final raw =
+            (await SharedPreferences.getInstance()).getString(driveVisitsKey);
+        if (raw == null) return;
+        _visits = {
+          for (final e in (jsonDecode(raw) as Map<String, dynamic>).entries)
+            if (e.value is int) e.key: e.value as int,
+          ..._visits,
+        };
+      } catch (_) {}
+    }();
+
+/// Notes a visit of [drive] (or of something in it), now.
+Future<void> noteDriveVisited(String drive, {int? at}) async {
+  if (drive.isEmpty) return;
+  _visits[drive] = at ?? DateTime.now().millisecondsSinceEpoch;
+  try {
+    await (await SharedPreferences.getInstance())
+        .setString(driveVisitsKey, jsonEncode(_visits));
+  } catch (_) {}
+}
+
+/// Forgets what was read (tests: a fresh start).
+@visibleForTesting
+void resetDriveVisits() {
+  _visits = {};
+  _visitsRead = null;
+}
+
+/// The person's drives, the most recently visited first (the drive itself,
+/// or a resource opened in it); drives never visited keep their order, last.
+Future<List<DriveInfo>> drivesByRecent(AssistantApi api) async =>
+    sortDrivesByRecent(api, await api.drives());
+
+/// [drives], the most recently visited first.
+Future<List<DriveInfo>> sortDrivesByRecent(
+    AssistantApi api, List<DriveInfo> drives) async {
+  final visits = _visits;
   final latest = await Future.wait([
     for (final d in drives)
       api.recentResources(d.subject).then(
-            (list) =>
-                list.fold<int>(0, (m, r) => r.openedAt > m ? r.openedAt : m),
-            onError: (Object _) => 0,
+            (list) => list.fold<int>(visits[d.subject] ?? 0,
+                (m, r) => r.openedAt > m ? r.openedAt : m),
+            onError: (Object _) => visits[d.subject] ?? 0,
           ),
   ]);
   final order = List.generate(drives.length, (i) => i)

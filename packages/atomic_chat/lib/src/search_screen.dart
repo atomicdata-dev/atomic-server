@@ -15,6 +15,7 @@ import 'assistant_api.dart';
 import 'resource_row.dart';
 import 'native_views.dart';
 import 'list_and_field.dart';
+import 'new_document_sheet.dart';
 
 /// What a search looks for: anything, or one kind (a home section's search).
 enum SearchKind {
@@ -542,7 +543,6 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _open(
       String drive, String subject, String title, String className) async {
     if (_scopeToDrive(subject, className)) return;
-    widget.api.noteOpened(drive, subject);
     final opened = openFromList<void>(
       context,
       (_) => openResourceView(
@@ -552,6 +552,11 @@ class _SearchScreenState extends State<SearchScreen> {
           title: title,
           className: className),
       subject: subject,
+      // Noted once it is left: the lists do not move under the finger.
+      onLeave: () {
+        widget.api.noteOpened(drive, subject);
+        noteDriveVisited(drive);
+      },
     );
     widget.onOpened?.call();
     await opened;

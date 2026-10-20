@@ -13,6 +13,7 @@ import 'app_bottom_bar.dart';
 import 'models.dart';
 import 'assistant_api.dart';
 import 'search_screen.dart';
+import 'new_document_sheet.dart' show warmDriveVisits;
 import 'native_views.dart';
 import 'warm_resource_web_view.dart';
 import 'slide_back_route.dart';
@@ -176,6 +177,10 @@ class ShellController extends ChangeNotifier {
   /// Pages opened for a resource ([openDetail]) and its subject.
   final Map<Route<dynamic>, String> _details = {};
 
+  /// What runs when a page opened by [openDetail] is left (popped, or
+  /// replaced by the next one).
+  final Map<Route<dynamic>, VoidCallback> _onLeave = {};
+
   /// The drive search looks in; the home updates it.
   final ValueNotifier<String> drive;
 
@@ -302,7 +307,11 @@ class ShellController extends ChangeNotifier {
   /// pushed on a phone, in the detail pane next to the list. [subject] marks
   /// its row as the selected one. Picking the row that is shown already
   /// does nothing.
-  Future<T?> openDetail<T>(WidgetBuilder builder, {String? subject}) async {
+  ///
+  /// [onLeave] runs once the page is left: a list notes the visit then, so
+  /// it does not reorder under the finger that just opened the row.
+  Future<T?> openDetail<T>(WidgetBuilder builder,
+      {String? subject, VoidCallback? onLeave}) async {
     final navigator = navigatorKey.currentState;
     if (navigator == null) return null;
     if (split && subject != null && _top != null && _details[_top] == subject) {
@@ -311,6 +320,7 @@ class ShellController extends ChangeNotifier {
     // Next to the list the pane just shows it: no slide to wait for.
     final route = SlideBackRoute<T>(builder: builder, instant: split);
     if (subject != null) _details[route] = subject;
+    if (onLeave != null) _onLeave[route] = onLeave;
     return _show(navigator, route, overList: true);
   }
 
@@ -376,6 +386,7 @@ class ShellController extends ChangeNotifier {
     _kinds.remove(route);
     _menus.remove(route);
     _reselect.remove(route);
+    _onLeave.remove(route)?.call();
     if (_details.remove(route) != null) _changed();
   }
 
@@ -468,12 +479,15 @@ class ShellScope extends InheritedWidget {
 /// is one ([ShellController.openDetail]: the detail pane next to the list),
 /// else pushed on the nearest navigator.
 Future<T?> openFromList<T>(BuildContext context, WidgetBuilder builder,
-    {String? subject}) {
+    {String? subject, VoidCallback? onLeave}) {
   final shell = ShellScope.maybeOf(context);
   if (shell != null && shell.navigatorKey.currentState != null) {
-    return shell.openDetail<T>(builder, subject: subject);
+    return shell.openDetail<T>(builder, subject: subject, onLeave: onLeave);
   }
-  return Navigator.of(context).push(SlideBackRoute<T>(builder: builder));
+  final pushed =
+      Navigator.of(context).push(SlideBackRoute<T>(builder: builder));
+  if (onLeave != null) pushed.whenComplete(onLeave);
+  return pushed;
 }
 
 /// Tracks which page route is on top of the shell's navigator. Dialogs and
@@ -614,6 +628,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
           ?..showAhead = _likelyNext
           ..warmUp();
     _shell.loadListPrefs();
+    warmDriveVisits();
     _shell.identityLoader = widget.api.ownIdentity;
     _shell.refreshIdentity();
     WidgetsBinding.instance.addObserver(this);
