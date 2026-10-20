@@ -87,6 +87,11 @@ fn canonical(path: &Path) -> PathBuf {
 pub fn create_database(path: &Path) -> AtomicResult<Database> {
     match std::panic::catch_unwind(|| Database::create(path)) {
         Ok(Ok(db)) => Ok(db),
+        Ok(Err(e)) if is_damage(&e) => Err(format!(
+            "The {DAMAGED_STORE}: redb could not read {}: {e}",
+            path.display()
+        )
+        .into()),
         Ok(Err(e)) => Err(format!("Failed to create redb at {}: {e}", path.display()).into()),
         Err(panic) => Err(format!(
             "The {DAMAGED_STORE}: redb panicked opening {}: {}",
@@ -94,6 +99,20 @@ pub fn create_database(path: &Path) -> AtomicResult<Database> {
             panic_message(&panic)
         )
         .into()),
+    }
+}
+
+/// redb's errors for a file that is not (or no longer) a readable store:
+/// a checksum or format failure, a wrong magic number (`InvalidData`) or a
+/// file that ends early. A lock or a permission problem is not damage.
+fn is_damage(e: &redb::DatabaseError) -> bool {
+    match e {
+        redb::DatabaseError::Storage(redb::StorageError::Corrupted(_)) => true,
+        redb::DatabaseError::Storage(redb::StorageError::Io(io)) => matches!(
+            io.kind(),
+            std::io::ErrorKind::InvalidData | std::io::ErrorKind::UnexpectedEof
+        ),
+        _ => false,
     }
 }
 
@@ -337,6 +356,18 @@ mod tests {
         verify_readable(&db).unwrap();
         drop(db);
         assert!(kept.exists(), "the broken file is kept");
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn a_file_that_is_not_a_store_is_damage() {
+        let dir = temp_dir("garbage");
+        let path = dir.join("atomic.redb");
+        std::fs::write(&path, vec![0x42u8; 9000]).unwrap();
+        let Err(err) = create_database(&path) else {
+            panic!("garbage must not open");
+        };
+        assert!(is_damaged_store_error(&err.to_string()), "{err}");
         std::fs::remove_dir_all(dir).ok();
     }
 
