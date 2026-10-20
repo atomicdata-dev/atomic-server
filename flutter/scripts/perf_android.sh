@@ -30,7 +30,7 @@
 #   --only L   comma list of steps: cold,warm,scroll,open,search,chat,memory,size,
 #              allchats (All AI chats: painted, page loads, scroll jank),
 #              typing (search per keystroke, cold first one, AI chats chip),
-#              bigchat (open the newest chats, scroll one)
+#              bigchat (open two seeded chats, scroll them)
 #
 # Reads the app's `[perf]`, `[warm]` and `[chat]` lines in logcat (profile and
 # debug builds print them; see packages/atomic_flutter/lib/src/perf.dart).
@@ -439,15 +439,17 @@ if step typing; then
   mem_stage "after searching"
 fi
 
-# ── Opening the newest chats, and scrolling one ───────────────────────────
+# ── Opening seeded chats, and scrolling them ──────────────────────────────
 if step bigchat; then
   start_cold; home_ready || true
   for i in $(seq "$RUNS"); do
     go_home
     at=$(find_scrolling "All AI chats") || break
     a shell input tap $at; sleep 1.5
-    # The list's first chat rows, under the first age heading.
-    for y in 420 600; do
+    # Past the newest chats (the ones made by hand today are short), into
+    # the seeded ones, then two rows there.
+    a shell input swipe 540 1900 540 400 600; sleep 1
+    for y in 900 1200; do
       a logcat -c
       a shell input tap 540 $y
       if wait_log '\[perf\] chat painted' 10; then
