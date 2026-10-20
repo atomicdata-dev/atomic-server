@@ -22,23 +22,46 @@ logical pixels):
 
 - **Bar under the sidebar only** (2026-10-20, Joep: a full-width bar wastes
   room in landscape): in `split` the bar is at the foot of the list pane,
-  exactly its width (`_SplitPanes` positions it; one keyed instance, so it
-  is not rebuilt when it moves). The list pane's minimum is 304 dp (six 48
-  dp slots incl. the resource's ⋮, plus padding). The profile button shows
-  the name next to the avatar when the bar is >= 400 dp wide (the default
-  sidebar at 1000+ dp windows), else the avatar only. The buttons start at
-  the left of the bar, the resource's ⋮ sits at its right end. The bar is
-  flush at the bottom, its colour under the system navigation inset. The
-  detail pane runs to the bottom of the window. **Folded**: the bar slides
-  away with the sidebar (no floating bar); the pages have the whole window
-  and the tab at the left edge (or a swipe from it) brings both back. The
-  home's header (wordmark) has a Close sidebar button. Keyboard: the bar is
-  covered by it as on the phone; the list pane sees the keyboard minus the
-  bar's height, the detail pane the whole keyboard.
-- **Reopening in one gesture**: a tap on the tab, or a drag that starts at
-  the left edge (a 24 dp strip, `_PaneHandle.edgeStrip`, starting beyond
-  `MediaQuery.systemGestureInsets.left` so Android's back swipe keeps the
-  very edge; it is a Flutter widget above the pages' web view) and follows
+  exactly its width (`_SplitPanes` positions it without a top; one keyed
+  instance, so it is not rebuilt when it moves). A 56 dp row
+  (`AppBottomBar.rowHeight`), buttons centred in it, the system inset under
+  it in the bar's colour. Next to the pages its buttons are equal slots
+  (`Expanded`) across the sidebar: Home, Search, +, Profile (avatar only,
+  24 dp like the icons), Settings, the resource's ⋮ (slot kept empty when
+  nothing is open) and **Close sidebar** at the right end (Joep: thumbs are
+  at the bottom). The phone's wide bar still shows the name next to the
+  avatar. The detail pane runs to the bottom of the window. **Folded**: the
+  bar slides away with the sidebar (no floating bar); the pages have the
+  whole window and a round menu button at the bottom left (above the
+  inset) or a swipe from the left edge brings both back. Keyboard: the bar
+  is covered by it as on the phone; the list pane sees the keyboard minus
+  the bar's height, the detail pane the whole keyboard.
+- **Home page of the detail pane**: with nothing open it shows the home's
+  activity feed, big (title "Activity", rows at most 720 dp wide, an empty
+  text). The home publishes the feed it read and its own rows to
+  `ShellController.activity`; the Activity section leaves the sidebar in
+  `split` (the phone keeps it).
+- **Search on a tablet is a card over the window** (Joep: like ⌘K):
+  `showSearchPalette` on the root navigator, a dimmed backdrop, a card of
+  at most 640 dp in the upper part (as high as fits above the keyboard, up
+  to 70%), the field on top and the results under it (`SearchScreen` with
+  `palette: true`; rows at one inset, the Enter row filled). A result opens
+  in the detail pane and closes it; a tap next to it, Esc or back closes it
+  and leaves everything as it was. Search is marked while it is open
+  (`ShellController.searching`). A phone's search page that moves to the
+  sidebar on a resize has a back button there.
+- **Visits count when a page is left** (Joep: Recents jumped under the
+  finger): `openFromList(onLeave:)` notes the visit (`noteOpened`, and the
+  drive's visit) when the page is popped or replaced. Drives are listed the
+  most recently visited first (`sortDrivesByRecent`: a drive's own visit,
+  per device in SharedPreferences `drive_visited_at`, read at shell start
+  and never waited for, or the latest resource opened in it).
+- **Reopening in one gesture**: the bottom-left button, or a drag that
+  starts at the left edge (a 24 dp strip, `_PaneHandle.edgeStrip`, starting
+  beyond `MediaQuery.systemGestureInsets.left` so Android's back swipe
+  keeps the very edge; it is opaque, so the web view under it, which claims
+  a touch at once, never gets the swipe: before, it did not open over a
+  web page) and follows
   the finger: the list width tracks it, then settles (<= 140 ms) open past
   a third of the width or on a fling > 300 dp/s, else back folded. A fling
   left on the divider strip folds it. While the list moves, the pages are
@@ -47,8 +70,8 @@ logical pixels):
 - **Bar**: Home, Search, +, Profile, Settings, and on a tablet the
   resource's ⋮ at the bar's right end (on the phone ⋮ takes Settings'
   place; a 48 dp slot is kept for it so nothing moves when a resource
-  opens). Home and Search show what the list pane holds; Home on the home
-  closes the detail page. The + list opens above the + as on the
+  opens). Home shows the home in the sidebar; on the home it closes the
+  detail page. Search opens the search card. The + list opens above the + as on the
   phone.
 - **+ opens on the way down** (`HoldFan.opensOnDown`, raw pointer
   listener): the list is there in the frame the finger lands; moving more
@@ -124,6 +147,19 @@ folded there was a floating bar card over a black strip.
   read as "Profile is the current page"; it is neutral now unless it is.
 - [x] Tests at 1752x2800 @ 340 dpi with a 48 dp gesture inset and a
   signed-in person (`tablet_layout_test.dart`, "the Samsung Galaxy Tab").
+- [x] Seen on the Tablet_A35 emulator at 1752x2800 @ 340 (gesture nav): the
+  sidebar with its sections, the bar flush at its foot, folded with the
+  bottom-left button, the edge swipe over a web page, the search card with
+  and without the keyboard, the activity page. On the real SM-X810
+  (landscape, 1318x824 dp): sidebar, bar and activity page as designed.
+- [ ] A drive opened in the sidebar as its resource list (Joep: "may"):
+  needs a native list of a drive's resources (the phone's drive view is the
+  web page, nothing native to reuse); a host API for a drive's children
+  first.
+- [ ] The Xiaomi Pad (USB 92f5edcb) and the Xiaomi phone were offline when
+  the last build went out; install there.
+- [ ] Dark mode on the tablet (the app's own theme setting stayed light on
+  the emulator).
 
 ## Seen on the tablet emulator (Tablet_A35, 2560x1600 @ 320 dpi = 1280x800 dp)
 
