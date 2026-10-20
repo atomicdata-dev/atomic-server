@@ -20,7 +20,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val flow = AccountFlow(
         backend = CoreBackend,
         session = atomic.session,
-        openStore = { openStore(app.filesDir.resolve("atomic").absolutePath) },
+        openStore = { openStore(app.filesDir.resolve("atomic").absolutePath).also { Perf.mark("db open") } },
         recovery = { storeRecovery() },
     )
     /** The settings screen's model, living as long as the app does. */
@@ -31,7 +31,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     init {
         launch {
             flow.start()
-            if (flow.state.value == AppState.Ready) seed()
+            if (flow.state.value == AppState.Ready) {
+                Perf.mark("session restored")
+                seed()
+            }
         }
     }
 

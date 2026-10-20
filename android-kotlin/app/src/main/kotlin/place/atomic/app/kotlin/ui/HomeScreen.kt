@@ -67,8 +67,10 @@ fun HomeScreen(
     onSettings: () -> Unit,
     modifier: Modifier = Modifier,
     wide: Boolean = false,
+    /** Starts a chat with the AI; the AI chats heading offers it. */
+    onNewChat: (() -> Unit)? = null,
 ) {
-    val list: @Composable (Modifier) -> Unit = { m -> HomeList(state, onQuery, onShowAll, onOpen, onSettings, m) }
+    val list: @Composable (Modifier) -> Unit = { m -> HomeList(state, onQuery, onShowAll, onOpen, onSettings, onNewChat, m) }
     if (wide) {
         Row(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             list(Modifier.width(420.dp).fillMaxHeight())
@@ -93,6 +95,7 @@ private fun HomeList(
     onShowAll: (Section?) -> Unit,
     onOpen: (RowItem) -> Unit,
     onSettings: () -> Unit,
+    onNewChat: (() -> Unit)?,
     modifier: Modifier,
 ) {
     val all = state.showAll
@@ -120,7 +123,7 @@ private fun HomeList(
                 allRows(state, all, onOpen)
             } else {
                 item { SearchField(state.query, onQuery) }
-                if (state.searching) searchRows(state, onOpen) else sectionRows(state, onShowAll, onOpen)
+                if (state.searching) searchRows(state, onOpen) else sectionRows(state, onShowAll, onOpen, onNewChat)
             }
         }
     }
@@ -130,13 +133,18 @@ private fun androidx.compose.foundation.lazy.LazyListScope.sectionRows(
     state: HomeState,
     onShowAll: (Section?) -> Unit,
     onOpen: (RowItem) -> Unit,
+    onNewChat: (() -> Unit)?,
 ) {
     for (section in Section.entries) {
         val rows = state.sections[section]
         // Left out, with its heading, while there is nothing to list.
         if (section.hideEmpty && rows.isNullOrEmpty()) continue
         item(key = "h-${section.name}") {
-            SectionHeading(section.title, if ((rows?.size ?: 0) > HOME_ROWS) ({ onShowAll(section) }) else null)
+            SectionHeading(
+                section.title,
+                if ((rows?.size ?: 0) > HOME_ROWS) ({ onShowAll(section) }) else null,
+                if (section == Section.Chats) onNewChat else null,
+            )
         }
         when {
             rows == null -> item(key = "l-${section.name}") { Loading() }
@@ -188,7 +196,7 @@ private fun SearchField(query: String, onQuery: (String) -> Unit) {
 }
 
 @Composable
-private fun SectionHeading(title: String, onShowAll: (() -> Unit)?) {
+private fun SectionHeading(title: String, onShowAll: (() -> Unit)?, onNew: (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(
             title,
@@ -197,6 +205,15 @@ private fun SectionHeading(title: String, onShowAll: (() -> Unit)?) {
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )
+        if (onNew != null) {
+            Text(
+                "New chat",
+                Modifier.clickable(onClick = onNew).padding(horizontal = 8.dp, vertical = 4.dp).testTag("new-chat"),
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
         if (onShowAll != null) {
             Text(
                 "Show all",

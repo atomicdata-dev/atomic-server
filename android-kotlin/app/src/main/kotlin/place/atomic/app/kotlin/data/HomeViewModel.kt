@@ -10,7 +10,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
+import place.atomic.app.kotlin.Perf
 import place.atomic.app.kotlin.core.HomeList
 
 /** What the Home screen shows. A `null` list is still loading. */
@@ -37,7 +39,10 @@ class HomeViewModel(private val repo: HomeRepository) : ViewModel() {
     private var driveNames: Map<String, String> = emptyMap()
     private var search: Job? = null
 
+    private val startedAt = Perf.clock()
+
     init {
+        Perf.mark("home start")
         reload()
         viewModelScope.launch {
             // Bursts of writes (a sync, a seed) are one reload.
@@ -70,11 +75,16 @@ class HomeViewModel(private val repo: HomeRepository) : ViewModel() {
 
     private suspend fun <T> load(read: suspend () -> List<T>): List<T> = runCatching { read() }.getOrDefault(emptyList())
 
-    private fun put(section: Section, rows: List<RowItem>) =
-        _state.update { it.copy(sections = it.sections + (section to rows)) }
+    private fun put(section: Section, rows: List<RowItem>) {
+        // Flutter's `home <list>` spans, and `home data` once every list is in.
+        Perf.span("home ${section.name.lowercase()}", Perf.clock() - startedAt)
+        val all = _state.updateAndGet { it.copy(sections = it.sections + (section to rows)) }
+        if (all.sections.size == Section.entries.size) Perf.once("home data")
+    }
 
     /** Search on every keystroke; an older search is dropped when a newer starts. */
     fun setQuery(query: String) {
+        Perf.typed()
         _state.update { it.copy(query = query, results = if (query.isBlank()) null else it.results) }
         search?.cancel()
         if (query.isBlank()) return
@@ -82,7 +92,9 @@ class HomeViewModel(private val repo: HomeRepository) : ViewModel() {
     }
 
     private suspend fun runSearch(query: String) {
+        val began = Perf.clock()
         val hits = load { repo.search(query, SEARCH_ROWS) }.map { it.toItem(driveNames) }
+        Perf.span("search query", Perf.clock() - began)
         _state.update { if (it.query == query) it.copy(results = hits) else it }
     }
 

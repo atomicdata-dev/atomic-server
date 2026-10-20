@@ -24,7 +24,7 @@ object EmbedProtocol {
     const val ORIGIN = "https://$HOST"
 
     /** A message from the page. [id] is null for notifications. */
-    data class Request(val id: Int?, val method: String, val argsJson: String, val flushId: Int?)
+    data class Request(val id: Int?, val method: String, val argsJson: String, val flushId: Int?, val ms: Long? = null)
 
     /** Parses one message of the page; null when it is not one of ours. */
     fun parse(message: String): Request? = try {
@@ -34,6 +34,7 @@ object EmbedProtocol {
             method = json.getString("method"),
             argsJson = (json.optJSONArray("args") ?: JSONArray()).toString(),
             flushId = if (json.has("flush")) json.getInt("flush") else null,
+            ms = if (json.has("ms")) json.optLong("ms") else null,
         )
     } catch (_: Exception) {
         null
@@ -69,6 +70,37 @@ object EmbedProtocol {
     fun changedScript(subjects: List<String>) =
         "window.atomicEmbed&&window.atomicEmbed.changed&&window.atomicEmbed.changed(" +
             subjects.joinToString(",", "[", "]") { jsString(it) } + ")"
+
+    /**
+     * `[perf] resource painted`: posts `painted` two frames after the page's `main`
+     * shows [title], with the page's own clock (from this script when [warm], from
+     * the page's load when not). Twin of Flutter's `_watchPainted`.
+     */
+    fun paintedScript(title: String, warm: Boolean): String {
+        val since = if (warm) "Date.now()" else "Date.now()-performance.now()"
+        return "(function(){var t0=$since,s=Date.now();function c(){" +
+            "var m=document.querySelector(\"main\");" +
+            "if(m&&m.innerText.indexOf(${jsString(title)})>=0){requestAnimationFrame(" +
+            "function(){requestAnimationFrame(function(){" +
+            "AtomicFlutter.postMessage(JSON.stringify({method:\"painted\"," +
+            "ms:Date.now()-t0}))})});return}" +
+            "if(Date.now()-s<20000)setTimeout(c,16)}c()})()"
+    }
+
+    /**
+     * `[perf] resource revealed`: posts `revealed` two frames after `main[about=subject]`
+     * holds more than a loading state (or after 1.5 s). Twin of Flutter's `_watchReveal`.
+     */
+    fun revealedScript(subject: String) =
+        "(function(){var s=${jsString(subject)},t=Date.now();" +
+            "function done(){requestAnimationFrame(function(){" +
+            "requestAnimationFrame(function(){AtomicFlutter.postMessage(" +
+            "JSON.stringify({method:\"revealed\",ms:Date.now()-t}))})})}" +
+            "function c(){var all=document.querySelectorAll(\"main\"),m=null;" +
+            "for(var i=0;i<all.length;i++)if(all[i].getAttribute(\"about\")===s)" +
+            "m=all[i];if((m&&m.children.length>1&&" +
+            "!m.querySelector(\"[role=status]\"))||Date.now()-t>1500){done();" +
+            "return}setTimeout(c,16)}c()})()"
 
     fun setColorSchemeScript(dark: Boolean) =
         "window.atomicEmbed&&window.atomicEmbed.setColorScheme&&" +

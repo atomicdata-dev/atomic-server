@@ -52,7 +52,7 @@ fun ResourceScreen(
         }
     }
     BackHandler(onBack = goBack)
-    LaunchedEffect(target) { embed.bridge.open(target.subject, target.drive) }
+    LaunchedEffect(target) { embed.bridge.open(target.subject, target.drive, target.title) }
     DisposableEffect(embed) { onDispose { embed.detach() } }
 
     Scaffold(

@@ -1,6 +1,8 @@
 package place.atomic.app.kotlin.embed
 
 import kotlinx.coroutines.CancellationException
+import place.atomic.app.kotlin.Perf
+import place.atomic.app.kotlin.chat.NativeKind
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -28,8 +30,11 @@ interface EmbedPage {
  * once it is) and builds the host calls (open, changed, back, flush).
  *
  * Calls the app answers itself (the page also asks for them in Flutter):
- * `openNative` is "no" (no native chat screens yet), `theme` is noted and
- * acknowledged, `opened` gets the drive the resource is shown in.
+ * `openNative(kind, subject, title)` is answered by [onOpenNative] (true when
+ * the app has a native screen for that kind and opened it, as in Flutter),
+ * `theme` is noted and acknowledged, `opened` gets the drive the resource is
+ * shown in. Debug and benchmark builds also take the page's `painted` and
+ * `revealed` notifications for the `[perf]` marks.
  */
 class EmbedBridge(
     private val scope: CoroutineScope,
@@ -37,11 +42,15 @@ class EmbedBridge(
     private val page: EmbedPage,
     private val flushTimeoutMs: Long = 2_000,
     private val onTheme: (String) -> Unit = {},
+    private val onOpenNative: (kind: String, subject: String, title: String) -> Boolean = { _, _, _ -> false },
 ) {
     @Volatile private var ready = false
     @Volatile private var pendingSubject: String? = null
     @Volatile private var drive: String = ""
     @Volatile private var dark: Boolean? = null
+    @Volatile private var pendingTitle: String = ""
+    @Volatile private var openedAt = 0L
+    @Volatile private var openedWarm = true
     private val flushes = ConcurrentHashMap<Int, CompletableDeferred<Unit>>()
     private val nextFlush = AtomicInteger()
 
@@ -61,9 +70,21 @@ class EmbedBridge(
         when (request.method) {
             "ready" -> {
                 ready = true
+                Perf.once("warm ready")
                 dark?.let { page.run(EmbedProtocol.setColorSchemeScript(it)) }
-                pendingSubject?.let { page.run(EmbedProtocol.openScript(it)) }
+                pendingSubject?.let { show(it) }
                 pendingSubject = null
+            }
+            "painted" -> {
+                val path = if (openedWarm) "warm" else "cold"
+                Perf.span("resource painted $path", Perf.clock() - openedAt)
+                Perf.sinceTap("resource painted $path")
+                Perf.span("resource painted in page $path", request.ms ?: -1)
+            }
+            "revealed" -> {
+                val path = if (openedWarm) "warm" else "cold"
+                Perf.span("resource revealed $path", Perf.clock() - openedAt)
+                Perf.sinceTap("resource revealed $path")
             }
             "flushed" -> request.flushId?.let { flushes.remove(it)?.complete(Unit) }
         }
@@ -72,7 +93,7 @@ class EmbedBridge(
     private suspend fun answer(id: Int, request: EmbedProtocol.Request) {
         val (ok, payload) = try {
             true to when (request.method) {
-                "openNative" -> "false"
+                "openNative" -> openNative(request.argsJson).toString()
                 "theme" -> {
                     onTheme(firstString(request.argsJson))
                     "true"
@@ -88,6 +109,14 @@ class EmbedBridge(
         page.run(EmbedProtocol.replyScript(id, ok, payload))
     }
 
+    private fun openNative(argsJson: String): Boolean {
+        val args = org.json.JSONArray(argsJson)
+        val kind = args.optString(0, "")
+        val subject = args.optString(1, "")
+        if (subject.isEmpty() || NativeKind.of(kind) == null) return false
+        return onOpenNative(kind, subject, args.optString(2, ""))
+    }
+
     private fun firstString(argsJson: String): String =
         org.json.JSONArray(argsJson).optString(0, "")
 
@@ -97,10 +126,23 @@ class EmbedBridge(
 
     // ── Host calls ─────────────────────────────────────────────────────────
 
-    /** Shows [subject] (in [inDrive]); waits for the page when it is still loading. */
-    fun open(subject: String, inDrive: String) {
+    /**
+     * Shows [subject] (in [inDrive]); waits for the page when it is still loading.
+     * [title] is what the `[perf]` marks look for on the page (none without it).
+     */
+    fun open(subject: String, inDrive: String, title: String = "") {
         drive = inDrive
-        if (ready) page.run(EmbedProtocol.openScript(subject)) else pendingSubject = subject
+        pendingTitle = title
+        openedAt = Perf.clock()
+        openedWarm = ready
+        if (ready) show(subject) else pendingSubject = subject
+    }
+
+    private fun show(subject: String) {
+        page.run(EmbedProtocol.openScript(subject))
+        if (!Perf.enabled) return
+        if (pendingTitle.isNotEmpty()) page.run(EmbedProtocol.paintedScript(pendingTitle, openedWarm))
+        page.run(EmbedProtocol.revealedScript(subject))
     }
 
     /** These resources changed in the store. */

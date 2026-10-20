@@ -38,6 +38,12 @@ private class FakeCore(val answer: (String, String) -> String = { _, _ -> "null"
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 class EmbedBridgeTest {
+    private var marks = false
+
+    // The page-watching scripts of the perf marks are tested on their own.
+    @org.junit.Before fun marksOff() { marks = Perf.enabled; Perf.enabled = false }
+    @org.junit.After fun marksBack() { Perf.enabled = marks }
+
     private fun TestScope.bridge(core: EmbedCore = FakeCore(), page: FakePage = FakePage(), flushMs: Long = 50) =
         EmbedBridge(this, core, page, flushTimeoutMs = flushMs)
 
@@ -157,4 +163,56 @@ class EmbedBridgeTest {
     }
 
     private fun TestScope.launchLeave(b: EmbedBridge) = this.launch { b.leave() }
+
+    @Test
+    fun openNativeOpensTheScreenForAKindTheAppHasAndSaysNoOtherwise() = runTest(StandardTestDispatcher()) {
+        val page = FakePage()
+        val opened = mutableListOf<Triple<String, String, String>>()
+        val b = EmbedBridge(this, FakeCore(), page, onOpenNative = { k, s, t -> opened += Triple(k, s, t); true })
+        b.onMessage("""{"id":1,"method":"openNative","args":["chatroom","did:ad:room","Planning"]}""")
+        b.onMessage("""{"id":2,"method":"openNative","args":["document","did:ad:doc","Doc"]}""")
+        b.onMessage("""{"id":3,"method":"openNative","args":["conversation","","x"]}""")
+        advanceUntilIdle()
+        assertEquals(listOf(Triple("chatroom", "did:ad:room", "Planning")), opened)
+        assertTrue(page.scripts.contains("""window.__atomicReply(1,true,"true")"""))
+        assertTrue(page.scripts.contains("""window.__atomicReply(2,true,"false")"""))
+        assertTrue(page.scripts.contains("""window.__atomicReply(3,true,"false")"""))
+    }
+
+    @Test
+    fun theResourceMarksAreTakenFromThePagesPaintedAndRevealedNotifications() = runTest(StandardTestDispatcher()) {
+        val lines = mutableListOf<String>()
+        val was = Perf.enabled
+        Perf.enabled = true
+        Perf.sink = { lines += it }
+        var now = 5_000L
+        Perf.clock = { now }
+        Perf.reset()
+        try {
+            Perf.start()
+            val page = FakePage()
+            val b = bridge(page = page)
+            b.onMessage("""{"method":"ready"}""")
+            now += 100
+            Perf.tapped()
+            now += 20
+            b.open("did:ad:doc", "did:ad:drive", "My doc")
+            // The page is told to watch for the title and for the view to fill.
+            assertTrue(page.scripts.any { it.contains("method:\"painted\"") && it.contains("\"My doc\"") })
+            assertTrue(page.scripts.any { it.contains("method:\"revealed\"") })
+            now += 300
+            b.onMessage("""{"method":"painted","ms":280}""")
+            b.onMessage("""{"method":"revealed","ms":310}""")
+            assertTrue(lines.contains("[perf] resource painted warm 300 ms (span)"))
+            assertTrue(lines.contains("[perf] resource painted warm since tap 320 ms (span)"))
+            assertTrue(lines.contains("[perf] resource painted in page warm 280 ms (span)"))
+            assertTrue(lines.contains("[perf] resource revealed warm since tap 320 ms (span)"))
+            assertTrue(lines.contains("[perf] warm ready 0 ms"))
+        } finally {
+            Perf.enabled = was
+            Perf.sink = { }
+            Perf.clock = { System.nanoTime() / 1_000_000 }
+            Perf.reset()
+        }
+    }
 }

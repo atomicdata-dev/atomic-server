@@ -38,6 +38,7 @@ class EmbedController(
     context: Context,
     private val scope: CoroutineScope,
     private val core: EmbedCore,
+    onOpenNative: (kind: String, subject: String, title: String) -> Boolean = { _, _, _ -> false },
 ) {
     private val appContext = context.applicationContext
     private val main = Handler(Looper.getMainLooper())
@@ -57,7 +58,7 @@ class EmbedController(
         }
     }
 
-    val bridge = EmbedBridge(scope, core, page)
+    val bridge = EmbedBridge(scope, core, page, onOpenNative = onOpenNative)
 
     /** Creates the WebView (on the main thread) and starts loading the embed. Idempotent. */
     fun warm() {
