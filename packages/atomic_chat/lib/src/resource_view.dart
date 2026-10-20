@@ -48,6 +48,17 @@ class ResourceView extends StatefulWidget {
   @visibleForTesting
   static Duration releaseDelay = const Duration(seconds: 3);
 
+  /// How long the page's placeholder ([ResourceSkeleton]) may stay at most
+  /// when the page never says it shows the resource: a warm page that was
+  /// told to open it, and a cold one from its start (it loads the bundle).
+  @visibleForTesting
+  static Duration revealWarm = const Duration(milliseconds: 2000);
+  @visibleForTesting
+  static Duration revealCold = const Duration(seconds: 8);
+
+  /// The placeholder's fade when the page shows the resource.
+  static const revealFade = Duration(milliseconds: 90);
+
   /// Answers one call of the page. Replaceable in a test.
   final Future<String> Function(String method, String argsJson)? call;
 
@@ -106,10 +117,27 @@ class _ResourceViewState extends State<ResourceView>
   /// (and answered) until they are done, so a close never cuts an edit off.
   static final _closing = <EmbedPage>{};
 
+  /// Whether the web view is shown. Until then a [ResourceSkeleton] in the
+  /// page's colours covers it (the resource's title where the page's header
+  /// will be), never a black box or a spinner: a page that was told to open
+  /// a resource first shows the last one, or its own loading state.
+  bool _revealed = true;
+
+  /// The placeholder is gone (faded out).
+  bool _skeletonGone = true;
+  Timer? _revealCap;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // A resource page in a real web view starts covered; a page of the app's
+    // own (settings) and a test's page do not.
+    if (widget.path == null) {
+      _revealed = false;
+      _skeletonGone = false;
+      _revealCap = Timer(ResourceView.revealCold, _reveal);
+    }
     _start();
     // The route is known once this is in the tree.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -134,16 +162,26 @@ class _ResourceViewState extends State<ResourceView>
     final fake = ResourceView.pageFactory;
     if (fake != null) {
       _page = fake(_onMessage);
+      // Only a page that can say it shows the resource is covered.
+      if (_page is! WarmPage) {
+        _revealCap?.cancel();
+        _revealed = _skeletonGone = true;
+      }
       return;
     }
     try {
       final server = await ResourceView.serverFactory();
+      if (!mounted) return;
+      final scheme =
+          Theme.of(context).brightness == Brightness.dark ? 'dark' : 'light';
       final page = await WebViewEmbedPage.create(
         server.page.replace(queryParameters: {
           if (widget.path != null)
             'path': widget.path!
           else
             'subject': widget.subject,
+          // The page's first paint is in the app's light or dark mode.
+          'scheme': scheme,
         }),
         onMessage: _onMessage,
         onLoaded: _pageLoaded,
@@ -155,7 +193,44 @@ class _ResourceViewState extends State<ResourceView>
       }
     } catch (e) {
       if (mounted) setState(() => _error = e);
+      _reveal();
     }
+  }
+
+  /// Watches the page until its `main` shows [ResourceView.subject] with
+  /// something in it other than a loading state, then posts `revealed` two
+  /// frames later (so it is on screen). Gives up after 1.5 s and posts
+  /// anyway: the page then shows its own loading state or an empty view.
+  void _watchReveal() {
+    if (_revealed || _revealWatched) return;
+    _revealWatched = true;
+    final subject = jsonEncode(widget.subject);
+    unawaited(_page
+        ?.runJavaScript('(function(){var s=$subject,t=Date.now();'
+            'function done(){requestAnimationFrame(function(){'
+            'requestAnimationFrame(function(){AtomicFlutter.postMessage('
+            'JSON.stringify({method:"revealed",ms:Date.now()-t}))})})}'
+            'function c(){var all=document.querySelectorAll("main"),m=null;'
+            'for(var i=0;i<all.length;i++)if(all[i].getAttribute("about")===s)'
+            'm=all[i];if((m&&m.children.length>1&&'
+            '!m.querySelector("[role=status]"))||Date.now()-t>1500){done();'
+            'return}setTimeout(c,16)}c()})()')
+        .catchError((_) {}));
+  }
+
+  bool _revealWatched = false;
+
+  /// Shows the web view: the placeholder fades out.
+  void _reveal() {
+    _revealCap?.cancel();
+    if (_revealed) return;
+    _revealed = true;
+    if (_page != null && !kReleaseMode) {
+      final path = _warm ? 'warm' : 'cold';
+      Perf.span('resource revealed $path', _clock.elapsedMilliseconds);
+      Perf.sinceTap('resource revealed $path');
+    }
+    if (mounted) setState(() {});
   }
 
   /// Takes a loaded [page] over: its messages come here, it is told the
@@ -167,6 +242,14 @@ class _ResourceViewState extends State<ResourceView>
     page.onMessage = _onMessage;
     page.onLoaded = _pageLoaded;
     if (warm) {
+      // The page is still in the pool's slot this frame (it is taken while
+      // this page builds; the slot lets go after that). Both rebuild in the
+      // next frame and the web view moves over, still attached. Nothing is
+      // lost: the placeholder covers it for the first frames anyway.
+      _inTree = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _inTree = true);
+      });
       debugPrint('[warm] taken ready=${page is WebViewEmbedPage ? page.age : 0}'
           ' ms after it started loading');
       final subject = jsonEncode(widget.subject);
@@ -180,11 +263,17 @@ class _ResourceViewState extends State<ResourceView>
       unawaited(page.runJavaScript('(function(e){if(!e)return;$reload'
           '(e.open||e.show)($subject)})(window.atomicEmbed)'));
       _watchPainted();
+      _revealCap?.cancel();
+      _revealCap = Timer(ResourceView.revealWarm, _reveal);
+      _watchReveal();
     }
   }
 
   bool _warm = false;
   int _traced = 0;
+
+  /// Whether this page builds its web view (see [_attach]).
+  bool _inTree = true;
 
   /// Debug and profile builds: `[perf] resource painted` once the page's
   /// main area shows the resource's title (two frames after, so it is on
@@ -213,6 +302,7 @@ class _ResourceViewState extends State<ResourceView>
 
   void _pageLoaded() {
     _watchPainted();
+    _watchReveal();
     debugPrint('[embed] page loaded after ${_clock.elapsedMilliseconds} ms');
     // The page follows the app's light/dark mode for its own 'auto'.
     _scheme = null;
@@ -279,6 +369,7 @@ class _ResourceViewState extends State<ResourceView>
 
   @override
   void dispose() {
+    _revealCap?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     final route = _route;
     if (route != null) _shell?.unregisterMenu(route);
@@ -345,6 +436,10 @@ class _ResourceViewState extends State<ResourceView>
     if (request['method'] == 'flushed') {
       final done = _flushed[request['flush']];
       if (done != null && !done.isCompleted) done.complete();
+      return;
+    }
+    if (request['method'] == 'revealed') {
+      _reveal();
       return;
     }
     if (request['method'] == 'painted') {
@@ -507,19 +602,30 @@ class _ResourceViewState extends State<ResourceView>
             child: _error != null
                 ? Center(
                     child: Text('$_error', style: TextStyle(color: c.alert)))
-                : page == null
-                    ? const Center(child: CircularProgressIndicator())
-                    : _readable(Stack(children: [
-                        // Swipe back starts at the left edge.
-                        page.build(),
-                        const Positioned(
-                          left: 0,
-                          top: 0,
-                          bottom: 0,
-                          width: 24,
-                          child: _EdgeStrip(),
+                : _readable(Stack(children: [
+                    if (page != null && _inTree) page.build(),
+                    if (!_skeletonGone)
+                      Positioned.fill(
+                        child: AnimatedOpacity(
+                          opacity: _revealed ? 0 : 1,
+                          duration: ResourceView.revealFade,
+                          onEnd: () {
+                            if (_revealed && mounted) {
+                              setState(() => _skeletonGone = true);
+                            }
+                          },
+                          child: ResourceSkeleton(title: widget.title),
                         ),
-                      ])),
+                      ),
+                    // Swipe back starts at the left edge.
+                    const Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: 24,
+                      child: _EdgeStrip(),
+                    ),
+                  ])),
           ),
         ));
   }
@@ -530,6 +636,45 @@ class _ResourceViewState extends State<ResourceView>
 extension on _ResourceViewState {
   Widget _readable(Widget page) =>
       widget.path != null ? ReadableWidth(child: page) : page;
+}
+
+/// What a resource page shows until its web view shows the resource: the
+/// page's background and its 36 px header row with the resource's title (as
+/// the row it was opened from called it), so the page is there at once and
+/// the web view's own header takes its place.
+class ResourceSkeleton extends StatelessWidget {
+  final String title;
+
+  const ResourceSkeleton({super.key, required this.title});
+
+  static const headerHeight = 36.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    return ColoredBox(
+      key: const Key('resource-skeleton'),
+      color: c.bgBody,
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: Container(
+          height: headerHeight,
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          alignment: Alignment.centerLeft,
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: c.bg2)),
+          ),
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: c.textPrimary, fontSize: 15),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Catches touches at the screen's left edge so the swipe back works over the

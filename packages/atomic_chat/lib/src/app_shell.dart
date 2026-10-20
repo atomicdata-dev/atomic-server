@@ -455,10 +455,25 @@ class _AppShellState extends State<AppShell> {
   late final Widget _detail = _Pane(
     removeLeft: true,
     child: Stack(children: [
+      ..._spareUnderPages,
       Positioned.fill(child: _navigator),
       _DetailMore(shell: _shell),
     ]),
   );
+
+  /// The pages on a phone: the navigator, with the warm page under it.
+  late final Widget _phonePages = Stack(children: [
+    ..._spareUnderPages,
+    Positioned.fill(child: _navigator),
+  ]);
+
+  /// The warm page ([WarmPageSlot]), filling the box the pages fill, so it is
+  /// laid out at the size a resource page will give it. It moves with a
+  /// change of layout (its key), like the navigator.
+  List<Widget> get _spareUnderPages => [
+        if (_shell.warm != null)
+          Positioned.fill(child: WarmPageSlot(pool: _shell.warm!)),
+      ];
 
   late final Widget _listPane = _Pane(
     removeLeft: true,
@@ -475,6 +490,14 @@ class _AppShellState extends State<AppShell> {
         (widget.warmPool ?? WarmResourceWebView.forPlatform)(widget.api)
           ?..showAhead = _likelyNext
           ..warmUp();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The spare paints in the app's light or dark mode before it is taken.
+    _shell.warm?.colorScheme =
+        Theme.of(context).brightness == Brightness.dark ? 'dark' : 'light';
   }
 
   /// The latest of Recents, when the page shows it (a native view does not).
@@ -545,7 +568,7 @@ class _AppShellState extends State<AppShell> {
           .addPostFrameCallback((_) => _relayout(from, layout));
     }
     final Widget pages = switch (layout) {
-      ShellLayout.bar => _navigator,
+      ShellLayout.bar => _phonePages,
       ShellLayout.rail => Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [_rail, Expanded(child: _detail)]),
