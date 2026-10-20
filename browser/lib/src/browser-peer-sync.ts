@@ -448,6 +448,9 @@ class BrowserPeerConnection {
           const auth = await createAuthentication(
             `${this.options.drive}#${remoteChallenge}`,
             this.agent!,
+            // Not the did:ad: spelling servers get: this session compares the
+            // agent to the invite's issuer and to ephemeral frames by string.
+            { agentSubject: this.agent!.subject },
           );
 
           if (invitation) {
