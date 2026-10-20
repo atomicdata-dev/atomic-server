@@ -12,6 +12,9 @@
 #   -a APK     install this APK first (-r, keeps the data) and report its size.
 #              Measure a PROFILE build: flutter build apk --profile
 #              --target-platform android-arm64 [--dart-define=FAKE_AI=1]
+#              FAKE_AI=1 only for an emulator or a test phone: its AI chat
+#              is a canned fake (marked "FAKE AI" in every reply). A build
+#              for someone's own phone omits it.
 #              Debug builds are several times slower and say little.
 #   -n RUNS    samples per timing (default 5)
 #   -o OUT.md  also write the table there
@@ -281,6 +284,8 @@ open_one() { # $1 = "x y" to tap, $2 = label; records the open's numbers
   put "open $2 ($path): painted (ms)" "$(last_ms '\[perf\] resource painted (warm|cold) [0-9]')"
   put "open $2 ($path): painted, page's own clock (ms)" "$(last_ms '\[perf\] resource painted in page')"
   put "open $2 ($path): tap to painted (ms)" "$(last_ms '\[perf\] resource painted (warm|cold) since tap')"
+  # The web view shown (its placeholder gone); builds before 2026-10-20 have none.
+  put "open $2 ($path): tap to revealed (ms)" "$(last_ms '\[perf\] resource revealed (warm|cold) since tap')"
   log >> "$work/open.log"
 }
 if step open || step memory; then
