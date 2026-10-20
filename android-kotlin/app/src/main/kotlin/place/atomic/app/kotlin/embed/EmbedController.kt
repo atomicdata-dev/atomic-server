@@ -38,6 +38,8 @@ class EmbedController(
     context: Context,
     private val scope: CoroutineScope,
     private val core: EmbedCore,
+    /** What the view loads: the warm page, or [EmbedAssets.actionUrl] for a page of the web app. */
+    private val pageUrl: String = EmbedAssets.PAGE_URL,
     onOpenNative: (kind: String, subject: String, title: String) -> Boolean = { _, _, _ -> false },
 ) {
     private val appContext = context.applicationContext
@@ -134,7 +136,7 @@ class EmbedController(
                 }
             },
         )
-        view.loadUrl(EmbedAssets.PAGE_URL)
+        view.loadUrl(pageUrl)
         return view
     }
 

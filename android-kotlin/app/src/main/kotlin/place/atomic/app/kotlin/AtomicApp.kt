@@ -10,6 +10,7 @@ import place.atomic.app.kotlin.chat.AiProvider
 import place.atomic.app.kotlin.core.activeAgent
 import place.atomic.app.kotlin.core.signWithAgent
 import place.atomic.app.kotlin.embed.CoreEmbed
+import place.atomic.app.kotlin.embed.EmbedAssets
 import place.atomic.app.kotlin.embed.EmbedController
 import place.atomic.app.kotlin.session.KeystoreSecretBox
 import place.atomic.app.kotlin.session.PrefsKeyValue
@@ -20,7 +21,7 @@ class AtomicApp : Application() {
 
     /** The one warm WebView of the embedded renderer; created by [startEmbed]. */
     val embed: EmbedController by lazy {
-        EmbedController(this, scope, CoreEmbed) { kind, subject, title -> nativeOpener?.invoke(kind, subject, title) ?: false }
+        EmbedController(this, scope, CoreEmbed, onOpenNative = { kind, subject, title -> nativeOpener?.invoke(kind, subject, title) ?: false })
     }
 
     /** Set by the screen that can show native chats: what the page's `openNative` calls. */
@@ -39,6 +40,27 @@ class AtomicApp : Application() {
         Perf.start()
     }
 
+    private val actions = java.util.concurrent.CopyOnWriteArrayList<EmbedController>()
+
+    /**
+     * A second, cold page for one of the web app's own pages (the template picker of a new
+     * drive): the warm page only opens resources. It gets the store's changes too until [release]d.
+     */
+    fun actionEmbed(path: String, dark: Boolean): EmbedController {
+        val controller = EmbedController(
+            this, scope, CoreEmbed, EmbedAssets.actionUrl(path, dark),
+            onOpenNative = { kind, subject, title -> nativeOpener?.invoke(kind, subject, title) ?: false },
+        )
+        controller.bridge.setColorScheme(dark)
+        actions.add(controller)
+        return controller
+    }
+
+    fun release(controller: EmbedController) {
+        actions.remove(controller)
+        controller.destroy()
+    }
+
     private var pushing: AutoCloseable? = null
 
     /**
@@ -50,7 +72,10 @@ class AtomicApp : Application() {
         if (pushing != null) return
         pushing = AutoCloseable { }
         scope.launch {
-            pushing = CoreEmbed.pushChanges(embed.bridge::changed)
+            pushing = CoreEmbed.pushChanges { subjects ->
+                embed.bridge.changed(subjects)
+                actions.forEach { it.bridge.changed(subjects) }
+            }
         }
     }
 }

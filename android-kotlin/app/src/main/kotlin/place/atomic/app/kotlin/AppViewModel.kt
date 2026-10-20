@@ -8,7 +8,13 @@ import place.atomic.app.kotlin.core.flushStore
 import place.atomic.app.kotlin.core.openStore
 import place.atomic.app.kotlin.core.storeRecovery
 import place.atomic.app.kotlin.data.CoreBackend
+import place.atomic.app.kotlin.data.IdentityModel
 import place.atomic.app.kotlin.data.SettingsModel
+import place.atomic.app.kotlin.session.KeyValue
+import place.atomic.app.kotlin.session.PrefsKeyValue
+import place.atomic.app.kotlin.shell.BackgroundSync
+import place.atomic.app.kotlin.shell.ToastController
+import kotlinx.coroutines.flow.collectLatest
 
 /**
  * Process start-up: opens the store (idempotent, Android recreates the
@@ -25,10 +31,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     )
     /** The settings screen's model, living as long as the app does. */
     val settings by lazy { SettingsModel(CoreBackend, atomic.session, viewModelScope) }
+    /** Layout, list width and the like: what the person arranged, per device. */
+    val uiPrefs: KeyValue by lazy { PrefsKeyValue(app, "atomic_ui") }
+    /** Who the bottom bar's profile button shows. */
+    val identity by lazy { IdentityModel(CoreBackend, viewModelScope) }
+    val toasts = ToastController()
+    /** The sync with other devices after sign-in and on every resume; failures are quiet. */
+    val sync by lazy { BackgroundSync(CoreBackend, toasts, viewModelScope, log = { android.util.Log.d("atomic", it) }) }
     val state get() = flow.state
     val ui get() = flow.ui
 
     init {
+        viewModelScope.launch {
+            flow.state.collectLatest { if (it == AppState.Ready) sync.start() else sync.stop() }
+        }
         launch {
             flow.start()
             if (flow.state.value == AppState.Ready) {
@@ -63,6 +79,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Debug builds fill the store when asked to; release builds do nothing. */
     private suspend fun seed() = DebugSeed.runIfAsked(getApplication())
+
+    /** Back in the foreground: look for the other devices again, and read the profile again. */
+    fun resumed() {
+        if (flow.state.value == AppState.Ready) {
+            sync.start()
+            identity.refresh()
+        }
+    }
 
     fun flush() {
         runCatching { flushStore() }

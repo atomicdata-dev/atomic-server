@@ -14,6 +14,14 @@ object EmbedAssets {
     fun pageUrl(subject: String? = null): String =
         if (subject.isNullOrEmpty()) PAGE_URL else PAGE_URL + "?subject=" + java.net.URLEncoder.encode(subject, "UTF-8")
 
+    /**
+     * A cold page that opens one of the web app's own pages ([path], such as `/app/new-drive`)
+     * instead of a resource: the embed reads `path` only when it loads.
+     */
+    fun actionUrl(path: String, dark: Boolean? = null): String =
+        PAGE_URL + "?path=" + java.net.URLEncoder.encode(path, "UTF-8") +
+            (dark?.let { "&scheme=" + if (it) "dark" else "light" } ?: "")
+
     /** Is [url] a page of the bundled origin (everything else is not ours to load)? */
     fun isOurs(url: String): Boolean = url == EmbedProtocol.ORIGIN || url.startsWith(EmbedProtocol.ORIGIN + "/")
 
