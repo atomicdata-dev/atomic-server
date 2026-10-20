@@ -224,6 +224,29 @@ void main() {
     await done(tester);
   });
 
+  testWidgets(
+      'a warm page opens the row with `open` (history reset), and back with '
+      'nothing to go back to inside leaves to the home', (tester) async {
+    await start(tester);
+    final spare = pages.single;
+
+    await tester.tap(find.text('Plans'));
+    await tester.pumpAndSettle();
+    // `open` (replacing the warm-up's entries), never a pushing `show` alone.
+    final script =
+        spare.scripts.singleWhere((s) => s.contains('e.open||e.show'));
+    expect(script, contains('"did:ad:plans"'));
+    expect(find.byType(ResourceView), findsOneWidget);
+
+    // The page has no earlier entry (`back()` answers false): back leaves.
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(ResourceView), findsNothing);
+    expect(find.text('Plans'), findsWidgets);
+    expect(find.byType(ChatsScreen), findsOneWidget);
+    await done(tester);
+  });
+
   testWidgets('a page that never says it shows the resource is shown anyway',
       (tester) async {
     await start(tester);

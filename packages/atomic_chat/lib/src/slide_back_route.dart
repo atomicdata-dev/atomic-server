@@ -1,3 +1,4 @@
+import 'package:atomic_flutter/atomic_flutter.dart' show AppColors;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 
@@ -17,13 +18,23 @@ class SlideBackRoute<T> extends PageRouteBuilder<T> {
       {required WidgetBuilder builder, super.settings, bool instant = false})
       : _instant = instant,
         super(
-          pageBuilder: (context, _, __) =>
-              CoveredInsetsFreeze(child: builder(context)),
+          pageBuilder: (context, _, __) => ColoredBox(
+              color: surfaceOf(context),
+              child: CoveredInsetsFreeze(child: builder(context))),
           transitionDuration: instant ? Duration.zero : duration,
           reverseTransitionDuration: instant ? Duration.zero : duration,
         );
 
   final bool _instant;
+
+  /// What lies under every page: the app's surface colour. A page that is
+  /// sliding or loading (a web view not yet painted, a placeholder without a
+  /// colour) shows this, never the window's black.
+  static Color surfaceOf(BuildContext context) {
+    final theme = Theme.of(context);
+    return theme.extension<AppColors>()?.bgBody ??
+        theme.scaffoldBackgroundColor;
+  }
 
   /// How long the slide in and out takes.
   static const duration = Duration(milliseconds: 150);

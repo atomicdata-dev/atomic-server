@@ -22,6 +22,7 @@ Future<void> _open(WidgetTester tester) async {
 }
 
 void main() {
+  _surfaceTests();
   testWidgets('dragging the page to the right far enough goes back',
       (tester) async {
     await _open(tester);
@@ -63,5 +64,47 @@ void main() {
     expect(find.text('chat'), findsOneWidget);
     await tester.pumpAndSettle();
     expect(find.text('chat'), findsNothing);
+  });
+}
+
+void _surfaceTests() {
+  testWidgets('the page has an opaque surface under it, in the slide too',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData.dark(),
+      home: Builder(
+        builder: (context) => TextButton(
+          onPressed: () => Navigator.of(context).push(SlideBackRoute<void>(
+            // A page that paints nothing of its own, as a web view that has
+            // not painted yet.
+            builder: (_) => const SizedBox.expand(key: Key('empty')),
+          )),
+          child: const Text('overview'),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('overview'));
+    await tester.pump();
+    for (var i = 0; i < 3; i++) {
+      await tester.pump(const Duration(milliseconds: 40));
+      final box = tester.widget<ColoredBox>(find
+          .ancestor(
+              of: find.byKey(const Key('empty')),
+              matching: find.byType(ColoredBox))
+          .first);
+      expect(box.color.a, 1.0, reason: 'opaque at step $i');
+      expect(box.color, isNot(const Color(0xFF000000)));
+    }
+    await tester.pumpAndSettle();
+    final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+    navigator.pop();
+    await tester.pump(const Duration(milliseconds: 40));
+    final box = tester.widget<ColoredBox>(find
+        .ancestor(
+            of: find.byKey(const Key('empty')),
+            matching: find.byType(ColoredBox))
+        .first);
+    expect(box.color.a, 1.0);
+    await tester.pumpAndSettle();
   });
 }
