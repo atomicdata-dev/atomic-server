@@ -88,7 +88,7 @@ object CoreChatBackend : ChatBackend {
     override suspend fun recents(limit: Int) = place.atomic.app.kotlin.core.homeList(HomeList.RECENTS, limit.toUInt())
 
     override suspend fun search(query: String, limit: Int): List<DataReader.Hit> =
-        place.atomic.app.kotlin.core.search(query, limit.toUInt()).map { DataReader.Hit(it.subject, it.title, it.className) }
+        place.atomic.app.kotlin.core.search(query, limit.toUInt(), null, emptyList()).map { DataReader.Hit(it.subject, it.title, it.className) }
 
     override suspend fun resourceText(subject: String, maxChars: Int) =
         place.atomic.app.kotlin.core.resourceText(subject, maxChars.toUInt())

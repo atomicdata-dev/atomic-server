@@ -11,8 +11,8 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /** SharedPreferences as [KeyValue]. `commit()` so a force-stop right after cannot lose it. */
-class PrefsKeyValue(context: Context) : KeyValue {
-    private val prefs = context.getSharedPreferences("atomic_session", Context.MODE_PRIVATE)
+class PrefsKeyValue(context: Context, name: String = "atomic_session") : KeyValue {
+    private val prefs = context.getSharedPreferences(name, Context.MODE_PRIVATE)
     override fun getString(key: String): String? = prefs.getString(key, null)
     override fun putString(key: String, value: String?) {
         prefs.edit().apply { if (value == null) remove(key) else putString(key, value) }.commit()

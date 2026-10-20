@@ -39,6 +39,9 @@ interface Backend {
     suspend fun ownProfile(): OwnProfile
     suspend fun setOwnProfile(name: String, description: String)
 
+    /** The bytes of a File resource (a profile picture) when this device holds them. */
+    suspend fun readFileBytes(file: String): ByteArray? = null
+
     // Servers
     suspend fun openServer(origin: String)
     suspend fun closeServer()
@@ -79,6 +82,7 @@ object CoreBackend : Backend {
     override suspend fun ownProfile() = place.atomic.app.kotlin.core.ownProfile()
     override suspend fun setOwnProfile(name: String, description: String) =
         place.atomic.app.kotlin.core.setOwnProfile(name, description)
+    override suspend fun readFileBytes(file: String) = place.atomic.app.kotlin.core.readFileBytes(file)
 
     override suspend fun openServer(origin: String) = place.atomic.app.kotlin.core.openWsSync(origin)
     override suspend fun closeServer() = place.atomic.app.kotlin.core.closeWsSync()

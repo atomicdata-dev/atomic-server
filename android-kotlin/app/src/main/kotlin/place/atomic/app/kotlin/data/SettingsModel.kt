@@ -31,6 +31,8 @@ data class SettingsState(
     val loading: Boolean = true,
     val error: String? = null,
     val profile: OwnProfile? = null,
+    /** The picture's bytes, when this device holds the profile's File. */
+    val profileImage: ByteArray? = null,
     val deviceName: String = "",
     val peerId: String? = null,
     val serverConnected: Boolean = false,
@@ -101,11 +103,13 @@ class SettingsModel(
         scope.launch {
             try {
                 val profile = runCatching { backend.ownProfile() }.getOrNull()
+                val image = profile?.iconFile?.let { runCatching { backend.readFileBytes(it) }.getOrNull() }
                 _state.update {
                     it.copy(
                         loading = false,
                         error = null,
                         profile = profile,
+                        profileImage = image,
                         deviceName = backend.deviceName(),
                         peerId = backend.peerId(),
                         serverConnected = backend.serverConnected(),
