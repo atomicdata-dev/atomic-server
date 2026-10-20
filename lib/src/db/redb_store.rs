@@ -61,6 +61,11 @@ pub struct RedbStore {
     /// durable-flush tick skip the fsync (and the sentinel write) when nothing
     /// changed, which is most ticks on an idle node or a phone in a pocket.
     dirty: AtomicBool,
+    /// Keeps this process from opening the file a second time while `db`
+    /// has it (see `recovery::OpenFileGuard`). Declared last so it is
+    /// released after the database closes.
+    #[cfg(not(target_arch = "wasm32"))]
+    _open_guard: Option<super::recovery::OpenFileGuard>,
 }
 
 /// Per-tree map of pending operations. Used for fast read-your-writes lookups.
@@ -141,9 +146,10 @@ impl RedbStore {
         // below persists the allocator state on every commit so the
         // next open is "almost instant" (redb transactions.rs:1246-1258
         // describes the mechanism).
+        let open_guard = super::recovery::OpenFileGuard::acquire(path)?;
         let t = std::time::Instant::now();
-        let mut db = Database::create(path)
-            .map_err(|e| format!("Failed to create redb at {}: {e}", path.display()))?;
+        // A damaged file makes redb panic; this says so in an error instead.
+        let mut db = super::recovery::create_database(path)?;
         let open_duration = t.elapsed();
         tracing::info!(
             "RedbStore::new_file: Database::create in {:?}",
@@ -182,6 +188,7 @@ impl RedbStore {
                 db: Arc::new(db),
                 batch_buffer: std::sync::Mutex::new(None),
                 dirty: AtomicBool::new(false),
+                _open_guard: Some(open_guard),
             },
             compaction,
         ))
@@ -209,6 +216,8 @@ impl RedbStore {
             db: Arc::new(db),
             batch_buffer: std::sync::Mutex::new(None),
             dirty: AtomicBool::new(false),
+            #[cfg(not(target_arch = "wasm32"))]
+            _open_guard: None,
         })
     }
 
@@ -777,6 +786,197 @@ mod tests {
             "a Durability::None commit must not survive an abort without flush"
         );
         drop(store);
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
+    /// A file backend without redb's `flock`, standing in for a platform
+    /// where the lock does not keep a second handle out.
+    #[derive(Debug)]
+    struct UnlockedFile(std::fs::File);
+
+    impl redb::StorageBackend for UnlockedFile {
+        fn len(&self) -> Result<u64, std::io::Error> {
+            Ok(self.0.metadata()?.len())
+        }
+        fn read(&self, offset: u64, out: &mut [u8]) -> Result<(), std::io::Error> {
+            std::os::unix::fs::FileExt::read_exact_at(&self.0, out, offset)
+        }
+        fn set_len(&self, len: u64) -> Result<(), std::io::Error> {
+            self.0.set_len(len)
+        }
+        fn sync_data(&self) -> Result<(), std::io::Error> {
+            self.0.sync_data()
+        }
+        fn write(&self, offset: u64, data: &[u8]) -> Result<(), std::io::Error> {
+            std::os::unix::fs::FileExt::write_all_at(&self.0, data, offset)
+        }
+    }
+
+    fn unlocked(path: &std::path::Path) -> Database {
+        let file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(path)
+            .unwrap();
+        Database::builder()
+            .create_with_backend(UnlockedFile(file))
+            .unwrap()
+    }
+
+    /// The store lost on Android: a second handle on a file that is still
+    /// open. Dropping it trims the file to what that handle thinks is free;
+    /// the first handle's next commit writes its own, longer, layout into
+    /// the header. After a kill the header describes more file than there
+    /// is and `Database::create` panics in redb's page manager.
+    #[test]
+    fn a_second_handle_on_an_open_file_leaves_it_shorter_than_its_header() {
+        let path = temp_path("second-handle");
+        let first = unlocked(&path);
+        let table = TableDefinition::<u32, &[u8]>::new("t");
+        let write = |db: &Database, keys: std::ops::Range<u32>, len: usize, durable: bool| {
+            let mut tx = db.begin_write().unwrap();
+            if !durable {
+                tx.set_durability(redb::Durability::None).unwrap();
+            }
+            tx.set_quick_repair(true);
+            {
+                let mut t = tx.open_table(table).unwrap();
+                for k in keys {
+                    t.insert(k, vec![1u8; len].as_slice()).unwrap();
+                }
+            }
+            tx.commit().unwrap();
+        };
+        write(&first, 0..5, 100, true);
+        // Unflushed app writes: the file has grown, its header not yet.
+        write(&first, 0..200, 20_000, false);
+        {
+            let second = unlocked(&path);
+            drop(second);
+        }
+        write(&first, 0..10, 100, true);
+        // The app is killed: no destructor runs.
+        std::mem::forget(first);
+        let check = crate::db::recovery::inspect(&path).unwrap().unwrap();
+        assert!(check.is_short(), "{check:?}");
+        let Err(err) = crate::db::recovery::create_database(&path) else {
+            panic!("redb cannot open a file shorter than its header");
+        };
+        assert!(
+            crate::db::recovery::is_damaged_store_error(&err.to_string()),
+            "{err}"
+        );
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
+    /// What keeps the second handle above from happening: one process opens
+    /// a store file once, whether or not the platform has file locks.
+    #[test]
+    fn a_store_file_is_opened_once_per_process() {
+        let path = temp_path("once");
+        let store = RedbStore::new_file(&path).unwrap();
+        let Err(err) = RedbStore::new_file(&path) else {
+            panic!("a second open must be refused");
+        };
+        assert!(err.to_string().contains("already open"), "{err}");
+        assert!(!crate::db::recovery::is_damaged_store_error(
+            &err.to_string()
+        ));
+        drop(store);
+        RedbStore::new_file(&path).expect("closed stores open again");
+        std::fs::remove_dir_all(path.parent().unwrap()).ok();
+    }
+
+    const KILL_LOOP_CHILD_ENV: &str = "ATOMIC_REDB_KILL_LOOP_CHILD_PATH";
+    const KILL_LOOP_TEST_NAME: &str = "db::redb_store::tests::store_opens_after_repeated_sigkill";
+
+    /// The app's write pattern, killed with SIGKILL at random moments, again
+    /// and again on the same file: `Durability::None` commits of values from
+    /// a few bytes to a few hundred kB (the file grows), bursts of deletes
+    /// (the file shrinks at the next durable commit) and the 100 ms durable
+    /// flush tick. After every kill the store must open. `ATOMIC_KILL_LOOP_N`
+    /// sets the number of kills (default 30).
+    #[test]
+    #[ignore = "kill-loop stress test, several seconds; run with --ignored"]
+    fn store_opens_after_repeated_sigkill() {
+        use rand::Rng;
+        if let Ok(path) = std::env::var(KILL_LOOP_CHILD_ENV) {
+            let path = std::path::PathBuf::from(path);
+            let (store, _) = RedbStore::new_file_with_policy(
+                &path,
+                &crate::db::compaction::CompactionPolicy::default(),
+            )
+            .unwrap();
+            let store: Arc<dyn KvStore> = Arc::new(store);
+            let flusher = Arc::downgrade(&store);
+            std::thread::spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                let Some(kv) = flusher.upgrade() else { break };
+                kv.flush().unwrap();
+            });
+            let mut rng = rand::thread_rng();
+            loop {
+                if rng.gen_ratio(1, 40) {
+                    for k in 0..400u32 {
+                        store.remove(Tree::PluginMeta, &k.to_be_bytes()).unwrap();
+                    }
+                } else {
+                    let k: u32 = rng.gen_range(0..400);
+                    let len = if rng.gen_ratio(1, 10) {
+                        rng.gen_range(10_000..300_000)
+                    } else {
+                        rng.gen_range(10..2_000)
+                    };
+                    store
+                        .insert(Tree::PluginMeta, &k.to_be_bytes(), &vec![k as u8; len])
+                        .unwrap();
+                }
+            }
+        }
+
+        let kills: usize = std::env::var("ATOMIC_KILL_LOOP_N")
+            .ok()
+            .and_then(|n| n.parse().ok())
+            .unwrap_or(30);
+        let path = temp_path("kill-loop");
+        let mut rng = rand::thread_rng();
+        let mut failures = Vec::new();
+        for i in 0..kills {
+            let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    KILL_LOOP_TEST_NAME,
+                    "--ignored",
+                    "--nocapture",
+                    "--test-threads=1",
+                ])
+                .env(KILL_LOOP_CHILD_ENV, &path)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(rng.gen_range(50..1_500)));
+            child.kill().unwrap();
+            child.wait().unwrap();
+
+            let opened = std::panic::catch_unwind(|| RedbStore::new_file(&path).map(drop));
+            match opened {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => failures.push(format!("kill {i}: {e}")),
+                Err(_) => failures.push(format!("kill {i}: panic while opening")),
+            }
+            if !failures.is_empty() {
+                break;
+            }
+        }
+        let len = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+        assert!(
+            failures.is_empty(),
+            "store did not open after a kill ({len} bytes at {}): {failures:?}",
+            path.display()
+        );
         std::fs::remove_dir_all(path.parent().unwrap()).ok();
     }
 

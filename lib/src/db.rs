@@ -29,6 +29,8 @@ pub mod plugin_secret;
 pub mod plugin_trigger;
 pub(crate) mod prop_val_sub_index;
 mod query_index;
+#[cfg(all(feature = "db", not(target_arch = "wasm32")))]
+pub mod recovery;
 pub mod redb_store;
 pub mod website;
 /// The set of drives [`Db::migrate_messages_step`] may write chat log pages
