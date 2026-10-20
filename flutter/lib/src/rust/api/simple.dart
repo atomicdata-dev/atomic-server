@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'simple/types.dart';
 
-// These functions are ignored because they are not marked as `pub`: `catch_up_search_index`, `db_event_to_json`, `drive_resource_exists`, `ensure_sync_connectivity`, `fetch_other_drive`, `follow_listed_drives`, `is_corruption_error`, `is_unreachable_hub_url`, `node_apply_local`, `nudge_peers_after_local_change`, `peer_ids_to_try`, `push_local_write`, `save_and_push`, `short_id`, `sync_connectivity_inner`, `try_auto_peer_sync`
+// These functions are ignored because they are not marked as `pub`: `catch_up_search_index`, `db_event_to_json`, `describe_file`, `drive_resource_exists`, `ensure_sync_connectivity`, `fetch_other_drive`, `follow_listed_drives`, `is_unreachable_hub_url`, `node_apply_local`, `nudge_peers_after_local_change`, `open_native_store`, `open_store_catching`, `peer_ids_to_try`, `push_local_write`, `save_and_push`, `short_id`, `sync_connectivity_inner`, `try_auto_peer_sync`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `PeerSyncReport`, `SyncConnectivityReport`
 
 /// Local-first Atomic Data SDK for Flutter.
@@ -21,9 +21,26 @@ import 'simple/types.dart';
 ///   6. Peer      — start_peer(), get_peer_id(), peer_announce(), peer_sync(), peer_discover_sync()
 ///
 /// Networking (group 6) is explicit and opt-in. Nothing in groups 1-5 touches the network.
-/// Open a local database. Call once on app start.
+/// Open a local database. Call on app start; a second call in the same
+/// process (Android runs `main` again when it recreates the activity) keeps
+/// the store that is already open.
+///
+/// Never panics and never deletes the user's data. A store that cannot be
+/// opened because the file is damaged is renamed to
+/// `atomic.redb.corrupt-<ms>`, a repaired copy (or, failing that, an empty
+/// store) takes its place, and `store_recovery` tells the app so it can say
+/// so. Other errors (permissions, a full disk) are returned as they are.
 Future<void> openDb({required String path}) =>
     RustLib.instance.api.crateApiSimpleOpenDb(path: path);
+
+/// Set when the last `open_db` had to set a damaged store aside.
+StoreRecovery? storeRecovery() =>
+    RustLib.instance.api.crateApiSimpleStoreRecovery();
+
+/// Make every write so far durable now. The app calls it when it goes to
+/// the background, where Android may kill it without warning; the store
+/// otherwise makes writes durable on a 100 ms tick.
+Future<void> flushDb() => RustLib.instance.api.crateApiSimpleFlushDb();
 
 /// Create an agent and a personal drive in one call. Pure local — no networking.
 /// Call `start_peer()` + `peer_announce()` afterwards if you want to be discoverable.

@@ -5,6 +5,8 @@ use flutter_rust_bridge::frb;
 mod peer_tests;
 pub(crate) mod state;
 #[cfg(test)]
+mod store_open_tests;
+#[cfg(test)]
 pub(crate) mod tests;
 pub mod types;
 pub mod ws_sync;
@@ -12,7 +14,7 @@ pub mod ws_sync;
 pub use atomic_lib::{Commit, Db};
 
 use state::{db, err, node, set_db};
-pub use types::{AgentInfo, SetupResult, VersionMetadata};
+pub use types::{AgentInfo, SetupResult, StoreRecovery, VersionMetadata};
 
 /// Save resource locally, record it in the durable outbox, and drain the
 /// outbox over WS when a session is open. Offline edits wait on disk.
@@ -124,7 +126,15 @@ async fn nudge_peers_after_local_change(store: &atomic_lib::Db) {
 
 // ── 1. Database ────────────────────────────────────────────────────────────
 
-/// Open a local database. Call once on app start.
+/// Open a local database. Call on app start; a second call in the same
+/// process (Android runs `main` again when it recreates the activity) keeps
+/// the store that is already open.
+///
+/// Never panics and never deletes the user's data. A store that cannot be
+/// opened because the file is damaged is renamed to
+/// `atomic.redb.corrupt-<ms>`, a repaired copy (or, failing that, an empty
+/// store) takes its place, and `store_recovery` tells the app so it can say
+/// so. Other errors (permissions, a full disk) are returned as they are.
 pub async fn open_db(path: String) -> Result<(), String> {
     // Set up log filtering — suppress noisy TLS/mDNS/iroh internals
     #[cfg(target_os = "android")]
@@ -137,22 +147,23 @@ pub async fn open_db(path: String) -> Result<(), String> {
             ))
             .try_init();
     }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    let _opening = state::OPEN_DB_LOCK.lock().await;
+    if db().is_ok() {
+        // A second store handle on the same file is what damaged stores on
+        // Android (see `atomic_lib::db::recovery`).
+        tracing::info!("open_db: the store is already open in this process; keeping it");
+        return Ok(());
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     let store = {
-        let base_path = std::path::Path::new(&path);
-        let db_path = base_path.join("atomic.redb");
-        let uploads_path = base_path.join("uploads");
-        match atomic_lib::Db::init_redb_file(base_path, None, &uploads_path).await {
-            Ok(s) => s,
-            Err(e) if is_corruption_error(&e) => {
-                tracing::warn!("DB corrupted, deleting and recreating: {e}");
-                let _ = std::fs::remove_file(&db_path);
-                atomic_lib::Db::init_redb_file(base_path, None, &uploads_path)
-                    .await
-                    .map_err(err)?
-            }
-            Err(e) => return Err(err(e)),
+        let (store, recovery) = open_native_store(std::path::Path::new(&path)).await?;
+        if let Some(recovery) = recovery {
+            state::set_store_recovery(recovery);
         }
+        store
     };
 
     #[cfg(target_arch = "wasm32")]
@@ -167,6 +178,117 @@ pub async fn open_db(path: String) -> Result<(), String> {
         crate::host::start_recents(std::path::Path::new(&path), db()?.clone());
     }
     Ok(())
+}
+
+/// Set when the last `open_db` had to set a damaged store aside.
+#[frb(sync)]
+pub fn store_recovery() -> Option<StoreRecovery> {
+    state::store_recovery()
+}
+
+/// Make every write so far durable now. The app calls it when it goes to
+/// the background, where Android may kill it without warning; the store
+/// otherwise makes writes durable on a 100 ms tick.
+pub fn flush_db() -> Result<(), String> {
+    db()?.flush().map_err(err)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+async fn open_native_store(
+    base_path: &std::path::Path,
+) -> Result<(atomic_lib::Db, Option<StoreRecovery>), String> {
+    use atomic_lib::db::recovery;
+    let db_path = base_path.join("atomic.redb");
+    let before = recovery::inspect(&db_path).ok().flatten();
+    let started = std::time::Instant::now();
+
+    let (store, recovered) = match open_store_catching(base_path).await {
+        Ok(store) => (store, None),
+        Err(e) if recovery::is_damaged_store_error(&e) => {
+            tracing::error!("The store could not be opened, setting it aside: {e} ({before:?})");
+            let kept = recovery::set_aside(&db_path).map_err(|io| {
+                format!("The store could not be opened ({e}) nor moved aside: {io}")
+            })?;
+            let mut repaired = match recovery::repair_copy(&kept, &db_path) {
+                Ok(()) => true,
+                Err(repair) => {
+                    tracing::warn!("Repairing a copy of the store failed: {repair}");
+                    false
+                }
+            };
+            let store = match open_store_catching(base_path).await {
+                Ok(store) => store,
+                Err(again) if repaired => {
+                    // Only the repaired copy goes; the original is `kept`.
+                    tracing::warn!("The repaired store did not open either: {again}");
+                    let _ = std::fs::remove_file(&db_path);
+                    repaired = false;
+                    open_store_catching(base_path).await?
+                }
+                Err(again) => return Err(again),
+            };
+            let recovery = StoreRecovery {
+                kept_path: kept.to_string_lossy().into_owned(),
+                reason: e,
+                repaired,
+            };
+            (store, Some(recovery))
+        }
+        Err(e) => return Err(e),
+    };
+
+    let after = recovery::inspect(&db_path).ok().flatten();
+    tracing::info!(
+        "store self-check: {} opened in {:?}; before {}; now {}; {}",
+        db_path.display(),
+        started.elapsed(),
+        describe_file(before),
+        describe_file(after),
+        match &recovered {
+            None => "no recovery needed".to_string(),
+            Some(r) if r.repaired => format!("REPAIRED a damaged store, kept at {}", r.kept_path),
+            Some(r) => format!(
+                "STARTED EMPTY, the damaged store is kept at {}",
+                r.kept_path
+            ),
+        }
+    );
+    Ok((store, recovered))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn describe_file(check: Option<atomic_lib::db::recovery::FileCheck>) -> String {
+    match check {
+        None => "no store file".into(),
+        Some(c) => format!(
+            "{} bytes, header describes {}{}{}",
+            c.file_len,
+            c.layout_len,
+            if c.is_short() { " (SHORT)" } else { "" },
+            if c.recovery_required {
+                ", last run did not close it"
+            } else {
+                ", closed cleanly"
+            }
+        ),
+    }
+}
+
+/// `Db::init_redb_file` with any panic inside it turned into a "damaged"
+/// error: a panic must not escape to the app, which then never draws.
+#[cfg(not(target_arch = "wasm32"))]
+async fn open_store_catching(base_path: &std::path::Path) -> Result<atomic_lib::Db, String> {
+    use futures::FutureExt;
+    let uploads_path = base_path.join("uploads");
+    let opening = atomic_lib::Db::init_redb_file(base_path, None, &uploads_path);
+    match std::panic::AssertUnwindSafe(opening).catch_unwind().await {
+        Ok(result) => result.map_err(err),
+        Err(panic) => Err(format!(
+            "The {}: panic while opening: {}",
+            atomic_lib::db::recovery::DAMAGED_STORE,
+            atomic_lib::db::recovery::panic_message(&panic)
+        )),
+    }
 }
 
 /// Make sure every stored resource is searchable. An index written by an older
@@ -192,16 +314,6 @@ async fn catch_up_search_index(store: std::sync::Arc<atomic_lib::Db>) {
             break;
         }
     }
-}
-
-/// Whether an open error means the file itself is damaged. redb reports that
-/// as `StorageError::Corrupted` ("DB corrupted: …"), and atomic_lib's own
-/// deserialisation failures say the DB is "possibly corrupt". Anything else —
-/// the file locked by another process, a permission problem, a redb version
-/// that needs an upgrade — is not a reason to throw the user's data away.
-#[cfg(not(target_arch = "wasm32"))]
-fn is_corruption_error(e: &atomic_lib::errors::AtomicError) -> bool {
-    e.to_string().to_ascii_lowercase().contains("corrupt")
 }
 
 #[frb(init)]

@@ -20,6 +20,25 @@ pub(crate) fn node() -> Result<atomic_lib::runtime::AtomicNode, String> {
     Ok(atomic_lib::runtime::AtomicNode::from_db((**db()?).clone()))
 }
 
+/// Serialises `open_db`: two engines starting at once must not both open
+/// the file.
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) static OPEN_DB_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+static STORE_RECOVERY: std::sync::Mutex<Option<super::StoreRecovery>> = std::sync::Mutex::new(None);
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) fn set_store_recovery(recovery: super::StoreRecovery) {
+    *STORE_RECOVERY.lock().unwrap_or_else(|e| e.into_inner()) = Some(recovery);
+}
+
+pub(super) fn store_recovery() -> Option<super::StoreRecovery> {
+    STORE_RECOVERY
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone()
+}
+
 pub(super) fn set_db(store: atomic_lib::Db) {
     let _ = DB.set(Arc::new(store));
 }

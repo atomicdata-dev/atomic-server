@@ -7,6 +7,7 @@ import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `DbEventDto`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `clone`, `eq`, `fmt`
 
 class AgentInfo {
   final String secret;
@@ -59,6 +60,38 @@ class SetupResult {
           agentSecret == other.agentSecret &&
           agentSubject == other.agentSubject &&
           driveSubject == other.driveSubject;
+}
+
+/// What `open_db` did about a store it could not open (`store_recovery`).
+class StoreRecovery {
+  /// The broken file, kept under a new name next to the new store.
+  final String keptPath;
+
+  /// Why the store could not be opened, for the log and a bug report.
+  final String reason;
+
+  /// `true`: a repaired copy of the old store is in use (the last moments
+  /// before the crash may be missing). `false`: the app starts on an
+  /// empty store and gets its data back by syncing.
+  final bool repaired;
+
+  const StoreRecovery({
+    required this.keptPath,
+    required this.reason,
+    required this.repaired,
+  });
+
+  @override
+  int get hashCode => keptPath.hashCode ^ reason.hashCode ^ repaired.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is StoreRecovery &&
+          runtimeType == other.runtimeType &&
+          keptPath == other.keptPath &&
+          reason == other.reason &&
+          repaired == other.repaired;
 }
 
 /// Metadata for a single historical version of a resource.
