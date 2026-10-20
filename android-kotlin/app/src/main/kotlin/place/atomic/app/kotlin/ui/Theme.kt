@@ -1,7 +1,10 @@
 package place.atomic.app.kotlin.ui
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -101,6 +104,11 @@ private fun AtomicColors.toScheme(dark: Boolean) = if (dark) {
 fun AtomicTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     val colors = if (dark) AtomicColors.Dark else AtomicColors.Light
     CompositionLocalProvider(LocalAtomicColors provides colors) {
-        MaterialTheme(colorScheme = colors.toScheme(dark), content = content)
+        MaterialTheme(colorScheme = colors.toScheme(dark)) {
+            // Screens without a Scaffold (first run, the secret) draw text in
+            // LocalContentColor, which is black outside a Surface: near-black on
+            // the dark background. The base surface sets onBackground.
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background, contentColor = MaterialTheme.colorScheme.onBackground, content = content)
+        }
     }
 }
