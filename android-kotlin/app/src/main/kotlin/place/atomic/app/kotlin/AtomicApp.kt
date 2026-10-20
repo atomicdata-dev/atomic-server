@@ -7,12 +7,18 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import place.atomic.app.kotlin.embed.CoreEmbed
 import place.atomic.app.kotlin.embed.EmbedController
+import place.atomic.app.kotlin.session.KeystoreSecretBox
+import place.atomic.app.kotlin.session.PrefsKeyValue
+import place.atomic.app.kotlin.session.SessionStore
 
 class AtomicApp : Application() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /** The one warm WebView of the embedded renderer; created by [startEmbed]. */
     val embed: EmbedController by lazy { EmbedController(this, scope, CoreEmbed) }
+
+    /** The agent's secret and routing state; the store does not keep the agent. */
+    val session: SessionStore by lazy { SessionStore(PrefsKeyValue(this), KeystoreSecretBox()) }
 
     private var pushing: AutoCloseable? = null
 

@@ -11,6 +11,7 @@ import place.atomic.app.kotlin.core.activeAgent
 import place.atomic.app.kotlin.core.createAgentAndDrive
 import place.atomic.app.kotlin.core.flushStore
 import place.atomic.app.kotlin.core.openStore
+import place.atomic.app.kotlin.core.resumeAgent
 
 sealed interface AppState {
     data object Opening : AppState
@@ -33,6 +34,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             _state.value = try {
                 openStore(getApplication<Application>().filesDir.resolve("atomic").absolutePath)
+                resumeSession()
                 if (activeAgent() == null) AppState.Welcome else AppState.Ready.also { seed() }
             } catch (e: Exception) {
                 AppState.Failed(e.message ?: e.toString())
@@ -40,11 +42,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private val session get() = getApplication<AtomicApp>().session
+
+    /**
+     * The store keeps the active drive but not the agent (it lives in memory),
+     * so a restarted process has none until the kept secret is loaded. Skipping
+     * this made every start a first run with a new agent.
+     */
+    private suspend fun resumeSession() {
+        if (activeAgent() != null) return // the process is alive: the activity was recreated
+        val saved = session.load() ?: return
+        resumeAgent(saved.secret, saved.drive)
+    }
+
     /** First run: an agent and its private drive, so the Home has something to show. */
     fun createAccount(name: String) {
         viewModelScope.launch {
             _state.value = try {
-                createAgentAndDrive(name.trim().ifEmpty { "Me" })
+                val made = createAgentAndDrive(name.trim().ifEmpty { "Me" })
+                session.save(made.agent.secret, drive = made.driveSubject)
                 seed()
                 AppState.Ready
             } catch (e: Exception) {

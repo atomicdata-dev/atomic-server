@@ -258,3 +258,43 @@ mod embed_channel {
         assert_eq!(changed_subjects(&events, &echo), ["did:ad:a", "did:ad:b"]);
     }
 }
+
+/// The bug found on the phone: after a restart the store had no agent, the app
+/// ran first-run again and made a new one. The agent is in memory only; the
+/// secret the app keeps brings the same agent and drive back.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_second_open_of_the_same_store_keeps_the_same_agent_and_drive() {
+    let dir = temp_dir("reopen");
+    let (secret, subject, drive) = {
+        let (db, _) = store::open_native_store(&dir).await.unwrap();
+        let (agent, drive) = db.setup("Pelican").await.unwrap();
+        db.flush().unwrap();
+        (agent.build_secret().unwrap(), agent.subject.to_string(), drive)
+    };
+
+    let (db, recovery) = store::open_native_store(&dir).await.unwrap();
+    assert_eq!(recovery, None);
+    // What the phone showed: nothing in the store says who this device is...
+    assert!(atomic_lib::Storelike::get_default_agent(&db).is_err());
+    // ...but the drive it was working on is remembered.
+    assert_eq!(db.get_active_drive().as_deref(), Some(drive.as_str()));
+
+    // Resuming with the kept secret and drive gives the same agent and drive.
+    let here = crate::session::resume(&db, &secret, Some(&drive)).await.unwrap();
+    assert!(here, "the drive is in the store");
+    let agent = atomic_lib::Storelike::get_default_agent(&db).unwrap();
+    assert_eq!(agent.subject.to_string(), subject);
+    assert_eq!(db.get_active_drive().as_deref(), Some(drive.as_str()));
+    let drives = home::drives(&db).await.unwrap();
+    assert!(drives.iter().any(|d| d.subject == drive && d.name == "Pelican's Drive"));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn resuming_without_a_drive_hint_uses_the_private_drive() {
+    let dir = temp_dir("resume-home");
+    let (db, _) = store::open_native_store(&dir).await.unwrap();
+    let (agent, drive) = db.setup("Pelican").await.unwrap();
+    db.set_active_drive("did:ad:something-else").unwrap();
+    assert!(crate::session::resume(&db, &agent.build_secret().unwrap(), None).await.unwrap());
+    assert_eq!(db.get_active_drive().as_deref(), Some(drive.as_str()));
+}

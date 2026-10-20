@@ -278,3 +278,27 @@ pub async fn embed_dispatch(method: String, args_json: String) -> CoreResult<Str
 pub async fn subscribe_embed(listener: Arc<dyn EmbedListener>) -> CoreResult<Arc<Subscription>> {
     Ok(Arc::new(Subscription { task: crate::embed::spawn_pusher(listener)? }))
 }
+
+// ── Signing in again ───────────────────────────────────────────────────────
+
+/// Start-up of a device that has signed in before: load the agent from the
+/// secret the app kept (the store does not keep it) and make `drive` (what the
+/// app remembered, empty for none) the active drive. `true` when that drive is
+/// in this store; `false` means it still has to arrive (see the sync calls).
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn resume_agent(secret: String, drive: Option<String>) -> CoreResult<bool> {
+    crate::session::resume(db()?, &secret, drive.as_deref()).await
+}
+
+/// Set the active drive (what tapping a drive does).
+#[uniffi::export]
+pub fn set_active_drive(subject: String) -> CoreResult<()> {
+    Ok(db()?.set_active_drive(&subject)?)
+}
+
+/// Forget the agent held in memory (sign out). The data stays in the store.
+#[uniffi::export]
+pub fn clear_agent() -> CoreResult<()> {
+    db()?.clear_default_agent();
+    Ok(())
+}

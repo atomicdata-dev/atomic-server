@@ -14,6 +14,7 @@ mod api;
 mod embed;
 mod error;
 mod home;
+mod session;
 mod state;
 mod store;
 mod types;
