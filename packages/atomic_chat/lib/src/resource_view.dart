@@ -184,13 +184,19 @@ class _ResourceViewState extends State<ResourceView>
     if (kReleaseMode || widget.title.isEmpty || _paintWatched) return;
     _paintWatched = true;
     final title = jsonEncode(widget.title);
+    // The page also times itself: from this script (a warm page, just told
+    // to open) or from its own load (cold), to the frame that shows the
+    // title. That excludes getting the message to the app, which on the
+    // emulator waits for the web view's GL frames.
+    final since = _warm ? 'Date.now()' : 'Date.now()-performance.now()';
     unawaited(_page
-        ?.runJavaScript('(function(){var t0=Date.now();function c(){'
+        ?.runJavaScript('(function(){var t0=$since,s=Date.now();function c(){'
             'var m=document.querySelector("main");'
             'if(m&&m.innerText.indexOf($title)>=0){requestAnimationFrame('
             'function(){requestAnimationFrame(function(){'
-            'AtomicFlutter.postMessage(\'{"method":"painted"}\')})});return}'
-            'if(Date.now()-t0<20000)setTimeout(c,16)}c()})()')
+            'AtomicFlutter.postMessage(JSON.stringify({method:"painted",'
+            'ms:Date.now()-t0}))})});return}'
+            'if(Date.now()-s<20000)setTimeout(c,16)}c()})()')
         .catchError((_) {}));
   }
 
@@ -333,8 +339,9 @@ class _ResourceViewState extends State<ResourceView>
       return;
     }
     if (request['method'] == 'painted') {
-      Perf.span('resource painted ${_warm ? 'warm' : 'cold'}',
-          _clock.elapsedMilliseconds);
+      final path = _warm ? 'warm' : 'cold';
+      Perf.span('resource painted $path', _clock.elapsedMilliseconds);
+      Perf.span('resource painted in page $path', request['ms'] as int? ?? -1);
       return;
     }
     final id = request['id'] as int;

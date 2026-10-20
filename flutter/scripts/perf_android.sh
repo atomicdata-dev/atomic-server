@@ -136,6 +136,9 @@ note "device: $device"
 if [ -n "$APK" ]; then
   note "installing $APK"
   a install -r "$APK" >/dev/null
+  # The first start after an install extracts and verifies the dex: not a
+  # start anyone measures twice.
+  a shell am start -W -n $ACT >/dev/null; sleep 15; a shell am force-stop $PKG
   if step size; then put "APK size (MB)" "$(du -k "$APK" | awk '{printf "%.1f", $1/1024}')"; fi
 fi
 if step size && [ -f "$here/assets/embed/embed.html" ]; then
@@ -269,7 +272,8 @@ open_one() { # $1 = "x y" to tap, $2 = label; records the open's numbers
   wait_log '\[perf\] resource painted' 30 || { back; return 1; }
   local path; path=$(log | grep -Eo 'resource painted (warm|cold)' | head -1 | awk '{print $3}')
   put "open $2 ($path): data in page (ms)" "$(last_ms '\[perf\] resource data')"
-  put "open $2 ($path): painted (ms)" "$(last_ms '\[perf\] resource painted')"
+  put "open $2 ($path): painted (ms)" "$(last_ms '\[perf\] resource painted (warm|cold)')"
+  put "open $2 ($path): painted, page's own clock (ms)" "$(last_ms '\[perf\] resource painted in page')"
   log >> "$work/open.log"
 }
 if step open || step memory; then
