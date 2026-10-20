@@ -108,8 +108,9 @@ What changed (one commit each):
   OpenGL ES, likely much less on a phone's Vulkan), and `flutter_tts`, which
   creates a `TextToSpeech` when the engine attaches and enumerates every voice
   (`getVoices`, Java deserialization) on the main thread at every start, for a
-  feature only voice mode uses. Lazy registration of that plugin is the next
-  start-up fix if the phone shows it.
+  feature only voice mode uses. `MainActivity` now takes the plugin out of engine start-up and
+  `PluginSpeechOutput` asks for it before the first utterance (unmeasured:
+  check the `main` -> `documents dir` gap on the phone).
 - **Opening a resource**: the page's own render is 1.0-1.4 s; on the emulator
   every web view frame also blocks the Android main thread (it waits in
   `ThreadedRenderer.syncAndDrawFrame` while the RenderThread draws the web
@@ -125,7 +126,7 @@ What changed (one commit each):
   document) and back to ~160 MB within a minute; no page leak (released pages
   leave `/json`).
 - **APK**: the profile APK also carries `mobile_scanner`'s barhopper for x86_64
-  and armeabi-v7a (9 MB); an app bundle or `--split-per-abi` drops them.
+  and armeabi-v7a (9 MB); release and profile builds now exclude them (`build.gradle`, unmeasured: check the entries with the size script).
   Gradle's incremental packaging leaves the APK file at its old length (99 MB
   on disk, 75 MB of entries): the script reports the entries.
 
@@ -147,8 +148,8 @@ What changed (one commit each):
   stores repair) or replaced by an empty one, the app explains it (recovery
   screen with Share) and never stays black, and it flushes on background.
   Emulator kill-loop afterwards: 50 force-stops, 25 of them after a
-  same-process relaunch, 0 failures. Still open: cargokit builds with
-  `stable`, not the repo's pinned toolchain.
+  same-process relaunch, 0 failures. cargokit now builds with the repo's pinned
+  toolchain (`rust-toolchain.toml`), so `File::try_lock` works on Android.
 - **ANRs on the emulator** while opening and leaving pages: the main thread
   waits for the RenderThread drawing the web view through emulated GL
   (stacks above). Probably emulator-only; watch for it on the phone.
