@@ -9,6 +9,8 @@
 /// account of itself read from `/server`.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -45,16 +47,81 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
   String? _error;
   final _addController = TextEditingController();
 
+  /// What each listed server says about itself (`/server`), by URL: its node
+  /// id is how a paired peer is recognised as that server.
+  Map<String, ServerInfo> _infos = {};
+
+  /// The device search, re-read while the section is shown.
+  PeerSearchInfo? _search;
+  Timer? _searchPoll;
+  bool _showSearchDetail = false;
+  bool _discovered = false;
+
   @override
   void initState() {
     super.initState();
+    _search = widget.backend.peerSearchStatus();
+    if (_search != null) {
+      _searchPoll = Timer.periodic(const Duration(seconds: 2), (_) {
+        final next = widget.backend.peerSearchStatus();
+        if (!mounted) return;
+        final liveChanged = next?.connected != _search?.connected;
+        setState(() => _search = next);
+        // A device came or went: its card's Connected / Paired badge too.
+        if (liveChanged) _refreshPeers();
+      });
+    }
     _load();
   }
 
   @override
   void dispose() {
+    _searchPoll?.cancel();
     _addController.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshPeers() async {
+    try {
+      final peers = await widget.backend.getKnownPeers();
+      final live = await widget.backend.livePeerIds();
+      if (mounted) {
+        setState(() {
+          _peers = peers;
+          _livePeerIds = live;
+        });
+      }
+    } catch (_) {}
+  }
+
+  /// Every listed server's own account of itself, in parallel; one that does
+  /// not answer is simply unknown.
+  Future<void> _loadServerInfos() async {
+    final backend = widget.backend.servers;
+    if (backend == null) return;
+    final entries = await Future.wait(_servers.map((url) async {
+      try {
+        return MapEntry(url, await backend.serverInfo(url));
+      } catch (_) {
+        return MapEntry(url, ServerInfo.unknown);
+      }
+    }));
+    if (mounted) setState(() => _infos = Map.fromEntries(entries));
+  }
+
+  /// Servers the active drive's pkarr record names (verified by the host),
+  /// once per section: they join the list without being typed in.
+  Future<void> _discoverServers() async {
+    final backend = widget.backend.servers;
+    if (backend == null || _discovered) return;
+    _discovered = true;
+    try {
+      final found = await backend.discoverServers();
+      if (!mounted) return;
+      if (found.any((url) => !_servers.any((s) => sameOrigin(s, url)))) {
+        await _load();
+      }
+    } catch (_) {}
   }
 
   Future<void> _load() async {
@@ -86,6 +153,8 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
       });
 
       await _loadActiveDetails();
+      await _loadServerInfos();
+      unawaited(_discoverServers());
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -238,6 +307,24 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
     );
   }
 
+  /// The raw id is long and unreadable, so it is not shown: a compact button
+  /// copies it (the tooltip and long-press show it).
+  Widget _copyIdButton(String id, String label) => Tooltip(
+        message: id,
+        child: TextButton.icon(
+          onPressed: () => _copy(id, 'ID'),
+          icon: const Icon(Icons.copy, size: 14),
+          label: const Text('Copy ID'),
+          style: TextButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            minimumSize: const Size(0, 28),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            textStyle: const TextStyle(fontSize: 12),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -263,6 +350,7 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
             ),
           ),
         ),
+        if (_search != null) _searchStatus(theme, _search!),
         if (_servers.isEmpty && _peers.isEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -277,7 +365,9 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
             ),
           ),
         for (final server in _servers) _serverCard(theme, server),
-        for (final peer in _peers) _peerCard(theme, peer),
+        for (final peer in _peers)
+          if (!_servers.any((s) => _isServerPeer(s, peer)))
+            _peerCard(theme, peer),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -291,7 +381,103 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
     );
   }
 
+  /// Whether a paired device *is* this server: the same always-on device
+  /// reached two ways, over https and over Iroh. Pairing with a server's code
+  /// names the peer after it (`atomic.place (node1.example.org)`), and the
+  /// active server reports its own node id. One device is listed once.
+  ///
+  /// A server introduces itself (HELLO) by its configured name, often its
+  /// host's first label (`staging` for staging.atomicdata.dev), and its
+  /// `/server` names its node id — when it tells this device (a node may
+  /// hide it from a visitor). Any of those makes the peer that server.
+  bool _isServerPeer(String server, Map<String, String> peer) {
+    final host = Uri.tryParse(server)?.host.toLowerCase() ?? '';
+    final name = (peer['name'] ?? '').trim().toLowerCase();
+    if (host.isNotEmpty && name.isNotEmpty) {
+      if (name.contains(host) || name == host.split('.').first) return true;
+    }
+    final nodeId = _infos[server]?.nodeId ??
+        (sameOrigin(server, _active) ? _info.nodeId : null);
+    return nodeId != null && isLiveAtomicPeer(peer['node_id'] ?? '', {nodeId});
+  }
+
+  /// A peer that is a server whose address this device does not know: an
+  /// atomic-server names itself `…atomic-server` unless configured otherwise.
+  /// Shown as a server, not as a phone.
+  static bool _looksLikeServer(Map<String, String> peer) =>
+      (peer['name'] ?? '').trim().toLowerCase().endsWith('atomic-server');
+
+  /// The search's line ("Looking for devices…", "No other device found yet"),
+  /// a "Search again" button and, on tap, why.
+  Widget _searchStatus(ThemeData theme, PeerSearchInfo search) {
+    final scheme = theme.colorScheme;
+    final style = TextStyle(
+        fontSize: 12,
+        color:
+            search.failed ? Colors.orange.shade800 : scheme.onSurfaceVariant);
+    final again = widget.backend.searchAgain;
+    final detail = search.detail;
+    return Padding(
+      key: const ValueKey('peer-search-status'),
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (search.busy)
+                const Padding(
+                  padding: EdgeInsets.only(right: 8),
+                  child: SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 1.5)),
+                ),
+              Expanded(
+                child: InkWell(
+                  onTap: detail == null
+                      ? null
+                      : () => setState(
+                          () => _showSearchDetail = !_showSearchDetail),
+                  child: Text(
+                    [
+                      search.message,
+                      if (!search.busy &&
+                          !search.connected &&
+                          (search.retryInSecs ?? 0) > 0)
+                        'trying again in ${search.retryInSecs} s',
+                    ].join(' · '),
+                    style: style,
+                  ),
+                ),
+              ),
+              if (again != null && !search.busy)
+                TextButton(
+                  onPressed: () {
+                    again();
+                    setState(() => _search = widget.backend.peerSearchStatus());
+                  },
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    minimumSize: const Size(0, 28),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    textStyle: const TextStyle(fontSize: 12),
+                  ),
+                  child: const Text('Search again'),
+                ),
+            ],
+          ),
+          if (detail != null && (_showSearchDetail || search.failed))
+            Text(detail, style: style.copyWith(fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
   Widget _serverCard(ThemeData theme, String server) {
+    final peer = _peers.where((p) => _isServerPeer(server, p)).firstOrNull;
+    final peerSynced = int.tryParse(peer?['last_synced'] ?? '');
     final isActive = sameOrigin(server, _active);
     final scheme = theme.colorScheme;
 
@@ -342,7 +528,23 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
                 ),
             ],
           ),
+          _serverAddressLine(theme, server, peer, showId: !isActive),
           if (isActive) ..._activeDetails(theme),
+          if (peer != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                [
+                  if (isLiveAtomicPeer(peer['node_id'] ?? '', _livePeerIds))
+                    'Connected'
+                  else
+                    'Paired',
+                  if (peerSynced != null)
+                    'last synced ${_relativeTime(peerSynced)}',
+                ].join(' · '),
+                style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+              ),
+            ),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -373,6 +575,29 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
     );
   }
 
+  /// Where the server is known: its https URL, with a Copy ID button for its
+  /// node id (from its `/server`, else from the paired peer that is it). The
+  /// active server's id is shown in its details below instead.
+  Widget _serverAddressLine(
+      ThemeData theme, String server, Map<String, String>? peer,
+      {required bool showId}) {
+    final nodeId = _infos[server]?.nodeId ?? peer?['node_id'];
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            server,
+            style: TextStyle(
+                fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        if (showId && nodeId != null && nodeId.isNotEmpty)
+          _copyIdButton(nodeId, 'Node ID'),
+      ],
+    );
+  }
+
   /// What the active node says about itself. Absent facts are simply not shown:
   /// a node with no peer-to-peer transport has no node id, which is not a fault.
   List<Widget> _activeDetails(ThemeData theme) {
@@ -391,28 +616,17 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
 
     return [
       const SizedBox(height: 6),
-      if (_info.version != null)
-        Text('atomic-server ${_info.version}', style: labelStyle)
-      else
-        Text('Not reachable', style: labelStyle.copyWith(color: Colors.orange)),
-      if (_info.nodeId != null) ...[
-        const SizedBox(height: 4),
-        InkWell(
-          onTap: () => _copy(_info.nodeId!, 'Node ID'),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _info.nodeId!,
-                  style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Icon(Icons.copy, size: 12, color: scheme.onSurfaceVariant),
-            ],
+      Row(
+        children: [
+          Expanded(
+            child: _info.version != null
+                ? Text('atomic-server ${_info.version}', style: labelStyle)
+                : Text('Not reachable',
+                    style: labelStyle.copyWith(color: Colors.orange)),
           ),
-        ),
-      ],
+          if (_info.nodeId != null) _copyIdButton(_info.nodeId!, 'Node ID'),
+        ],
+      ),
       if (_usage != null) ...[
         const SizedBox(height: 6),
         Text(
@@ -442,6 +656,8 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
     final scheme = theme.colorScheme;
     final labelStyle = TextStyle(fontSize: 11, color: scheme.onSurfaceVariant);
     final lastSynced = int.tryParse(peer['last_synced'] ?? '');
+    final isServer = _looksLikeServer(peer);
+    final relay = Uri.tryParse(peer['relay_url'] ?? '')?.host ?? '';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -455,7 +671,7 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
         children: [
           Row(
             children: [
-              Icon(Icons.phone_android,
+              Icon(isServer ? Icons.cloud_outlined : Icons.phone_android,
                   size: 18, color: scheme.onSurfaceVariant),
               const SizedBox(width: 8),
               Expanded(
@@ -499,31 +715,24 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
               ),
             ],
           ),
-          if (nodeId.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            InkWell(
-              onTap: () => _copy(nodeId, 'Device ID'),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      nodeId,
-                      style: const TextStyle(
-                          fontSize: 10, fontFamily: 'monospace'),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Icon(Icons.copy, size: 12, color: scheme.onSurfaceVariant),
-                ],
-              ),
-            ),
-          ],
           const SizedBox(height: 4),
-          Text(
-            lastSynced != null
-                ? 'Last synced ${_relativeTime(lastSynced)}'
-                : 'Not synced yet',
-            style: labelStyle,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  [
+                    if (isServer) 'Server, address unknown',
+                    lastSynced != null
+                        ? 'Last synced ${_relativeTime(lastSynced)}'
+                        : 'Not synced yet',
+                    if (relay.isNotEmpty)
+                      'via ${relay.replaceAll(RegExp(r'\.$'), '')}',
+                  ].join(' · '),
+                  style: labelStyle,
+                ),
+              ),
+              if (nodeId.isNotEmpty) _copyIdButton(nodeId, 'Device ID'),
+            ],
           ),
         ],
       ),

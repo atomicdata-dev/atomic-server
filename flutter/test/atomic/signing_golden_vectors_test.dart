@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:atomiccanvas_flutter/atomic/atomic_auth.dart';
+import 'package:atomic_app/atomic/atomic_auth.dart';
 
 /// The same fixture the Rust side asserts (`lib/src/genesis.rs::matches_the_golden_vectors`)
 /// and the TS side asserts (`browser/lib/src/genesis.test.ts`). Dart signs

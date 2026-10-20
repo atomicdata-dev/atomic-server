@@ -278,16 +278,6 @@ pub async fn resolve_node_ids_filtered(
     Ok(peers)
 }
 
-/// The newest NodeID [`resolve_node_ids_filtered`] finds.
-pub async fn resolve_node_id_filtered(
-    drive_did: &str,
-    exclude_node_id: Option<&str>,
-) -> AtomicResult<String> {
-    Ok(resolve_node_ids_filtered(drive_did, exclude_node_id)
-        .await?
-        .remove(0))
-}
-
 /// What the pkarr relay says about where a drive lives: its replicas' Iroh
 /// NodeIDs and public https origins. Anyone may have written to the record, so
 /// an origin from it proves nothing until its genesis answer passes

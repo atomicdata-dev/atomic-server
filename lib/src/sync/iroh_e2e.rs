@@ -979,3 +979,75 @@ async fn a_completed_peer_sync_names_the_drive_to_reconnect_to() {
         "after syncing a drive, the device must know to dial back for it"
     );
 }
+
+/// A device signed in with the secret (not paired) knows no other device: it
+/// finds them through the directory the devices announce in. Here the
+/// directory is a fake that names this device and the other one, and the
+/// search dials the other over real Iroh and syncs the drive: the resource
+/// made on A is on B after one round, and A is live.
+#[tokio::test]
+async fn a_fresh_device_finds_the_other_through_the_peer_search() {
+    use crate::host::peer_search::{
+        PeerDialer, PeerDirectory, PeerSearch, PeerSearchSchedule, PeerSearchState,
+    };
+    use async_trait::async_trait;
+
+    struct Directory(Vec<String>);
+    #[async_trait]
+    impl PeerDirectory for Directory {
+        async fn announced(&self, _drive: &str) -> Result<Vec<String>, String> {
+            Ok(self.0.clone())
+        }
+        async fn announce(&self, _drive: &str, _me: &str) -> Result<(), String> {
+            Ok(())
+        }
+    }
+    struct Dialer<'a> {
+        ep: &'a iroh::Endpoint,
+        db: &'a Db,
+    }
+    #[async_trait]
+    impl PeerDialer for Dialer<'_> {
+        async fn dial(&self, node_id: &str, drive: &str) -> Result<(), String> {
+            crate::sync::peer::sync_drive_with_peer_using(self.ep, node_id, drive, self.db, false)
+                .await
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        }
+        fn live(&self) -> Vec<String> {
+            crate::sync::peer::live_peer_ids()
+        }
+    }
+
+    let pair = setup_pair("peer_search").await;
+    let page = pair
+        .db_a
+        .create_resource(CANVAS_CLASS, &pair.drive, "Made on A", None)
+        .await
+        .unwrap();
+    let me = pair.ep_b.node_id().to_string();
+
+    let search = PeerSearch::new(PeerSearchSchedule::default());
+    // The record names B itself first (it announced last), then A.
+    let directory = Directory(vec![me.clone(), pair.node_id_a.clone()]);
+    let dialer = Dialer {
+        ep: &pair.ep_b,
+        db: &pair.db_b,
+    };
+    let outcome = search
+        .search_once(&me, std::slice::from_ref(&pair.drive), &directory, &dialer, false)
+        .await;
+
+    assert_eq!(outcome.dialled, vec![pair.node_id_a.to_lowercase()]);
+    // Both ends live in this process and share the live-peer table, so A's
+    // side of the link counts as well: connected, to one or two.
+    assert!(
+        matches!(search.status().state, PeerSearchState::Connected { .. }),
+        "{:?}",
+        search.status()
+    );
+    pair.db_b
+        .get_resource(&page.as_str().into())
+        .await
+        .expect("B has the page made on A");
+}

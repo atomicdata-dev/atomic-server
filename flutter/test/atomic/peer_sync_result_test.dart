@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:atomiccanvas_flutter/atomic/atomic_client.dart';
+import 'package:atomic_app/atomic/atomic_client.dart';
 
 /// A sync reported one number: what it imported. So sending a workspace to a
 /// device that had none said "Synced 0 resources" under a green tick, and so

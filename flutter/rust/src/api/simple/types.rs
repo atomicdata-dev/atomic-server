@@ -4,33 +4,24 @@ pub struct SetupResult {
     pub drive_subject: String,
 }
 
+/// What `open_db` did about a store it could not open (`store_recovery`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StoreRecovery {
+    /// The broken file, kept under a new name next to the new store.
+    pub kept_path: String,
+    /// Why the store could not be opened, for the log and a bug report.
+    pub reason: String,
+    /// `true`: a repaired copy of the old store is in use (the last moments
+    /// before the crash may be missing). `false`: the app starts on an
+    /// empty store and gets its data back by syncing.
+    pub repaired: bool,
+}
+
 pub struct AgentInfo {
     pub secret: String,
     pub subject: String,
     pub public_key: String,
     pub name: Option<String>,
-}
-
-pub struct CanvasListItem {
-    pub subject: String,
-    pub name: String,
-    /// Unix milliseconds (`dateEdited` property).
-    pub date_edited: i64,
-}
-
-/// JSON-only list entry (includes folder_id). Use `list_canvases_json` from Dart.
-#[derive(serde::Serialize)]
-pub struct CanvasListItemJson {
-    pub subject: String,
-    pub name: String,
-    pub folder_id: String,
-    pub date_edited: i64,
-}
-
-#[derive(serde::Serialize)]
-pub struct FolderListItem {
-    pub subject: String,
-    pub name: String,
 }
 
 /// Db event forwarded to Flutter (`poll_db_event`).

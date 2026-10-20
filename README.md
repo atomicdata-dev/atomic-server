@@ -29,7 +29,7 @@ This repo includes:
 - [`@tomic/svelte`](/browser/svelte/README.md) Svelte NPM library.
 - [`atomic_lib`](lib/README.md) Rust library.
 - [`atomic-cli`](cli/README.md) terminal client.
-- [`flutter`](/flutter) a Dart / Flutter client (with demo app AtomicCanvas)
+- [`flutter`](/flutter) a Dart / Flutter client (with the Atomic demo app)
 
 _Status: alpha. [Breaking changes](CHANGELOG.md) are expected until 1.0._
 

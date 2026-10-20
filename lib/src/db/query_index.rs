@@ -281,6 +281,28 @@ pub async fn query_sorted_indexed(
     q: &Query,
     q_filter: &QueryFilter,
 ) -> AtomicResult<(Vec<Subject>, Vec<Resource>, usize)> {
+    query_sorted_indexed_inner(store, q, q_filter, false).await
+}
+
+/// [`query_sorted_indexed`] that stops reading the index once the page
+/// (`offset` + `limit`) is full, instead of walking every member to count
+/// them: the cost follows the page, not the size of the set. The count it
+/// returns is a lower bound (the members read). For paging through a long
+/// sorted set, like the newest messages of a chat.
+pub async fn query_sorted_indexed_page(
+    store: &Db,
+    q: &Query,
+    q_filter: &QueryFilter,
+) -> AtomicResult<(Vec<Subject>, Vec<Resource>, usize)> {
+    query_sorted_indexed_inner(store, q, q_filter, true).await
+}
+
+async fn query_sorted_indexed_inner(
+    store: &Db,
+    q: &Query,
+    q_filter: &QueryFilter,
+    stop_when_full: bool,
+) -> AtomicResult<(Vec<Subject>, Vec<Resource>, usize)> {
     let id = query_id(q_filter)?;
 
     // Range bounds. A bare id prefix sorts before every member key with that
@@ -315,6 +337,9 @@ pub async fn query_sorted_indexed(
     let limit = q.limit.unwrap_or(usize::MAX);
 
     for kv in iter {
+        if stop_when_full && subjects.len() >= limit {
+            break;
+        }
         let kv = kv?;
         let (k, _v) = &kv;
         let (_id, _sort, subject_str) = parse_members_key(k)?;

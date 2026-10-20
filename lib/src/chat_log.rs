@@ -29,6 +29,10 @@ pub const FIELD_REPLY_TO: &str = "r";
 pub const FIELD_EDITED_AT: &str = "e";
 pub const FIELD_KINDS: &str = "k";
 
+/// Entries a `ChatLog` page holds before the next page is started; the same as
+/// `CHAT_LOG_CAPACITY` in `browser/data-browser/src/helpers/chatLog.ts`.
+pub const CHAT_LOG_CAPACITY: usize = 256;
+
 /// `<createdAt hex>-<8 random hex>`.
 pub fn new_entry_key(created_at: i64) -> String {
     use rand::Rng;

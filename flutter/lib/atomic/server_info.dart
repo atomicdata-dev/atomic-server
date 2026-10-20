@@ -85,7 +85,8 @@ class DriveUsage {
 
 /// Asks `serverUrl` what it is. Returns [ServerInfo.unknown] when the node is
 /// unreachable, or too old to describe itself.
-Future<ServerInfo> fetchServerInfo(String serverUrl, {http.Client? client}) async {
+Future<ServerInfo> fetchServerInfo(String serverUrl,
+    {http.Client? client}) async {
   if (serverUrl.isEmpty) {
     return ServerInfo.unknown;
   }

@@ -29,6 +29,8 @@ pub mod plugin_secret;
 pub mod plugin_trigger;
 pub(crate) mod prop_val_sub_index;
 mod query_index;
+#[cfg(all(feature = "db", not(target_arch = "wasm32")))]
+pub mod recovery;
 pub mod redb_store;
 pub mod website;
 /// The set of drives [`Db::migrate_messages_step`] may write chat log pages
@@ -91,8 +93,8 @@ use self::{
     kv_store::KvStore,
     prop_val_sub_index::{add_atom_to_prop_val_sub_index, find_in_prop_val_sub_index},
     query_index::{
-        check_if_atom_matches_watched_query_filters, query_sorted_indexed, update_indexed_member,
-        IndexIterator,
+        check_if_atom_matches_watched_query_filters, query_sorted_indexed,
+        query_sorted_indexed_page, update_indexed_member, IndexIterator,
     },
     val_prop_sub_index::add_atom_to_valpropsub_index,
 };
@@ -1140,6 +1142,20 @@ impl Db {
         uploads_path: &std::path::Path,
         policy: &compaction::CompactionPolicy,
     ) -> AtomicResult<Db> {
+        Self::init_redb_file_with_cache(path, base_domain, uploads_path, policy, None).await
+    }
+
+    /// `init_redb_file_with_policy` with redb's read cache at `cache_bytes`
+    /// instead of its 1 GiB default. The cache keeps whatever was read, up
+    /// to the store's size; a phone sets tens of MiB.
+    #[cfg(all(feature = "db", not(target_arch = "wasm32")))]
+    pub async fn init_redb_file_with_cache(
+        path: &std::path::Path,
+        base_domain: Option<String>,
+        uploads_path: &std::path::Path,
+        policy: &compaction::CompactionPolicy,
+        cache_bytes: Option<usize>,
+    ) -> AtomicResult<Db> {
         tracing::info!("Opening ReDB database at {:?}", path);
 
         std::fs::create_dir_all(path).map_err(|e| {
@@ -1199,7 +1215,7 @@ impl Db {
         let _ = uploads_path;
 
         let (redb_store, compaction) =
-            redb_store::RedbStore::new_file_with_policy(&redb_path, policy)?;
+            redb_store::RedbStore::new_file_with_options(&redb_path, policy, cache_bytes)?;
 
         let store = Db::from_kv(path.to_path_buf(), Arc::new(redb_store), base_domain);
 
@@ -1627,11 +1643,28 @@ impl Db {
     /// If `drive_needs_sync` is true, the caller must sync with another device
     /// before the user can create resources — the drive's genesis commit is missing.
     pub async fn load_agent_from_secret(&self, secret: &str) -> AtomicResult<AgentLoadResult> {
-        let agent = crate::agents::Agent::from_secret(secret)?;
+        let mut agent = crate::agents::Agent::from_secret(secret)?;
+
+        // A secret carries no name (nor when the agent was made). Signing in
+        // again on the device that made the agent (every app start does) used
+        // to replace its stored resource with this nameless one, so the
+        // agent showed as "Someone" and the embedded page found no name.
+        // What the store already holds wins; the secret fills in the rest.
+        let stored = self.get_resource_shallow(&agent.subject).ok();
+        if agent.name.is_none() {
+            if let Some(Ok(Value::String(name))) = stored.as_ref().map(|r| r.get(urls::NAME)) {
+                agent.name = Some(name.clone());
+            }
+        }
         self.set_default_agent(agent.clone());
 
         // Persist so list_drives() can read the agent's `drives` property
-        let agent_resource = agent.to_resource()?;
+        let mut agent_resource = agent.to_resource()?;
+        if let Some(stored) = stored {
+            for (property, value) in stored.get_propvals().iter() {
+                agent_resource.set_unsafe(property.clone(), value.clone())?;
+            }
+        }
         self.add_resource_opts(&agent_resource, false, false, true)
             .await?;
 
@@ -1702,7 +1735,10 @@ impl Db {
 
         let mut drives = Vec::with_capacity(subjects.len());
         for subject in subjects {
-            let name = match self.get_resource(&subject.as_str().into()).await {
+            // Stored state only: `get_resource` would go and fetch every drive
+            // this device does not hold (the agent lists dozens of old ones),
+            // one after the other, before the list could be shown.
+            let name = match self.get_resource_shallow(&subject.as_str().into()) {
                 Ok(r) => r.get(urls::NAME).map(|v| v.to_string()).unwrap_or_default(),
                 Err(_) => String::new(),
             };
@@ -4224,6 +4260,21 @@ impl Db {
         }
 
         Ok(outcomes)
+    }
+
+    /// The subjects of one page of a sorted (or multi-filter) query, reading
+    /// only as far into the query index as the page reaches (`offset` +
+    /// `limit`), not every member as [`Storelike::query`] does to count them.
+    /// The first call for a filter builds its index the usual way (a full
+    /// pass); after that a page of the newest 50 of 200 000 costs 50 reads.
+    pub async fn query_page(&self, q: &Query) -> AtomicResult<Vec<Subject>> {
+        if q.expression_filters.is_empty() && requires_query_index(q) {
+            let q_filter = QueryFilter::try_from_query(q)?;
+            if q_filter.is_watched(self) {
+                return Ok(query_sorted_indexed_page(self, q, &q_filter).await?.0);
+            }
+        }
+        Ok(self.query(q).await?.subjects)
     }
 
     async fn query_complex(&self, q: &Query) -> AtomicResult<QueryResult> {

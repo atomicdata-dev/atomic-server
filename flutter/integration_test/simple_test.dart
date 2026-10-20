@@ -1,7 +1,7 @@
 import 'dart:io';
-import 'package:atomiccanvas_flutter/atomic/atomic_client.dart';
-import 'package:atomiccanvas_flutter/atomic/settings_backend.dart';
-import 'package:atomiccanvas_flutter/src/rust/frb_generated.dart';
+import 'package:atomic_app/atomic/atomic_client.dart';
+import 'package:atomic_app/atomic/settings_backend.dart';
+import 'package:atomic_app/src/rust/frb_generated.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
@@ -14,7 +14,7 @@ void main() {
     addTearDown(() => dir.delete(recursive: true));
     await AtomicClient.openDb(dir.path);
     final account = await AtomicClient.setup('Package test');
-    final backend = CanvasSettingsBackend();
+    final backend = AppSettingsBackend();
     expect((await backend.getActiveAgent())?.subject, account.agentSubject);
     expect(await backend.listDrives(), contains(account.driveSubject));
     expect(await backend.exportSecret(), account.agentSecret);

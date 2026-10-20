@@ -33,15 +33,26 @@ android {
         targetSdk 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
-        ndk {
-            // only build for joep's local android devices
-            abiFilters 'arm64-v8a'
-        }
     }
 
     buildTypes {
         release {
             signingConfig signingConfigs.debug
+        }
+    }
+}
+
+// Release and profile APKs carry arm64-v8a only. The Flutter plugin resets
+// `abiFilters` to arm64 + armeabi-v7a + x86_64 when it is applied, and an
+// `ndk { abiFilters }` block here only adds to that list, so third-party
+// prebuilt libraries (mobile_scanner's barhopper: 9 MB) stayed in. Excluding
+// the other ABIs' libraries from the packaged APK is independent of that.
+// Debug keeps every ABI (x86_64 emulators, `flutter run` on any device).
+// Other ABIs for a release: `-Patomic.allAbis=true` (see flutter/README.md).
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        if (variant.buildType != "debug" && !project.hasProperty("atomic.allAbis")) {
+            variant.packaging.jniLibs.excludes.addAll("**/x86_64/**", "**/armeabi-v7a/**", "**/x86/**")
         }
     }
 }

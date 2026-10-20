@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
 import 'atomic_client.dart';
@@ -6,16 +8,37 @@ import 'server_info.dart';
 import 'session.dart';
 import '../screens/pair_screen.dart';
 
-/// Canvas keeps its existing native bridge, secure storage and transport.
+/// The app keeps its existing native bridge, secure storage and transport.
 /// Only the UI is shared with other Atomic applications.
-class CanvasSettingsBackend extends shared.AtomicSettingsBackend {
+class AppSettingsBackend extends shared.AtomicSettingsBackend {
   @override
   Future<shared.AtomicIdentity?> getActiveAgent() async {
     final agent = await AtomicClient.getActiveAgent();
-    return agent == null
-        ? null
-        : shared.AtomicIdentity(subject: agent.subject, name: agent.name);
+    if (agent == null) return null;
+    try {
+      final p = jsonDecode(await AtomicClient.getOwnProfile())
+          as Map<String, dynamic>;
+      String? text(String key) {
+        final v = (p[key] as String?)?.trim();
+        return v == null || v.isEmpty ? null : v;
+      }
+
+      return shared.AtomicIdentity(
+        subject: agent.subject,
+        name: text('name') ?? agent.name,
+        description: text('description'),
+        imageUrl: text('imageUrl'),
+        emoji: text('emoji'),
+      );
+    } catch (_) {
+      return shared.AtomicIdentity(subject: agent.subject, name: agent.name);
+    }
   }
+
+  @override
+  Future<void> Function({required String name, required String description})
+      get saveProfile => ({required name, required description}) =>
+          AtomicClient.setAgentProfile(name, description);
 
   @override
   Future<String> exportSecret() async {
@@ -72,12 +95,18 @@ class CanvasSettingsBackend extends shared.AtomicSettingsBackend {
   }
 
   @override
-  shared.AtomicServerBackend get servers => CanvasServerBackend();
+  shared.PeerSearchInfo? peerSearchStatus() =>
+      shared.PeerSearchInfo.fromJson(AtomicClient.peerSearchStatus());
+  @override
+  void Function() get searchAgain => AtomicClient.peerSearchAgain;
+
+  @override
+  shared.AtomicServerBackend get servers => AppServerBackend();
   @override
   Future<void> Function() get signOut => AtomicSession.clear;
 }
 
-class CanvasServerBackend extends shared.AtomicServerBackend {
+class AppServerBackend extends shared.AtomicServerBackend {
   @override
   Future<List<String>> knownServers() => AtomicSession.knownServers();
   @override
@@ -128,4 +157,19 @@ class CanvasServerBackend extends shared.AtomicServerBackend {
 
   @override
   Future<int> pushWorkspace(String url) => AtomicClient.syncDriveToServer(url);
+
+  /// The servers the active drive's pkarr record names and that prove they
+  /// hold it: added to the known list (not put in use), so a server that hosts
+  /// the drive (an atomic.place node, a self-hosted one) is listed without
+  /// being typed in.
+  @override
+  Future<List<String>> discoverServers() async {
+    final drive = AtomicClient.getActiveDrive();
+    if (drive == null) return const [];
+    final found = await AtomicClient.verifiedDriveOrigins(drive);
+    for (final origin in found) {
+      await AtomicSession.addKnownServer(origin);
+    }
+    return found;
+  }
 }

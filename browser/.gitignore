@@ -9,6 +9,7 @@ publish
 .tsup
 */lib
 */dist
+*/dist-embed
 */dist-tauri
 */dev-dist
 */yarn-error.log
