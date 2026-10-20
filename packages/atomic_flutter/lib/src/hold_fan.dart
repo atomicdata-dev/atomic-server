@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
@@ -64,12 +65,14 @@ class HoldFan<T> extends StatefulWidget {
   /// when a tap does [onTap]: a hold opens the card, a drag picks a row.
   final bool cardMenu;
 
-  /// With [tapOpensMenu]: the card opens as the finger goes down, with no
-  /// wait for a hold. Moving the finger more than [holdFanDragSlop] drags
+  /// The bottom bar's gesture (one for Home, Search and New): the card
+  /// opens at once when the finger moves more than [holdFanDragSlop] (a
+  /// swipe), or after [holdDuration] of a finger held still. Then it drags
   /// through the rows (the one under it marked) and letting go picks one,
   /// or, off the rows, closes the card; letting go without moving leaves it
-  /// open for a tap. For a button that is not in anything that scrolls (the
-  /// bottom bar): a scroll that starts on it would open the card.
+  /// open for a tap. A lift before the swipe or the delay is a tap: it opens
+  /// the card with [tapOpensMenu], else does [onTap]. For a button that is
+  /// not in anything that scrolls (the bottom bar).
   final bool opensOnDown;
 
   final List<HoldFanItem<T>> items;
@@ -121,7 +124,7 @@ class HoldFan<T> extends StatefulWidget {
     this.defaultIndex = 0,
     this.tooltip,
     this.layout = HoldFanLayout.list,
-    this.holdDuration = const Duration(milliseconds: 150),
+    this.holdDuration = HoldMenuStyle.holdDelay,
     this.onOpen,
     this.menuLabel = 'More options',
     this.selected = false,
@@ -209,15 +212,49 @@ const _pillMinHeight = 44.0;
 /// takes it off the room for the label, so the pill must be that much bigger.
 const _pillBorder = 1.5;
 
-const _cardPad = 6;
-const _rowPadding = EdgeInsets.symmetric(horizontal: 16);
-const _rowIcon = 24.0;
-const _rowGap = 14.0;
-const _rowMinWidth = 176.0;
+/// The one hold menu of the bottom bar's buttons (Home, Search, New): the
+/// same hold delay, drag slop, animation, haptics and card, so they feel alike.
+abstract final class HoldMenuStyle {
+  /// How long a finger stays still on the button before the menu opens. A
+  /// swipe opens it at once ([dragSlop]); a lift before either is a tap.
+  static const holdDelay = Duration(milliseconds: 150);
+
+  /// How far the finger moves before it is a swipe that opens the menu now.
+  static const dragSlop = 8.0;
+
+  /// The card fading and scaling in, and out.
+  static const animation = Duration(milliseconds: 80);
+  static const curve = Curves.easeOutCubic;
+  static const startScale = 0.92;
+
+  /// The card.
+  static const cardPadding = 6.0;
+  static const cardRadius = 16.0;
+  static const cardElevation = 8.0;
+
+  /// A row: at least this high, an icon and a label, the one under the
+  /// finger tinted.
+  static const rowMinHeight = 48.0;
+  static const rowMinWidth = 176.0;
+  static const rowRadius = 12.0;
+  static const rowPadding = EdgeInsets.symmetric(horizontal: 16);
+  static const rowIcon = 24.0;
+  static const rowGap = 14.0;
+  static const hoverAlpha = 0.14;
+
+  /// A tick as the menu opens and on each row the finger reaches.
+  static void haptic() => HapticFeedback.selectionClick();
+}
+
+const _cardPad = HoldMenuStyle.cardPadding;
+const _rowPadding = HoldMenuStyle.rowPadding;
+const _rowIcon = HoldMenuStyle.rowIcon;
+const _rowGap = HoldMenuStyle.rowGap;
+const _rowMinWidth = HoldMenuStyle.rowMinWidth;
 
 /// How far a finger that went down on an [HoldFan.opensOnDown] button moves
-/// before it is a drag through the rows rather than a tap.
-const holdFanDragSlop = 8.0;
+/// before it is a swipe through the rows rather than a tap.
+const holdFanDragSlop = HoldMenuStyle.dragSlop;
 
 /// The list that is open now, if any (there is one at a time).
 _HoldFanState<dynamic>? _openList;
@@ -231,7 +268,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
     super.initState();
     _anim = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 80),
+      duration: HoldMenuStyle.animation,
     );
   }
 
@@ -258,6 +295,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
 
   @override
   void dispose() {
+    _cancelPending();
     _removeEntry();
     _anim.dispose();
     _hover.dispose();
@@ -276,13 +314,50 @@ class _HoldFanState<T> extends State<HoldFan<T>>
 
   void _tapOpen() => _show(finger: null, sticky: true);
 
-  bool get _onDown =>
-      widget.opensOnDown && widget.tapOpensMenu && widget.items.isNotEmpty;
+  bool get _onDown => widget.opensOnDown && widget.items.isNotEmpty;
 
-  /// [HoldFan.opensOnDown]: the card at once, following the finger.
+  /// Waiting to see whether the touch is a tap, a swipe or a hold.
+  Timer? _holdTimer;
+  bool _pending = false;
+  Offset _pendingAt = Offset.zero;
+
+  void _cancelPending() {
+    _holdTimer?.cancel();
+    _holdTimer = null;
+    _pending = false;
+  }
+
+  /// [HoldFan.opensOnDown]: the finger is down; the card follows once it
+  /// swipes or the hold delay has passed.
   void _down(PointerDownEvent event) {
     if (_open) return;
-    _show(finger: event.position, sticky: false);
+    _cancelPending();
+    _pending = true;
+    _pendingAt = event.position;
+    _holdTimer = Timer(widget.holdDuration, () {
+      if (!_pending) return;
+      _pending = false;
+      _show(finger: _pendingAt, sticky: false);
+    });
+  }
+
+  void _pendingMove(PointerMoveEvent event) {
+    if ((event.position - _pendingAt).distance <= HoldMenuStyle.dragSlop) {
+      return;
+    }
+    _cancelPending();
+    _show(finger: _pendingAt, sticky: false);
+    _move(event);
+  }
+
+  /// Lifted before a swipe or the delay: a tap.
+  void _pendingUp() {
+    _cancelPending();
+    if (widget.tapOpensMenu) {
+      _tapOpen();
+    } else {
+      widget.onTap?.call();
+    }
   }
 
   void _show({required Offset? finger, required bool sticky}) {
@@ -323,7 +398,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
       bounds.right - media.padding.right,
       bounds.bottom,
     );
-    final card = widget.tapOpensMenu || widget.cardMenu;
+    final card = widget.tapOpensMenu || widget.cardMenu || widget.opensOnDown;
     final sizes = [
       for (final item in _shown)
         card
@@ -358,7 +433,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
     overlay.insert(_entry!);
     _openList = this;
     _anim.forward(from: 0);
-    HapticFeedback.selectionClick();
+    HoldMenuStyle.haptic();
   }
 
   /// A row of the menu card: an icon, the label, 48 high at least.
@@ -379,7 +454,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
                   _rowPadding.horizontal +
                   _rowIcon +
                   _rowGap)),
-      math.max(48, painter.height + 24),
+      math.max(HoldMenuStyle.rowMinHeight, painter.height + 24),
     );
     painter.dispose();
     return size;
@@ -410,17 +485,18 @@ class _HoldFanState<T> extends State<HoldFan<T>>
   void _move(PointerMoveEvent event) {
     final box = _overlayBox;
     if (!_open || box == null) return;
-    final slop = _onDown ? holdFanDragSlop : kTouchSlop;
+    final slop = _onDown ? HoldMenuStyle.dragSlop : kTouchSlop;
     if ((event.position - _downAt).distance > slop) _wandered = true;
     final local = box.globalToLocal(event.position);
     final hit = holdFanHit(_rects, local, slop: _slop);
     if (hit != _hover.value) {
       _hover.value = hit;
-      if (hit != null) HapticFeedback.selectionClick();
+      if (hit != null) HoldMenuStyle.haptic();
     }
   }
 
   void _up(PointerUpEvent event) {
+    if (_pending) return _pendingUp();
     if (!_open || _sticky) return;
     final box = _overlayBox;
     final hit = box == null
@@ -506,7 +582,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
           child: AnimatedBuilder(
             animation: _anim,
             builder: (context, _) {
-              final t = Curves.easeOutCubic.transform(_anim.value);
+              final t = HoldMenuStyle.curve.transform(_anim.value);
               if (card != null) return _buildCard(context, card, t);
               return Stack(
                 children: [
@@ -565,19 +641,20 @@ class _HoldFanState<T> extends State<HoldFan<T>>
           child: Opacity(
             opacity: t,
             child: Transform.scale(
-              scale: 0.92 + 0.08 * t,
+              scale:
+                  HoldMenuStyle.startScale + (1 - HoldMenuStyle.startScale) * t,
               alignment: alignment,
               child: Material(
                 key: const ValueKey('hold-fan-card'),
                 color: c.barSurface,
-                elevation: 8,
+                elevation: HoldMenuStyle.cardElevation,
                 shadowColor: c.panelShadow,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(HoldMenuStyle.cardRadius),
                   side: BorderSide(color: c.border),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(6),
+                  padding: const EdgeInsets.all(HoldMenuStyle.cardPadding),
                   child: Column(
                     children: [
                       for (var i = 0; i < _rects.length; i++)
@@ -622,6 +699,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
         // finger.
         ? InkWell(
             onTap: onTap,
+            onTapDown: onDown ? (_) {} : null,
             borderRadius: rounded,
             splashFactory: NoSplash.splashFactory,
             child: SizedBox(
@@ -632,6 +710,8 @@ class _HoldFanState<T> extends State<HoldFan<T>>
           )
         : InkResponse(
             onTap: onTap,
+            // The tap itself is the Listener's; this only shows the press.
+            onTapDown: onDown ? (_) {} : null,
             radius: widget.size / 2,
             child: SizedBox(
               width: widget.width ?? widget.size,
@@ -655,9 +735,13 @@ class _HoldFanState<T> extends State<HoldFan<T>>
       target = Listener(
         behavior: HitTestBehavior.opaque,
         onPointerDown: _down,
-        onPointerMove: _move,
-        onPointerUp: _up,
+        onPointerMove: (e) => _pending ? _pendingMove(e) : _move(e),
+        onPointerUp: (e) {
+          if (!_pending && !_open) return;
+          _up(e);
+        },
         onPointerCancel: (_) {
+          _cancelPending();
           if (!_sticky) _close();
         },
         child: target,
@@ -688,7 +772,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
       button: true,
       selected: widget.selected,
       label: widget.tooltip,
-      onTap: onDown ? _tapOpen : null,
+      onTap: onDown ? (widget.tapOpensMenu ? _tapOpen : widget.onTap) : null,
       onLongPress: hold ? _openMenu : null,
       onLongPressHint: hold ? widget.menuLabel : null,
       customSemanticsActions: hold
@@ -788,8 +872,10 @@ class _MenuRow extends StatelessWidget {
       excludeSemantics: true,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: hovered ? c.main.withValues(alpha: 0.14) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          color: hovered
+              ? c.main.withValues(alpha: HoldMenuStyle.hoverAlpha)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(HoldMenuStyle.rowRadius),
         ),
         child: Padding(
           padding: _rowPadding,

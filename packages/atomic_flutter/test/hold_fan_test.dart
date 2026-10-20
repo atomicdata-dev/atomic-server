@@ -377,6 +377,7 @@ void main() {
       await tester.pumpWidget(plus(picked));
       final g =
           await tester.startGesture(tester.getCenter(find.byIcon(Icons.add)));
+      await g.moveBy(const Offset(0, -20));
       await tester.pump();
       expect(find.text('Document'), findsOneWidget);
       await g.moveTo(tester.getCenter(find.text('Document')));
@@ -656,6 +657,107 @@ void main() {
           await tester.tapAt(const Offset(3, 3));
           await tester.pumpAndSettle();
         }
+      });
+    }
+  });
+
+  group('one hold menu for every bottom-bar button', () {
+    // plus: a tap opens the list; home/search: a tap does onTap.
+    for (final kind in ['plus', 'home', 'search']) {
+      group(kind, () {
+        late int taps;
+        late List<String> picked;
+        setUp(() {
+          taps = 0;
+          picked = [];
+        });
+
+        Widget bar() => MaterialApp(
+              theme: ThemeData(extensions: const [AppColors.light]),
+              home: Scaffold(
+                body: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: HoldFan<String>(
+                    tooltip: kind,
+                    opensOnDown: true,
+                    tapOpensMenu: kind == 'plus',
+                    onTap: kind == 'plus' ? null : () => taps++,
+                    defaultIndex: null,
+                    items: const [
+                      HoldFanItem('One', '1', icon: Icons.chat),
+                      HoldFanItem('Two', '2', icon: Icons.mic),
+                    ],
+                    onSelected: picked.add,
+                    child: const Icon(Icons.add),
+                  ),
+                ),
+              ),
+            );
+        final target = find.byIcon(Icons.add);
+
+        testWidgets('still hold: closed before the delay, open after',
+            (tester) async {
+          await tester.pumpWidget(bar());
+          final g = await tester.startGesture(tester.getCenter(target));
+          await tester
+              .pump(HoldMenuStyle.holdDelay - const Duration(milliseconds: 30));
+          expect(find.text('One'), findsNothing);
+          await tester.pump(const Duration(milliseconds: 60));
+          await tester.pump(const Duration(milliseconds: 100));
+          expect(find.text('One'), findsOneWidget);
+          expect(
+              tester
+                  .getSize(find.byKey(const ValueKey('hold-fan-item-0')))
+                  .height,
+              HoldMenuStyle.rowMinHeight);
+          await g.up();
+          await tester.pumpAndSettle();
+          expect(taps, 0);
+          // A hold lifted in place leaves the card for a tap.
+          expect(find.text('One'), findsOneWidget);
+        });
+
+        testWidgets(
+            'swipe opens at once, the row under the finger is marked, '
+            'release picks it', (tester) async {
+          await tester.pumpWidget(bar());
+          final g = await tester.startGesture(tester.getCenter(target));
+          await tester.pump(const Duration(milliseconds: 10));
+          expect(find.text('One'), findsNothing);
+          await g.moveBy(const Offset(0, -12));
+          await tester.pump();
+          expect(find.text('One'), findsOneWidget);
+          await g.moveTo(tester.getCenter(find.text('Two')));
+          await tester.pump();
+          final row = tester.widget<DecoratedBox>(find
+              .descendant(
+                  of: find.byKey(const ValueKey('hold-fan-item-1')),
+                  matching: find.byType(DecoratedBox))
+              .first);
+          expect((row.decoration as BoxDecoration).color,
+              AppColors.light.main.withValues(alpha: HoldMenuStyle.hoverAlpha));
+          await g.up();
+          await tester.pumpAndSettle();
+          expect(picked, ['2']);
+          expect(taps, 0);
+        });
+
+        testWidgets('a tap with a little jitter is still a tap',
+            (tester) async {
+          await tester.pumpWidget(bar());
+          final g = await tester.startGesture(tester.getCenter(target));
+          await g.moveBy(const Offset(2, -2));
+          await tester.pump(const Duration(milliseconds: 40));
+          await g.up();
+          await tester.pumpAndSettle();
+          if (kind == 'plus') {
+            expect(taps, 0);
+            expect(find.text('One'), findsOneWidget);
+          } else {
+            expect(taps, 1);
+            expect(find.text('One'), findsNothing);
+          }
+        });
       });
     }
   });

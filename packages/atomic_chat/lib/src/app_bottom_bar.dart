@@ -1,5 +1,5 @@
 import 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColorsExt, HoldFan, HoldFanItem;
+    show AppColorsExt, HoldFan, HoldFanItem, HoldMenuStyle;
 import 'package:flutter/material.dart';
 
 import 'app_shell.dart';
@@ -33,11 +33,12 @@ const _listDrives = 4;
 ///
 /// The button of the page on top is shown as the current one (in the main
 /// colour) and does nothing; a page of the bar is never opened twice (see
-/// [ShellController.open]). New lists what to make as soon as the finger is
-/// down: an AI chat (always a fresh one), a voice chat, a document or anything
-/// else the web app makes. Lifted at once, the list waits for a tap; moved,
-/// the finger drags to a choice and lets go on it ([HoldFan.opensOnDown]).
-/// Search has the drives on touch and hold.
+/// [ShellController.open]). Home (its sections), Search (its drives) and New
+/// (an AI chat, a voice chat, a document, anything else) share one hold menu
+/// ([HoldMenuStyle]): a swipe opens it at once and the finger drags to a
+/// choice, a still finger opens it after the hold delay, a quick tap is the
+/// button's action (Home and Search go there; New opens the list and waits
+/// for a tap) ([HoldFan.opensOnDown]).
 ///
 /// On a tablet ([ShellLayout.split]) the bar is the foot of the sidebar (the
 /// list pane). Home and Search show what the sidebar holds (Home on the home
@@ -150,8 +151,8 @@ class AppBottomBar extends StatelessWidget {
                             tooltip: 'Home',
                             selected: homeCurrent,
                             menuLabel: 'Home sections',
-                            cardMenu: true,
-                            // A tap goes home; hold and drag to a section.
+                            // A tap goes home; swipe or hold for a section.
+                            opensOnDown: true,
                             defaultIndex: null,
                             onTap: onHome,
                             items: [
@@ -181,7 +182,7 @@ class AppBottomBar extends StatelessWidget {
                             tooltip: 'New',
                             selected: newCurrent,
                             tapOpensMenu: true,
-                            // The list at once; a drag from + picks.
+                            // A tap opens the list; swipe or hold also.
                             opensOnDown: true,
                             items: newItems,
                             onSelected: (choice) => _new(context, choice),
@@ -627,13 +628,15 @@ class _SearchButtonState extends State<_SearchButton> {
       // Also on the open search: it starts over.
       onTap: () => widget.onSearch(),
       onOpen: _load,
+      opensOnDown: true,
+      defaultIndex: null,
       items: [
-        const HoldFanItem('All drives', _allDrives),
+        const HoldFanItem('All drives', _allDrives, icon: Icons.search),
         for (final d in drives.take(_listDrives))
           HoldFanItem(d.name.isEmpty ? 'Untitled drive' : d.name, d.subject,
               emoji: d.emoji),
         if (drives.length > _listDrives)
-          const HoldFanItem('More…', _moreDrives),
+          const HoldFanItem('More…', _moreDrives, icon: Icons.more_horiz),
       ],
       onSelected: _pick,
       child: _barIcon(context, Icons.search, widget.current),

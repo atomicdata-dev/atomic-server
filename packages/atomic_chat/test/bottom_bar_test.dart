@@ -273,13 +273,14 @@ void main() {
       expect(chat.voiceMode, isFalse);
     });
 
-    testWidgets('the list is there as the finger goes down; a drag picks',
+    testWidgets('a swipe opens the list at once; a drag picks',
         (tester) async {
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
       final gesture = await tester.startGesture(tester.getCenter(
           find.byWidgetPredicate((w) => w is HoldFan && w.tooltip == 'New')));
-      // No wait for a hold: the same frame.
+      // No wait for a hold: the frame after the swipe passes the slop.
+      await gesture.moveBy(const Offset(0, -12));
       await tester.pump();
       expect(find.text('AI voice'), findsOneWidget);
       await gesture.moveTo(tester.getCenter(find.text('AI voice')));
@@ -413,7 +414,7 @@ void main() {
       final gesture = await _hold(tester, 'Search');
       expect(find.text('All drives'), findsOneWidget);
       expect(find.text('Home'), findsWidgets);
-      await _pick(tester, gesture, '💼 Work');
+      await _pick(tester, gesture, 'Work');
 
       final screen = tester.widget<SearchScreen>(find.byType(SearchScreen));
       expect(screen.scopeDrive, 'did:ad:work');
