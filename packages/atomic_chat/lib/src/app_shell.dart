@@ -198,7 +198,8 @@ class ShellController extends ChangeNotifier {
     if (split && subject != null && _top != null && _details[_top] == subject) {
       return null;
     }
-    final route = SlideBackRoute<T>(builder: builder);
+    // Next to the list the pane just shows it: no slide to wait for.
+    final route = SlideBackRoute<T>(builder: builder, instant: split);
     if (subject != null) _details[route] = subject;
     return _show(navigator, route);
   }

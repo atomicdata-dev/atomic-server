@@ -7,14 +7,22 @@ import 'covered_insets_freeze.dart';
 /// that the whole page can be dragged back to the right to leave: the page
 /// below is there on the left while it moves. The back button and the system
 /// back run the same slide.
+///
+/// The slide is short ([duration]): a tap should show the page about at once,
+/// and a long slide is time the page waits to be seen. With [instant] there is
+/// none (the detail pane next to a list just shows the next page).
 class SlideBackRoute<T> extends PageRouteBuilder<T> {
-  SlideBackRoute({required WidgetBuilder builder, super.settings})
+  SlideBackRoute(
+      {required WidgetBuilder builder, super.settings, bool instant = false})
       : super(
           pageBuilder: (context, _, __) =>
               CoveredInsetsFreeze(child: builder(context)),
-          transitionDuration: const Duration(milliseconds: 380),
-          reverseTransitionDuration: const Duration(milliseconds: 320),
+          transitionDuration: instant ? Duration.zero : duration,
+          reverseTransitionDuration: instant ? Duration.zero : duration,
         );
+
+  /// How long the slide in and out takes.
+  static const duration = Duration(milliseconds: 150);
 
   /// Work the page must finish before it is gone (an embedded page handing
   /// over its last edits). A swipe that leaves slides the page out at once,
