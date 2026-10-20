@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -601,6 +603,111 @@ void main() {
       await _settle(tester);
       expect(_controller(tester).listCollapsed.value, isTrue);
       await _done(tester);
+    });
+  });
+
+  group('the divider is a rubber band past its bounds', () {
+    // Where the divider is: the pane's shown width (the list inside keeps at
+    // least its minimum while it is pulled narrower).
+    double listWidth(WidgetTester tester) =>
+        tester.getCenter(find.byKey(const Key('list-toggle'))).dx;
+
+    Future<TestGesture> grab(WidgetTester tester) async {
+      _size(tester, _landscape);
+      await tester.pumpWidget(_shell(_api()));
+      await _settle(tester);
+      final g = await tester.startGesture(
+          tester.getCenter(find.byKey(const Key('list-toggle'))));
+      // The first move only gets past the touch slop.
+      await g.moveBy(const Offset(30, 0));
+      await tester.pump();
+      await g.moveBy(const Offset(-30, 0));
+      await tester.pump();
+      return g;
+    }
+
+    testWidgets('inside the range it follows the finger 1:1', (tester) async {
+      final g = await grab(tester);
+      final start = listWidth(tester);
+      for (var i = 0; i < 4; i++) {
+        await g.moveBy(const Offset(10, 0));
+        await tester.pump();
+        expect(listWidth(tester), closeTo(start + 10.0 * (i + 1), 0.01));
+      }
+      await g.up();
+      await _settle(tester);
+      expect(listWidth(tester), closeTo(start + 40, 0.01));
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getDouble(listWidthKey), closeTo(start + 40, 0.01));
+      await _done(tester);
+    });
+
+    testWidgets('far past the widest it gives less and less, then springs back',
+        (tester) async {
+      final g = await grab(tester);
+      final start = listWidth(tester);
+      final room = _landscape.width;
+      final max = math.max(304.0, math.min(520.0, room - 280));
+      final shown = <double>[];
+      for (var i = 0; i < 30; i++) {
+        await g.moveBy(const Offset(20, 0));
+        await tester.pump();
+        shown.add(listWidth(tester));
+      }
+      expect(start + 600, greaterThan(max));
+      final over = shown.map((w) => w - max).toList();
+      expect(over.last, greaterThan(20));
+      expect(shown.every((w) => w <= max + 48), isTrue);
+      // Every 20 dp of finger moves the pane less than the one before.
+      final steps = [
+        for (var i = 1; i < shown.length; i++) shown[i] - shown[i - 1]
+      ].where((d) => d > 0).toList();
+      for (var i = 1; i < steps.length; i++) {
+        expect(steps[i], lessThanOrEqualTo(steps[i - 1] + 1e-9));
+      }
+      expect(steps.last, lessThan(1));
+      await g.up();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 60));
+      // On its way back, not yet there.
+      expect(listWidth(tester), lessThan(shown.last));
+      await _settle(tester);
+      expect(listWidth(tester), closeTo(max, 0.01));
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getDouble(listWidthKey), closeTo(max, 0.01));
+      await _done(tester);
+    });
+
+    testWidgets('narrower than the least it resists too, and springs back',
+        (tester) async {
+      final g = await grab(tester);
+      final start = listWidth(tester);
+      // To 250 dp wanted: past 304, not yet the fold (182).
+      await g.moveBy(Offset(250 - start, 0));
+      await tester.pump();
+      final w = listWidth(tester);
+      expect(w, lessThan(304));
+      expect(w, greaterThanOrEqualTo(304 - 48));
+      expect(w, greaterThan(250));
+      await g.up();
+      await _settle(tester);
+      expect(listWidth(tester), closeTo(304, 0.01));
+      expect(_controller(tester).listCollapsed.value, isFalse);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getDouble(listWidthKey), closeTo(304, 0.01));
+      await _done(tester);
+    });
+
+    test('the band is the identity inside, bounded outside, and invertible',
+        () {
+      expect(listRubberBand(400, 304, 520), 400);
+      for (final raw in [521.0, 600.0, 700.0]) {
+        final w = listRubberBand(raw, 304, 520);
+        expect(w, greaterThan(520));
+        expect(w, lessThanOrEqualTo(520 + listOvershootLimit));
+        expect(listRubberBandInverse(w, 304, 520), closeTo(raw, 0.5));
+      }
+      expect(listRubberBand(0, 304, 520), greaterThanOrEqualTo(304 - 48));
     });
   });
 

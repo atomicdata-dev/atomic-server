@@ -5,7 +5,9 @@ import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt, HoldFan;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/physics.dart' show SpringDescription, SpringSimulation;
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'covered_insets_freeze.dart';
@@ -817,6 +819,50 @@ const _minList = 304.0;
 const _maxDragged = 520.0;
 const _minDetail = 280.0;
 
+/// How far past its bounds the list pane can be pulled, however far the
+/// finger goes: the pull gets harder the further it goes (a tanh band, 1:1
+/// at the bound), and the pane springs back on release.
+const listOvershootLimit = 48.0;
+
+/// The spring that brings the list pane back to its bound: a little under
+/// critical damping (a hair of overshoot), settled in about 300 ms.
+final listSpring = SpringDescription.withDampingRatio(
+    mass: 1, stiffness: 260, ratio: 0.85);
+
+double _tanh(double x) {
+  final e = math.exp(2 * x.clamp(-20.0, 20.0));
+  return (e - 1) / (e + 1);
+}
+
+/// The width shown for a finger at [raw]: the same inside [lo]..[hi], and
+/// outside it never more than [listOvershootLimit] past the bound.
+double listRubberBand(double raw, double lo, double hi) {
+  const l = listOvershootLimit;
+  if (raw > hi) return hi + l * _tanh((raw - hi) / l);
+  if (raw < lo) return lo - l * _tanh((lo - raw) / l);
+  return raw;
+}
+
+/// The finger position that shows [shown] (the inverse of [listRubberBand]).
+double listRubberBandInverse(double shown, double lo, double hi) {
+  const l = listOvershootLimit;
+  double atanh(double y) {
+    final c = y.clamp(-0.999999, 0.999999);
+    return 0.5 * math.log((1 + c) / (1 - c));
+  }
+
+  if (shown > hi) return hi + l * atanh((shown - hi) / l);
+  if (shown < lo) return lo - l * atanh((lo - shown) / l);
+  return shown;
+}
+
+/// How fast the shown width follows the finger at [raw] (1 inside the range).
+double listRubberBandSlope(double raw, double lo, double hi) {
+  if (raw <= hi && raw >= lo) return 1;
+  final t = _tanh((raw > hi ? raw - hi : lo - raw) / listOvershootLimit);
+  return 1 - t * t;
+}
+
 /// How long the list pane takes to fold away or come back.
 const listFoldDuration = Duration(milliseconds: 140);
 
@@ -847,26 +893,49 @@ class _SplitPanes extends StatefulWidget {
 }
 
 class _SplitPanesState extends State<_SplitPanes>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _open = AnimationController(
     vsync: this,
     duration: listFoldDuration,
     value: widget.shell.listCollapsed.value ? 0 : 1,
   );
 
-  /// The width while the divider is being dragged.
+  /// Drives the width back to its bound after a drag went past it.
+  late final AnimationController _spring = AnimationController.unbounded(
+    vsync: this,
+  );
+
+  /// The width shown while the divider is being dragged, or springing back.
   double? _dragging;
+
+  /// Where the finger would have the divider, without the resistance.
+  double _raw = 0;
+  bool _springing = false;
+  bool _atBound = false;
+  bool _foldArmed = false;
 
   @override
   void initState() {
     super.initState();
     widget.shell.listCollapsed.addListener(_fold);
+    _spring.addListener(() {
+      if (_springing) setState(() => _dragging = _spring.value);
+    });
+    _spring.addStatusListener((status) {
+      if (status == AnimationStatus.completed && _springing) {
+        setState(() {
+          _springing = false;
+          _dragging = null;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     widget.shell.listCollapsed.removeListener(_fold);
     _open.dispose();
+    _spring.dispose();
     super.dispose();
   }
 
@@ -878,58 +947,106 @@ class _SplitPanesState extends State<_SplitPanes>
   void _toggle() =>
       widget.shell.setListCollapsed(!widget.shell.listCollapsed.value);
 
-  void _dragStart(double full) {
+  double _hi(double room) =>
+      math.max(_minList, math.min(_maxDragged, room - _minDetail));
+
+  double _lo() => widget.shell.listCollapsed.value ? 0 : _minList;
+
+  void _dragStart(double full, double room) {
     final collapsed = widget.shell.listCollapsed.value;
-    setState(() => _dragging = collapsed ? 0 : full);
+    if (_springing) {
+      // Caught on its way back: carry on from where it is shown.
+      _springing = false;
+      _spring.stop();
+      final shown = _dragging ?? full;
+      _raw = listRubberBandInverse(shown, _lo(), _hi(room));
+    } else {
+      _raw = collapsed ? 0 : full;
+    }
+    _atBound = false;
+    _foldArmed = false;
+    setState(() => _dragging = listRubberBand(_raw, _lo(), _hi(room)));
   }
 
   void _dragUpdate(DragUpdateDetails d, double room) {
-    final w = _dragging;
-    if (w == null) return;
-    setState(() => _dragging = (w + d.delta.dx).clamp(0.0, room - _minDetail));
+    if (_dragging == null || _springing) return;
+    _raw = math.max(0.0, _raw + d.delta.dx);
+    final lo = _lo(), hi = _hi(room);
+    final out = _raw > hi || _raw < lo;
+    if (out && !_atBound) HapticFeedback.selectionClick();
+    _atBound = out;
+    if (!widget.shell.listCollapsed.value) {
+      final armed = _raw < _minList * 0.6;
+      if (armed && !_foldArmed) HapticFeedback.selectionClick();
+      _foldArmed = armed;
+    }
+    setState(() => _dragging = listRubberBand(_raw, lo, hi));
   }
 
   /// A fling faster than this (dp/s) opens or folds the list whatever the
   /// distance.
   static const _fling = 300.0;
 
+  /// Runs the width from [from] to [to] with a spring, [velocity] dp/s in.
+  void _springBack(double from, double to, double velocity) {
+    _springing = false;
+    _spring.stop();
+    _spring.value = from;
+    _springing = true;
+    _spring.animateWith(SpringSimulation(listSpring, from, to, velocity));
+  }
+
   void _dragEnd(double room, double velocity) {
     final w = _dragging;
-    setState(() => _dragging = null);
-    if (w == null) return;
+    if (w == null || _springing) return;
     final shell = widget.shell;
     final full = listPaneWidth(room, dragged: shell.listWidth.value);
+    final lo = _lo(), hi = _hi(room);
+    // The finger's speed as the shown width moves (the band slows it).
+    final slope = listRubberBandSlope(_raw, lo, hi);
     if (shell.listCollapsed.value) {
       // Opening from the edge: follows the finger, then settles open (past a
       // third of the way, or flung right) or back.
       _open.value = (w / full).clamp(0.0, 1.0);
       if (velocity > _fling || (velocity > -_fling && w > full / 3)) {
         shell.setListCollapsed(false);
+        if (w > full + 0.5) {
+          _open.value = 1;
+          _springBack(w, full, velocity * slope);
+          return;
+        }
+        setState(() => _dragging = null);
         _open.animateTo(1, curve: Curves.easeOutCubic);
       } else {
+        setState(() => _dragging = null);
         _open.animateTo(0, curve: Curves.easeOutCubic);
       }
       return;
     }
     if (velocity < -_fling && w < full) {
       // Flung left: fold from where the finger left it.
+      setState(() => _dragging = null);
       _open.value = (w / full).clamp(0.0, 1.0);
       shell.setListCollapsed(true);
       return;
     }
-    if (w < _minList * 0.6) {
+    if (_raw < _minList * 0.6) {
       // From where the finger left it.
-      final full = listPaneWidth(room, dragged: shell.listWidth.value);
+      setState(() => _dragging = null);
       _open.value = (w / full).clamp(0.0, 1.0);
-      if (shell.listCollapsed.value) {
-        _open.animateTo(0, curve: Curves.easeOutCubic);
-      }
       shell.setListCollapsed(true);
       return;
     }
-    shell.setListWidth(listPaneWidth(room, dragged: w));
+    // Only the settled width is kept, never the overshoot.
+    final settled = listPaneWidth(room, dragged: w);
+    shell.setListWidth(settled);
     _open.value = 1;
     shell.setListCollapsed(false);
+    if ((w - settled).abs() > 0.5) {
+      _springBack(w, settled, velocity * slope);
+    } else {
+      setState(() => _dragging = null);
+    }
   }
 
   @override
@@ -1033,7 +1150,7 @@ class _SplitPanesState extends State<_SplitPanes>
                   at: shown,
                   collapsed: shell.listCollapsed.value,
                   onTap: _toggle,
-                  onDragStart: () => _dragStart(full),
+                  onDragStart: () => _dragStart(full, room),
                   onDragUpdate: (d) => _dragUpdate(d, room),
                   onDragEnd: (v) => _dragEnd(room, v),
                 ),
