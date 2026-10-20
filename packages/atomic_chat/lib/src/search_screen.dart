@@ -212,12 +212,12 @@ class SearchPalette extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             borderRadius: BorderRadius.circular(16),
             // The page under the card is not the card's: no insets.
-            child: MediaQuery.removePadding(
-              context: context,
-              removeTop: true,
-              removeBottom: true,
-              child: MediaQuery.removeViewInsets(
-                  context: context, removeBottom: true, child: child),
+            child: MediaQuery(
+              data: media
+                  .removePadding(removeTop: true, removeBottom: true)
+                  .removeViewPadding(removeTop: true, removeBottom: true)
+                  .removeViewInsets(removeBottom: true),
+              child: child,
             ),
           ),
         ),
