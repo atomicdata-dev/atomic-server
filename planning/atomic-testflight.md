@@ -7,8 +7,10 @@
 - [x] Prepare iOS CI, signing and upload; fix missing RunnerTests Podfile target and minimum iOS version required by mobile_scanner.
 - [x] Publish the prepared side branch to ontola/atomic-server after explicit user approval.
 - [x] Configure the newly generated Atomic CI key for this repository's signing and upload steps.
-- [ ] Run the iOS build, fix concrete failures, upload the signed IPA.
-- [ ] Verify Apple processing, export-compliance status and availability to internal testers.
+- [x] Fix the iOS linker failure in netdev 0.31 with a Flutter-only vendored patch; verify an arm64 iOS dynamic-library link locally.
+- [x] Create the Atomic Internal TestFlight group and add the owner's Apple account.
+- [x] Run the iOS build, fix concrete failures, upload the signed IPA (1.0.0 build 5, run 39395781157).
+- [x] Verify Apple processing (VALID), export-compliance status and internal availability (IN_BETA_TESTING); build 5 is in Atomic Internal.
 
 Source snapshot: 1302adbfc, from claude/flutter-mobile-app-w8e9wz. Live uncommitted
 work is not included. The release work is on codex/atomic-flutter-testflight.
