@@ -1,7 +1,7 @@
 //! Host-side tests: the home data on a temporary store, and the process-level
 //! `open_store` guard. Run with `cargo test` in `android-kotlin/rust`.
 
-use crate::{api, home, store, types::*};
+use crate::{api, home, store, sync_api, types::*};
 use atomic_lib::{host::{create::create_resource_of_class, recents::RecentsIndex, NoPush}, runtime::AtomicNode, urls};
 
 fn temp_dir(name: &str) -> std::path::PathBuf {
@@ -129,6 +129,68 @@ async fn a_second_open_store_keeps_the_store_that_is_open() {
     let favs = api::home_list(HomeList::Favorites, 10).await.unwrap();
     assert_eq!(favs.iter().filter(|r| r.subject == doc).count(), 1);
     assert!(!api::list_drives().await.unwrap().is_empty());
+
+    // Start-up with a saved session: the same agent comes back, offline is not
+    // an error, and a drive this device does not hold means "needs sync".
+    let secret = setup.agent.secret.clone();
+    let drive = Some(setup.drive_subject.clone());
+    let ready = sync_api::resume_session("http://127.0.0.1:1".into(), secret.clone(), drive.clone()).await.unwrap();
+    assert_eq!(ready, ResumeStatus::Ready);
+    assert_eq!(api::active_agent().unwrap().unwrap().subject, setup.agent.subject);
+    let missing = Some("did:ad:not-on-this-device".to_string());
+    assert_eq!(
+        sync_api::resume_session(String::new(), secret.clone(), missing).await.unwrap(),
+        ResumeStatus::NeedsSync
+    );
+    // Tapping a drive makes it active.
+    sync_api::activate_drive(setup.drive_subject.clone()).await.unwrap();
+    assert_eq!(api::active_drive().unwrap(), drive);
+
+    // Devices and the own profile.
+    assert!(sync_api::known_peers().unwrap().is_empty());
+    sync_api::set_device_name("  Pixel  ".into()).unwrap();
+    assert_eq!(sync_api::device_name().unwrap(), "Pixel");
+    assert_eq!(sync_api::own_profile().await.unwrap().name, "Heron");
+    sync_api::set_own_profile("Heron Two".into(), "Likes reeds".into()).await.unwrap();
+    let profile = sync_api::own_profile().await.unwrap();
+    assert_eq!((profile.name.as_str(), profile.description.as_str()), ("Heron Two", "Likes reeds"));
+    assert!(sync_api::set_own_profile("  ".into(), String::new()).await.is_err());
+}
+
+/// A local write waits in the outbox until a server takes it, and the real
+/// pusher (unlike `NoPush`) offers it to the session, which here is closed.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_local_write_stays_queued_when_no_server_is_reachable() {
+    let d = Device::new("outbox").await;
+    struct Direct(atomic_lib::Db);
+    #[async_trait::async_trait]
+    impl atomic_lib::host::LocalWritePusher for Direct {
+        async fn push(&self, response: &atomic_lib::commit::CommitResponse) {
+            crate::sync::peers::push_local_write(response, &self.0).await;
+        }
+    }
+    let doc = create_resource_of_class(&d.node, &Direct(d.db.clone()), &d.drive, urls::DOCUMENT_V2, "Offline note")
+        .await
+        .unwrap();
+    let queued = atomic_lib::sync::outbox::Outbox::new(d.db.clone()).entries().unwrap();
+    assert!(!queued.is_empty(), "the write waits for a server");
+    assert!(crate::sync::ws::drain_outbox(&d.db).await == false, "no session: nothing is sent");
+    assert!(atomic_lib::Storelike::get_resource(&d.db, &doc.as_str().into()).await.is_ok());
+}
+
+#[test]
+fn reconnect_waits_longer_each_time_up_to_a_minute() {
+    use crate::sync::ws::backoff;
+    let secs: Vec<u64> = (0..8).map(|n| backoff(n).as_secs()).collect();
+    assert_eq!(secs, [2, 4, 8, 16, 32, 60, 60, 60]);
+}
+
+#[test]
+fn a_server_origin_becomes_its_websocket_url() {
+    use crate::sync::ws::server_origin_to_ws_url as ws;
+    assert_eq!(ws("https://a.example/").unwrap(), "wss://a.example/ws");
+    assert_eq!(ws("http://10.0.0.2:9883").unwrap(), "ws://10.0.0.2:9883/ws");
+    assert_eq!(ws("wss://a.example/ws").unwrap(), "wss://a.example/ws");
 }
 
 #[tokio::test(flavor = "multi_thread")]

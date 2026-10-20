@@ -34,3 +34,10 @@ impl From<atomic_lib::AtomicError> for CoreError {
 }
 
 pub type CoreResult<T> = Result<T, CoreError>;
+
+/// The ported sync code (`crate::sync`) speaks `Result<_, String>`.
+impl From<CoreError> for String {
+    fn from(e: CoreError) -> Self {
+        e.to_string()
+    }
+}

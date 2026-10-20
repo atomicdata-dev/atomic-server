@@ -3,20 +3,20 @@
 //! (the Flutter app binds the same one): `method` and a JSON array of
 //! arguments in, JSON out. This module only adds what a host decides:
 //!
-//! - which `LocalWritePusher` follows a page write: [`NoPush`] (no server in
-//!   this app yet; the commit waits in the outbox),
-//! - no agent-name lookups ([`NoProfiles`]),
+//! - which `LocalWritePusher` follows a page write: the real one, so the commit
+//!   reaches the server, live peers and paired devices (`state::pusher`),
+//! - agent names come from the connected server (`state::profiles`),
 //! - an echo filter, so the page is not told about the commits it applied
 //!   itself (re-reading a document under the cursor would fight the editor),
 //! - coalescing: a burst of store events is one `changed([...])` call.
 
 use crate::{
     error::CoreResult,
-    state::{db, node, recents},
+    state::{db, node, profiles, pusher, recents},
     types::EmbedListener,
 };
 use atomic_lib::{
-    host::{embed::EmbedHost, profiles::AgentProfiles, NoProfiles, NoPush},
+    host::embed::EmbedHost,
     DbEvent,
 };
 use serde_json::Value as Json;
@@ -97,7 +97,7 @@ pub(crate) fn embed() -> CoreResult<&'static Embed> {
     if let Some(embed) = EMBED.get() {
         return Ok(embed);
     }
-    let host = EmbedHost::new(node()?, Arc::new(NoPush), AgentProfiles::new(Arc::new(NoProfiles)))
+    let host = EmbedHost::new(node()?, pusher(), profiles())
         .with_recents(recents().clone());
     Ok(EMBED.get_or_init(|| Embed::new(host)))
 }

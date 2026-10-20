@@ -8,7 +8,7 @@ use crate::{
     store,
     types::*,
 };
-use atomic_lib::{host::NoPush, Storelike};
+use atomic_lib::Storelike;
 use std::sync::Arc;
 
 /// Library version, to check that the bindings and the `.so` belong together.
@@ -139,7 +139,7 @@ pub fn note_resource_opened(drive: String, subject: String) {
 
 async fn create_of_class(drive: &str, class_url: &str, name: &str) -> CoreResult<String> {
     Ok(
-        atomic_lib::host::create::create_resource_of_class(&node()?, &NoPush, drive, class_url, name)
+        atomic_lib::host::create::create_resource_of_class(&node()?, state::pusher().as_ref(), drive, class_url, name)
             .await?,
     )
 }
@@ -165,7 +165,7 @@ pub async fn create_drive(name: String) -> CoreResult<String> {
 /// A new AI chat in the private drive. Returns its subject.
 #[uniffi::export(async_runtime = "tokio")]
 pub async fn create_ai_chat(name: String) -> CoreResult<String> {
-    Ok(atomic_lib::host::chats::create_ai_chat(&node()?, &NoPush, &name).await?)
+    Ok(atomic_lib::host::chats::create_ai_chat(&node()?, state::pusher().as_ref(), &name).await?)
 }
 
 /// Add `subject` to the favorites of the private drive (what the web app's
@@ -204,6 +204,12 @@ async fn home_favorite(subject: &str) -> CoreResult<()> {
 #[derive(uniffi::Object)]
 pub struct Subscription {
     task: tokio::task::AbortHandle,
+}
+
+impl Subscription {
+    pub(crate) fn new(task: tokio::task::AbortHandle) -> Self {
+        Self { task }
+    }
 }
 
 #[uniffi::export]
@@ -288,12 +294,6 @@ pub async fn subscribe_embed(listener: Arc<dyn EmbedListener>) -> CoreResult<Arc
 #[uniffi::export(async_runtime = "tokio")]
 pub async fn resume_agent(secret: String, drive: Option<String>) -> CoreResult<bool> {
     crate::session::resume(db()?, &secret, drive.as_deref()).await
-}
-
-/// Set the active drive (what tapping a drive does).
-#[uniffi::export]
-pub fn set_active_drive(subject: String) -> CoreResult<()> {
-    Ok(db()?.set_active_drive(&subject)?)
 }
 
 /// Forget the agent held in memory (sign out). The data stays in the store.

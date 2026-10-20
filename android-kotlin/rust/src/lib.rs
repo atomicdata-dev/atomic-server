@@ -14,9 +14,12 @@ mod api;
 mod embed;
 mod error;
 mod home;
+mod pairing;
 mod session;
 mod state;
 mod store;
+mod sync;
+mod sync_api;
 mod types;
 
 pub use error::CoreError;

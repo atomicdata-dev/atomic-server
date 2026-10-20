@@ -96,3 +96,104 @@ pub trait StoreListener: Send + Sync {
 pub trait EmbedListener: Send + Sync {
     fn on_changed(&self, subjects: Vec<String>);
 }
+
+// ── Sync, servers, peers, profile ──────────────────────────────────────────
+
+/// How a start-up with a saved session ended.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
+pub enum ResumeStatus {
+    /// The drive is on this device.
+    Ready,
+    /// The drive has to arrive first (a server, a paired device).
+    NeedsSync,
+}
+
+/// What looking for the server a drive lives on did.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct DiscoveryResult {
+    /// The server that verified and was connected to.
+    pub origin: Option<String>,
+    /// One line per origin that did not work out, for showing when none did.
+    pub log: Vec<String>,
+}
+
+/// What a server says about itself (`GET /server`); every field is absent when
+/// it does not report it or cannot be reached.
+#[derive(Clone, Debug, Default, PartialEq, Eq, uniffi::Record)]
+pub struct ServerInfo {
+    pub node_id: Option<String>,
+    pub version: Option<String>,
+    pub managed: bool,
+    pub portal_url: Option<String>,
+}
+
+/// What a drive stores on a server.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct DriveUsage {
+    pub drive_name: Option<String>,
+    pub resource_count: u64,
+    pub blob_bytes: u64,
+    pub loro_bytes: u64,
+}
+
+/// A paired device.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct PeerRow {
+    pub node_id: String,
+    pub name: String,
+    /// Unix ms of the last completed sync, if any.
+    pub last_synced: Option<u64>,
+    /// Whether a live connection to it is open right now.
+    pub live: bool,
+}
+
+/// What a sync with one device moved, in both directions.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct PeerSyncOutcome {
+    pub imported: i32,
+    pub pushed: i32,
+    pub in_sync: bool,
+    pub peer_name: Option<String>,
+}
+
+/// The result of looking for the person's devices.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct ConnectivityReport {
+    pub imported: i32,
+    pub live_peers: u32,
+    pub message: String,
+}
+
+/// A parsed pairing code (see `pairing.rs`).
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct PairingCode {
+    pub node_id: String,
+    pub name: String,
+    pub server_url: Option<String>,
+    pub drives: Vec<String>,
+}
+
+/// The profile of this device's agent.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct OwnProfile {
+    pub subject: String,
+    pub name: String,
+    pub description: String,
+    pub emoji: Option<String>,
+    pub image_url: Option<String>,
+}
+
+/// Something that happened on the sync side: a device connected, went away, or
+/// a sync moved resources. `kind` is `sync`, `connected` or `disconnected`.
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct SyncEvent {
+    pub kind: String,
+    pub remote_node_id: String,
+    pub resources_imported: u32,
+}
+
+/// Kotlin implements this to hear about sync events, on a background thread.
+#[uniffi::export(with_foreign)]
+pub trait SyncListener: Send + Sync {
+    fn on_event(&self, event: SyncEvent);
+}
