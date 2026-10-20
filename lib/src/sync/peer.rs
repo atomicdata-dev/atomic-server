@@ -323,6 +323,11 @@ impl iroh::protocol::ProtocolHandler for AtomicHandler {
 /// Global endpoint, set once on startup. Needed for outgoing connections.
 static ENDPOINT: OnceLock<Endpoint> = OnceLock::new();
 
+/// The endpoint started by [`start`], for dialing out.
+pub fn endpoint() -> Option<&'static Endpoint> {
+    ENDPOINT.get()
+}
+
 /// Global router, must be kept alive or incoming connections stop working.
 static ROUTER: OnceLock<Router> = OnceLock::new();
 
@@ -2442,7 +2447,7 @@ pub fn remember_peer_addr(
 /// bare node id. The bare id forces Iroh to discover the address via pkarr,
 /// which is exactly what fails on restrictive networks; a stored relay url lets
 /// the connection go straight through the relay.
-fn dial_target(store: &Db, node_id: NodeId) -> iroh::NodeAddr {
+pub(crate) fn dial_target(store: &Db, node_id: NodeId) -> iroh::NodeAddr {
     let key = node_id.to_string();
     for peer in get_known_peers(store) {
         if normalize_node_id(&peer.node_id) != normalize_node_id(&key) {
@@ -2602,6 +2607,7 @@ fn handshake_frame_drive(buf: &[u8]) -> Option<String> {
         super::protocol::tag::SYNC_PUSH => {
             super::protocol::decode_sync_push(&buf[1..]).map(|p| p.drive)
         }
+        super::protocol::tag::CALL => super::call::frame_drive(&buf[1..]),
         _ => None,
     }
 }
@@ -2759,6 +2765,14 @@ async fn handle_stream(
                 )
                 .await
             }
+        } else if tag == super::protocol::tag::CALL {
+            super::call::serve(
+                &buf[1..],
+                &store,
+                &agent,
+                is_paired_peer(&store, &remote_key),
+            )
+            .await
         } else {
             super::engine::handle_frame_for_caps(
                 &buf,

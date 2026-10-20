@@ -30,7 +30,7 @@ const TOUCH_WORKSPACE_SOURCES = [
   'sh',
   '-c',
   'find /code/server /code/lib /code/cli /code/desktop /code/wasm ' +
-    '/code/plugin-examples /code/atomic-plugin /code/tools ' +
+    '/code/plugin-examples /code/atomic-plugin /code/atomic-host /code/tools ' +
     '-type f -exec touch {} +',
 ];
 
@@ -919,6 +919,8 @@ export class AtomicServer {
           '/code/atomic-plugin',
           this.source.directory('atomic-plugin'),
         )
+        // The host ABI's WIT, read by the server's and the examples' bindgen.
+        .withDirectory('/code/atomic-host', this.source.directory('atomic-host'))
         .withDirectory('/code/tools', this.source.directory('tools'))
         .withMountedCache(
           '/code/target',
@@ -978,6 +980,8 @@ export class AtomicServer {
           '/code/atomic-plugin',
           this.source.directory('atomic-plugin'),
         )
+        // The host ABI's WIT, read by the server's and the examples' bindgen.
+        .withDirectory('/code/atomic-host', this.source.directory('atomic-host'))
         .withDirectory('/code/tools', this.source.directory('tools'))
         // `server/src/forms.rs` pins its validation verdicts to the cases the
         // browser form renderer shares (`include_str!`), so the Rust tests need
@@ -1386,6 +1390,13 @@ export class AtomicServer {
       // Integration sources live at the repository root. The browser mounts at
       // /app, and its raw imports resolve these paths from /integrations.
       .withDirectory('/integrations', this.source.directory('integrations'))
+      // `@tomic/plugin`'s export-bindings test reads the Rust example's
+      // manifest and checked-in bindings from the repository root, which
+      // resolves from /app/plugin/src to /plugin-examples.
+      .withDirectory(
+        '/plugin-examples/host-abi-statement',
+        this.source.directory('plugin-examples/host-abi-statement'),
+      )
       // integrations/localthought/tsconfig.json extends the repo-root-relative
       // `../../browser/tsconfig.build.json`. Alias /browser to the /app mount
       // so that relative path resolves.
@@ -1520,6 +1531,7 @@ export class AtomicServer {
         source.directory('plugin-examples'),
       )
       .withDirectory('/code/atomic-plugin', source.directory('atomic-plugin'))
+      .withDirectory('/code/atomic-host', source.directory('atomic-host'))
       .withDirectory('/code/tools', source.directory('tools'))
       // See the slim container above: the form validation cases are shared
       // with the browser and `include_str!`d by the Rust tests.
@@ -1780,6 +1792,7 @@ export class AtomicServer {
           source.directory('plugin-examples'),
         )
         .withDirectory('/code/atomic-plugin', source.directory('atomic-plugin'))
+        .withDirectory('/code/atomic-host', source.directory('atomic-host'))
         .withDirectory('/code/tools', source.directory('tools'))
         .withMountedCache('/code/target', this.targetCache('rust-checks-target-v3'))
         .with(touchWorkspaceSources)

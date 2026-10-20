@@ -2,10 +2,11 @@
 name = "atomic-plugin"
 version = "0.1.1"
 edition = "2021"
-description = "Helper library for building Atomic Data class extender plugins in Wasm"
+description = "Helper library for building Atomic Data class extender plugins (server modules on the host ABI) in Wasm"
 # Unlike the other `publish = false` members (see ../wasm/Cargo.toml) this one
-# COULD publish today — it has no path dependencies, so nothing blocks it.
-# It is held back on purpose, not because it is unpublishable.
+# is close to publishable. What blocks it is not a path dependency but the WIT
+# it generates its bindings from, `../atomic-host/wit`, which lies outside the
+# crate: vendor that directory into the crate first.
 #
 # The name `atomic-plugin` is unclaimed on crates.io. Whoever writes a plugin
 # outside this repo needs this crate from a registry, so publishing it is
@@ -13,7 +14,7 @@ description = "Helper library for building Atomic Data class extender plugins in
 # and it should be a decision, not a side effect of the first release whose
 # workspace happened to include this directory.
 #
-# To publish: drop this line, and treat 0.1.1 as the number that goes out.
+# To publish: vendor the WIT, drop this line, and bump the version.
 publish = false
 
 [dependencies]

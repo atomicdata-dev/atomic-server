@@ -123,65 +123,6 @@ fn refuse_v6(addr: Ipv6Addr) -> Option<Refusal> {
     None
 }
 
-/// Whether a plugin may fetch this URL, resolving the host first.
-///
-/// The WASI socket check covers anything the guest dials itself, but the host
-/// also fetches on a plugin's behalf when it asks for a subject on another
-/// server. That path uses the host's HTTP client, never touches a guest socket,
-/// and would otherwise stay wide open behind the same permission.
-///
-/// Every resolved address must pass, not just one: a name that answers with a
-/// public address and a private one should not be usable by picking the
-/// convenient answer.
-///
-/// This resolves and then hands the URL to a client that resolves again, so it
-/// narrows the window rather than closing it. Pinning the checked address into
-/// the connection is the real fix and belongs with the `http-request` boundary,
-/// where the client is ours to configure.
-pub async fn refuse_url(url: &str) -> Option<String> {
-    let parsed = match url::Url::parse(url) {
-        Ok(parsed) => parsed,
-        Err(e) => return Some(format!("not a URL: {e}")),
-    };
-
-    match parsed.scheme() {
-        "http" | "https" => {}
-        scheme => return Some(format!("scheme {scheme} is not fetchable")),
-    }
-
-    let Some(host) = parsed.host_str() else {
-        return Some("URL has no host".to_string());
-    };
-
-    // Default ports only matter for resolution; the check is on the address.
-    let port = parsed.port_or_known_default().unwrap_or(443);
-
-    if let Ok(literal) = host.parse::<IpAddr>() {
-        return refuse_address(literal).map(|refusal| format!("{host} is {refusal:?}"));
-    }
-
-    let resolved = match tokio::net::lookup_host((host, port)).await {
-        Ok(addresses) => addresses,
-        Err(e) => return Some(format!("could not resolve {host}: {e}")),
-    };
-
-    let mut any = false;
-
-    for address in resolved {
-        any = true;
-
-        if let Some(refusal) = refuse_address(address.ip()) {
-            return Some(format!("{host} resolves to {} ({refusal:?})", address.ip()));
-        }
-    }
-
-    if !any {
-        return Some(format!("{host} resolved to no addresses"));
-    }
-
-    None
-}
-
 /// Resolve once and return only checked destinations for the host HTTP client.
 pub async fn checked_addresses(url: &url::Url) -> Result<Vec<std::net::SocketAddr>, String> {
     if !matches!(url.scheme(), "http" | "https") {
@@ -410,30 +351,6 @@ mod tests {
         // worse way to learn the secret was not there.
         let err = substitute_headers(headers, |_| None).expect_err("refused");
         assert!(err.contains("missing"));
-    }
-
-    #[tokio::test]
-    async fn refuses_a_url_pointing_at_the_host_itself() {
-        assert!(refuse_url("http://127.0.0.1:9883/some/resource")
-            .await
-            .is_some());
-        assert!(refuse_url("http://[::1]/x").await.is_some());
-        assert!(refuse_url("http://169.254.169.254/latest/meta-data/")
-            .await
-            .is_some());
-    }
-
-    #[tokio::test]
-    async fn refuses_a_hostname_that_resolves_to_loopback() {
-        // The point of resolving before checking: the name says nothing.
-        assert!(refuse_url("http://localhost:9883/x").await.is_some());
-    }
-
-    #[tokio::test]
-    async fn refuses_what_is_not_fetchable() {
-        assert!(refuse_url("file:///etc/passwd").await.is_some());
-        assert!(refuse_url("not a url").await.is_some());
-        assert!(refuse_url("https://").await.is_some());
     }
 
     #[test]

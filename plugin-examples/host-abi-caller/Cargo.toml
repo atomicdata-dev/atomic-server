@@ -1,0 +1,15 @@
+[package]
+name = "host-abi-caller"
+version = "0.1.0"
+edition = "2021"
+description = "Example app on the Atomic host ABI: exports atomic:example/caller@1, calls the counter"
+# Not published, see ../../wasm/Cargo.toml. Built for wasm32-wasip2, not the
+# host triple: `cargo build -p host-abi-caller --target wasm32-wasip2 --release`.
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.48.1"
+serde_json = "1"

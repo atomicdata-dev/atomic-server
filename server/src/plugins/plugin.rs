@@ -213,6 +213,8 @@ fn on_resource_get(context: GetExtenderContext) -> BoxFuture<AtomicResult<Resour
 mod installation_hook {
     use super::*;
     use crate::plugins::{
+        host_abi::HostAbiRegistry,
+        installation::{within, Scopes},
         manifest::Manifest,
         release,
         wasm::{
@@ -223,8 +225,9 @@ mod installation_hook {
     use atomic_lib::db::{
         app_agent::{AppAgent, AppAgentKey, AppAgentState},
         plugin_meta::PluginMeta,
-        plugin_release::{PluginRelease, WORLD_SERVER_EXTENSION},
+        plugin_release::{PluginRelease, WORLD_SANDBOXED_APP, WORLD_SERVER_EXTENSION},
     };
+    use atomic_lib::{hierarchy, values::SubResource, Subject};
     use tracing::info;
     use zip::ZipArchive;
 
@@ -271,6 +274,7 @@ mod installation_hook {
         signer: &str,
         plugins_dir: &Path,
         plugin_cache_dir: &Path,
+        registry: &std::sync::Arc<HostAbiRegistry>,
     ) -> AtomicResult<()> {
         let subject = resource.get_subject().to_string();
         let reference = string_value(resource, urls::RELEASE_PROP)
@@ -303,6 +307,13 @@ mod installation_hook {
         //    Installation are the approved set the host reads back.
         release::check_grants(&release.manifest, &json_value(resource, urls::GRANTS)?)?;
 
+        // Checked here, written after the commit (`after_activate`): a refusal
+        // below must leave nothing behind, and these are commits of their own.
+        scope_roots(resource, drive, store, signer).await?;
+        if let Some(schema) = declared_schema(&release) {
+            schema.check(store, drive, &for_agent).await?;
+        }
+
         let (namespace, name) = identifiers(resource, &release.manifest)?;
         let key = PluginMetaKey::new(drive, &namespace, &name);
         let existing = store.get_plugin_meta(&key)?;
@@ -315,8 +326,12 @@ mod installation_hook {
             }
         }
 
-        // 3. Materialize by runtime.
-        if release.is_wasip2() {
+        // 3. Materialize by runtime. A `sandboxed-app` (host ABI) is a wasip2
+        //    component too, but it is no class extender: nothing is extracted
+        //    and no hook is registered. Like a JS installation it has only an
+        //    identity; `host_abi::HostAbiRegistry::refresh` loads the
+        //    component from the pinned release when the app is first called.
+        if release.is_wasip2() && release.world != WORLD_SANDBOXED_APP {
             // The exact release whose code is already on disk, by id: a config
             // change or the legacy migration then extracts and compiles
             // nothing again. Comparing manifests instead would be wrong, since
@@ -338,6 +353,7 @@ mod installation_hook {
                     &name,
                     plugins_dir,
                     plugin_cache_dir,
+                    registry,
                 )
                 .await?;
             } else {
@@ -367,6 +383,7 @@ mod installation_hook {
                     store,
                     plugins_dir,
                     plugin_cache_dir,
+                    registry,
                 )
                 .await?;
                 // Now that this release's code is the code on disk, say so, so
@@ -383,6 +400,102 @@ mod installation_hook {
             "activated installation {subject} ({namespace}/{name}, {})",
             release.runtime
         );
+        Ok(())
+    }
+
+    fn declared_schema(release: &PluginRelease) -> Option<crate::plugins::app_schema::AppSchema> {
+        Manifest::parse(release.manifest.clone())
+            .ok()
+            .flatten()
+            .and_then(|m| m.schema)
+    }
+
+    /// What activation does once the Installation is stored: the classes and
+    /// properties the app declares exist, and its agent is on the scope roots.
+    /// Both are commits of their own, so they follow the Installation's
+    /// instead of running inside the hook that can still refuse it.
+    pub async fn after_activate(
+        resource: &Resource,
+        drive: &str,
+        store: &Db,
+        signer: &str,
+    ) -> AtomicResult<()> {
+        let reference = string_value(resource, urls::RELEASE_PROP)
+            .ok_or("an active Installation needs a release")?;
+        let for_agent = ForAgent::AgentSubject(signer.to_string().into());
+        let release = release::resolve(store, &reference, &for_agent).await?;
+        if let Some(schema) = declared_schema(&release) {
+            schema.ensure(store, drive).await?;
+        }
+        let roots = scope_roots(resource, drive, store, signer).await?;
+        grant_scopes(roots, resource, drive, store).await
+    }
+
+    /// The roots the Installation's scopes name, read, checked and not yet
+    /// granted. Every one must be in the drive and writable by whoever commits
+    /// the Installation: nobody can hand an app more than they hold. Checked
+    /// before anything is installed, so a bad scope leaves nothing behind.
+    async fn scope_roots(
+        resource: &Resource,
+        drive: &str,
+        store: &Db,
+        signer: &str,
+    ) -> AtomicResult<Vec<(&'static str, Resource)>> {
+        let scopes = Scopes::of(resource, drive);
+        let signer = ForAgent::AgentSubject(signer.into());
+        let in_drive = [drive.to_string()];
+        let mut roots = Vec::new();
+        for (property, listed) in [(urls::READ, &scopes.read), (urls::WRITE, &scopes.write)] {
+            for root in listed.iter().flatten() {
+                let target = store
+                    .get_resource(&root.as_str().into())
+                    .await
+                    .map_err(|e| AtomicError::from(format!("scope {root} cannot be read: {e}")))?;
+                if !within(store, &target, Some(&in_drive)).await {
+                    return Err(AtomicError::from(format!(
+                        "scope {root} is not in the drive of this installation"
+                    )));
+                }
+                hierarchy::check_write(store, &target, &signer)
+                    .await
+                    .map_err(|e| {
+                        AtomicError::from(format!(
+                            "you cannot grant {root}, since you may not write it: {e}"
+                        ))
+                    })?;
+                roots.push((property, target));
+            }
+        }
+        Ok(roots)
+    }
+
+    /// Puts the Installation's agent on those roots, so the hierarchy and the
+    /// scopes say the same thing. This is the one place a scope becomes a
+    /// right, for every runtime; the host enforces the list itself on top
+    /// (`installation::Scopes`). Rights an earlier set of scopes gave are not
+    /// taken back here; the scopes make them inert for the host.
+    async fn grant_scopes(
+        roots: Vec<(&'static str, Resource)>,
+        resource: &Resource,
+        drive: &str,
+        store: &Db,
+    ) -> AtomicResult<()> {
+        let key = AppAgentKey::new(drive, &resource.get_subject().to_string());
+        let Some(identity) = store.get_app_agent_info(&key)? else {
+            return Ok(());
+        };
+        for (property, mut target) in roots {
+            let held = target
+                .get(property)
+                .ok()
+                .and_then(|list| list.to_subjects(None).ok())
+                .is_some_and(|list| list.contains(&identity.agent));
+            if !held {
+                let agent = Subject::from(identity.agent.as_str());
+                target.push(property, SubResource::Subject(agent), true)?;
+                target.save(store).await?;
+            }
+        }
         Ok(())
     }
 
@@ -501,6 +614,8 @@ mod installation_hook {
             // Leaves the revocation tombstone `installation::resolve` honours.
             store.delete_app_agent(&app_key)?;
         }
+        // The app's filters and checkpoint on the drive's event stream.
+        store.forget_event_consumer(drive, &subject)?;
         info!("deactivated installation {subject}");
         Ok(())
     }
@@ -545,11 +660,59 @@ mod installation_hook {
     }
 }
 
+/// Whether this commit (re)activates the Installation.
+#[cfg(feature = "wasm-plugins")]
+fn activation_changed(is_new: bool, changed_props: &std::collections::HashSet<String>) -> bool {
+    is_new
+        || [
+            urls::INSTALLATION_STATUS,
+            urls::RELEASE_PROP,
+            urls::RELEASE_ID,
+            urls::GRANTS,
+            urls::CONFIG,
+        ]
+        .iter()
+        .any(|prop| changed_props.contains(*prop))
+}
+
+/// The writes an activation makes as commits of their own (the app's schema
+/// and its scope grants) follow the Installation's commit, so an Installation
+/// that is refused leaves none of them behind. A failure here is logged by the
+/// commit pipeline; the Installation stays.
+#[allow(unused_variables)]
+fn on_installation_after_commit(context: CommitExtenderContext) -> BoxFuture<AtomicResult<()>> {
+    Box::pin(async move {
+        #[cfg(feature = "wasm-plugins")]
+        {
+            let CommitExtenderContext {
+                store,
+                commit,
+                resource,
+                is_new,
+                changed_props,
+            } = context;
+            if commit.destroy == Some(true)
+                || installation_hook::status(resource) != STATUS_ACTIVE
+                || !activation_changed(is_new, changed_props)
+            {
+                return Ok(());
+            }
+            let drive = get_parent_drive(resource, store).await?;
+            installation_hook::after_activate(resource, &drive, store, commit.signer.as_str())
+                .await?;
+        }
+        Ok(())
+    })
+}
+
 #[allow(unused_variables)]
 fn on_installation_before_commit(
     context: CommitExtenderContext,
     plugins_dir: PathBuf,
     plugin_cache_dir: PathBuf,
+    #[cfg(feature = "wasm-plugins")] registry: std::sync::Arc<
+        crate::plugins::host_abi::HostAbiRegistry,
+    >,
 ) -> BoxFuture<AtomicResult<()>> {
     Box::pin(async move {
         let CommitExtenderContext {
@@ -582,16 +745,7 @@ fn on_installation_before_commit(
         {
             use installation_hook::*;
             let status = status(resource);
-            let activation_changed = is_new
-                || [
-                    urls::INSTALLATION_STATUS,
-                    urls::RELEASE_PROP,
-                    urls::RELEASE_ID,
-                    urls::GRANTS,
-                    urls::CONFIG,
-                ]
-                .iter()
-                .any(|prop| changed_props.contains(*prop));
+            let activation_changed = activation_changed(is_new, changed_props);
             match status.as_str() {
                 STATUS_ACTIVE if activation_changed => {
                     activate(
@@ -601,6 +755,7 @@ fn on_installation_before_commit(
                         commit.signer.as_str(),
                         &plugins_dir,
                         &plugin_cache_dir,
+                        &registry,
                     )
                     .await?
                 }
@@ -632,6 +787,9 @@ fn on_installation_before_commit(
 pub fn build_installation_extender(
     plugins_dir: PathBuf,
     plugin_cache_dir: PathBuf,
+    #[cfg(feature = "wasm-plugins")] registry: std::sync::Arc<
+        crate::plugins::host_abi::HostAbiRegistry,
+    >,
 ) -> ClassExtender {
     ClassExtender::builder()
         .id("installation".to_string())
@@ -639,8 +797,17 @@ pub fn build_installation_extender(
         .on_resource_get(ClassExtender::wrap_get_handler(move |context| {
             on_resource_get(context)
         }))
+        .after_commit(ClassExtender::wrap_commit_handler(
+            on_installation_after_commit,
+        ))
         .before_commit(ClassExtender::wrap_commit_handler(move |context| {
-            on_installation_before_commit(context, plugins_dir.clone(), plugin_cache_dir.clone())
+            on_installation_before_commit(
+                context,
+                plugins_dir.clone(),
+                plugin_cache_dir.clone(),
+                #[cfg(feature = "wasm-plugins")]
+                registry.clone(),
+            )
         }))
         .build()
 }
@@ -1375,6 +1542,7 @@ mod installation_tests {
             db,
             &f.appstate.config.plugin_path,
             &f.appstate.config.plugin_cache_path,
+            &f.appstate.host_abi,
         )
         .await
         .unwrap();

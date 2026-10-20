@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 2,
+  "runtime": "wasip2/1",
+  "world": "sandboxed-app",
+  "name": "statement",
+  "namespace": "example",
+  "version": "0.1.0",
+  "description": "Parses a CSV bank statement into transactions.",
+  "exports": [
+    {
+      "interface": "atomic:example/statement@1",
+      "function": "read",
+      "description": "Reads a statement (date,description,amount per line, amounts in decimal) into transactions with amounts in minor units. An optional header row is skipped.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "statement": { "type": "string", "description": "The CSV text of the statement." }
+        },
+        "required": ["statement"],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": { "type": "integer", "description": "The number of transactions." },
+          "totalMinor": { "type": "integer", "description": "The sum of all amounts, in minor units (cents)." },
+          "transactions": {
+            "type": "array",
+            "description": "The transactions in statement order.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": { "type": "string", "description": "The booking date, YYYY-MM-DD." },
+                "description": { "type": "string", "description": "The description as written." },
+                "amountMinor": { "type": "integer", "description": "The amount in minor units; negative is a debit." }
+              },
+              "required": ["date", "description", "amountMinor"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": ["count", "totalMinor", "transactions"],
+        "additionalProperties": false
+      },
+      "effect": "read"
+    }
+  ]
+}

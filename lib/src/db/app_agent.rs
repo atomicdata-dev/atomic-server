@@ -144,6 +144,34 @@ mod store_tests {
     }
 
     #[tokio::test]
+    async fn the_agents_of_a_drive_are_found_under_either_spelling_of_it() {
+        let db = db("by_drive").await;
+        db.set_node_key(NODE_KEY);
+        let agent = Agent::new(Some("test app")).expect("agent");
+        let other = Agent::new(Some("elsewhere")).expect("agent");
+        let put = |key: AppAgentKey, agent: &Agent| {
+            db.set_app_agent(
+                &key,
+                &AppAgent::new(
+                    agent.subject.to_string(),
+                    agent.build_secret().expect("secret"),
+                    0,
+                ),
+            )
+            .expect("stored")
+        };
+        put(AppAgentKey::new("did:ad:drive", "did:ad:app"), &agent);
+        put(AppAgentKey::new("did:ad:other", "did:ad:app"), &other);
+
+        let found = |drive: &str| db.app_agents_in_drive(drive);
+        let want = vec![agent.subject.to_string()];
+        assert_eq!(found("did:ad:drive"), want);
+        assert_eq!(found("atomic:drive"), want, "the legacy spelling");
+        assert_eq!(found("did:ad:drive?drive=https://example.com"), want);
+        assert!(found("did:ad:nothing").is_empty());
+    }
+
+    #[tokio::test]
     async fn the_key_is_not_in_the_clear_on_disk() {
         let db = db("at_rest").await;
         db.set_node_key(NODE_KEY);

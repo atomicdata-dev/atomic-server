@@ -1237,6 +1237,12 @@ fn unique(names: &[String]) -> Vec<String> {
     out
 }
 
+/// Whether `plan` could be made real, so a caller can refuse an inconsistent
+/// one early. Writes nothing.
+pub fn validate_plan(plan: &OntologyPlan) -> AtomicResult<()> {
+    check_plan(plan).map(|_| ())
+}
+
 /// Checks a plan and fills in what it leaves out: one entry per property
 /// (identified by shortname), names and descriptions, and every class's
 /// `requires` and `recommends` complete. Errors before anything is written.
@@ -1904,7 +1910,12 @@ pub async fn ensure_ontology(
 pub struct CommitSink(
     #[allow(clippy::type_complexity)]
     pub  std::sync::Arc<
-        dyn Fn(Commit) -> std::pin::Pin<Box<dyn std::future::Future<Output = AtomicResult<()>>>>,
+        dyn Fn(
+                Commit,
+            )
+                -> std::pin::Pin<Box<dyn std::future::Future<Output = AtomicResult<()>> + Send>>
+            + Send
+            + Sync,
     >,
 );
 

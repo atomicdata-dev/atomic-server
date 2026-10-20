@@ -37,7 +37,18 @@ pub struct InputSchema {
 pub struct Field {
     pub r#type: String,
     pub description: String,
+    /// A Property of the manifest's `schema` whose datatype the value must
+    /// also satisfy. Only exports use it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub property: Option<String>,
+    /// For `type: "array"` (exports only): the flat object each element is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub items: Option<Box<InputSchema>>,
 }
+
+/// The most elements an `array` field may hold.
+pub const MAX_ARRAY_ITEMS: usize = 5000;
+
 impl InputSchema {
     pub fn validate(&self, args: &Value) -> Result<(), String> {
         let args = args
@@ -55,6 +66,20 @@ impl InputSchema {
                 "string" => value.is_string(),
                 "integer" => value.is_i64() || value.is_u64(),
                 "boolean" => value.is_boolean(),
+                "array" => {
+                    let (Some(items), Some(list)) = (&field.items, value.as_array()) else {
+                        return Err(format!("invalid type for action argument {name}"));
+                    };
+                    if list.len() > MAX_ARRAY_ITEMS {
+                        return Err(format!("{name} has too many elements"));
+                    }
+                    for item in list {
+                        items
+                            .validate(item)
+                            .map_err(|e| format!("in {name}: {e}"))?;
+                    }
+                    true
+                }
                 _ => false,
             };
             if !valid {
@@ -90,9 +115,10 @@ pub fn validate_actions(manifest: &Manifest) -> Result<(), String> {
             || s.additional_properties
             || s.properties.len() > 32
             || s.required.iter().any(|p| !s.properties.contains_key(p))
-            || s.properties
-                .values()
-                .any(|p| !matches!(p.r#type.as_str(), "string" | "integer" | "boolean"))
+            || s.properties.values().any(|p| {
+                p.property.is_some()
+                    || !matches!(p.r#type.as_str(), "string" | "integer" | "boolean")
+            })
         {
             return Err("unsupported action input schema".into());
         }

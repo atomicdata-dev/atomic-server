@@ -1,7 +1,8 @@
 # Host ABI: apps on a typed, real-time, multi-machine host
 
-**Status:** Accepted direction (Joep, 2026-10-14). Step 0 in progress; nothing
-else built. Pre-v1: the ABI may break until it is declared v1.
+**Status:** Accepted direction (Joep, 2026-10-14). Step 0 done (#2258). The
+first slice of step 1 runs on the server and from frames (below). Pre-v1: the ABI may break until it
+is declared v1.
 
 Goal, in Joep's words: the plugin interface should be "a type-safe, real-time,
 decentralized, multi-machine Linux". Plugins are apps. Apps export typed
@@ -71,10 +72,10 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 
 ### 0. Close the frame network hole
 
-- [ ] Frame CSPs (`server/src/handlers/plugin_ui.rs`) get `connect-src 'none'`
+- [x] Frame CSPs (`server/src/handlers/plugin_ui.rs`) get `connect-src 'none'`
       and both carry a `sandbox` directive. Today `connect-src *` lets a view
       that may read drive data send it to any host.
-- [ ] Integration-proxy requests from frames go through the host (a
+- [x] Integration-proxy requests from frames go through the host (a
       `proxyFetch` host op restricted to the minted capability's origin)
       instead of a direct `fetch` from the frame.
 - [ ] `img-src 'self' data: blob:` and `font-src 'self' data:`: a remote
@@ -93,18 +94,163 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       state (resources under the installation), and calls
       (`call(interface, function, args)`). Interaction is not a kernel op: it
       is `call` on the built-in `atomic:ui/*` apps (principle 7).
-- [ ] Typed records instead of JSON strings; batch operations.
+      *Slice built (2026-10-14):* `atomic-host/wit/host.wit`, implemented for
+      world `sandboxed-app` in `server/src/plugins/host_abi/`: `get`,
+      `get-many`, `query` (class, parent, `eq`/`lt`/`lte`/`gt`/`gte`/`contains`/
+      `exists`, cursor, `complete`), `apply`, `subscribe`, `net.fetch`,
+      `events.set-filters`/`next`/`ack`, `calls.providers`/`describe`/`call`. Still
+      `unsupported` or missing: `search`, `undo`, the `ne` filter, subclass
+      matching in `class`, `invoke-action`, state as resources, feeding
+      `events` from triggers/cron, durable proposals, `handles`.
+      Docs: `docs/src/plugins/host-abi.md`.
+      *Review hold fixed (2026-10-15):* `/host/call` is v2-signed (method + body),
+      needs read (and write for `write`/`external` exports) on the drive before
+      anything loads, is rate limited, and caches release load failures for 5
+      minutes; manifest `uses` bounds `calls.call`; frames send
+      `allowEffects: ["read"]` (no approval UI yet); one entry call has a shared
+      budget (64 calls, 16G fuel pool with give-back, 30 s deadline);
+      `get-many` is capped at 100; app error codes outside the ABI become
+      `internal`; `apply` refuses a `set` of `isA` to Installation/Plugin/Release.
+      Open: `effect` is author-declared, so approval UI (step 2) must not trust
+      it alone; the fuel pool is per entry call, not per drive or agent.
+- [x] Typed records instead of JSON strings; batch operations. (`get-many`,
+      multi-intent `apply`. `calls` arguments stay JSON by design.)
 - [ ] Generate Rust bindings and TS types plus the frame client from it.
+      *Rust done* (host: `wasmtime::component::bindgen!`; apps: `wit-bindgen`,
+      see `plugin-examples/host-abi-*`). *TS: calls done*, hand-written rather
+      than generated: `browser/plugin/src/hostAbi.ts` (`AppExport`, `Effect`,
+      `HostError`, error codes; a test checks them against the Rust codes) and
+      `store.callExport(interface, fn, args)` in `@tomic/plugin` (`store.call(op, args)` stays the transport), over a `call` frame
+      op that the host sends as a signed `POST /host/call`. Not done: types for
+      `store`/`net`/`events`, generating them with jco, `call` in packaged
+      views (only drive-app frames), `describe`/`providers` from a frame.
 - [ ] Port the three runtimes (class-extender WIT, plugin-runtime WIT, frame
       `store`) onto it. Legacy RPC, `plugin.json` and `/app-write` go once the
       catalog apps are ported; stored installations stay readable.
+      *Mapping (2026-10-16).* Old function -> ABI function; "missing" is what
+      one side lacks.
+
+      QuickJS `run` (`plugin-runtime/wit`, `js_runtime.rs`, `ctx.*`):
+      | old | ABI | note |
+      | --- | --- | --- |
+      | `fetch(json{method,url,...})` / `ctx.http` | `net.fetch` | old is URL-based, ABI names a manifest operation; kept as the alias (testdata plugins call it) |
+      | `get-resource(subject)` / `ctx.read` | `store.get` | old returns JSON-AD, ABI a typed resource; alias kept (testdata plugins read `row[prop]`) |
+      | `query(property, value)` / `ctx.query` | `store.query` (`eq`) | old returns subjects, drive-scoped; alias kept |
+      | `invoke-action` / `ctx.integration` | none | integration actions; closest is `calls.call` on a connector app |
+      | `run(source, input) -> verdict` | `app.on-event` / `invoke` | the verdict's intents are `store.intent`s; proposing is `store.apply` -> `proposed` |
+      | missing in old, **built (JS)**: | `store.get`, `get-many`, `query`, `net.fetch`, `calls.providers/describe/call` | `host_abi/js.rs`, globals `store`, `net`, `calls` |
+      | missing in old, not built | `store.apply` (`needs-approval`, intents are the verdict), `subscribe`, `undo`, `search`, `events` | |
+
+      Class extender (`atomic:class-extender@0.1.0`, now world `server-module`):
+      | old | ABI | note |
+      | --- | --- | --- |
+      | `get-resource(subject, agent?)` | `store.get` | **done.** ABI has no `agent` override: reads are caller ∩ Installation agent, and the module is both. The old host ignored `agent` too |
+      | `query(property, value, agent?)` | `store.query` + `eq`, `with-resources` | **done**, same |
+      | `get-plugin-agent()`, `get-config()` | `context.get` (new, `server-module` only) | **done.** The Installation, the agent and the config |
+      | `commit(commit-json)` | `store.apply` | **done.** Raw signed commits are gone: intents are planned like every other write. `atomic-plugin`'s `commit(&CommitBuilder)` builds the intents (`push` reads the array first) |
+      | `fetch(http-request)` | `net.fetch` | **done.** By operation id; no `wasi:http`, no sockets. A module may fetch `write` operations (it runs in the commit path, nobody approves) |
+      | `class-url` | `hooks.classes` | kept as an export instead of the manifest: an operator's `global` module has no manifest, and `describe_package` learns a package's classes from it |
+      | `on-resource-get(ctx)` | `hooks.on-get(resource, agent, query)` | **done.** Answer replaces the resource (only the changed properties are rebuilt). The request's query pairs go in as `query`; `get-answer.referenced` lists subjects the host reads (with the module's grant) and sends along |
+      | `before-commit(ctx)` | `hooks.before-commit(commit-info, after)` | **done.** `list<problem>`: an `error` refuses. No `before` argument: the commit is not stored yet, so `store.get` is the state before |
+      | `after-commit(ctx)` | `hooks.after-commit(commit-info, after)` | **done.** The `events` `commit` kind is still the long-term shape |
+
+      Frame (`hostStore.ts` ops):
+      | op | ABI | note |
+      | --- | --- | --- |
+      | `get`, `getMany` (100) | `store.get`, `get-many` (100) | |
+      | `query` | `store.query` | frame's `parseViewQuery` fields differ |
+      | `search` | `store.search` | unsupported on the host too |
+      | `apply`, `undo` | `store.apply`, `undo` | frame has its own history |
+      | `create`, `save`, `destroy` | `store.apply` (`create`/`set`+`remove`/`destroy`) | `refuseOutsideApp` is a frame-side scope; ABI needs step 2 grants |
+      | `call` | `calls.call` | done (`callExport`) |
+      | `subscribe`, `unsubscribe` | `store.subscribe`, `unsubscribe` | frame no-ops |
+      | `proxyCapability`, `proxyFetch`, `proxyConnections` | `net.fetch` | integration proxy has no ABI function |
+      | `app`, `data`, `context` | none | the Installation, table binding and current agent: a `context` call |
+
+      *Built (slice 1, 2026-10-16): QuickJS `run` plugins.* The runtime has
+      one new import, `abi(function, args)` by WIT name, and the globals
+      `store`, `net`, `calls` (`plugin-runtime/src/lib.rs`). The host side,
+      `host_abi::JsAbi` (`host_abi/js.rs`), builds an `AbiState` for the
+      plugin's Installation per call and calls the same interface code as a
+      component, so rights, `CallBudget`, `check_write` per hop, error codes
+      and `manifest.uses` are the same code. Wired in `/plugin-run`, triggers
+      and schedules. A run's budget allows `read` exports only (as a frame);
+      `store.apply` is `needs-approval` (the verdict proposes). `uses` is
+      allowed in world `extension` too.
+      *Old names are shims (same slice).* `ctx.http`, `ctx.read`, `ctx.query`
+      are JS in the prelude over `abi(...)`, with their old shapes: `http` is
+      `net.fetch` in its URL form (`{method, url, ...}`, still
+      `HostCore::fetch`; the operation-id form is the ABI's), `read` builds
+      JSON-AD from `store.get`, `query` pages `store.query` (`eq`, string
+      value). `fetch`, `get-resource` and `query` are gone from the runtime
+      WIT, `PluginHost`, `StoreHost` and the test fakes. `ctx.integration`
+      stays on `invoke-action` (no ABI function). A bare `StoreHost` answers
+      `abi` with a throwaway registry (`calls.*` reloads apps); `JsAbi` shares
+      one. `atomic-plugins` calls none of the removed imports directly; all
+      its plugins use `ctx.*`.
+      *Next:* widen a run's budget once approval exists; move the URL form's
+      checks onto operation ids and drop it.
+      *Built (slice 2, 2026-10-16): class extenders as `server-module`.*
+      `host_abi/module.rs` (`ServerModule`) loads a component of world
+      `server-module` and registers its hooks with `lib`'s `ClassExtender`.
+      Each hook builds an `AbiState` for the module's Installation
+      (`build_host`, so `HostCore::for_run`), caller and Installation both the
+      module's own agent, and links the same `store`, `net` and `calls`
+      implementations as an app (`module_bindings` maps those interfaces onto
+      the `sandboxed-app` bindings). There is no rights code of its own.
+      `wasm.rs` keeps only the zip, the files and the registration; the old
+      `WasmPlugin`, `PluginHostState`, the class-extender `Host` impl,
+      `HostCore::{for_class_extender, commit, plugin_agent}`, `FetchPolicy::Origins`,
+      `egress::refuse_url`, `wasi-http` and `server/wit/class-extender.wit` are
+      deleted. `atomic-plugin` is regenerated from `atomic-host/wit` (same
+      `ClassExtender` trait, now with `on_resource_get` defaulting to `None`).
+      A legacy `PluginMeta` agent becomes the Installation's app agent when the
+      module loads (`bind_installation_agent`), so `installation::resolve` finds
+      one identity. Fixtures rebuilt: `browser/e2e/tests/fixtures/test-plugin.zip`
+      (README procedure, ui included) and the new `testdata/host-abi/module.wasm`.
+      What took the six steps:
+      - [x] (1) `after-commit` and `commit-info` (`commit-json`, `is-new`) in `hooks`
+      - [x] (2) writes: `store.apply`, no raw commit
+      - [x] (3) `get-config` and `get-plugin-agent` as `context.get`
+      - [x] (4) `server-module` linker (`module.rs`) and hooks from `wasm.rs`'s
+        registration in place of `bindings::ClassExtender`
+      - [ ] (5) operator-only install: world `server-extension` still means "a
+        `server-module` component", and who may install it is unchanged (not
+        a new check)
+      - [x] (6) rebuild `test-plugin`, `random-folder-extender` (its Discord
+        webhook is dropped: a user-configured URL is not an operation);
+        atomic-plugins has no extender crates and no `atomic-plugin` users
+      A module shares the node's `HostAbiRegistry` (`appstate.host_abi`,
+      threaded through the Installation hook and the loader), so `calls.call`
+      from a hook finds the apps of its drive. A server extension may declare
+      `uses` now; a module that declares some loads the drive's apps before
+      each hook.
+      *Next:* an entry deadline for hooks (only fuel and memory bound them),
+      the `storage` folder under the ABI's own name, and move `events`
+      `commit` in as the after-commit.
 - [ ] Conformance suite: run published catalog releases against each host
       build (regression test until v1, a promise after).
 
 ### 2. Scoped grants
 
-- [ ] Replace the six capabilities with `(scope, rights)` grants enforced in the
-      one place grants are intersected today (`host_core.rs`).
+- [x] Rights as `(scope, rights)` grants enforced in the one place grants are
+      intersected today (`host_core.rs`'s `Grant`), for every runtime.
+      *Done as the smallest design:* three ordinary properties on the
+      Installation (`readScope`, `writeScope`: subtree roots; `callScope`:
+      interface names), parsed once by `installation::Scopes`, checked by
+      `hierarchy::check_read` / `check_write` first and then by the scope.
+      Activation (`plugin.rs`, `scope_roots` / `grant_scopes`) validates every
+      root (exists, in the drive, writable by the installer) and puts the
+      app's agent on it, replacing the `full-drive-access` special case in
+      `create_plugin_meta`, which is now the widest scope (the drive).
+      Unset means unlimited (older Installations); `proposed` is the outcome
+      of an out-of-scope write, as for any write the agent may not make.
+      *Not done:* class scopes (`readScope` takes subtrees, not "every Task");
+      the other capabilities (`storage`, `extended-*`, `custom-view`) are not
+      scopes yet and stay in `grants`; removing the agent from old roots when a
+      scope shrinks (the host ignores them); per-call `handle`s still ignored;
+      the manifest does not declare scopes yet (step 4), so the installer picks
+      them freely within their own rights.
 - [ ] Consent dialog shows scopes in plain language.
 - [ ] Covers #1740, #1741, #1849 and most of #2235 with one mechanism.
 
@@ -112,6 +258,34 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 
 - [ ] Durable, cursor-based stream: query edges, commits on a class, cron,
       field timers, inbound webhooks, "connection needed", tombstones (#1850).
+      *Done:* one ordered log per drive (`lib/src/db/drive_events.rs`), a row
+      per applied commit written in the commit's own batch, so a crash never
+      separates change and event. Apps subscribe through `events.set-filters`
+      (class, subtree, property), read from a cursor with `next` and `ack`;
+      filters and checkpoint are stored, so a restart replays what was missed
+      exactly once. Delivery checks the caller's and the Installation agent's
+      read rights and `readScope` per event; tombstones (destroy events) exist.
+      Replaces the in-memory per-installation queue.
+      *Done too:* `triggers.rs` consumes the log. Query edges are not a second
+      producer: `apply_transaction` already sees the `QueryMembers` writes, so
+      the commit's own event row lists the edges of watched trigger queries
+      (`DriveEvent.edges`). Each trigger has a cursor (`trigger/<plugin>`) and
+      one saved in-flight record; the old `plugin-event/v1` queue, its dedup
+      window and the id-keyed check are gone. Kept: the self-echo skip and the
+      30-per-minute rate limit, which the stream does not cover. Old
+      `plugin-event/v1` rows are not migrated: at startup a trigger that waits
+      on a proposal whose in-flight record is gone has the proposal cleared
+      (logged), and the dead rows are removed.
+      Retention is 7 days and does not wait for acknowledgements: an event a
+      consumer has not acked by then is dropped, with a warning naming the
+      consumer whose checkpoint is behind.
+      *Not done:* the producers other than commits (cron, field timers,
+      webhooks, connection-needed). Module `after-commit` stays synchronous: it
+      is handed the resource as the commit left it, runs under the commit's
+      locks-released window and its failures are logged against that call, none
+      of which an event row carries. The WS commit notifications still run on
+      their own path. The host does not call `on-event`; apps
+      pull. Event rows hold no per-subscriber state, so no fan-out cost.
 - [ ] Untriggered verdicts become stored proposals, not discarded ones.
 - [ ] Replace the three webhook proposals (#77, #976, atomic-plugins#369).
 
@@ -124,6 +298,20 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 - [ ] Releases declare the classes they read, write and extend; the host binds
       at install. The scheduler stops looking up vocabulary by shortname
       (`drive_terms`).
+      *Started (smallest slice):* a manifest `schema` has `vocabularies`
+      (fixed shared ontologies, referenced, never copied) and one inline
+      `ontology` (the `ensureOntology` plan). `plugin.rs`'s `activate` makes the
+      inline one real through `ensure_ontology` (`plugins/app_schema.rs`), so a
+      second app or a reinstall reuses it, and refuses a missing vocabulary. An
+      export field's `property` points into either; `check_values` validates
+      call arguments and results with `Value::new` for that Property's datatype
+      and its `allowsOnly`, after the JSON shape check. Not a second schema
+      engine.
+      *Not done:* the binding is not stored as a resource; class scopes (step
+      2) and `uses`/`extends` by class; nested fields, and a `property` binding inside array items (arrays of flat objects exist); a class as a
+      field type; the scheduler still uses `drive_terms`; moving
+      `ontology-kit` classes into the vocabularies; `@tomic/lib` has no
+      matching type for the manifest `schema` field.
 - [ ] Views match subclasses of the class they declare, so drive classes that
       extend a shared class get its views (to settle with atomic-plugins, whose
       views match the exact class).
@@ -135,24 +323,143 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 - [ ] Every app export (function, stream, view) is a resource under its
       `Release`: name, description, input and output schema, effect
       (`read` / `write` / `external`).
+      *Started:* a `sandboxed-app` manifest declares `exports` (function only,
+      bounded JSON Schema subset) and `calls.describe` / `POST /host/call`
+      serve them. They are not resources yet, and MCP tools, Cmd+K and docs are
+      not derived from them.
+      *Progress (step 5, MCP):* every `read` / `write` export of an installed
+      app is also an MCP tool on `/mcp` (`server/src/mcp/exports.rs`), named
+      `<interface>__<function>`, called through the same rights path as
+      `/host/call` (`host_abi::call_for_agent`). `external` and `interactive`
+      are not offered. Cmd+K, in-app AI tools, bindings and docs do not derive
+      from exports yet, and the exports are still not resources.
 - [ ] MCP tools, Cmd+K actions, in-app AI tools, bindings and docs are all
       derived from those resources (today only manifest `actions` become MCP
-      tools, `server/src/plugins/actions.rs`).
+      tools in `server/src/plugins/actions.rs`'s `list`, an in-app listing).
 - [ ] The host ABI itself is described the same way.
 
 ### 6. Placement and multiple machines
 
-- [ ] Leases for background work, as resources.
-- [ ] Forward a call to a node that can run it (WS or Iroh), same signature,
-      async.
-- [ ] Apps needing a secret run on the node that holds it.
+- [x] Leases for background work, as resources.
+      *Done (first slice):* `server/src/plugins/lease.rs`, vocabulary in
+      `lib/defaults/plugins.json` (`Lease`, `leaseOf`, `leaseHolder`,
+      `leaseExpiresAt`, `leaseGeneration`, `previousLease`). A lease is a child
+      of the Installation, created with a genesis commit and renewed by its
+      holder only. `triggers::drain` and `scheduler::run_due` ask
+      `Leases::holds` before running anything; a non-holder leaves edges
+      pending. TTL 60 s, renewed with 30 s left; an expired head is taken over
+      by a new lease naming it (`previousLease`, generation + 1).
+      *Convergence:* the head is the maximum of the synced leases under
+      `(generation desc, holder node id asc, subject asc)`. All three are
+      immutable after creation and the order is total, so the head is a
+      function of the *set* of leases: nodes with the same set agree, and sets
+      only grow. Concurrent takeovers share a generation, so the lowest node id
+      wins. This replaces the "reject as a causality conflict" idea above: the
+      takeover needs no rejection because losing is decided by the rule, and
+      a Loro LWW write is never what picks the holder (expiry only decides
+      whether the head *may* be replaced). Overlap while two contenders have
+      not yet synced is the sync latency; a holder that lost keeps running at
+      most until its cached verdict ends (at most 30 s, the renewal point).
+      *Delivery across a takeover: at-least-once.* Cursors and in-flight
+      records stay in each node's db. A standby does not move its cursor, so
+      the new holder repeats edges the old holder handled since the standby
+      last held the lease (bounded by the 7-day retention). Nothing is
+      skipped: each node writes an event row for every commit it applies.
+      *Single node:* no Iroh node id, or no known peer for the drive and no
+      lease synced, writes no lease; the verdict is cached for 10 s, so the
+      hot path is a map lookup.
+      *Not done:* a watermark in the lease so a new holder skips what the old
+      one finished (needs a commit-level identity shared across nodes; event
+      `seq` and `at_ms` are per node, so a time cutoff could lose edges);
+      trigger and schedule registrations themselves are node-local rows, not
+      synced, so a standby only takes over triggers it has; `events.next`
+      consumers and the future cron/field-timer producers are not leased;
+      no validation of a takeover by other nodes (a signer with write rights
+      could take over early, or lie about time); clocks are assumed to agree
+      to within seconds; not tested over a real Iroh sync, the tests carry
+      the lease commits between dbs by hand.
+- [x] Forward a call to a node that can run it, same signature.
+      *Done (first slice):* `call_export` finds no provider and a known Iroh
+      peer syncs the drive: the call goes out as a `CALL` frame
+      (`lib/src/sync/call.rs`, `docs/src/websockets.md`), the answer is a
+      `CALL_RESULT`. Server side in `host_abi/forward.rs`: `CallForwarder`
+      (Iroh, over the known peers whose `drives` list the drive), `ServedCalls`
+      (the `CallHandler` the lib calls). *Auth:* the stream's AUTH is the
+      forwarding node's agent, bound to `drive#nodeId` like a sync. The caller's
+      own proof is not forwarded: it is signed for the first node (or is an MCP
+      token), and replaying it at another node is what the node binding exists
+      to stop. So the node vouches for the caller named in the frame, and the
+      serving node needs *both* to pass: `call_for_agent` for the caller, and
+      `check_read` / `check_write` on the drive for the vouching node's agent
+      (`CallBudget::vouched_by`, checked at each hop that writes). A node can
+      therefore only vouch for what it could do itself; a malicious paired node
+      can still name any caller whose rights it holds too, for the drive-level
+      checks. App reads inside the call are bounded by the named caller and the
+      Installation's agent only, not by the vouching node. *Budget:* calls,
+      fuel, effects and the secrets flag travel; the server caps them at its own
+      limits and never widens; the sender reserves its whole pool and gets back
+      `callsLeft` / `fuelLeft`. Depth counts across the hop; a served call is not
+      forwarded again (no loops). Tested in `host_abi/forward_tests.rs` (two
+      nodes in one process, a real Iroh connection) and
+      `lib/src/sync/call.rs`.
+      *Not done:* MCP tools are listed from local exports only, so a forwarded
+      export is reachable over `/host/call` but not offered by MCP; peers are
+      tried in known-peers order with no health or load; a drive this node
+      never synced is not forwarded; the call is synchronous (no async/queued
+      form, so a call over 30 s is stopped); a forwarded call to a peer without
+      the `CALL` frame times out instead of failing fast (no capability
+      advertised yet); the forward is not tested across two OS processes.
+- [~] Apps needing a secret run on the node that holds it.
+      *Minimal:* an app found locally whose declared secrets this node does not
+      hold (`forward::holds_secrets`, name and origin) is forwarded too, and a
+      peer's `not-found` falls back to running here. Secrets are never sent or
+      synced. Left: knowing *which* peer holds them (today every known peer of
+      the drive is tried in order, and each re-runs the check on its own
+      secrets), and an explicit "run only where the secret is" policy for
+      background work, which belongs to the lease above.
 
 ### 7. Proof
 
-- [ ] One Rust component (for example the Money statement parser) called by a
+- [~] One Rust component (for example the Money statement parser) called by a
       JS app through a typed interface, in the browser and on the server.
-- [ ] One built-in extender (form or chatroom) rewritten as a module on the
-      ABI, as a second conformance test next to the Kanban plugin.
+      *Done:* `plugin-examples/host-abi-statement` (`atomic:example/statement@1`
+      `read`: CSV text in, a list of transactions out; a small parser of its own,
+      not the Money plugin's, whose MT940 parser ships minified in `ui.js`).
+      Server: a QuickJS run plugin calls it through `calls.call` and gets a typed
+      object (`host_abi/tests.rs`, `a_run_plugin_reads_a_statement_...`).
+      Browser: a frame calls it with `store.callExport`, which the host sends to
+      `/host/call`, so the browser runs no WASM for it (JS to server, never
+      JS to WASM to Rust). To make a list a result the export schema subset got
+      `array` fields of flat objects (`actions.rs` `Field::items`, checked by
+      `manifest.rs`). Typed bindings: `generateExportBindings` in
+      `@tomic/plugin` (`pnpm generate-bindings <manifest> <out.ts>`) turns the
+      manifest schemas into interfaces and a typed `statementRead(store, args)`;
+      a test keeps the checked-in `bindings.ts` in step and type-checks a
+      caller. The frame test (`browser/plugin/src/exportBindings.test.ts`) uses
+      a mocked transport: no integration test of `callExport` against a real
+      server exists, and `/host/call` has no handler test of its own beyond
+      `call_as`.
+      *Not done:* running the component itself in the browser. That takes
+      `jco transpile` of the wasip2 component to a core module plus JS glue, run
+      in a worker, with `store` / `calls` imports backed by the frame's
+      postMessage client; only worth it for work that must run offline, and it
+      cannot hold a server-side secret or the app's agent. The manifest `schema`
+      does not fit this app (no stored properties; array item fields cannot yet
+      point at a Property), so the parser declares none. Array fields have no
+      `property` binding or nested arrays; the 64 KiB argument cap applies to
+      the statement and the result.
+- [x] One built-in extender (chatroom) rewritten as a module on the
+      ABI, as a second conformance test next to the Kanban plugin. It is a
+      native module: `NativeHooks` (the `hooks` interface as a Rust trait) behind
+      `ServerModule::native`, registered and answered like a component, calling
+      `store.query` through the same `AbiState` imports and `Grant`. It differs
+      from an installed app in loading and in one grant: with no Installation it
+      reads as the reader, not as the public. Form was not taken: its summary is
+      5000 lines of host form logic (`forms::build_form_definition`), not a
+      read of the store. Left: Form and the other built-in extenders
+      (`files`, `installation`, `conversations`), and without the
+      `wasm-plugins` feature the chat room extender is not registered, since
+      the ABI host lives behind it.
 
 ## Not now
 
