@@ -1,4 +1,5 @@
 import {
+  Client,
   core,
   dataBrowser,
   useResources,
@@ -38,9 +39,6 @@ import { externalOrigin, searchLoadedExternal } from './loadedExternal';
 /**
  * Options shown at the top of the results when the `isA` prop matches a key in this object.
  */
-// Typing one of these starts a subject, not a search.
-const SUBJECT_PREFIXES = ['http:', 'https:', 'atomic:', 'did:'];
-
 const STANDARD_OPTIONS: Record<string, string[]> = {
   [core.classes.property]: [
     core.properties.name,
@@ -237,9 +235,9 @@ export function SearchBoxWindow({
 
     const selected = options[override! ?? selectedIndex!];
 
-    // No results to pick from: take what was typed (a pasted subject).
+    // No results to pick from: take what was typed if it is a subject.
     if (!selected) {
-      if (searchValue) onSelect(searchValue);
+      if (Client.isValidSubject(searchValue)) onSelect(searchValue);
 
       return;
     }
@@ -278,7 +276,11 @@ export function SearchBoxWindow({
   };
 
   const handleChange: React.ChangeEventHandler<HTMLInputElement> = e => {
-    if (SUBJECT_PREFIXES.some(prefix => e.target.value.startsWith(prefix))) {
+    if (
+      e.target.value.startsWith('http:') ||
+      e.target.value.startsWith('https:') ||
+      Client.isValidSubject(e.target.value)
+    ) {
       onChange(e.target.value);
       setValueIsURL(true);
 

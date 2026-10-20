@@ -230,4 +230,14 @@ describe('class picker', () => {
 
     expect(onSelect).toHaveBeenCalledWith('atomic:abc123');
   });
+
+  it('ignores Enter on free text when nothing was found', () => {
+    const { onSelect } = show(newStore(), { searchValue: 'foo bar' });
+    const input = screen.getByRole('textbox');
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onSelect).not.toHaveBeenCalled();
+  });
 });
