@@ -482,15 +482,31 @@ pub async fn set_active_drive(subject: String) -> Result<(), String> {
 
 /// List drives belonging to the current agent, with names.
 pub async fn list_drives() -> Result<Vec<String>, String> {
-    let drives = db()?.list_drives().await.map_err(err)?;
-    Ok(drives.iter().map(|d| d.subject.clone()).collect())
+    Ok(drives_by_use()
+        .await?
+        .into_iter()
+        .map(|d| d.subject)
+        .collect())
+}
+
+/// The agent's drives in the order every drive list shows: the active one,
+/// then the most recently used, then the rest by name.
+async fn drives_by_use() -> Result<Vec<atomic_lib::db::DriveInfo>, String> {
+    let store = db()?;
+    let drives = store.list_drives().await.map_err(err)?;
+    Ok(atomic_lib::host::lists::order_drives_by_use(
+        store,
+        crate::host::recents(),
+        drives,
+        |d| (d.subject.as_str(), d.name.as_str()),
+    ))
 }
 
 /// List drives with names. Returns JSON-encoded array of {subject, name,
 /// emoji?} (`emoji` is the drive's own icon, absent when it has none).
 pub async fn list_drives_with_names() -> Result<String, String> {
     let store = db()?;
-    let drives = store.list_drives().await.map_err(err)?;
+    let drives = drives_by_use().await?;
     let mut rows = serde_json::to_value(&drives).map_err(|e| e.to_string())?;
     if let Some(rows) = rows.as_array_mut() {
         for row in rows {

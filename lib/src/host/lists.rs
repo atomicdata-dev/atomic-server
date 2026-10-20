@@ -177,6 +177,42 @@ pub async fn list_activity(
         .collect()
 }
 
+/// Put `drives` in the order every drive list shows them: the `active`
+/// drive first, then the most recently used (opened here, or changed by the
+/// person: [`RecentsIndex::drive_last_used`]), then the never-used ones by
+/// name. `subject_and_name` reads a drive's subject and name.
+pub fn order_drives_by_use<T>(
+    store: &Db,
+    recents: &RecentsIndex,
+    drives: Vec<T>,
+    subject_and_name: impl Fn(&T) -> (&str, &str),
+) -> Vec<T> {
+    let own = store
+        .get_default_agent()
+        .ok()
+        .map(|a| a.subject.to_string());
+    let active = store.get_active_drive().map(|d| drive_key(&d));
+    let mut keyed: Vec<(bool, i64, String, T)> = drives
+        .into_iter()
+        .map(|d| {
+            let (subject, name) = subject_and_name(&d);
+            (
+                active.as_deref() == Some(drive_key(subject).as_str()),
+                recents.drive_last_used(subject, own.as_deref()),
+                name.to_lowercase(),
+                d,
+            )
+        })
+        .collect();
+    // Stable: equal drives keep the store's order.
+    keyed.sort_by(|a, b| {
+        b.0.cmp(&a.0)
+            .then(b.1.cmp(&a.1))
+            .then_with(|| a.2.cmp(&b.2))
+    });
+    keyed.into_iter().map(|k| k.3).collect()
+}
+
 /// A drive's subject in one spelling (`did:ad:` / `atomic:`, without a
 /// query), for comparing drives.
 fn drive_key(drive: &str) -> String {
@@ -775,6 +811,69 @@ mod tests {
             list_activity(&d.store, &d.recents, &none, Some("did:ad:elsewhere"), 500)
                 .await
                 .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn drives_are_ordered_by_use_with_the_active_one_first() {
+        let d = Device::new().await;
+        let mut rx = d.store.subscribe_events();
+        let mut make = Vec::new();
+        for name in ["Zebra", "apple", "Mango", "Kiwi"] {
+            make.push(d.store.create_drive(name).await.unwrap());
+        }
+        let [zebra, apple, mango, kiwi] = <[String; 4]>::try_from(make).unwrap();
+        d.pump(&mut rx).await;
+        // Kiwi: a resource in it was opened; Mango: opened earlier. The rest
+        // never (creating a drive is not using it).
+        d.recents.note_opened(&kiwi, "did:ad:in-kiwi", i64::MAX / 2);
+        d.recents.note_opened(&mango, &mango, i64::MAX / 4);
+        let order = |active: &str| {
+            d.store.set_active_drive(active).unwrap();
+            let drives = vec![
+                (zebra.clone(), "Zebra"),
+                (apple.clone(), "apple"),
+                (mango.clone(), "Mango"),
+                (kiwi.clone(), "Kiwi"),
+                (d.drive.clone(), "Test device"),
+            ];
+            order_drives_by_use(&d.store, &d.recents, drives, |(s, n)| (s.as_str(), *n))
+                .into_iter()
+                .map(|(_, n)| n)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            order(&zebra),
+            ["Zebra", "Kiwi", "Mango", "apple", "Test device"]
+        );
+        // The active drive in the other spelling is still the active one.
+        let atomic = crate::identifiers::canonicalize_scheme(&apple);
+        let did = match atomic.strip_prefix("atomic:") {
+            Some(rest) => format!("did:ad:{rest}"),
+            None => atomic,
+        };
+        assert_eq!(order(&did)[0], "apple");
+
+        // An edit by the person in a drive counts as using it.
+        let mut rx = d.store.subscribe_events();
+        let in_apple = d
+            .store
+            .create_resource(urls::FOLDER, &apple, "Apple notes", None)
+            .await
+            .unwrap();
+        d.pump(&mut rx).await;
+        assert!(
+            d.recents.drive_last_used(
+                &apple,
+                Some(&d.store.get_default_agent().unwrap().subject.to_string())
+            ) > 0,
+            "{in_apple}"
+        );
+        d.recents.note_opened(&kiwi, "did:ad:in-kiwi", 1);
+        d.recents.note_opened(&mango, &mango, 1);
+        assert_eq!(
+            order(&zebra),
+            ["Zebra", "apple", "Kiwi", "Mango", "Test device"]
         );
     }
 

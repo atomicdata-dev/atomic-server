@@ -566,6 +566,40 @@ impl RecentsIndex {
         });
     }
 
+    /// When the person last used `drive` here (ms, 0 for never): the newest
+    /// of the times this device opened the drive or anything in it, and of
+    /// the changes `own` (the person's agent) made to the drive or in it.
+    pub fn drive_last_used(&self, drive: &str, own: Option<&str>) -> i64 {
+        let key = crate::identifiers::canonicalize_scheme(&drive_id(drive));
+        self.with(|s| {
+            let opened = s
+                .recents
+                .drives
+                .iter()
+                .filter(|(k, _)| crate::identifiers::canonicalize_scheme(k) == key)
+                .flat_map(|(_, r)| r.opened.values().copied())
+                .max()
+                .unwrap_or(0);
+            let edited = s
+                .recents
+                .activity
+                .iter()
+                .filter(|a| {
+                    own.is_some_and(|own| {
+                        a.actor
+                            .as_deref()
+                            .is_some_and(|actor| same_agent(actor, own))
+                    }) && [&a.drive, &a.subject]
+                        .iter()
+                        .any(|d| crate::identifiers::canonicalize_scheme(&drive_id(d)) == key)
+                })
+                .map(|a| a.at)
+                .max()
+                .unwrap_or(0);
+            opened.max(edited)
+        })
+    }
+
     /// The `limit` most recently opened resources of `drive`, newest first.
     pub fn opened(&self, drive: &str, limit: usize) -> Vec<(String, i64)> {
         let mut all: Vec<(String, i64)> = self.with(|s| {

@@ -285,6 +285,11 @@ request (refused, harmless).
   a fresh envelope came with it. Others' *edits* that arrive over WS are
   therefore not listed yet. Follow-up: carry the frame's commit id to the
   index and resolve its signer from the server.
+- **Drive order** (Home, Search's drive picker, the bar's drive switcher,
+  Sync): the active drive, then by last use here (a resource in it or the
+  drive opened, or changed by the person), then never-used drives by name.
+  One place: `host::lists::order_drives_by_use`, applied by the bridge's
+  `list_drives` / `list_drives_with_names`.
 
 ## Not planned
 
