@@ -208,7 +208,7 @@ void main() {
     });
   }
 
-  testWidgets('the resource menu is in the bar, after Settings',
+  testWidgets('the resource menu is in its pane, not in the sidebar bar',
       (tester) async {
     _size(tester, _landscape);
     await tester.pumpWidget(_shell(_api()));
@@ -218,15 +218,80 @@ void main() {
     await _settle(tester);
     // The page's menu: registered by the view once the page is up.
     final bar = find.byType(AppBottomBar);
-    final more = find.descendant(of: bar, matching: find.byTooltip('More'));
+    expect(find.descendant(of: bar, matching: find.byTooltip('More')),
+        findsNothing);
+    final more = find.byTooltip('More');
     expect(more, findsOneWidget);
-    final settings =
-        find.descendant(of: bar, matching: find.byTooltip('Settings'));
-    expect(settings, findsOneWidget);
-    expect(tester.getRect(more).left,
-        greaterThanOrEqualTo(tester.getRect(settings).right - 1));
+    final pane = tester.getRect(find.byType(ResourceView));
+    expect(tester.getRect(more).right, closeTo(pane.right, 8));
+    expect(tester.getRect(more).top, closeTo(pane.top, 8));
     await _done(tester);
   });
+
+  for (final (width, scale) in [
+    (304.0, 1.0),
+    (400.0, 1.0),
+    (520.0, 1.0),
+    (304.0, 1.3),
+    (568.0, 1.3), // the rubber band's overshoot
+  ]) {
+    testWidgets('the bar: six evenly spread buttons at $width dp, text $scale',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({listWidthKey: width});
+      _size(tester, _landscape);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpWidget(_shell(_api()));
+      await _settle(tester);
+      final bar = find.byType(AppBottomBar);
+      List<Rect> buttons() => [
+            for (final tip in [
+              'Home',
+              'Search',
+              'New',
+              'Profile',
+              'Settings',
+              'Close sidebar',
+            ])
+              tester.getRect(find.descendant(
+                  of: bar, matching: find.byTooltip(tip).first)),
+          ];
+      final before = buttons();
+      // Every button is whole, 48 dp, inside the bar, in order, centred in
+      // the bar's height; no placeholder and no menu.
+      final barRect = tester.getRect(bar);
+      for (final r in before) {
+        expect(r.width, greaterThanOrEqualTo(24));
+        expect(r.left, greaterThanOrEqualTo(barRect.left));
+        expect(r.right, lessThanOrEqualTo(barRect.right));
+        expect(r.center.dy, closeTo(before.first.center.dy, 0.5));
+      }
+      for (var i = 1; i < before.length; i++) {
+        expect(before[i].left, greaterThanOrEqualTo(before[i - 1].right - 0.5),
+            reason: 'no overlap at $i');
+      }
+      expect(find.descendant(of: bar, matching: find.byTooltip('More')),
+          findsNothing);
+      final gaps = [
+        for (var i = 1; i < before.length; i++)
+          before[i].center.dx - before[i - 1].center.dx
+      ];
+      for (final g in gaps) {
+        expect(g, closeTo(gaps.first, 1), reason: '$gaps');
+      }
+
+      // A resource opening moves none of them.
+      await tester.tap(find.text('Plans'));
+      await _settle(tester);
+      expect(find.byTooltip('More'), findsOneWidget);
+      final after = buttons();
+      for (var i = 0; i < before.length; i++) {
+        expect(after[i].center.dx, closeTo(before[i].center.dx, 0.5));
+        expect(after[i].center.dy, closeTo(before[i].center.dy, 0.5));
+      }
+      await _done(tester);
+    });
+  }
 
   testWidgets('a tap on the bar\'s New lists the kinds above it, on screen',
       (tester) async {

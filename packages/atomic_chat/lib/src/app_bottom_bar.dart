@@ -28,8 +28,8 @@ const _listDrives = 4;
 
 /// The one row at the bottom of the app, within the thumb's reach, the same on
 /// every page and never moving with them: home (the atomic.place mark), search, new (a list), the user (agent,
-/// sync and account) and, last, settings, or the "more" menu of the resource
-/// the page on top shows. Back is the system back and the swipe from the left
+/// sync and account) and, last, settings, or (on a phone) the "more" menu of
+/// the resource the page on top shows. Back is the system back and the swipe from the left
 /// edge.
 ///
 /// The button of the page on top is shown as the current one (in the main
@@ -44,7 +44,8 @@ const _listDrives = 4;
 /// On a tablet ([ShellLayout.split]) the bar is the foot of the sidebar (the
 /// list pane). Home and Search show what the sidebar holds (Home on the home
 /// closes the detail page), the others open in the detail pane; Settings
-/// stays and the resource's "more" menu comes last.
+/// stays and Close sidebar comes last: six equal slots. The resource's "more"
+/// menu is not in the bar there; the resource's pane shows it.
 class AppBottomBar extends StatelessWidget {
   final AssistantApi api;
   final ShellController shell;
@@ -117,7 +118,9 @@ class AppBottomBar extends StatelessWidget {
                               ? () => shell.showList(ShellPage.home)
                               : (shell.atHome ? null : shell.goHome))
                           : (homeCurrent ? null : shell.goHome);
-                      final more = onMore == null
+                      // On a phone the bar's last button; next to the pages the
+                      // resource shows it in its own pane (see ResourceView).
+                      final more = onMore == null || split
                           ? null
                           : Builder(
                               key: const ValueKey('more'),
@@ -204,12 +207,6 @@ class AppBottomBar extends StatelessWidget {
                         ),
                         if (split) ...[
                           settings,
-                          // Room for it whether or not a resource is open: the
-                          // other buttons do not move.
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 200),
-                            child: more ?? const SizedBox(width: 48),
-                          ),
                           // Under the thumb, where the button that opens
                           // it again is when it is folded.
                           IconButton(
@@ -224,8 +221,9 @@ class AppBottomBar extends StatelessWidget {
                             child: more ?? settings,
                           ),
                       ];
-                      // Next to the pages: equal slots across the sidebar,
-                      // which fit its narrowest width too.
+                      // Next to the pages: six equal slots (the five pages and
+                      // Close sidebar) across the sidebar, which fit its
+                      // narrowest width too; the same whatever is open.
                       if (split) {
                         return Row(children: [
                           for (final b in buttons)

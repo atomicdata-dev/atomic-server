@@ -616,6 +616,37 @@ class _ResourceViewState extends State<ResourceView>
                           child: ResourceSkeleton(title: widget.title),
                         ),
                       ),
+                    // Next to the list the bar has no room for the resource's
+                    // menu: it sits in the pane's top right corner.
+                    if (widget.path == null &&
+                        ShellScope.maybeOf(context) != null &&
+                        ShellScope.layoutOf(context) == ShellLayout.split)
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        child: ListenableBuilder(
+                          listenable: ShellScope.maybeOf(context)!,
+                          builder: (context, _) {
+                            final onMore = ShellScope.maybeOf(context)!.topMenu;
+                            if (onMore == null || _route?.isCurrent != true) {
+                              return const SizedBox.shrink();
+                            }
+                            return Builder(
+                              key: const ValueKey('more'),
+                              builder: (button) => IconButton(
+                                tooltip: 'More',
+                                onPressed: () {
+                                  final box =
+                                      button.findRenderObject() as RenderBox;
+                                  onMore(box.localToGlobal(Offset.zero) &
+                                      box.size);
+                                },
+                                icon: const Icon(Icons.more_vert),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     // Swipe back starts at the left edge.
                     const Positioned(
                       left: 0,

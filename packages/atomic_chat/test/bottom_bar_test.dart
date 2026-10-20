@@ -135,28 +135,23 @@ void main() {
       addTearDown(tester.view.reset);
     }
 
-    testWidgets('the More menu is asked to open at the More button',
+    testWidgets('the bar next to the list has no More button, only six',
         (tester) async {
       wide(tester);
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
-      Rect? anchor;
-      // A tablet: the same bar, the width of the list pane, with the menu
-      // after Settings.
+      // A tablet: the same bar, the width of the list pane. A page's menu
+      // is shown by the page itself, never by the bar.
       expect(find.byType(AppBottomBar), findsOneWidget);
       expect(tester.getSize(find.byType(AppBottomBar)).width, 360);
       final route = _controller(tester).top!;
-      _controller(tester).registerMenu(route, (a) => anchor = a);
+      _controller(tester).registerMenu(route, (_) {});
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('More'));
-      await tester.pump();
-      final button = tester.getRect(find.byTooltip('More'));
-      expect(anchor, isNotNull);
-      expect(anchor!.right, closeTo(button.right, 8));
-      expect(anchor!.top, closeTo(button.top, 8));
-      // Right of Settings, which stays.
-      expect(button.left,
-          greaterThan(tester.getRect(find.byTooltip('Settings')).right - 1));
+      expect(
+          find.descendant(
+              of: find.byType(AppBottomBar), matching: find.byTooltip('More')),
+          findsNothing);
+      expect(find.byTooltip('Close sidebar'), findsOneWidget);
     });
 
     testWidgets('the + and Search lists open next to their own buttons',
