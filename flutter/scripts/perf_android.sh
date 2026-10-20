@@ -139,7 +139,12 @@ if [ -n "$APK" ]; then
   # The first start after an install extracts and verifies the dex: not a
   # start anyone measures twice.
   a shell am start -W -n $ACT >/dev/null; sleep 15; a shell am force-stop $PKG
-  if step size; then put "APK size (MB)" "$(du -k "$APK" | awk '{printf "%.1f", $1/1024}')"; fi
+  if step size; then
+    # The entries, not the file: Gradle's incremental packaging leaves the
+    # file at its old size with holes (a clean build is about this size).
+    put "APK size, compressed entries (MB)" "$(unzip -lv "$APK" | tail -1 | awk '{printf "%.1f", $2/1048576}')"
+    put "APK: Rust library (MB)" "$(unzip -lv "$APK" | awk '/libatomic_flutter_rust.so/ {printf "%.1f", $1/1048576}')"
+  fi
 fi
 if step size && [ -f "$here/assets/embed/embed.html" ]; then
   "$here/scripts/check_embed_size.sh" > "$work/embed_size.txt" 2>&1 || true

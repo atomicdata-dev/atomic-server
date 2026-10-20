@@ -44,3 +44,9 @@ opt-level = 2
 
 [profile.dev.package.atomic_lib]
 opt-level = 1
+
+# What ships (cargokit builds `--release` for profile and release apps): one
+# codegen unit and fat LTO let the linker drop what the app never calls.
+[profile.release]
+lto = "fat"
+codegen-units = 1
