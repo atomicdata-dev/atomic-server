@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'device_stats.dart';
 import 'server_info.dart';
 
 /// Public identity only. Secrets are retrieved on explicit user action.
@@ -68,6 +69,13 @@ abstract class AtomicSettingsBackend {
 
   /// Look for the other devices now. Null: no "Search again" button.
   void Function()? get searchAgain => null;
+
+  /// How much of the person's data this device holds. Slow on a big store: the
+  /// card asks lazily and caches. Null: the host cannot say (nothing shown).
+  Future<StoreStats?> storeStats() async => null;
+
+  /// What this build and platform are; null when unknown.
+  DeviceInfo? deviceInfo() => null;
 }
 
 /// The device search's state (`peer_search_status` in the bridge): what it is

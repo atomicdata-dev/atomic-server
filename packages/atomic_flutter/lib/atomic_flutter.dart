@@ -12,3 +12,6 @@ export 'src/theme.dart';
 export 'src/hold_fan.dart';
 
 export 'src/perf.dart';
+
+export 'src/device_stats.dart';
+export 'src/sync_widgets.dart';
