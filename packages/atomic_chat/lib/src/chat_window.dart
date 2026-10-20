@@ -369,8 +369,7 @@ class ChatScrollKeeper {
   static const showButtonDistance = 120.0;
 
   bool get farFromBottom =>
-      controller.hasClients &&
-      controller.position.pixels > showButtonDistance;
+      controller.hasClients && controller.position.pixels > showButtonDistance;
 
   /// The index (from the bottom) the list last built: where the eye is.
   int _lastBuilt = 0;
@@ -419,9 +418,8 @@ class ChatScrollKeeper {
     final pos = controller.position;
     final view = pos.viewportDimension;
     if (reload && pos.pixels > 1.5 * view) {
-      controller.jumpTo(pos.maxScrollExtent < 1.5 * view
-          ? pos.maxScrollExtent
-          : 1.5 * view);
+      controller.jumpTo(
+          pos.maxScrollExtent < 1.5 * view ? pos.maxScrollExtent : 1.5 * view);
     } else if (pos.pixels > 3 * view) {
       controller.jumpTo(1.5 * view);
     }
@@ -479,8 +477,9 @@ class _RowEntranceState extends State<RowEntrance>
   Widget build(BuildContext context) => FadeTransition(
         opacity: _c,
         child: SlideTransition(
-          position: _c.drive(Tween(begin: const Offset(0, 0.25), end: Offset.zero)
-              .chain(CurveTween(curve: Curves.easeOut))),
+          position: _c.drive(
+              Tween(begin: const Offset(0, 0.25), end: Offset.zero)
+                  .chain(CurveTween(curve: Curves.easeOut))),
           child: widget.child,
         ),
       );

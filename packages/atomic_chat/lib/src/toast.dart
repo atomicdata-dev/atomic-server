@@ -111,9 +111,8 @@ class ToastScope extends InheritedNotifier<ToastController> {
     required super.child,
   }) : super(notifier: controller);
 
-  static ToastController? maybeOf(BuildContext context) => context
-      .getInheritedWidgetOfExactType<ToastScope>()
-      ?.notifier;
+  static ToastController? maybeOf(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<ToastScope>()?.notifier;
 
   static ToastController of(BuildContext context) =>
       maybeOf(context) ?? (throw StateError('No ToastHost above this context'));

@@ -56,8 +56,8 @@ ScrollPosition _pos(WidgetTester tester) =>
     tester.state<ScrollableState>(find.byType(Scrollable).first).position;
 
 /// Streams [lines] paragraphs, pumping past the screen's ~30 fps redraw.
-Future<void> _stream(
-    WidgetTester tester, StreamController<String> c, Iterable<int> lines) async {
+Future<void> _stream(WidgetTester tester, StreamController<String> c,
+    Iterable<int> lines) async {
   for (final i in lines) {
     c.add('Answer paragraph $i.\n\n');
     await tester.pump(const Duration(milliseconds: 50));
@@ -114,14 +114,14 @@ void main() {
     final c = StreamController<String>();
     await tester.pumpWidget(_app(ChatScreen(
         api: _Api(_ai(() => c.stream), history: [
-      for (var i = 0; i < 30; i++)
-        (
-          id: 'h$i',
-          role: i.isEven ? 'user' : 'assistant',
-          text: 'Earlier message $i',
-          createdAt: 1700000000000 + i * 1000
-        ),
-    ]),
+          for (var i = 0; i < 30; i++)
+            (
+              id: 'h$i',
+              role: i.isEven ? 'user' : 'assistant',
+              text: 'Earlier message $i',
+              createdAt: 1700000000000 + i * 1000
+            ),
+        ]),
         subject: 'did:ad:chat')));
     await tester.pumpAndSettle();
     await _send(tester, 'Question');
@@ -140,8 +140,8 @@ void main() {
 
   testWidgets('a chat whose last answer is long opens at that answer\'s start',
       (tester) async {
-    final long = [for (var i = 0; i < 60; i++) 'Long answer paragraph $i.']
-        .join('\n\n');
+    final long =
+        [for (var i = 0; i < 60; i++) 'Long answer paragraph $i.'].join('\n\n');
     await tester.pumpWidget(_app(ChatScreen(
         api: _Api(_ai(() => const Stream.empty()), history: [
           (id: 'q', role: 'user', text: 'Tell me a lot', createdAt: 1),

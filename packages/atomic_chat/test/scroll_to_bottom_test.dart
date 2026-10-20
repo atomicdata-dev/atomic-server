@@ -91,7 +91,8 @@ void main() {
         ConversationScreen(api: api, subject: 'did:ad:c', title: 'C'),
   };
   for (final e in screens.entries) {
-    testWidgets('${e.key}: button hidden at the bottom, shown and used '
+    testWidgets(
+        '${e.key}: button hidden at the bottom, shown and used '
         'after scrolling up', (tester) async {
       await tester.pumpWidget(_app(e.value(_Api())));
       await tester.pumpAndSettle();
@@ -117,8 +118,8 @@ void main() {
 
   testWidgets('the button scales in from nothing and out again',
       (tester) async {
-    await tester.pumpWidget(_app(
-        ConversationScreen(api: _Api(), subject: 'did:ad:c', title: 'C')));
+    await tester.pumpWidget(
+        _app(ConversationScreen(api: _Api(), subject: 'did:ad:c', title: 'C')));
     await tester.pumpAndSettle();
     await tester.drag(find.byType(ListView), const Offset(0, 500));
     await tester.pump();

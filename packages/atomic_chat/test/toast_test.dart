@@ -66,7 +66,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(tester.getRect(find.byKey(const Key('content'))), before);
-      final card = tester.getRect(find.byKey(const ValueKey('toast-sync:error')));
+      final card =
+          tester.getRect(find.byKey(const ValueKey('toast-sync:error')));
       expect(card.right, 1200 - ToastHost.margin);
       expect(card.width, ToastHost.maxWidth);
       expect(card.top, lessThan(80));
