@@ -95,6 +95,21 @@ class AtomicClient {
   static AgentInfo agentFromSecret(String secret) =>
       ffi.agentFromSecret(secret: secret);
 
+  /// What this build and platform are: `{version, os, arch}`.
+  static Map<String, dynamic> deviceInfoJson() {
+    try {
+      return jsonDecode(ffi.deviceInfo()) as Map<String, dynamic>;
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  /// How much of the person's data this device holds: the bridge's
+  /// `store_stats` JSON (`resources`, `loro_bytes`, `blob_bytes`,
+  /// `disk_bytes?`, `drives`). Counted on the Rust async pool.
+  static Future<Map<String, dynamic>> storeStatsJson() async =>
+      jsonDecode(await ffi.storeStats()) as Map<String, dynamic>;
+
   // ── 3. Drive ─────────────────────────────────────────────────────────────
 
   static Future<String> createDrive(String name) => ffi.createDrive(name: name);

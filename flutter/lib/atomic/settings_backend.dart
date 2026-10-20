@@ -1,3 +1,4 @@
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
@@ -95,6 +96,60 @@ class AppSettingsBackend extends shared.AtomicSettingsBackend {
       shared.PeerSearchInfo.fromJson(AtomicClient.peerSearchStatus());
   @override
   void Function() get searchAgain => AtomicClient.peerSearchAgain;
+
+  static const _statsTtl = Duration(seconds: 30);
+  static shared.StoreStats? _stats;
+  static DateTime? _statsAt;
+  static Future<shared.StoreStats?>? _statsRunning;
+
+  /// Counted off the UI thread by the bridge, kept for 30 s, and one count at
+  /// a time however often the card asks.
+  @override
+  Future<shared.StoreStats?> storeStats({bool refresh = false}) {
+    final at = _statsAt;
+    if (!refresh &&
+        _stats != null &&
+        at != null &&
+        DateTime.now().difference(at) < _statsTtl) {
+      return Future.value(_stats);
+    }
+    return _statsRunning ??= () async {
+      try {
+        final stats =
+            shared.StoreStats.fromJson(await AtomicClient.storeStatsJson());
+        _stats = stats;
+        _statsAt = DateTime.now();
+        return stats;
+      } finally {
+        _statsRunning = null;
+      }
+    }();
+  }
+
+  @override
+  shared.DeviceInfo? deviceInfo() {
+    final info = AtomicClient.deviceInfoJson();
+    String? platform;
+    try {
+      platform = _platformName(Platform.operatingSystem);
+    } catch (_) {
+      // dart:io has no platform on the web.
+    }
+    return shared.DeviceInfo(
+      platform: platform,
+      appVersion: info['version'] as String?,
+      arch: info['arch'] as String?,
+    );
+  }
+
+  static String _platformName(String os) => switch (os) {
+        'android' => 'Android',
+        'ios' => 'iOS',
+        'macos' => 'macOS',
+        'windows' => 'Windows',
+        'linux' => 'Linux',
+        _ => os,
+      };
 
   @override
   shared.AtomicServerBackend get servers => AppServerBackend();

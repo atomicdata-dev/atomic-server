@@ -54,8 +54,8 @@ abstract final class SyncText {
       fontSize: 20, fontWeight: FontWeight.w600, color: c.textPrimary);
   static TextStyle chip(Color color) =>
       TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color);
-  static TextStyle mono(AppColors c) => caption(c).copyWith(
-      fontFamily: 'monospace', fontFamilyFallback: const ['Courier']);
+  static TextStyle mono(AppColors c) => caption(c)
+      .copyWith(fontFamily: 'monospace', fontFamilyFallback: const ['Courier']);
 }
 
 /// What a chip or note says about a state. The hues are the toast's
@@ -279,7 +279,8 @@ class KeyValueRow extends StatelessWidget {
     if (tap == null) return row;
     return InkWell(
       onTap: tap,
-      child: Semantics(button: true, label: '$label, ${value ?? ''}', child: row),
+      child:
+          Semantics(button: true, label: '$label, ${value ?? ''}', child: row),
     );
   }
 }
@@ -439,10 +440,8 @@ class SyncNote extends StatelessWidget {
           const SizedBox(width: SyncGap.m),
         ],
         Expanded(
-          child: Text(text,
-              style: plain
-                  ? SyncText.caption(c)
-                  : SyncText.body(c)),
+          child:
+              Text(text, style: plain ? SyncText.caption(c) : SyncText.body(c)),
         ),
         if (action != null) action!,
       ]),
@@ -486,4 +485,62 @@ class SyncSpinner extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const SizedBox.square(
       dimension: 20, child: CircularProgressIndicator(strokeWidth: 2));
+}
+
+/// A two-line row: an icon, a title, a muted subtitle and a trailing widget;
+/// 56 dp when it has a subtitle, else 48.
+class SyncRow extends StatelessWidget {
+  const SyncRow({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.icon,
+    this.iconColor,
+    this.trailing,
+    this.onTap,
+    this.destructive = false,
+  });
+
+  final String title;
+  final String? subtitle;
+  final IconData? icon;
+  final Color? iconColor;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = syncColors(context);
+    final row = ConstrainedBox(
+      constraints: BoxConstraints(minHeight: subtitle == null ? 48 : 56),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+            horizontal: SyncGap.l, vertical: SyncGap.s),
+        child: Row(children: [
+          if (icon != null) ...[
+            Icon(icon,
+                size: 24,
+                color: iconColor ?? (destructive ? c.textSecondary : c.main)),
+            const SizedBox(width: SyncGap.m),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: SyncText.body(c)),
+                if (subtitle != null && subtitle!.isNotEmpty)
+                  Text(subtitle!, style: SyncText.caption(c)),
+              ],
+            ),
+          ),
+          if (trailing != null) ...[
+            const SizedBox(width: SyncGap.s),
+            trailing!,
+          ],
+        ]),
+      ),
+    );
+    return onTap == null ? row : InkWell(onTap: onTap, child: row);
+  }
 }

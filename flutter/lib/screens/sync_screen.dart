@@ -22,6 +22,7 @@ import '../atomic/settings_backend.dart';
 import '../theme.dart';
 import 'account_link_dialog.dart';
 import 'edit_profile_screen.dart';
+import 'this_device_card.dart';
 
 /// The circle for an identity: its picture, else emoji, else initial.
 Widget agentAvatar(shared.AtomicIdentity? agent, {double radius = 16}) =>
@@ -430,7 +431,7 @@ class _SyncScreenState extends State<SyncScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.appColors;
+    final c = shared.syncColors(context);
     return Scaffold(
       backgroundColor: c.bgBody,
       appBar: const AppTopBar(title: 'Sync'),
@@ -439,26 +440,32 @@ class _SyncScreenState extends State<SyncScreen> {
           // A tablet's detail pane: a readable column, centred.
           : ReadableWidth(
               child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+              padding: const EdgeInsets.fromLTRB(
+                  shared.SyncGap.l, shared.SyncGap.xs, shared.SyncGap.l, 32),
               children: [
                 if (_error != null)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(_error!, style: TextStyle(color: c.alert)),
+                    padding: const EdgeInsets.only(bottom: shared.SyncGap.m),
+                    child: shared.SyncNote(_error!,
+                        tone: shared.SyncTone.error, icon: Icons.error_outline),
                   ),
                 _identity(c),
                 _workspaceSwitcher(c),
                 if (_account != null || _accountError != null) _account_(c),
                 if (_account == null && _portal != null) _linkRow(c, _portal!),
-                _group(c, 'This device', [_thisDevice(c)]),
+                ThisDeviceCard(
+                  backend: _backend,
+                  deviceName: _deviceName,
+                  peerId: _peerId,
+                  identity: _agent?.subject,
+                  driveNames: _drives,
+                  onRename: _rename,
+                ),
                 // Servers, paired devices and the pairing code: the browser's
                 // Devices list.
-                Padding(
-                  padding: const EdgeInsets.only(top: 20),
-                  child: shared.ServerSettingsSection(
-                    backend: _backend,
-                    onServerChanged: _load,
-                  ),
+                shared.ServerSettingsSection(
+                  backend: _backend,
+                  onServerChanged: _load,
                 ),
               ],
             )),
@@ -470,22 +477,16 @@ class _SyncScreenState extends State<SyncScreen> {
   Widget _workspaceSwitcher(AppColors c) {
     final active = _activeDrive;
     return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: Material(
-        color: c.bgBody,
-        shape: RoundedRectangleBorder(
-          side: BorderSide(color: c.textSecondary.withValues(alpha: 0.3)),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: ListTile(
-          dense: true,
-          leading: Icon(Icons.folder_outlined, color: c.main),
-          title: Text(active == null ? 'No workspace' : _driveLabel(active)),
-          subtitle: const Text('Workspace'),
-          trailing: Icon(Icons.expand_more, color: c.textSecondary),
+      padding: const EdgeInsets.only(top: shared.SyncGap.l),
+      child: shared.SyncCard(children: [
+        shared.SyncRow(
+          icon: Icons.folder_outlined,
+          title: active == null ? 'No workspace' : _driveLabel(active),
+          subtitle: 'Workspace',
+          trailing: Icon(Icons.expand_more, size: 24, color: c.textSecondary),
           onTap: _pickWorkspace,
         ),
-      ),
+      ]),
     );
   }
 
@@ -504,35 +505,35 @@ class _SyncScreenState extends State<SyncScreen> {
         elsewhere++;
       }
     }
-    final c = context.appColors;
+    final c = shared.syncColors(context);
     final picked = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       backgroundColor: c.bgBody,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
       builder: (ctx) => SafeArea(
         child: ListView(
           shrinkWrap: true,
           children: [
             for (final d in shown)
-              ListTile(
-                leading: Icon(
-                    d == _activeDrive
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_off,
-                    color: c.main),
-                title: Text(_driveLabel(d)),
+              shared.SyncRow(
+                icon: d == _activeDrive
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
+                title: _driveLabel(d),
                 onTap: () => Navigator.pop(ctx, d),
               ),
             if (elsewhere > 0)
-              ListTile(
-                leading:
-                    Icon(Icons.cloud_download_outlined, color: c.textSecondary),
-                title: Text(
-                    '$elsewhere more workspace${elsewhere == 1 ? '' : 's'} not on this device yet'),
+              shared.SyncRow(
+                icon: Icons.cloud_download_outlined,
+                iconColor: c.textSecondary,
+                title:
+                    '$elsewhere more workspace${elsewhere == 1 ? '' : 's'} not on this device yet',
               ),
-            ListTile(
-              leading: Icon(Icons.add, color: c.main),
-              title: const Text('New workspace'),
+            shared.SyncRow(
+              icon: Icons.add,
+              title: 'New workspace',
               onTap: () => Navigator.pop(ctx, ''),
             ),
           ],
@@ -547,29 +548,6 @@ class _SyncScreenState extends State<SyncScreen> {
     }
   }
 
-  Widget _group(AppColors c, String title, List<Widget> children) => Padding(
-        padding: const EdgeInsets.only(top: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(title,
-                  style: TextStyle(
-                      color: c.textSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600)),
-            ),
-            Material(
-              color: c.bg1,
-              borderRadius: BorderRadius.circular(12),
-              clipBehavior: Clip.antiAlias,
-              child: Column(children: children),
-            ),
-          ],
-        ),
-      );
-
   Widget _identity(AppColors c) {
     final agent = _agent;
     return Column(
@@ -580,14 +558,14 @@ class _SyncScreenState extends State<SyncScreen> {
           borderRadius: BorderRadius.circular(12),
           child: Row(children: [
             agentAvatar(agent, radius: 28),
-            const SizedBox(width: 16),
+            const SizedBox(width: shared.SyncGap.l),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     (agent?.name?.isNotEmpty ?? false) ? agent!.name! : 'You',
-                    style: Theme.of(context).textTheme.titleLarge,
+                    style: shared.SyncText.title(c),
                   ),
                   if (agent != null)
                     // The ID with a copy mark: a bare line of grey text gave
@@ -599,16 +577,16 @@ class _SyncScreenState extends State<SyncScreen> {
                         onTap: () => _copy(agent.subject, 'Agent ID'),
                         borderRadius: BorderRadius.circular(6),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: shared.SyncGap.s),
                           child: Row(mainAxisSize: MainAxisSize.min, children: [
                             Flexible(
-                              child: Text(_short(agent.subject),
+                              child: Text(shared.shortId(agent.subject),
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                      color: c.textSecondary, fontSize: 12)),
+                                  style: shared.SyncText.caption(c)),
                             ),
-                            const SizedBox(width: 6),
-                            Icon(Icons.copy, size: 14, color: c.textSecondary),
+                            const SizedBox(width: shared.SyncGap.s),
+                            Icon(Icons.copy, size: 20, color: c.textSecondary),
                           ]),
                         ),
                       ),
@@ -617,23 +595,26 @@ class _SyncScreenState extends State<SyncScreen> {
               ),
             ),
             if (agent != null)
-              Icon(Icons.chevron_right, color: c.textSecondary),
+              Icon(Icons.chevron_right, size: 24, color: c.textSecondary),
           ]),
         ),
-        const SizedBox(height: 12),
-        Wrap(spacing: 8, children: [
-          OutlinedButton.icon(
-            icon: const Icon(Icons.key, size: 16),
-            label: const Text('Copy secret key'),
-            onPressed: _copySecret,
-          ),
-          if (_backend.signOut != null)
-            OutlinedButton.icon(
-              icon: const Icon(Icons.logout, size: 16),
-              label: const Text('Sign out'),
-              onPressed: _signOut,
-            ),
-        ]),
+        const SizedBox(height: shared.SyncGap.m),
+        Wrap(
+            spacing: shared.SyncGap.s,
+            runSpacing: shared.SyncGap.s,
+            children: [
+              shared.SyncActionButton(
+                icon: Icons.key,
+                label: 'Copy secret key',
+                onPressed: _copySecret,
+              ),
+              if (_backend.signOut != null)
+                shared.SyncActionButton(
+                  icon: Icons.logout,
+                  label: 'Sign out',
+                  onPressed: _signOut,
+                ),
+            ]),
       ],
     );
   }
@@ -643,73 +624,68 @@ class _SyncScreenState extends State<SyncScreen> {
   Widget _account_(AppColors c) {
     final account = _account;
     if (account == null) {
-      return _group(c, 'Account', [
-        ListTile(
-          leading: Icon(Icons.error_outline, color: c.alert),
-          title: const Text('Could not read your account'),
-          subtitle: Text(_accountError ?? ''),
+      return shared.SyncSection(title: 'Account', children: [
+        shared.SyncRow(
+          icon: Icons.error_outline,
+          iconColor: c.alert,
+          title: 'Could not read your account',
+          subtitle: _accountError ?? '',
           trailing:
-              TextButton(onPressed: _loadAccount, child: const Text('Retry')),
+              shared.SyncTextAction(label: 'Retry', onPressed: _loadAccount),
         ),
       ]);
     }
     final vault = account.vault;
     final server = account.server;
-    return _group(c, 'Account', [
-      ListTile(
-        leading: Icon(Icons.alternate_email, color: c.main),
-        title: Text(account.address),
-        subtitle: Text(account.portal.host),
+    return shared.SyncSection(title: 'Account', children: [
+      shared.SyncRow(
+        icon: Icons.alternate_email,
+        title: account.address,
+        subtitle: account.portal.host,
       ),
-      ListTile(
-        leading: Icon(Icons.shield_outlined, color: c.main),
-        title: const Text('Cloud Vault'),
-        subtitle: Text(vault == null
+      shared.SyncRow(
+        icon: Icons.shield_outlined,
+        title: 'Cloud Vault',
+        subtitle: vault == null
             ? 'Off for ${_driveLabel(_activeDrive ?? '')}'
-            : _vaultLine(vault)),
+            : _vaultLine(vault),
       ),
-      ListTile(
-        leading: Icon(Icons.cloud_outlined, color: c.main),
-        title: const Text('Cloud Server'),
-        subtitle: Text(server == null
+      shared.SyncRow(
+        icon: Icons.cloud_outlined,
+        title: 'Cloud Server',
+        subtitle: server == null
             ? 'Off for ${_driveLabel(_activeDrive ?? '')}'
-            : _serverLine(server)),
+            : _serverLine(server),
       ),
-      ListTile(
-        leading: Icon(Icons.auto_awesome_outlined, color: c.main),
-        title: const Text('AI credits'),
-        subtitle: Text(_creditsLine()),
+      shared.SyncRow(
+        icon: Icons.auto_awesome_outlined,
+        title: 'AI credits',
+        subtitle: _creditsLine(),
         trailing: _creditsLoading
-            ? const SizedBox.square(
-                dimension: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
+            ? const shared.SyncSpinner()
             : IconButton(
                 tooltip: 'Refresh AI credits',
-                icon: const Icon(Icons.refresh),
+                icon: const Icon(Icons.refresh, size: 24),
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                 onPressed: _loadCredits),
       ),
       if (_credits?.purchasesEnabled == true)
-        ListTile(
-          leading: Icon(Icons.add_card_outlined, color: c.main),
-          title: const Text('Get more credits'),
+        shared.SyncRow(
+          icon: Icons.add_card_outlined,
+          title: 'Get more credits',
           onTap: () => _openInBrowser(account.portal
               .replace(path: '/dashboard', query: null, fragment: null)),
         ),
-      ListTile(
-        leading: Icon(Icons.open_in_new, color: c.main),
-        title: const Text('Manage in the portal'),
-        trailing: _openingPortal
-            ? const SizedBox.square(
-                dimension: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : null,
+      shared.SyncRow(
+        icon: Icons.open_in_new,
+        title: 'Manage in the portal',
+        trailing: _openingPortal ? const shared.SyncSpinner() : null,
         onTap: () => _openPortal(account.portal),
       ),
-      ListTile(
-        leading: Icon(Icons.link_off, color: c.textSecondary),
-        title: const Text('Unlink this device'),
+      shared.SyncRow(
+        icon: Icons.link_off,
+        iconColor: c.textSecondary,
+        title: 'Unlink this device',
         onTap: _unlink,
       ),
     ]);
@@ -739,32 +715,14 @@ class _SyncScreenState extends State<SyncScreen> {
     ].join(' · ');
   }
 
-  Widget _linkRow(AppColors c, String portal) => _group(c, 'Account', [
-        ListTile(
-          leading: Icon(Icons.link, color: c.main),
-          title: const Text('Link your account'),
-          subtitle: Text(
-              'Show Cloud Vault and Cloud Server from ${Uri.tryParse(portal)?.host ?? portal}'),
+  Widget _linkRow(AppColors c, String portal) =>
+      shared.SyncSection(title: 'Account', children: [
+        shared.SyncRow(
+          icon: Icons.link,
+          title: 'Link your account',
+          subtitle:
+              'Show Cloud Vault and Cloud Server from ${Uri.tryParse(portal)?.host ?? portal}',
           onTap: () => _link(portal),
         ),
       ]);
-
-  Widget _thisDevice(AppColors c) {
-    final online = _peerId != null;
-    return ListTile(
-      leading: Icon(Icons.phone_android, color: c.main),
-      title: Text(_deviceName.isEmpty ? 'This device' : _deviceName),
-      subtitle: Text([
-        online ? 'Online' : 'Offline',
-        if (_peerId != null) _short(_peerId!),
-      ].join(' · ')),
-      trailing: const Icon(Icons.edit_outlined, size: 18),
-      onTap: _rename,
-      onLongPress: _peerId == null ? null : () => _copy(_peerId!, 'Device ID'),
-    );
-  }
-
-  static String _short(String id) => id.length <= 22
-      ? id
-      : '${id.substring(0, 12)}…${id.substring(id.length - 6)}';
 }

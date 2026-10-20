@@ -71,8 +71,8 @@ abstract class AtomicSettingsBackend {
   void Function()? get searchAgain => null;
 
   /// How much of the person's data this device holds. Slow on a big store: the
-  /// card asks lazily and caches. Null: the host cannot say (nothing shown).
-  Future<StoreStats?> storeStats() async => null;
+  /// card asks lazily; the host may cache, and [refresh] asks for a fresh count. Null: the host cannot say (nothing shown).
+  Future<StoreStats?> storeStats({bool refresh = false}) async => null;
 
   /// What this build and platform are; null when unknown.
   DeviceInfo? deviceInfo() => null;

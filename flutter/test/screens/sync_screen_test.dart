@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
-import 'package:atomic_chat/atomic_chat.dart' show ResourceWebView;
+import 'package:atomic_flutter/atomic_flutter.dart' show SyncCard;
+import 'package:atomic_chat/atomic_chat.dart'
+    show ProfileAvatar, ResourceWebView;
 import 'package:atomic_app/atomic/account_store.dart';
 import 'package:atomic_app/screens/sync_screen.dart';
 import 'package:atomic_app/theme.dart';
@@ -47,8 +51,19 @@ class _Backend extends shared.AtomicSettingsBackend {
   String description = '';
   String? emoji;
 
+  /// What the device card asks for; null leaves the card without it.
+  Future<shared.StoreStats?> Function()? stats;
+  shared.DeviceInfo? info;
+  List<Map<String, String>> peers = [];
+
   _Backend({shared.AtomicServerBackend? servers, this.editable = false})
       : _servers = servers;
+
+  @override
+  Future<shared.StoreStats?> storeStats({bool refresh = false}) async =>
+      stats?.call();
+  @override
+  shared.DeviceInfo? deviceInfo() => info;
 
   @override
   Future<shared.AtomicIdentity?> getActiveAgent() async =>
@@ -89,7 +104,7 @@ class _Backend extends shared.AtomicSettingsBackend {
   @override
   Future<void> setDeviceName(String name) async {}
   @override
-  Future<List<Map<String, String>>> getKnownPeers() async => [];
+  Future<List<Map<String, String>>> getKnownPeers() async => peers;
   @override
   Future<Set<String>> livePeerIds() async => {};
   @override
@@ -395,6 +410,235 @@ void main() {
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(find.text('AI credits'), 300);
       expect(find.text('—'), findsOneWidget);
+    });
+  });
+
+  group('This device card', () {
+    final stats = shared.StoreStats.fromJson({
+      'resources': 1700,
+      'loro_bytes': 3 * 1024 * 1024,
+      'blob_bytes': 1024 * 1024,
+      'disk_bytes': 9 * 1024 * 1024,
+      'drives': [
+        {
+          'subject': 'did:ad:b',
+          'name': 'Team',
+          'resources': 200,
+          'bytes': 1024 * 1024
+        },
+        {
+          'subject': 'did:ad:a',
+          'name': 'Archive',
+          'resources': 1500,
+          'bytes': 3 * 1024 * 1024
+        },
+      ],
+    })!;
+
+    _Backend full() => _Backend()
+      ..stats = (() async => stats)
+      ..info = const shared.DeviceInfo(
+          platform: 'Android', appVersion: '0.41.0', arch: 'aarch64')
+      ..peers = [
+        {'node_id': 'n1', 'name': 'Laptop', 'last_synced': '1700000000000'},
+      ];
+
+    testWidgets('shows name, platform, version, size and drives in order',
+        (tester) async {
+      await tester.pumpWidget(_app(SyncScreen(
+        backend: full(),
+        loadAccount: (_) async => null,
+      )));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pixel'), findsOneWidget);
+      expect(find.text('Android · aarch64'), findsOneWidget);
+      expect(find.text('0.41.0'), findsOneWidget);
+      expect(find.text('4.0 MB · 1.7k resources'), findsOneWidget);
+      expect(find.text('9.0 MB'), findsOneWidget);
+      expect(find.text('Synced with'), findsOneWidget);
+      expect(find.text('1 device'), findsOneWidget);
+      // Biggest drive first, with its size and count.
+      final archive =
+          tester.getTopLeft(find.byKey(const ValueKey('drive-row-did:ad:a')));
+      final team =
+          tester.getTopLeft(find.byKey(const ValueKey('drive-row-did:ad:b')));
+      expect(archive.dy, lessThan(team.dy));
+      expect(find.text('3.0 MB · 1.5k resources'), findsOneWidget);
+      expect(find.text('1.0 MB · 200 resources'), findsOneWidget);
+      // The paired device says it does not know how much it holds.
+      await tester.scrollUntilVisible(find.text('Data size unknown'), 300,
+          scrollable: find.byType(Scrollable).first);
+      expect(find.text('Data size unknown'), findsOneWidget);
+    });
+
+    testWidgets('a spinner stands in while the data is counted',
+        (tester) async {
+      final done = Completer<shared.StoreStats?>();
+      await tester.pumpWidget(_app(SyncScreen(
+        backend: full()..stats = (() => done.future),
+        loadAccount: (_) async => null,
+      )));
+      await tester.pump();
+      await tester.pump();
+      expect(find.byKey(const Key('stats-loading')), findsOneWidget);
+      done.complete(stats);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('stats-loading')), findsNothing);
+      expect(find.byKey(const Key('stats-total')), findsOneWidget);
+    });
+
+    testWidgets('a count that fails shows nothing broken', (tester) async {
+      await tester.pumpWidget(_app(SyncScreen(
+        backend: full()..stats = (() async => throw StateError('no store')),
+        loadAccount: (_) async => null,
+      )));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('stats-loading')), findsNothing);
+      expect(find.byKey(const Key('stats-total')), findsNothing);
+      expect(find.textContaining('no store'), findsNothing);
+      expect(find.text('Pixel'), findsOneWidget);
+    });
+
+    testWidgets('the device id copies on tap', (tester) async {
+      String? copied;
+      tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      });
+      addTearDown(() => tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null));
+      await tester.pumpWidget(_app(SyncScreen(
+        backend: full(),
+        loadAccount: (_) async => null,
+      )));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const Key('copy-device-id')));
+      await tester.tap(find.byKey(const Key('copy-device-id')));
+      await tester.pump();
+      expect(copied, 'a1b2c3d4e5f6a7b8c9d0e1f2');
+      expect(find.text('Device ID copied'), findsOneWidget);
+      await tester.pumpAndSettle(const Duration(seconds: 5));
+    });
+  });
+
+  group('style consistency', () {
+    final allowedSizes = {12.0, 13.0, 14.0, 15.0, 20.0};
+
+    Future<void> pumpFull(WidgetTester tester, Brightness brightness,
+        {Size size = const Size(393, 852)}) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final backend = _Backend(servers: _Servers(managed: true))
+        ..stats = (() async => shared.StoreStats.fromJson({
+              'resources': 3,
+              'loro_bytes': 2048,
+              'drives': [
+                {
+                  'subject': 'did:ad:a',
+                  'name': 'Private',
+                  'resources': 3,
+                  'bytes': 2048
+                },
+              ],
+            }))
+        ..info = const shared.DeviceInfo(platform: 'Android', appVersion: '1')
+        ..peers = [
+          {'node_id': 'n1', 'name': 'Laptop', 'last_synced': '1700000000000'},
+        ];
+      await tester.pumpWidget(MaterialApp(
+        theme: ThemeData(brightness: brightness, extensions: [
+          brightness == Brightness.dark ? AppColors.dark : AppColors.light
+        ]),
+        home: SyncScreen(
+          backend: backend,
+          loadCredits: () async => null,
+          loadAccount: (_) async => AccountSummary(
+            address: 'joep@example.org',
+            portal: Uri.parse('https://portal.example'),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    for (final brightness in Brightness.values) {
+      testWidgets('only the allowed font sizes, ${brightness.name}',
+          (tester) async {
+        await pumpFull(tester, brightness);
+        final bad = <String>[];
+        // Everything the list builds, scrolled through in pages.
+        for (var page = 0; page < 8; page++) {
+          for (final e in tester.widgetList<Text>(find.byType(Text))) {
+            final text = e.data ?? e.textSpan?.toPlainText() ?? '';
+            if (text.isEmpty) continue;
+            final element = tester.element(find.byWidget(e).first);
+            // The avatar's letter is a picture, not text.
+            if (element.findAncestorWidgetOfExactType<ProfileAvatar>() !=
+                null) {
+              continue;
+            }
+            final size =
+                DefaultTextStyle.of(element).style.merge(e.style).fontSize;
+            // Buttons and app bar title come from the theme: judged by size.
+            if (size != null && !allowedSizes.contains(size) && size != 22) {
+              bad.add('$text: $size');
+            }
+          }
+          await tester.drag(find.byType(ListView).first, const Offset(0, -400));
+          await tester.pumpAndSettle();
+        }
+        expect(bad.toSet(), isEmpty);
+      });
+    }
+
+    testWidgets('every card shares one border, radius and fill',
+        (tester) async {
+      await pumpFull(tester, Brightness.dark);
+      final cards = <BoxDecoration>[];
+      for (var page = 0; page < 8; page++) {
+        for (final card in tester.widgetList<SyncCard>(find.byType(SyncCard))) {
+          final c = tester.element(find.byWidget(card).first);
+          final box = tester
+              .widgetList<Container>(find.descendant(
+                  of: find.byWidget(card), matching: find.byType(Container)))
+              .map((w) => w.decoration)
+              .whereType<BoxDecoration>()
+              .first;
+          expect(box, shared.syncCardDecoration(shared.syncColors(c)));
+          cards.add(box);
+        }
+        await tester.drag(find.byType(ListView).first, const Offset(0, -400));
+        await tester.pumpAndSettle();
+      }
+      expect(cards, isNotEmpty);
+      final first = cards.first;
+      for (final b in cards) {
+        expect(b.border, first.border);
+        expect(b.borderRadius, BorderRadius.circular(12));
+        expect(b.color, first.color);
+        expect(b.boxShadow, isNull);
+      }
+    });
+
+    testWidgets('tablet: the column is centred and at most 720 wide',
+        (tester) async {
+      await pumpFull(tester, Brightness.light, size: const Size(1200, 900));
+      final card = tester.getRect(find.byType(SyncCard).first);
+      expect(card.width, lessThanOrEqualTo(720));
+      expect(card.center.dx, closeTo(600, 1));
+    });
+
+    testWidgets('phone: cards keep 16 dp gutters', (tester) async {
+      await pumpFull(tester, Brightness.light);
+      final card = tester.getRect(find.byType(SyncCard).first);
+      expect(card.left, 16);
+      expect(card.right, 393 - 16);
     });
   });
 }

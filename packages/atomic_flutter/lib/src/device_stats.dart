@@ -3,7 +3,6 @@
 /// cannot tell returns null and the card leaves the line out.
 library;
 
-
 export 'server_info.dart' show formatBytes;
 
 /// A count as a person reads it, the same in every locale: `842`, `1.2k`,
