@@ -269,3 +269,13 @@ Future<String> watchChildren({required String parent}) =>
 
 String getKnownPeersJson() =>
     RustLib.instance.api.crateApiSimpleGetKnownPeersJson();
+
+/// What this build is, for the "This device" card: `{"version": …, "os": …,
+/// "arch": …}` (the library's version and the platform it was built for).
+String deviceInfo() => RustLib.instance.api.crateApiSimpleDeviceInfo();
+
+/// How much of the person's data this device holds: `{disk_bytes?, resources,
+/// loro_bytes, blob_bytes, drives: [{subject, name, resources, bytes, …}]}`,
+/// biggest drive first. Walks the drives' resources, so it runs on the async
+/// pool, never the UI thread; the caller caches it.
+Future<String> storeStats() => RustLib.instance.api.crateApiSimpleStoreStats();

@@ -179,6 +179,7 @@ pub async fn open_db(path: String) -> Result<(), String> {
     set_db(store);
     #[cfg(not(target_arch = "wasm32"))]
     {
+        state::set_store_dir(std::path::Path::new(&path));
         catch_up_search_index(db()?.clone()).await;
         crate::host::start_recents(std::path::Path::new(&path), db()?.clone());
     }
@@ -1496,4 +1497,28 @@ pub fn get_known_peers_json() -> String {
     let Ok(store) = db() else { return "[]".into() };
     let peers = atomic_lib::sync::peer::get_known_peers(store.as_ref());
     serde_json::to_string(&peers).unwrap_or_else(|_| "[]".into())
+}
+
+/// What this build is, for the "This device" card: `{"version": …, "os": …,
+/// "arch": …}` (the library's version and the platform it was built for).
+#[frb(sync)]
+pub fn device_info() -> String {
+    serde_json::json!({
+        "version": atomic_lib::VERSION,
+        "os": std::env::consts::OS,
+        "arch": std::env::consts::ARCH,
+    })
+    .to_string()
+}
+
+/// How much of the person's data this device holds: `{disk_bytes?, resources,
+/// loro_bytes, blob_bytes, drives: [{subject, name, resources, bytes, …}]}`,
+/// biggest drive first. Walks the drives' resources, so it runs on the async
+/// pool, never the UI thread; the caller caches it.
+pub async fn store_stats() -> Result<String, String> {
+    let dir = state::store_dir();
+    let stats = atomic_lib::host::store_stats::store_stats(db()?, dir.as_deref())
+        .await
+        .map_err(err)?;
+    Ok(stats.to_string())
 }

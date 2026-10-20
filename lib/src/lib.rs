@@ -62,6 +62,9 @@ tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().bloc
 ```
 */
 
+/// The version of this library, for an app to show in its About / device views.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub mod agents;
 pub mod aggregate;
 pub mod atoms;

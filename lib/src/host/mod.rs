@@ -23,6 +23,7 @@
 //! - [`own_profile`]: this device's agent's profile: read, edit.
 //! - [`peer_search`]: looking for this agent's other devices, with retries and
 //!   a status a screen can show.
+//! - [`store_stats`]: how much data this device holds (disk, per drive).
 //! - [`recents`]: the event-driven, persisted index behind the home lists.
 //! - [`embed`]: the dispatcher the embedded web renderer's `NativeClientDb`
 //!   talks to, with its signing policy.
@@ -53,6 +54,7 @@ pub mod own_profile;
 pub mod peer_search;
 pub mod profiles;
 pub mod recents;
+pub mod store_stats;
 pub mod rows;
 
 #[cfg(test)]

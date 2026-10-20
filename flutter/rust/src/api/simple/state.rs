@@ -57,3 +57,15 @@ pub(crate) fn set_server_origin(origin: &str) {
 pub(crate) fn connected_server() -> Option<String> {
     SERVER_ORIGIN.lock().unwrap().clone()
 }
+
+static STORE_DIR: std::sync::Mutex<Option<std::path::PathBuf>> = std::sync::Mutex::new(None);
+
+/// Remember where `open_db` put the store, to measure it on disk.
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) fn set_store_dir(dir: &std::path::Path) {
+    *STORE_DIR.lock().unwrap_or_else(|e| e.into_inner()) = Some(dir.to_path_buf());
+}
+
+pub(crate) fn store_dir() -> Option<std::path::PathBuf> {
+    STORE_DIR.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
