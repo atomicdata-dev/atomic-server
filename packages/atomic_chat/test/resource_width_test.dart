@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,32 +21,57 @@ class _Page implements EmbedPage {
 void main() {
   tearDown(() => ResourceView.pageFactory = null);
 
-  testWidgets('a form page is a reading column, the resource it made is not',
+  testWidgets('a page opened by path fills the pane, with no frame',
       (tester) async {
     tester.view.physicalSize = const Size(2000, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
-    late _Page page;
-    ResourceView.pageFactory = (send) => page = _Page(send);
+    ResourceView.pageFactory = (send) => _Page(send);
 
     await tester.pumpWidget(MaterialApp(
       theme: ThemeData(extensions: const [AppColors.light]),
       home: ResourceView(
           api: const UnimplementedApi(),
           drive: 'd',
-          path: '/app/new',
+          path: '/app/new-drive',
           call: (method, args) async => 'null'),
     ));
     await tester.pumpAndSettle();
-    expect(tester.getSize(find.byKey(const Key('the-page'))).width, 720);
-
-    page.send(jsonEncode({
-      'id': 1,
-      'method': 'opened',
-      'args': ['did:ad:made'],
-    }));
-    await tester.pumpAndSettle();
-    expect(tester.getSize(find.byKey(const Key('the-page'))).width, 2000);
+    final page = find.byKey(const Key('the-page'));
+    expect(tester.getSize(page), const Size(2000, 1000));
+    expect(find.ancestor(of: page, matching: find.byType(ReadableWidth)),
+        findsNothing);
+    for (final e in find
+        .ancestor(of: page, matching: find.byType(ConstrainedBox))
+        .evaluate()) {
+      expect((e.widget as ConstrainedBox).constraints.maxWidth,
+          greaterThanOrEqualTo(2000));
+    }
+    for (final framed in [
+      find.ancestor(of: page, matching: find.byType(Card)),
+      find.ancestor(of: page, matching: find.byType(ClipRRect)),
+      find.ancestor(of: page, matching: find.byType(Padding)),
+    ]) {
+      // The Scaffold's own padding wrappers are zero; none may inset the page.
+      for (final e in framed.evaluate()) {
+        final w = e.widget;
+        if (w is Padding) {
+          expect(w.padding.resolve(TextDirection.ltr), EdgeInsets.zero);
+        } else {
+          fail('framed by $w');
+        }
+      }
+    }
+    for (final e in find
+        .ancestor(of: page, matching: find.byType(DecoratedBox))
+        .evaluate()) {
+      final d = (e.widget as DecoratedBox).decoration;
+      if (d is BoxDecoration) {
+        expect(d.border, isNull);
+        expect(d.boxShadow, isNull);
+        expect(d.borderRadius, isNull);
+      }
+    }
 
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 6));
