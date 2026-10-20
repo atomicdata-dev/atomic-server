@@ -112,7 +112,6 @@ pub async fn append_entry(
     entry: &Entry,
 ) -> AtomicResult<String> {
     let store = node.db();
-    let agent = store.get_default_agent()?;
 
     if let Some(subject) = crate::chat_log::page_with_room(store, chat).await? {
         let mut page = store.get_resource(&subject).await?;
@@ -123,8 +122,25 @@ pub async fn append_entry(
     }
 
     // A first page.
+    let (page, keys) = new_page(node, pusher, chat, std::slice::from_ref(entry)).await?;
+    Ok(format!("{page}#{}", keys[0]))
+}
+
+/// A new `ChatLog` page under `chat` holding `entries`, in one commit by the
+/// device's agent. Returns the page's subject and the entries' keys.
+async fn new_page(
+    node: &AtomicNode,
+    pusher: &dyn LocalWritePusher,
+    chat: &str,
+    entries: &[Entry],
+) -> AtomicResult<(String, Vec<String>)> {
+    let store = node.db();
+    let agent = store.get_default_agent()?;
     let doc = AtomicLoroDoc::new();
-    let key = doc.add_entry(entry)?;
+    let keys = entries
+        .iter()
+        .map(|entry| doc.add_entry(entry))
+        .collect::<AtomicResult<Vec<_>>>()?;
     let is_a = Value::ResourceArray(vec![urls::CHAT_LOG.to_string().into()]);
     let parent = Value::AtomicUrl(chat.into());
     doc.set_property(urls::IS_A, &is_a)?;
@@ -136,7 +152,26 @@ pub async fn append_entry(
     let page = commit.subject.to_string();
     let response = node.apply_local_commit(commit, &own_commit_opts()).await?;
     pusher.push(&response).await;
-    Ok(format!("{page}#{key}"))
+    Ok((page, keys))
+}
+
+/// Import a whole AI chat at once: an `AiChat` named `name` in the agent's
+/// private drive with `entries` (oldest first) on as few `ChatLog` pages as
+/// the page capacity allows. One commit for the chat and one per page,
+/// instead of one per message as [`append_chat_entry`] does; for importing a
+/// conversation from elsewhere and for seeding a store in performance tests.
+/// Returns the chat's subject.
+pub async fn import_ai_chat(
+    node: &AtomicNode,
+    pusher: &dyn LocalWritePusher,
+    name: &str,
+    entries: &[Entry],
+) -> AtomicResult<String> {
+    let chat = create_ai_chat(node, pusher, name).await?;
+    for page in entries.chunks(crate::chat_log::CHAT_LOG_CAPACITY) {
+        new_page(node, pusher, &chat, page).await?;
+    }
+    Ok(chat)
 }
 
 #[cfg(test)]
@@ -169,6 +204,32 @@ mod tests {
         assert_eq!(entries[1]["role"], "assistant");
         assert_eq!(entries[0]["c"], 1_000);
         assert!(entries[0]["id"].as_str().unwrap().ends_with("#1-00000001"));
+    }
+
+    #[tokio::test]
+    async fn an_imported_chat_fills_pages_up_to_their_capacity() {
+        let d = Device::new().await;
+        let n = crate::chat_log::CHAT_LOG_CAPACITY + 10;
+        let entries: Vec<Entry> = (0..n)
+            .map(|i| d.ai_entry("user", &format!("message {i}"), 1_000 + i as i64))
+            .collect();
+        let chat = import_ai_chat(&d.node, &crate::host::NoPush, "Imported", &entries)
+            .await
+            .unwrap();
+        let read = read_chat(&d.store, &chat).await.unwrap();
+        assert_eq!(read.len(), n);
+        assert_eq!(read[0]["parts"][0]["text"], "message 0");
+        assert_eq!(read[n - 1]["parts"][0]["text"], format!("message {}", n - 1));
+        let pages: std::collections::HashSet<&str> = read
+            .iter()
+            .map(|e| e["id"].as_str().unwrap().split('#').next().unwrap())
+            .collect();
+        assert_eq!(pages.len(), 2);
+        // A message added later goes on the page with room.
+        append_chat_entry(&d.node, &crate::host::NoPush, &chat, "user", "[]")
+            .await
+            .unwrap();
+        assert_eq!(read_chat(&d.store, &chat).await.unwrap().len(), n + 1);
     }
 
     #[tokio::test]
