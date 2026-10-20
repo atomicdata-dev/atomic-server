@@ -26,6 +26,7 @@ import { runAction } from '../../actions/runAction';
 import type { ActionDefinition } from '../../actions/types';
 import { usePluginClass } from '@chunks/PluginRuns/useDriveClass';
 import { useCustomContextItemsContext } from './CustomContextItemsContext';
+import { MoveResourceDialog } from '../MoveResourceDialog';
 import { CoverPickerDialog, IconPickerDialog } from '../ResourceDecorations';
 import { ResourceInline } from '../../views/ResourceInline';
 import { ResourceUsage } from '../ResourceUsage';
@@ -84,6 +85,7 @@ export const ContextMenuOptions = {
   SetCover: 'setCover',
   CreateTableForm: 'createTableForm',
   Reload: 'reload',
+  Move: 'move',
 } as const;
 
 export type ContextMenuOptionsUnion =
@@ -148,8 +150,10 @@ export function ResourceContextMenu({
   // undefined = never opened (dialog not mounted), boolean = mounted.
   const [emojiPickerOpen, setEmojiPickerOpen] = useState<boolean>();
   const [coverPickerOpen, setCoverPickerOpen] = useState<boolean>();
+  const [moveOpen, setMoveOpen] = useState<boolean>();
   const [pluginRunOpen, setPluginRunOpen] = useState<boolean>();
   const [reportChatOpen, setReportChatOpen] = useState<boolean>();
+  const openMoveDialog = useCallback(() => setMoveOpen(true), []);
   const openPluginRun = useCallback(() => setPluginRunOpen(true), []);
   const [currentDrive] = useDrive();
   const pluginClass = usePluginClass(currentDrive);
@@ -161,6 +165,7 @@ export function ResourceContextMenu({
     showCodeUsageDialog: openCodeUsageDialog,
     openEmojiPicker,
     openCoverPicker,
+    openMoveDialog,
     openPluginRun,
     pluginClass,
   });
@@ -438,6 +443,13 @@ export function ResourceContextMenu({
           resource={ctx.resource}
           show={coverPickerOpen}
           onShowChange={setCoverPickerOpen}
+        />
+      )}
+      {moveOpen !== undefined && (
+        <MoveResourceDialog
+          subject={subject}
+          show={moveOpen}
+          onShowChange={setMoveOpen}
         />
       )}
       {pluginRunOpen !== undefined && ctx.drive !== undefined && (
