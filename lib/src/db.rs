@@ -93,9 +93,8 @@ use self::{
     kv_store::KvStore,
     prop_val_sub_index::{add_atom_to_prop_val_sub_index, find_in_prop_val_sub_index},
     query_index::{
-        check_if_atom_matches_watched_query_filters, query_sorted_indexed, query_sorted_indexed_page,
-        update_indexed_member,
-        IndexIterator,
+        check_if_atom_matches_watched_query_filters, query_sorted_indexed,
+        query_sorted_indexed_page, update_indexed_member, IndexIterator,
     },
     val_prop_sub_index::add_atom_to_valpropsub_index,
 };
