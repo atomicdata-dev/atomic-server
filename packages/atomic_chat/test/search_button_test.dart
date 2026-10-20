@@ -137,7 +137,7 @@ void main() {
     expect(field.controller!.text, isEmpty);
   });
 
-  testWidgets('tablet rail: Search on the open search empties it, keyboard up',
+  testWidgets('tablet: Search again after closing starts over, keyboard up',
       (tester) async {
     tester.view.devicePixelRatio = 2;
     tester.view.physicalSize = _landscape * 2;
@@ -147,8 +147,9 @@ void main() {
     await tester.tap(_button());
     await tester.pumpAndSettle();
     await _typeAbc(tester);
-    FocusManager.instance.primaryFocus?.unfocus();
-    await tester.pump();
+    // The palette closes with back; the button opens a fresh one.
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
     tester.testTextInput.log.clear();
     await tester.tap(_button());
     await tester.pumpAndSettle();

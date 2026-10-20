@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt, Perf;
@@ -77,6 +78,13 @@ class SearchScreen extends StatefulWidget {
   /// back, when the window changed size).
   final String initialQuery;
 
+  /// The tablet's search over everything ([showSearchPalette]): the field on
+  /// top, the results under it, no page bar.
+  final bool palette;
+
+  /// Called as a result is opened (the palette closes then).
+  final VoidCallback? onOpened;
+
   const SearchScreen({
     super.key,
     required this.drive,
@@ -84,6 +92,8 @@ class SearchScreen extends StatefulWidget {
     this.scopeDrive,
     this.kind = SearchKind.any,
     this.initialQuery = '',
+    this.palette = false,
+    this.onOpened,
   });
 
   /// A quick fade and short rise instead of the page slide: the keyboard rises
@@ -128,6 +138,92 @@ class SearchScreen extends StatefulWidget {
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
+}
+
+/// The tablet's search: a card over the whole window (sidebar and pages)
+/// on a dimmed backdrop, like a browser's ⌘K. A tap next to it, Esc or back
+/// closes it and leaves everything as it was; a result opens in the detail
+/// pane and closes it. Its route carries the [ShellScope] the card needs.
+Future<void> showSearchPalette({
+  required ShellController shell,
+  required AssistantApi api,
+  String? scope,
+  SearchKind kind = SearchKind.any,
+}) async {
+  final context = shell.navigatorKey.currentContext;
+  if (context == null || shell.searching.value) return;
+  shell.searching.value = true;
+  try {
+    await showGeneralDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: true,
+      barrierLabel: 'Close search',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 120),
+      transitionBuilder: (context, animation, _, child) => FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: child),
+      pageBuilder: (dialog, _, __) => ShellScope(
+        controller: shell,
+        layout: ShellLayout.split,
+        child: SearchPalette(
+          child: SearchScreen(
+            drive: shell.drive.value,
+            api: api,
+            scopeDrive: scope,
+            kind: kind,
+            palette: true,
+            onOpened: () => Navigator.of(dialog).pop(),
+          ),
+        ),
+      ),
+    );
+  } finally {
+    shell.searching.value = false;
+  }
+}
+
+/// The palette's card: at most [maxWidth] wide, in the upper part of the
+/// window, as high as fits above the keyboard (up to 70% of the window).
+class SearchPalette extends StatelessWidget {
+  static const maxWidth = 640.0;
+
+  final Widget child;
+
+  const SearchPalette({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final size = media.size;
+    final top = media.padding.top + size.height * 0.08;
+    final room = size.height - top - media.viewInsets.bottom - 16;
+    final height = math.max(120.0, math.min(size.height * 0.7, room));
+    return Padding(
+      padding: EdgeInsets.only(top: top, left: 16, right: 16),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: height),
+          child: Material(
+            key: const Key('search-palette'),
+            elevation: 12,
+            clipBehavior: Clip.antiAlias,
+            borderRadius: BorderRadius.circular(16),
+            // The page under the card is not the card's: no insets.
+            child: MediaQuery.removePadding(
+              context: context,
+              removeTop: true,
+              removeBottom: true,
+              child: MediaQuery.removeViewInsets(
+                  context: context, removeBottom: true, child: child),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 typedef _Item = ({
@@ -447,7 +543,7 @@ class _SearchScreenState extends State<SearchScreen> {
       String drive, String subject, String title, String className) async {
     if (_scopeToDrive(subject, className)) return;
     widget.api.noteOpened(drive, subject);
-    await openFromList<void>(
+    final opened = openFromList<void>(
       context,
       (_) => openResourceView(
           api: widget.api,
@@ -457,6 +553,8 @@ class _SearchScreenState extends State<SearchScreen> {
           className: className),
       subject: subject,
     );
+    widget.onOpened?.call();
+    await opened;
     if (mounted) await _loadRecent(_model.drives);
   }
 
@@ -721,12 +819,15 @@ class _SearchScreenState extends State<SearchScreen> {
       return _nothingFound(c);
     }
     final heading = _model.showsRecent && items.isNotEmpty;
+    final palette = widget.palette;
     return ListView.builder(
-      // Best first, drawn from the bottom up: nearest the thumb.
-      reverse: true,
+      // Best first, drawn from the bottom up: nearest the thumb. The palette
+      // lists from its field on top down.
+      reverse: !palette,
       itemCount: items.length + (heading ? 1 : 0),
-      itemBuilder: (context, n) {
-        if (n == items.length) {
+      itemBuilder: (context, i) {
+        final n = palette ? (heading ? i - 1 : i) : i;
+        if (n == items.length || n < 0) {
           return Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Text(_model.kind.heading,
@@ -744,7 +845,8 @@ class _SearchScreenState extends State<SearchScreen> {
   /// A query without hits: said where the first hit would be, just above
   /// the field, with the way to every drive while scoped.
   Widget _nothingFound(AppColors c) => Align(
-        alignment: Alignment.bottomCenter,
+        alignment:
+            widget.palette ? Alignment.topCenter : Alignment.bottomCenter,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
           child: Column(
@@ -771,6 +873,22 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     final c = context.appColors;
     // Built once per theme: typing and loading only rebuild the list.
+    if (widget.palette) {
+      return Material(
+        color: c.bgBody,
+        child: Column(children: [
+          Padding(padding: const EdgeInsets.only(top: 12), child: _field),
+          Divider(
+              height: 1, color: Theme.of(context).colorScheme.outlineVariant),
+          Expanded(
+            child: ListenableBuilder(
+              listenable: _model,
+              builder: (context, _) => _results(context),
+            ),
+          ),
+        ]),
+      );
+    }
     return Scaffold(
       backgroundColor: c.bgBody,
       appBar: AppTopBar(

@@ -1,5 +1,6 @@
 import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -41,7 +42,7 @@ Widget _shell(FakeApi api) => app(AppShell(
     ));
 
 ShellController _controller(WidgetTester tester) =>
-    tester.widget<ShellScope>(find.byType(ShellScope)).controller;
+    tester.widget<ShellScope>(find.byType(ShellScope).first).controller;
 
 /// A page that has something typed in it, to see it survive a resize.
 class _TypingPage implements EmbedPage {
@@ -269,61 +270,6 @@ void main() {
     await _done(tester);
   });
 
-  testWidgets('search is the list pane; back returns to the home',
-      (tester) async {
-    _size(tester, _landscape);
-    final api = FakeApi(recent: [
-      _r('did:ad:plans', 'Plans')
-    ], hits: const [
-      (
-        subject: 'did:ad:found',
-        title: 'Found it',
-        className: 'document-v2',
-        drive: 'did:ad:drive',
-        score: 1.0,
-        emoji: null
-      ),
-    ]);
-    await tester.pumpWidget(_shell(api));
-    await _settle(tester);
-    await tester.tap(find.byTooltip('Search'));
-    await _settle(tester);
-    expect(find.byType(SearchScreen), findsOneWidget);
-    expect(find.byKey(const ValueKey('current:Search')), findsOneWidget);
-    final pane = tester.getRect(find.byType(SearchScreen));
-    expect(pane.left, 0);
-    await tester.enterText(find.byType(TextField), 'fou');
-    await tester.pump(const Duration(milliseconds: 200));
-    await _settle(tester);
-    await tester.tap(find.text('Found it'));
-    await _settle(tester);
-    // The hit opens next to the search, which stays.
-    expect(find.byType(ResourceView), findsOneWidget);
-    expect(find.byType(SearchScreen), findsOneWidget);
-    expect(find.text('Found it'), findsOneWidget);
-    ListTile tile(String title) => tester.widget<ListTile>(
-        find.ancestor(of: find.text(title), matching: find.byType(ListTile)));
-    expect(tile('Found it').selected, isTrue);
-    // Settings in its place: the hit is no longer marked; opened again it is.
-    await tester.tap(find.byTooltip('Settings'));
-    await _settle(tester);
-    expect(tile('Found it').selected, isFalse);
-    await tester.tap(find.text('Found it'));
-    await _settle(tester);
-    expect(tile('Found it').selected, isTrue);
-
-    // Back: the page first, then the search goes back to the home.
-    await tester.binding.handlePopRoute();
-    await _settle(tester);
-    expect(find.byType(ResourceView), findsNothing);
-    expect(find.byType(SearchScreen), findsOneWidget);
-    await tester.binding.handlePopRoute();
-    await _settle(tester);
-    expect(find.byType(SearchScreen), findsNothing);
-    expect(find.text('Plans'), findsOneWidget);
-    await _done(tester);
-  });
-
   testWidgets('a rotation keeps the open resource and what was typed in it',
       (tester) async {
     _size(tester, _landscape);
@@ -364,31 +310,28 @@ void main() {
     await _done(tester);
   });
 
-  testWidgets('a search moves between the list pane and a page on a resize',
+  testWidgets('a phone\'s search moves to the list pane on a resize',
       (tester) async {
-    _size(tester, _landscape);
+    _size(tester, _phone);
     await tester.pumpWidget(_shell(_api()));
     await _settle(tester);
     await tester.tap(find.byTooltip('Search'));
     await _settle(tester);
     await tester.enterText(find.byType(TextField), 'pla');
     await _settle(tester);
-
-    tester.view.physicalSize = _phone * 2;
-    await _settle(tester);
-    // A page of its own on the phone, with the text.
-    expect(find.byType(SearchScreen), findsOneWidget);
     expect(ShellPage.isSearch(_controller(tester).topKind), isTrue);
-    expect(find.widgetWithText(TextField, 'pla'), findsOneWidget);
-    await tester.enterText(find.byType(TextField), 'plan');
-    await _settle(tester);
 
     tester.view.physicalSize = _portrait * 2;
     await _settle(tester);
     expect(find.byType(SearchScreen), findsOneWidget);
     expect(_controller(tester).pages, isEmpty);
-    expect(find.widgetWithText(TextField, 'plan'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'pla'), findsOneWidget);
     expect(tester.getRect(find.byType(SearchScreen)).left, 0);
+    // Its back returns the sidebar to the home.
+    await tester.tap(find.byType(BackButton));
+    await _settle(tester);
+    expect(find.byType(SearchScreen), findsNothing);
+    expect(find.text('Plans').hitTestable(), findsOneWidget);
     await _done(tester);
   });
 
@@ -882,24 +825,17 @@ void main() {
       await tester.tap(find.text('Plans'));
       await _settle(tester);
       expect(find.byKey(const ValueKey('current:Profile')), findsNothing);
-      // A search in the sidebar; its back returns to the home.
+      // Search over everything; back closes it, the page stays.
       await tester.tap(find.byTooltip('Search'));
       await _settle(tester);
-      expect(find.byType(SearchScreen), findsOneWidget);
+      expect(find.byKey(const Key('search-palette')), findsOneWidget);
       expect(find.byKey(const ValueKey('current:Search')), findsOneWidget);
       expect(find.byKey(const ValueKey('current:Home')), findsNothing);
-      await tester.tap(find.byType(BackButton));
+      await tester.binding.handlePopRoute();
       await _settle(tester);
       expect(find.byType(SearchScreen), findsNothing);
       expect(find.text('Plans').hitTestable(), findsOneWidget);
-      // The page stayed.
       expect(find.byType(ResourceView), findsOneWidget);
-      // Home from a search, too.
-      await tester.tap(find.byTooltip('Search'));
-      await _settle(tester);
-      await tester.tap(find.byTooltip('Home'));
-      await _settle(tester);
-      expect(find.byType(SearchScreen), findsNothing);
       expect(find.byKey(const ValueKey('current:Home')), findsOneWidget);
       // Home on the home closes the page.
       await tester.tap(find.byTooltip('Home'));
@@ -1006,6 +942,113 @@ void main() {
       expect(find.byKey(const Key('home-activity')), findsNothing);
       expect(find.byKey(const ValueKey('section-heading-activity')),
           findsOneWidget);
+      await _done(tester);
+    });
+  });
+
+  group('search on a tablet is a card over the window', () {
+    FakeApi searchApi() => FakeApi(recent: [
+          _r('did:ad:plans', 'Plans'),
+          _r('did:ad:notes', 'Notes'),
+        ], hits: [
+          (
+            subject: 'did:ad:fox',
+            title: 'Fox',
+            className: 'document-v2',
+            drive: 'did:ad:drive',
+            score: 2.0,
+            emoji: null
+          ),
+        ]);
+    final palette = find.byKey(const Key('search-palette'));
+
+    testWidgets('type, a result opens next to the sidebar and it closes',
+        (tester) async {
+      _size(tester, _landscape);
+      await tester.pumpWidget(_shell(searchApi()));
+      await _settle(tester);
+      await tester.tap(find.byTooltip('Search'));
+      await _settle(tester);
+      expect(palette, findsOneWidget);
+      final card = tester.getRect(palette);
+      expect(card.width, lessThanOrEqualTo(640));
+      expect(card.center.dx, closeTo(_landscape.width / 2, 1));
+      expect(find.byKey(const ValueKey('current:Search')), findsOneWidget);
+      // The sidebar is still the home.
+      expect(_controller(tester).list.value, ShellPage.home);
+      await tester.enterText(
+          find.descendant(of: palette, matching: find.byType(TextField)),
+          'fox');
+      await _settle(tester);
+      await tester
+          .tap(find.descendant(of: palette, matching: find.text('Fox')));
+      await _settle(tester);
+      expect(palette, findsNothing);
+      expect(find.byType(ResourceView), findsOneWidget);
+      expect(tester.getRect(find.byType(ResourceView)).left,
+          greaterThan(tester.getRect(find.byType(ChatsScreen)).right));
+      expect(find.byKey(const ValueKey('current:Search')), findsNothing);
+      await _done(tester);
+    });
+
+    testWidgets('a tap next to it closes it, nothing else changes',
+        (tester) async {
+      _size(tester, _landscape);
+      await tester.pumpWidget(_shell(searchApi()));
+      await _settle(tester);
+      await tester.tap(find.text('Plans'));
+      await _settle(tester);
+      final view = tester.state(find.byType(ResourceView));
+      final pages = _controller(tester).pages.length;
+      await tester.tap(find.byTooltip('Search'));
+      await _settle(tester);
+      expect(palette, findsOneWidget);
+      await tester.tapAt(Offset(_landscape.width - 10, _landscape.height - 10));
+      await _settle(tester);
+      expect(palette, findsNothing);
+      expect(tester.state(find.byType(ResourceView)), same(view));
+      expect(_controller(tester).pages, hasLength(pages));
+      expect(_controller(tester).searching.value, isFalse);
+      await _done(tester);
+    });
+
+    testWidgets('back closes it', (tester) async {
+      _size(tester, _portrait);
+      await tester.pumpWidget(_shell(searchApi()));
+      await _settle(tester);
+      await tester.tap(find.byTooltip('Search'));
+      await _settle(tester);
+      expect(palette, findsOneWidget);
+      // Recently opened, before anything is typed.
+      expect(find.descendant(of: palette, matching: find.text('Plans')),
+          findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await _settle(tester);
+      expect(palette, findsNothing);
+      expect(find.byKey(const Key('nothing-open')), findsOneWidget);
+      await _done(tester);
+    });
+
+    testWidgets('Esc closes it', (tester) async {
+      _size(tester, _landscape);
+      await tester.pumpWidget(_shell(searchApi()));
+      await _settle(tester);
+      await tester.tap(find.byTooltip('Search'));
+      await _settle(tester);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await _settle(tester);
+      expect(palette, findsNothing);
+      await _done(tester);
+    });
+
+    testWidgets('a phone keeps its search page', (tester) async {
+      _size(tester, _phone);
+      await tester.pumpWidget(_shell(searchApi()));
+      await _settle(tester);
+      await tester.tap(find.byTooltip('Search'));
+      await _settle(tester);
+      expect(palette, findsNothing);
+      expect(find.byType(SearchScreen), findsOneWidget);
       await _done(tester);
     });
   });

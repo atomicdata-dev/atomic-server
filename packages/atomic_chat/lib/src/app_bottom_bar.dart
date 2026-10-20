@@ -83,8 +83,13 @@ class AppBottomBar extends StatelessWidget {
                   // window, not a phone.
                   final roomy = box.maxWidth + 16 >= 400;
                   return ListenableBuilder(
-                    listenable: Listenable.merge(
-                        [shell, shell.drive, shell.list, shell.listCollapsed]),
+                    listenable: Listenable.merge([
+                      shell,
+                      shell.drive,
+                      shell.list,
+                      shell.listCollapsed,
+                      shell.searching
+                    ]),
                     builder: (context, _) {
                       final onMore = shell.topMenu;
                       final top = shell.topKind;
@@ -93,12 +98,13 @@ class AppBottomBar extends StatelessWidget {
                       final folded = split && shell.listCollapsed.value;
                       final newCurrent = top == ShellPage.newChat ||
                           top == ShellPage.voiceChat;
-                      final homeCurrent = split
-                          ? list == ShellPage.home && !folded
-                          : top == ShellPage.home;
                       final searchCurrent = split
-                          ? ShellPage.isSearch(list) && !folded
+                          ? shell.searching.value ||
+                              (ShellPage.isSearch(list) && !folded)
                           : ShellPage.isSearch(top);
+                      final homeCurrent = split
+                          ? list == ShellPage.home && !folded && !searchCurrent
+                          : top == ShellPage.home;
                       // Next to the pages Home shows the home in the list pane (and
                       // brings it back when folded); on the home it closes what the
                       // detail pane shows.
@@ -297,16 +303,8 @@ class ShellActions {
   Future<void> search({String? scope, SearchKind of = SearchKind.any}) async {
     final kind = ShellPage.searchFor(scope: scope, kind: of);
     if (shell.split) {
-      final open = shell.list.value;
-      final folded = shell.listCollapsed.value;
-      shell.setListCollapsed(false);
-      if (ShellPage.isSearch(open) &&
-          ((scope == null && of == SearchKind.any) || open == kind)) {
-        // Unfolding is enough when the list was folded away.
-        if (folded) return;
-        return shell.resetSearch();
-      }
-      return shell.showList(kind);
+      // A card over the window; the sidebar and the page stay as they are.
+      return showSearchPalette(shell: shell, api: api, scope: scope, kind: of);
     }
     if (scope == null && of == SearchKind.any) {
       final open = shell.pages

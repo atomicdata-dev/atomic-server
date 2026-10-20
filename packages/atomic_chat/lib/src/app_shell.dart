@@ -110,6 +110,9 @@ class ShellController extends ChangeNotifier {
   /// [ShellPage.searchIn]).
   final ValueNotifier<String> list = ValueNotifier(ShellPage.home);
 
+  /// The search palette is open over the window (split layout).
+  final ValueNotifier<bool> searching = ValueNotifier(false);
+
   /// The home's activity feed, which the detail pane shows while nothing is
   /// open (split layout); the home publishes it, null until it has read it.
   final ValueNotifier<HomeFeed?> activity = ValueNotifier(null);
@@ -425,6 +428,7 @@ class ShellController extends ChangeNotifier {
     identity.dispose();
     list.dispose();
     activity.dispose();
+    searching.dispose();
     listCollapsed.dispose();
     listWidth.dispose();
     selected.dispose();
