@@ -134,7 +134,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.getTopLeft(anchor).dy, before);
     // The page is there: the line just above the first window.
-    for (var i = 0; i < 20 && find.text('Line 199949').evaluate().isEmpty; i++) {
+    for (var i = 0;
+        i < 20 && find.text('Line 199949').evaluate().isEmpty;
+        i++) {
       await tester.drag(list, const Offset(0, 300));
       await tester.pumpAndSettle();
     }
