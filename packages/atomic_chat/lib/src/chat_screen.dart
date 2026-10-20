@@ -214,6 +214,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// Listening ended without any words: a gentle hint instead of silence.
   bool _noSpeechHint = false;
 
+  /// "Stop and send" is waiting for the final transcript; blocks a second tap.
+  bool _finalising = false;
+
+  /// Completed by the recogniser's final result while finalising.
+  Completer<void>? _finalWaiter;
+
+  /// The account engine was stopped by "Stop and send": its text is sent as
+  /// soon as the transcription arrives.
+  bool _sendWhenTranscribed = false;
+
+  /// How long "Stop and send" waits for the final result before sending the
+  /// latest partial one.
+  static const _finalWait = Duration(milliseconds: 600);
+
   /// Voice mode's turn-by-turn loop is running.
   bool _voiceLoop = false;
 
@@ -301,7 +315,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   /// Ends listening; what was heard so far stays in the field.
-  void _stopListening() {
+  void _stopListening({bool stopInput = true}) {
     if (!_listening) return;
     if (_hostedActive) {
       // Still waiting for the microphone: nothing to transcribe.
@@ -325,7 +339,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _starting = false;
     _level = 0;
     if (!_heard) _noSpeechHint = true;
-    _inputInst?.stop();
+    if (stopInput) _inputInst?.stop();
     if (mounted) setState(() {});
   }
 
@@ -361,7 +375,38 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Stops dictation and sends what was recognised right away, as if the
+  /// normal send button was pressed. The words so far (the latest partial
+  /// result when the final one does not come in time) are in the field.
+  Future<void> _stopAndSend() async {
+    if (!_listening || _finalising || _voiceLoop) return;
+    if (_hostedActive) {
+      // Nothing recorded yet: nothing to send.
+      if (_starting) return _cancelHosted();
+      // The account transcribes after the stop; the final result sends.
+      _sendWhenTranscribed = true;
+      _stopListening();
+      return;
+    }
+    final session = _listenSession;
+    final waiter = _finalWaiter = Completer<void>();
+    setState(() => _finalising = true);
+    _inputInst?.stop();
+    await waiter.future.timeout(_finalWait, onTimeout: () {});
+    _finalWaiter = null;
+    if (!mounted) return;
+    setState(() => _finalising = false);
+    if (session != _listenSession) return;
+    _stopListening(stopInput: false);
+    if (_input.text.trim().isEmpty && _files.isEmpty) {
+      setState(() => _noSpeechHint = true);
+      return;
+    }
+    _send();
+  }
+
   Future<void> _toggleListening() async {
+    _sendWhenTranscribed = false;
     if (_listening) {
       _stopListening();
       // In the voice loop, stopping means "done talking": the device's words
@@ -441,6 +486,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             _level = 0;
             _noSpeechHint = !_heard;
           });
+          final waiter = _finalWaiter;
+          if (waiter != null && !waiter.isCompleted) waiter.complete();
+          if (_sendWhenTranscribed) {
+            _sendWhenTranscribed = false;
+            if (_input.text.trim().isNotEmpty) _send();
+          }
           if (_voiceLoop) _voiceTurnEnded(session);
         } else if (_noSpeechHint) {
           setState(() => _noSpeechHint = false);
@@ -448,6 +499,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       },
       onError: (e) {
         if (!mounted || session != _listenSession) return;
+        _sendWhenTranscribed = false;
+        final waiter = _finalWaiter;
+        if (waiter != null && !waiter.isCompleted) waiter.complete();
         // The account engine gives plain messages, the device codes.
         final message = hosted ? e : voiceErrorMessage(e);
         setState(() {
@@ -1601,12 +1655,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   )
                 else
                   IconButton.filled(
-                    tooltip: 'Send',
-                    onPressed: _transcribing ||
-                            ai == null ||
-                            !(_hadText || _files.isNotEmpty)
+                    key: _listening ? const Key('chat-stop-and-send') : null,
+                    // While dictating, this is stop and send in one tap.
+                    tooltip: _listening ? 'Stop and send' : 'Send',
+                    onPressed: _transcribing || _finalising || ai == null
                         ? null
-                        : _send,
+                        : _listening
+                            ? (_voiceLoop ? null : _stopAndSend)
+                            : !(_hadText || _files.isNotEmpty)
+                                ? null
+                                : _send,
                     icon: const Icon(Icons.arrow_upward),
                   ),
               ],

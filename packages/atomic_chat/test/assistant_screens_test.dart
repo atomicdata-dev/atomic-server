@@ -195,6 +195,11 @@ class FakeSpeechInput implements SpeechInput {
 
   FakeSpeechInput({this.available = true, this.startDelay = Duration.zero});
 
+  /// When set, stop() delivers this as the final result after
+  /// [finalDelay] (like the plugin does); otherwise none arrives.
+  String? finalOnStop;
+  Duration finalDelay = Duration.zero;
+
   String? lastLocale;
   List<SpeechLocale> available_ = const [
     SpeechLocale('en_US', 'English (United States)'),
@@ -233,6 +238,11 @@ class FakeSpeechInput implements SpeechInput {
   Future<void> stop() async {
     stops++;
     _on = false;
+    final text = finalOnStop;
+    if (text != null) {
+      if (finalDelay > Duration.zero) await Future<void>.delayed(finalDelay);
+      onText?.call(text, true);
+    }
   }
 }
 
@@ -987,8 +997,9 @@ void main() {
       expect(find.byIcon(Icons.search), findsNothing);
       expect(find.byIcon(Icons.add), findsNothing);
       expect(find.byIcon(Icons.format_list_bulleted), findsNothing);
-      // The Activity filter stays.
-      expect(find.byType(ShowMineChip), findsOneWidget);
+      // The Activity filter is the full page's, not the section's.
+      expect(find.byType(ShowMineChip), findsNothing);
+      expect(find.widgetWithText(FilterChip, 'Show mine'), findsNothing);
       // The Show all row is a 48 dp row at the rows' 16 dp inset.
       final row = find.byKey(const ValueKey('section-show-all-chats'));
       expect(tester.getSize(row).height, 48);
@@ -1700,6 +1711,96 @@ void main() {
         expect(field(tester), 'Hello world');
       });
 
+      group('stop and send', () {
+        Future<(FakeSpeechInput, FakeApi)> record(WidgetTester tester,
+            {String typed = ''}) async {
+          final input = FakeSpeechInput();
+          final api = FakeApi(ai: ai());
+          await tester.pumpWidget(app(ChatScreen(
+              api: api,
+              speechInput: input,
+              speechOutput: FakeSpeechOutput())));
+          await tester.pumpAndSettle();
+          if (typed.isNotEmpty) {
+            await tester.enterText(find.byType(TextField), typed);
+          }
+          await tester.tap(find.byIcon(Icons.mic));
+          await tester.pump();
+          return (input, api);
+        }
+
+        testWidgets('sends the final transcript once and clears the field',
+            (tester) async {
+          final (input, api) = await record(tester);
+          input.onText!('hello the', false);
+          await tester.pump();
+          input.finalOnStop = 'hello there';
+          await tester.tap(find.byTooltip('Stop and send'));
+          await tester.pumpAndSettle();
+          expect(input.stops, 1);
+          expect(api.added.where((m) => m.$2 == 'user').toList(), [
+            ('did:ad:new-chat', 'user', 'hello there'),
+          ]);
+          expect(field(tester), '');
+          expect(find.byIcon(Icons.mic), findsOneWidget);
+        });
+
+        testWidgets('uses the latest partial when no final arrives',
+            (tester) async {
+          final (input, api) = await record(tester);
+          input.onText!('good morning', false);
+          await tester.pump();
+          await tester.tap(find.byTooltip('Stop and send'));
+          await tester.pump(const Duration(milliseconds: 300));
+          expect(api.added, isEmpty);
+          // A second tap while finalising does nothing.
+          await tester.tap(find.byTooltip('Stop and send'),
+              warnIfMissed: false);
+          await tester.pump(const Duration(milliseconds: 400));
+          await tester.pumpAndSettle();
+          expect(input.stops, 1);
+          expect(api.added.where((m) => m.$2 == 'user').toList(), [
+            ('did:ad:new-chat', 'user', 'good morning'),
+          ]);
+        });
+
+        testWidgets('an empty transcript sends nothing', (tester) async {
+          final (input, api) = await record(tester);
+          await tester.tap(find.byTooltip('Stop and send'));
+          await tester.pump(const Duration(milliseconds: 700));
+          await tester.pumpAndSettle();
+          expect(input.stops, 1);
+          expect(api.added, isEmpty);
+          expect(find.byKey(const Key('voice-hint')), findsOneWidget);
+          expect(find.byIcon(Icons.mic), findsOneWidget);
+        });
+
+        testWidgets('keeps the typed draft and sends all of it',
+            (tester) async {
+          final (input, api) = await record(tester, typed: 'Hello');
+          input.onText!('world', false);
+          await tester.pump();
+          await tester.tap(find.byTooltip('Stop and send'));
+          await tester.pump(const Duration(milliseconds: 700));
+          await tester.pumpAndSettle();
+          expect(api.added.where((m) => m.$2 == 'user').toList(), [
+            ('did:ad:new-chat', 'user', 'Hello world'),
+          ]);
+        });
+
+        testWidgets('plain stop leaves the text in the field, unsent',
+            (tester) async {
+          final (input, api) = await record(tester);
+          input.onText!('just this', false);
+          await tester.pump();
+          await tester.tap(find.byIcon(Icons.stop));
+          await tester.pumpAndSettle();
+          expect(input.stops, 1);
+          expect(field(tester), 'just this');
+          expect(api.added, isEmpty);
+        });
+      });
+
       testWidgets('a final result leaves the text, not sent', (tester) async {
         final input = FakeSpeechInput();
         final api = FakeApi(ai: ai());
@@ -1983,7 +2084,8 @@ void main() {
         await tester.pump();
         input.onText!('hi there', false);
         await tester.pump();
-        await tester.tap(find.byTooltip('Send'));
+        await tester.tap(find.byTooltip('Stop and send'));
+        await tester.pump(const Duration(milliseconds: 700));
         await tester.pumpAndSettle();
         expect(input.stops, 1);
         expect(input.listening, isFalse);
