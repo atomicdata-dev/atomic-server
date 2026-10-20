@@ -267,12 +267,22 @@ impl CompressedKv {
             // is the one queued in this batch, and the row says which.
             {
                 let found = pending.iter().rev().find_map(|op| {
+                    // Cheap checks first: decoding a row is the costly part and
+                    // a bulk batch asks this once per snapshot.
+                    if op.tree != Tree::Resources || !matches!(op.method, Method::Insert) {
+                        return None;
+                    }
                     let signature = op
                         .key
                         .strip_prefix(crate::identifiers::ATOMIC_COMMIT_PREFIX.as_bytes())?;
-                    let base = genesis_base_of(op.val.as_deref()?, key)?;
-                    (op.tree == Tree::Resources && matches!(op.method, Method::Insert))
-                        .then_some((signature, base))
+                    let row = op.val.as_deref()?;
+                    // The row names the snapshot's subject; skip the decode
+                    // for every other commit in the batch.
+                    if !row.windows(key.len()).any(|w| w == key) {
+                        return None;
+                    }
+                    let base = genesis_base_of(row, key)?;
+                    Some((signature, base))
                 });
                 if let Some((signature, base)) = found {
                     if let Some(delta) = encode_snapshot_delta(&base, val) {
