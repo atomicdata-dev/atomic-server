@@ -4,6 +4,7 @@ import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt, Perf;
 import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'app_top_bar.dart';
 
 import 'models.dart';
@@ -129,12 +130,50 @@ class _SearchScreenState extends State<SearchScreen> {
     }
     _remember();
     _load();
+    _shell?.searchReset.addListener(_startOver);
     // `autofocus` only takes the focus where nothing has it; in the list
     // pane the page next to it (a web page) may have it.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && !_focus.hasFocus) _focus.requestFocus();
     });
     if (widget.initialQuery.trim().isNotEmpty) _changed(widget.initialQuery);
+  }
+
+  /// The Search button while this search is the one shown: an empty field
+  /// (and the recents), the keyboard up. A field that was empty already also
+  /// lets go of its drive.
+  void _startOver() {
+    if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
+    final wasEmpty = _text.text.trim().isEmpty;
+    _text.clear();
+    _changed('');
+    if (wasEmpty && _model.scope != null) _clearScope();
+    _showKeyboard();
+  }
+
+  /// Focus on the field and the keyboard up, also when the field kept the
+  /// focus but the keyboard was put away (Android's back).
+  void _showKeyboard() {
+    _focus.requestFocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _focus.hasFocus) {
+        unawaited(SystemChannels.textInput
+            .invokeMethod<void>('TextInput.show')
+            .catchError((_) {}));
+      }
+    });
+  }
+
+  /// Whether this search's page was on top when last looked at.
+  bool _wasCurrent = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Back to the search (a page opened from it was closed): ready to type.
+    final current = ModalRoute.of(context)?.isCurrent ?? true;
+    if (current && !_wasCurrent) _showKeyboard();
+    _wasCurrent = current;
   }
 
   /// The shell keeps the text and drive, for a search that moves between a
@@ -268,6 +307,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    _shell?.searchReset.removeListener(_startOver);
     _model.dispose();
     _text.dispose();
     _focus.dispose();

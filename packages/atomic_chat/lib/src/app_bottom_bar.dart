@@ -202,9 +202,28 @@ class _ShellActions {
 
   /// Search opens fast: the keyboard comes up with it. [scope] searches one
   /// drive. Next to the detail pane it is the list pane that searches.
+  ///
+  /// The button (no [scope]) always starts over: a search that is open, or
+  /// further down the pages, is shown with an empty field and the keyboard
+  /// up ([ShellController.resetSearch]); a new one never has an old query.
   Future<void> search({String? scope}) async {
     final kind = scope == null ? ShellPage.search : ShellPage.searchIn(scope);
-    if (shell.split) return shell.showList(kind);
+    if (shell.split) {
+      final open = shell.list.value;
+      if (ShellPage.isSearch(open) && (scope == null || open == kind)) {
+        return shell.resetSearch();
+      }
+      return shell.showList(kind);
+    }
+    if (scope == null) {
+      final open = shell.pages
+          .where((r) => ShellPage.isSearch(shell.kindOf(r)))
+          .lastOrNull;
+      if (open != null) {
+        shell.navigatorKey.currentState?.popUntil((r) => r == open);
+        return shell.resetSearch();
+      }
+    }
     await shell.open<void>(
         kind,
         (settings) => SearchScreen.route(
@@ -520,7 +539,8 @@ class _SearchButtonState extends State<_SearchButton> {
       tooltip: 'Search',
       layout: widget.layout,
       selected: widget.current,
-      onTap: widget.current ? null : () => widget.onSearch(),
+      // Also on the open search: it starts over.
+      onTap: () => widget.onSearch(),
       onOpen: _load,
       items: [
         const HoldFanItem('All drives', _allDrives),

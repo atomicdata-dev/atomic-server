@@ -92,6 +92,17 @@ class ShellController extends ChangeNotifier {
   /// of layout (it moves between a page and the list pane).
   ({String query, String? scope}) search = (query: '', scope: null);
 
+  /// Counts taps on the Search button while a search is open (or was popped
+  /// back to): the search on top empties its field ([resetSearch]).
+  final ValueNotifier<int> searchReset = ValueNotifier(0);
+
+  /// The Search button again: the open search starts over (empty field, the
+  /// keyboard up; its drive is kept unless the field was empty already).
+  void resetSearch() {
+    search = (query: '', scope: search.scope);
+    searchReset.value++;
+  }
+
   /// Pages opened for a resource ([openDetail]) and its subject.
   final Map<Route<dynamic>, String> _details = {};
 
@@ -304,6 +315,7 @@ class ShellController extends ChangeNotifier {
     drive.dispose();
     list.dispose();
     selected.dispose();
+    searchReset.dispose();
     super.dispose();
   }
 }
