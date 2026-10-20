@@ -8,6 +8,7 @@ import androidx.core.view.WindowCompat
 import android.os.Build
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import com.eyedeadevelopment.fluttertts.FlutterTtsPlugin
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity: FlutterActivity() {
@@ -36,6 +37,7 @@ class MainActivity: FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        holdBackTts(flutterEngine)
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         channel?.setMethodCallHandler { call, result ->
             when (call.method) {
@@ -51,6 +53,24 @@ class MainActivity: FlutterActivity() {
         }
         // Check if launched from a deep link
         handleIntent(intent)
+    }
+
+    /**
+     * flutter_tts creates a TextToSpeech when the engine attaches and reads
+     * every voice on the main thread (about a second of each start), for a
+     * feature only voice mode uses. It is taken out again here and added when
+     * Dart asks for it just before the first utterance (PluginSpeechOutput).
+     */
+    private fun holdBackTts(flutterEngine: FlutterEngine) {
+        flutterEngine.plugins.remove(FlutterTtsPlugin::class.java)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "atomic_chat/tts")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "ensure") return@setMethodCallHandler result.notImplemented()
+                if (!flutterEngine.plugins.has(FlutterTtsPlugin::class.java)) {
+                    flutterEngine.plugins.add(FlutterTtsPlugin())
+                }
+                result.success(null)
+            }
     }
 
     override fun onNewIntent(intent: Intent) {

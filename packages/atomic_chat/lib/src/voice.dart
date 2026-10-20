@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart'
+    show MethodChannel, MissingPluginException;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
@@ -182,24 +184,54 @@ class PluginSpeechInput implements SpeechInput {
 }
 
 /// [SpeechOutput] on the `flutter_tts` plugin, in the device's language.
+///
+/// Nothing is created before the first [speak]. On Android `flutter_tts`
+/// creates a `TextToSpeech` the moment the engine attaches and reads every
+/// voice on the main thread (about a second at every start), so the app
+/// leaves that plugin out of engine start-up (`MainActivity`) and this class
+/// asks for it just before the first use, over [ttsChannel].
 class PluginSpeechOutput implements SpeechOutput {
-  final FlutterTts _tts = FlutterTts();
-  bool _awaits = false;
+  PluginSpeechOutput({Future<void> Function()? prepare})
+      : _prepare = prepare ?? ensureNativeTts;
+
+  /// The app's native side registers the TTS plugin when it gets "ensure".
+  static const ttsChannel = MethodChannel('atomic_chat/tts');
+
+  /// Asks the host to bring up the platform TTS plugin; a no-op where the
+  /// host does not hold it back (every platform but the Android app).
+  static Future<void> ensureNativeTts() async {
+    try {
+      await ttsChannel.invokeMethod<void>('ensure');
+    } on MissingPluginException {
+      // Registered at start-up: nothing to wait for.
+    }
+  }
+
+  final Future<void> Function() _prepare;
+  late final FlutterTts _tts = FlutterTts();
+  Future<void>? _ready;
 
   /// Completes when the text has been spoken (or speaking was stopped).
   @override
   Future<void> speak(String text) async {
     try {
-      if (!_awaits) {
-        await _tts.awaitSpeakCompletion(true);
-        _awaits = true;
-      }
+      await (_ready ??= _start());
       await _tts.speak(text);
-    } catch (_) {}
+    } catch (_) {
+      // A failed start is tried again at the next utterance.
+      _ready = null;
+    }
+  }
+
+  Future<void> _start() async {
+    await _prepare();
+    await _tts.awaitSpeakCompletion(true);
   }
 
   @override
   Future<void> stop() async {
+    // Never spoke: no plugin to stop, and none to create for it.
+    if (_ready == null) return;
     try {
       await _tts.stop();
     } catch (_) {}
