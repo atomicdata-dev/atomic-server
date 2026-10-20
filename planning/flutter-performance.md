@@ -43,7 +43,8 @@ On a mid-range phone (Xiaomi), profile build, warm OS caches, seeded identity:
 | Open from Recents, warm page: tap → resource painted | < 500 ms (embed plan: 250 ms first content) | 1386 ms (page's own clock 1137 ms) |
 | Open, cold page (no spare) | < 1500 ms | not captured (the spare is back within 1.5 s) |
 | 80 kB document, warm page | < 800 ms | 1940 ms |
-| Search: last keystroke → results drawn (incl. 120 ms debounce) | < 200 ms | 157 ms (Rust query 12 ms) |
+| Search: last keystroke → results drawn | < 50 ms | 24 ms (Rust query 12 ms; no debounce) |
+| Tap → next frame drawn (any button, row, toggle) | < 16-50 ms | 6-28 ms |
 | Scrolling Home: janky frames | < 1 % | 6.5 % (raster-bound: emulated GL) |
 | App PSS after start | < 200 MB | 220 MB |
 | Web view renderer PSS with the spare | < 120 MB | 158 MB |
@@ -95,6 +96,62 @@ What changed (one commit each):
    then goes blank, and the taker reloads that resource.
 6. `Bridge: fat LTO and one codegen unit`: library 33 → 24 MB; a release
    Rust rebuild takes about 3.5 min instead of under 1 min.
+
+## Round 2: "instant" (2026-10-20)
+
+Goal: every tap or keystroke shows feedback within a frame, local content
+within 50-100 ms where the work allows. Emulator, profile build, interleaved
+with the round 1 APK as baseline.
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Search: last keystroke → results drawn (median, n=4-5) | 154 ms (146-219) | 24-33 ms (17-76) |
+| Search: Rust query | 18 ms | 12 ms (unchanged, noise) |
+| Open: the opened 80 kB document's read, page asks → answered | 200-280 ms | 2-21 ms (read on pointer-down) |
+| Open, warm, tap → painted (doc / 80 kB doc) | ~1.4 / 1.6 s | 1.4 / 1.5 s (emulator-bound, see below) |
+| Page slide in / out | 380 / 320 ms | 150 / 150 ms; none in the tablet detail pane |
+| Tap → next frame: bar buttons, Home section toggle, + menu, rows | not measured | 6-28 ms (one 217 ms Home tap out of 3, from a settings web page) |
+
+Commits:
+
+1. `Perf: log tap to next frame for every tap, and time since the tap`
+   (`[perf] tap ? to frame N ms`, `Perf.sinceTap`). No handler found that
+   blocks the UI thread: no sync FFI or big decode on a tap path.
+2. `Search: query on every keystroke, no 120 ms debounce`: one search at a
+   time, the latest text next, stale answers dropped, recents kept until the
+   first hits (no empty frame, no spinner).
+3. `Pages slide in and out in 150 ms, the detail pane swaps at once`.
+4. `Open: read the resource when the finger goes down on its row`
+   (`WarmResourceWebView.prefetch`, used by the page's batch read, once, for
+   1.5 s). With `adb input tap` down and up are one instant, so the emulator
+   only shows the read itself vanish; a finger adds its 50-120 ms.
+
+Tried and dropped: reading the resource the spare rendered ahead after the
+opened one instead of before (no gain: the bridge runs both reads at once).
+
+What an open still spends (emulator, screen recording at 20 fps):
+
+- ~450 ms after the tap the screen does not change at all (the bar's icon
+  changes, the page does not slide in): Flutter's own frame is built in
+  <20 ms and rasterized in <20 ms, so this is the Android main thread
+  attaching the web view (platform view) under emulated GL. Then the page
+  is up, dark, with the web app's own loading spinner for ~0.9 s, then the
+  title, then the text ~0.3 s later.
+- The page asks for the opened resource 250-500 ms after `open` (its JS),
+  and each reply reaches it 500-900 ms after it was answered.
+
+To re-measure on the Xiaomi (phone and Pad):
+
+- [ ] `scripts/perf_android.sh -s <serial> -a app-profile.apk --only open,search`
+      (fresh test data on a test install only): search should be < 50 ms,
+      `open ...: tap to painted` and the `[perf] embed ... delivered at` gaps.
+- [ ] A screen recording of an open (`adb shell screenrecord`, frames at
+      20 fps): the time from the tap to the first changed frame. If the web
+      view attach freezes the screen there too, keep the warm web view
+      attached (offstage) or draw the page's top bar natively first.
+- [ ] `[perf] tap ? to frame` over a few minutes of use: anything > 50 ms.
+- [ ] Whether the 150 ms slide feels right on the phone, and the instant
+      swap on the Pad.
 
 ## Where the time goes now (and what is emulator-only)
 
