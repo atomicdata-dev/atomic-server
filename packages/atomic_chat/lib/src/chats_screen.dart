@@ -25,14 +25,12 @@ const _homeItems = 4;
 /// Most entries the activity feed holds.
 const _maxActivity = 100;
 
-/// How a section folds, what holding its heading does, and the control at its
-/// right, if any (the activity's "Show mine" filter).
+/// How a section folds and what holding its heading does.
 typedef _Fold = ({
   bool collapsed,
   VoidCallback onToggle,
   VoidCallback onHold,
   HomeSection section,
-  Widget? trailing,
   ValueChanged<int> onCount,
 });
 
@@ -128,6 +126,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
   /// The activity feed shows the person's own changes too.
   bool _mine = false;
 
+  /// Tells the full activity page (phone) that the feed, its icons or the
+  /// "Show mine" setting changed.
+  final _feedChanged = _Notifier();
+
   Future<void> _loadMine() async {
     try {
       final p = await SharedPreferences.getInstance();
@@ -141,6 +143,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
       _mine = mine;
       _activity = _loadActivity();
     });
+    _feedChanged.notifyListeners();
     _publishActivity();
     SharedPreferences.getInstance()
         .then((p) => p.setBool(showMineKey, mine))
@@ -332,6 +335,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     _shell?.homeSections.value = const [];
     _shell?.activity.value = null;
     if (_shell?.onUser == _settings) _shell?.onUser = null;
+    _feedChanged.dispose();
     super.dispose();
   }
 
@@ -370,6 +374,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     widget.api.resourceIcons([for (final a in list) a.subject]).then((icons) {
       if (mounted && !_sameIcons(icons)) {
         setState(() => _icons = icons);
+        _feedChanged.notifyListeners();
         _publishActivity();
       }
     }).catchError((Object _) {});
@@ -414,6 +419,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         _activity = _loadActivity();
         _notifications = _loadNotifications();
       });
+      _feedChanged.notifyListeners();
       _publishActivity();
     });
     // A frame must run for the callback to fire.
@@ -423,8 +429,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
   /// Whether `screen` can have changed what the home lists: a section's list
   /// and a settings page only show things (what is opened from a list
   /// reloads by itself when it is closed).
-  static bool _changesData(Widget screen) =>
-      !(screen is _ListPage || (screen is ResourceView && screen.path != null));
+  static bool _changesData(Widget screen) => !(screen is _ListPage ||
+      screen is _ActivityPage ||
+      (screen is ResourceView && screen.path != null));
 
   /// Opens [screen]: pushed over the home on a phone, in the detail pane
   /// next to it on a tablet. [subject] is what it shows, to mark its row.
@@ -479,14 +486,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
     }
     Navigator.of(context).push(SlideBackRoute<void>(builder: page));
   }
-
-  /// The control at the right of a section's heading: only the activity's
-  /// "Show mine" filter.
-  Widget? _trailingFor(HomeSection id) => id == HomeSection.activity
-      ? Padding(
-          padding: const EdgeInsets.only(left: 4, right: 8),
-          child: ShowMineChip(value: _mine, onChanged: _setMine))
-      : null;
 
   Future<void> _settings() async {
     final profile = _profile;
@@ -672,7 +671,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
       },
       onHold: _customize,
       section: id,
-      trailing: _trailingFor(id),
       onCount: (n) => _noteCount(id, n),
     );
     final key = _sectionKeys[id] ??= GlobalKey<_SectionState<dynamic>>();
@@ -709,10 +707,16 @@ class _ChatsScreenState extends State<ChatsScreen> {
           empty: _mine ? 'Nothing changed yet' : 'No activity from others yet',
           rows: (list) => [for (final a in list) _activityRow(a)],
           total: (list) => list.length.clamp(0, _maxActivity),
-          onShowAll: (list) {
-            final shown = list.take(_maxActivity).toList();
-            _openAll(id, shown.length, (i) => _activityRow(shown[i]));
-          },
+          onShowAll: (_) => _openPage(
+              id,
+              (_) => _ActivityPage(
+                    title: id.title,
+                    changed: _feedChanged,
+                    mine: () => _mine,
+                    onMine: _setMine,
+                    feed: () => _activity,
+                    row: _activityRow,
+                  )),
         );
       case HomeSection.chats:
         return _Section<ChatSummary>(
@@ -897,75 +901,68 @@ class _SectionState<T> extends State<_Section<T>>
     if (list != null && list.isNotEmpty) widget.onShowAll(list);
   }
 
-  /// The heading's title: a tap folds the section, a hold opens the dialog to
-  /// show, hide and move sections. Pressed, a faint rounded wash hugs the title and
-  /// its chevron (not the row), and the chevron turns instead of changing.
+  /// The heading: one tap target across the whole row (a tap folds the
+  /// section, a hold opens the dialog to show, hide and move sections). The
+  /// title is at the rows' 16 dp inset, the chevron at the right turns
+  /// instead of changing.
   Widget _foldHeading(BuildContext context) {
     final c = context.appColors;
     final fold = widget.fold;
-    return SizedBox(
-      key: ValueKey('section-heading-${fold.section.name}'),
-      height: 48,
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: fold.onToggle,
-          onLongPress: fold.onHold,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Flexible(
-                // A title in proportion to the rows and the bar's 24 dp icons
-                // (it was a 13 sp grey label): 15 sp, nearly the text colour.
-                child: Text(widget.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                        color: c.textPrimary.withValues(alpha: 0.85),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600)),
+    final label =
+        '${widget.title}, ${fold.collapsed ? 'collapsed' : 'expanded'}';
+    return Semantics(
+      container: true,
+      button: true,
+      expanded: !fold.collapsed,
+      label: label,
+      onTap: fold.onToggle,
+      onLongPress: fold.onHold,
+      child: ExcludeSemantics(
+        child: SizedBox(
+          key: ValueKey('section-heading-${fold.section.name}'),
+          height: 48,
+          width: double.infinity,
+          child: Material(
+            type: MaterialType.transparency,
+            child: InkWell(
+              onTap: fold.onToggle,
+              onLongPress: fold.onHold,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(children: [
+                  Expanded(
+                    // A title in proportion to the rows and the bar's 24 dp
+                    // icons: 15 sp, nearly the text colour.
+                    child: Text(widget.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: c.textPrimary.withValues(alpha: 0.85),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(width: 4),
+                  AnimatedRotation(
+                    turns: fold.collapsed ? -0.25 : 0,
+                    duration: const Duration(milliseconds: 150),
+                    child: Icon(Icons.expand_more,
+                        size: 22, color: c.textSecondary),
+                  ),
+                ]),
               ),
-              const SizedBox(width: 4),
-              AnimatedRotation(
-                turns: fold.collapsed ? -0.25 : 0,
-                duration: const Duration(milliseconds: 150),
-                child:
-                    Icon(Icons.expand_more, size: 22, color: c.textSecondary),
-              ),
-            ]),
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// The heading row: the title at the left, the section's filter (if any)
-  /// at the right.
-  Widget _headingRow(BuildContext context) {
-    final fold = widget.fold;
-    final trailing = fold.trailing;
-    // 48 dp like the bar's buttons (more with a large font), with room
-    // above it between sections; the title at the rows' 16 dp inset.
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 48),
-        child: Row(children: [
-          const SizedBox(width: 8),
-          // The title as wide as it is (and no wider than the room).
-          Expanded(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: _foldHeading(context),
-            ),
-          ),
-          if (trailing != null) trailing,
-          const SizedBox(width: 4),
-        ]),
-      ),
-    );
-  }
+  /// The heading row: 48 dp like the bar's buttons, with room above it
+  /// between sections.
+  Widget _headingRow(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: _foldHeading(context),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -1062,6 +1059,77 @@ class _ListPage extends StatelessWidget {
           bottom: false,
           child: ListView.builder(
               itemCount: count, itemBuilder: (_, i) => item(i))),
+    );
+  }
+}
+
+class _Notifier extends ChangeNotifier {
+  @override
+  // ignore: unnecessary_overrides
+  void notifyListeners() => super.notifyListeners();
+}
+
+/// The activity's full list on a phone: the section's rows, all of them, with
+/// the "Show mine" chip in the bar. The setting is the home's own.
+class _ActivityPage extends StatelessWidget {
+  final String title;
+  final Listenable changed;
+  final bool Function() mine;
+  final ValueChanged<bool> onMine;
+  final Future<List<ActivityEntry>> Function() feed;
+  final Widget Function(ActivityEntry) row;
+
+  const _ActivityPage({
+    required this.title,
+    required this.changed,
+    required this.mine,
+    required this.onMine,
+    required this.feed,
+    required this.row,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    return ListenableBuilder(
+      listenable: changed,
+      builder: (context, _) => Scaffold(
+        backgroundColor: c.bgBody,
+        appBar: AppTopBar(title: title, actions: [
+          Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Center(
+                  child: ShowMineChip(value: mine(), onChanged: onMine))),
+        ]),
+        body: SafeArea(
+          top: false,
+          bottom: false,
+          child: FutureBuilder<List<ActivityEntry>>(
+            future: feed(),
+            builder: (context, snap) {
+              final list =
+                  (snap.data ?? const <ActivityEntry>[]).take(_maxActivity);
+              final rows = list.toList();
+              if (snap.connectionState != ConnectionState.done &&
+                  rows.isEmpty) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (rows.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Text(
+                      mine()
+                          ? 'Nothing changed yet'
+                          : 'No activity from others yet',
+                      style: TextStyle(color: c.textSecondary)),
+                );
+              }
+              return ListView.builder(
+                  itemCount: rows.length, itemBuilder: (_, i) => row(rows[i]));
+            },
+          ),
+        ),
+      ),
     );
   }
 }

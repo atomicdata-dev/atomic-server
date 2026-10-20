@@ -906,15 +906,14 @@ void main() {
       });
     }
 
-    testWidgets('a press on a heading washes the title, not the row',
+    testWidgets('a heading is one tap target across the whole row',
         (tester) async {
       _size(tester, _phone);
       await tester.pumpWidget(_shell(_api()));
       await _settle(tester);
       final heading = find.byKey(const ValueKey('section-heading-favorites'));
       final ink = find.descendant(of: heading, matching: find.byType(InkWell));
-      expect(tester.getSize(ink).width, lessThan(_phone.width / 2));
-      expect(tester.widget<InkWell>(ink).borderRadius, isNotNull);
+      expect(tester.getSize(ink).width, _phone.width);
       // A tap still folds it.
       await tester.tap(heading);
       await _settle(tester);
@@ -1308,36 +1307,78 @@ void main() {
   });
 
   group('Show mine', () {
-    for (final (name, size) in [
-      ('a tablet', _landscape),
-      ('a phone', _phone)
-    ]) {
-      testWidgets('$name: off at first; on adds own changes, by You, and stays',
-          (tester) async {
-        _size(tester, size);
-        await tester.pumpWidget(_shell(_MineApi()));
-        await _settle(tester);
-        final chip = find.byKey(const Key('show-mine'));
-        expect(chip, findsOneWidget);
-        expect(tester.widget<FilterChip>(chip).selected, isFalse);
-        expect(find.text('Budget'), findsOneWidget);
-        expect(find.text('My notes'), findsNothing);
-        await tester.tap(chip);
-        await _settle(tester);
-        expect(tester.widget<FilterChip>(chip).selected, isTrue);
-        expect(find.text('My notes'), findsOneWidget);
-        expect(find.textContaining('You '), findsOneWidget);
-        final prefs = await SharedPreferences.getInstance();
-        expect(prefs.getBool('activity_show_mine'), isTrue);
-        // A fresh start keeps it.
-        await _done(tester);
-        await tester.pumpWidget(_shell(_MineApi()));
-        await _settle(tester);
-        expect(tester.widget<FilterChip>(chip).selected, isTrue);
-        expect(find.text('My notes'), findsOneWidget);
-        await _done(tester);
-      });
-    }
+    final chip = find.byKey(const Key('show-mine'));
+
+    testWidgets('a tablet: the chip is on the Activity page, not the sidebar',
+        (tester) async {
+      _size(tester, _landscape);
+      await tester.pumpWidget(_shell(_MineApi()));
+      await _settle(tester);
+      expect(chip, findsOneWidget);
+      expect(find.byType(ChatsScreen).evaluate().length, 1);
+      expect(
+          find.descendant(
+              of: find.byType(ChatsScreen),
+              matching: find.widgetWithText(FilterChip, 'Show mine')),
+          findsNothing);
+      expect(
+          find.descendant(
+              of: find.byKey(const Key('home-activity')), matching: chip),
+          findsOneWidget);
+      expect(tester.widget<FilterChip>(chip).selected, isFalse);
+      expect(find.text('My notes'), findsNothing);
+      await tester.tap(chip);
+      await _settle(tester);
+      expect(tester.widget<FilterChip>(chip).selected, isTrue);
+      expect(find.text('My notes'), findsOneWidget);
+      expect(find.textContaining('You '), findsOneWidget);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('activity_show_mine'), isTrue);
+      // A fresh start keeps it.
+      await _done(tester);
+      await tester.pumpWidget(_shell(_MineApi()));
+      await _settle(tester);
+      expect(tester.widget<FilterChip>(chip).selected, isTrue);
+      expect(find.text('My notes'), findsOneWidget);
+      await _done(tester);
+    });
+
+    testWidgets(
+        'a phone: no chip in the Home section; the full page has it, '
+        'toggling persists and the section follows', (tester) async {
+      _size(tester, _phone);
+      await tester.pumpWidget(_shell(_MineApi()));
+      await _settle(tester);
+      // The Home section has no chip and shows others' changes only.
+      expect(find.byKey(const ValueKey('section-heading-activity')),
+          findsOneWidget);
+      expect(chip, findsNothing);
+      expect(find.widgetWithText(FilterChip, 'Show mine'), findsNothing);
+      expect(find.text('Budget'), findsOneWidget);
+      expect(find.text('My notes'), findsNothing);
+      // The full page: the chip in its bar.
+      final showAll = find.byKey(const ValueKey('section-show-all-activity'));
+      await tester.ensureVisible(showAll);
+      await tester.tap(showAll);
+      await _settle(tester);
+      expect(chip, findsOneWidget);
+      expect(find.descendant(of: find.byType(AppBar), matching: chip),
+          findsOneWidget);
+      expect(tester.widget<FilterChip>(chip).selected, isFalse);
+      await tester.tap(chip);
+      await _settle(tester);
+      expect(tester.widget<FilterChip>(chip).selected, isTrue);
+      expect(find.text('My notes'), findsOneWidget);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('activity_show_mine'), isTrue);
+      // Back on the Home: the section includes own changes, still no chip.
+      await tester.binding.handlePopRoute();
+      await _settle(tester);
+      expect(chip, findsNothing);
+      expect(find.text('My notes'), findsOneWidget);
+      expect(find.textContaining('You '), findsOneWidget);
+      await _done(tester);
+    });
   });
 }
 
@@ -1377,7 +1418,10 @@ class _MineApi extends FakeApi {
   _MineApi()
       : super(
           driveList: const [],
-          activityList: [_a('did:ad:budget', 'Budget', 'Polle')],
+          activityList: [
+            _a('did:ad:budget', 'Budget', 'Polle'),
+            for (var i = 0; i < 5; i++) _a('did:ad:o$i', 'Other $i', 'Polle'),
+          ],
         );
 
   @override
