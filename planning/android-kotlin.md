@@ -22,11 +22,12 @@ app. Android only. Lives in `android-kotlin/`; `flutter/` is not touched.
 - [x] Toolchain + app builds an APK (SDK, NDK, cargo-ndk, UniFFI); not yet run on a device
 - [~] Store init, agent persistence, onboarding/login (secret, new agent), recovery + startup-failed screens: built, JVM-tested, not run on a device
 - [~] Sync: WS session (reconnecting), home-server discovery, Iroh pairing (QR via CameraX + ZXing or pasted id), real write pusher
-- [ ] atomic.place account sign-in (portal, credits)
+- [~] atomic.place account: agent sign-in against the portal, AI status/consent (stage 4); no device link code, no credits page
 - [~] Home (built, JVM screenshots only): Drives, Recents, AI Chats, Favorites, Messages (max 4 + show all), search
 - [~] Resource view in warm WebView (embed): built, bundled by Gradle, JVM-tested; never run on a device/emulator
-- [ ] AI chat
-- [ ] Conversations (DM) and meeting chat
+- [~] AI chat: list, read, send, streamed hosted-AI reply with tools, context, new chat, windowed long chats (built, JVM-tested, never run on a device). Missing: voice, attachments, answer-top pinning
+- [~] Conversations (DM) and meeting / chat-room chat: list, read, send, poll, rename; the embed's `openNative` opens them (built, JVM-tested)
+- [~] `[perf]` marks as Flutter's and a `benchmark` build type with the seed (built; not measured)
 - [~] Settings behind the avatar: agent, workspaces, device, servers, peers, edit profile (built, JVM screenshots)
 - [ ] Tablet layout
 - [ ] Performance comparison table vs Flutter (cold start, search per key, resource open)

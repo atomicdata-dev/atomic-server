@@ -13,7 +13,9 @@ val jniLibsOut = layout.buildDirectory.dir("generated/jniLibs")
 val uniffiOut = layout.buildDirectory.dir("generated/uniffi/kotlin")
 // Debug APKs use the Rust `dev` profile (optimised dependencies, quick to compile);
 // pass -PrustRelease=true for the fat-LTO `release` profile.
-val rustRelease = providers.gradleProperty("rustRelease").map(String::toBoolean).orElse(false)
+// A benchmark build is release-grade by definition, so it takes the Rust `release` profile too.
+val benchmarkRequested = gradle.startParameter.taskNames.any { it.contains("benchmark", ignoreCase = true) }
+val rustRelease = providers.gradleProperty("rustRelease").map(String::toBoolean).orElse(benchmarkRequested)
 val rustAbis = listOf("arm64-v8a", "x86_64")
 // The embedded renderer (browser/data-browser/embed.html), built by scripts/build_embed.sh
 // into build output and bundled as assets/embed. -PskipEmbed=true bundles an empty
@@ -36,11 +38,24 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("boolean", "PERF_MARKS", "true")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("boolean", "PERF_MARKS", "false")
+        }
+        // Release-like (minified, not debuggable, release Rust) but profileable, with the
+        // seed and the [perf] marks: what perf runs measure. See README "Benchmark build".
+        create("benchmark") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+            signingConfig = signingConfigs.getByName("debug")
+            buildConfigField("boolean", "PERF_MARKS", "true")
         }
     }
 
@@ -49,13 +64,20 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 
     sourceSets.getByName("main") {
         jniLibs.srcDir(jniLibsOut)
         kotlin.srcDir(uniffiOut)
         assets.srcDir(embedOut)
     }
+
+    // The seed and the fake AI exist in debug and benchmark builds (src/seeded), as stubs in release.
+    sourceSets.getByName("debug") { kotlin.srcDir("src/seeded/kotlin") }
+    sourceSets.getByName("benchmark") { kotlin.srcDir("src/seeded/kotlin") }
 
     testOptions { unitTests { isIncludeAndroidResources = true } }
 

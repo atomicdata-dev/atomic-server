@@ -100,11 +100,60 @@ composables with fake data. Output goes outside the repo:
 SHOTS_DIR=/tmp/claude-0/kotlin-shots ./gradlew testDebugUnitTest -Proborazzi.test.record=true
 ```
 
-## Test data in debug builds
+## Test data in debug and benchmark builds
 
 `adb shell "echo 30 > /sdcard/Android/data/place.atomic.app.kotlin/files/perf_seed"`,
 then start the app: it makes 30 documents/folders, opens each once, adds three
-AI chats and three favorites (`DebugSeed`, compiled out of release).
+AI chats and three favorites (`DebugSeed`, in `src/seeded`, used by the `debug` and
+`benchmark` build types; the `release` source set has an empty stub).
+
+- `perf_seed_long` with a number N: one AI chat "Perf long chat" with N entries, for
+  the long-chat marks (`chat data`, `chat painted`, `chat older page`).
+- `fake_ai` (any content): the AI chat answers with a scripted, streamed reply, and
+  with a `semantic_search` tool call when the message contains "search" (`DebugAi`),
+  so the chat can be run and timed without an account.
+
+## Benchmark build
+
+`./gradlew assembleBenchmark` builds `app-benchmark.apk`: the `release` type
+(R8-minified, resources shrunk, not debuggable, Rust built with the `release` profile
+automatically when a `*Benchmark*` task is requested) plus
+`<profileable android:shell="true"/>`, the seed above, the fake AI and the `[perf]`
+marks. It is signed with the debug key. Measure with it, not with the debug APK:
+
+```sh
+adb install -r app/build/outputs/apk/benchmark/app-benchmark.apk
+adb shell "echo 30 > /sdcard/Android/data/place.atomic.app.kotlin/files/perf_seed"
+adb shell am start -W place.atomic.app.kotlin/.MainActivity
+adb logcat -d -s flutter:I | grep '\[perf\]'
+```
+
+A real `release` build has no seed and no marks (`BuildConfig.PERF_MARKS`).
+
+### `[perf]` marks
+
+Same names, format and logcat tag (`flutter`, priority I) as the Flutter app
+(`packages/atomic_flutter/lib/src/perf.dart`), so `flutter/scripts/perf_android.sh`'s
+log reading works on both: `[perf] <name> <ms> ms` is a mark since `Application.onCreate`,
+`[perf] <name> <ms> ms (span)` a span the app timed. Debug and benchmark builds only.
+
+| Mark | Where |
+| --- | --- |
+| `main`, `first frame` | `Perf.start()` in `onCreate`; first draw of the activity window |
+| `db open`, `session restored` | store opened; signed in again from the saved secret |
+| `home start`, `home <list>` (span), `home data` | `HomeViewModel`; `home data` when all five lists are in |
+| `home painted` | the frame after `home data` |
+| `warm ready` | the embed page said `ready` |
+| `search query` (span), `search keystroke to results` (span) | Rust query; last key to the frame that shows its results |
+| `resource painted warm\|cold`, `... since tap`, `resource painted in page ...` | the page's `main` shows the title (JS injected by the bridge, as in Flutter), two frames later |
+| `resource revealed warm\|cold`, `... since tap` | `main[about=subject]` holds more than a loading state (JS from Flutter's `_watchReveal`) |
+| `chat data N`, `chat painted N`, `chat older page N` | native chat screens: first page read, messages on screen, each older page |
+| `[chat] +Nms first event` | AI chat: time to the first streamed event |
+
+"Since tap" is the time since the last finger lifted anywhere (`MainActivity.dispatchTouchEvent`,
+as Flutter's `watchTaps`). `warm` means the embed page was ready when the resource was opened.
+Not marked (Flutter has them, this app has no equivalent step): `rust init`,
+`documents dir`, `runApp`, `session loaded`, `resource data warm|cold`.
 
 ## Account, sync and settings (stage 3)
 
@@ -136,12 +185,59 @@ Rust    session.rs (resume)   sync/ws.rs (WebSocket, reconnects)   sync/peers.rs
 - The warm WebView is laid out at screen size before the page loads and gets
   MATCH_PARENT params when shown (a 0 x 0 view made `100dvh` 0 and the page body blank).
 
-## Status (stages 1 to 3)
+## AI chat, conversations and chat rooms (stage 4)
+
+```
+Kotlin  AiChatModel / ThreadModel (one for DMs and rooms)   ChatWindow   HostedAi   AccountClient
+           |  ChatBackend / ThreadSource (CoreChatBackend = UniFFI; FakeChat in the JVM tests)
+Rust    chat.rs: windowed reads, append_ai_chat_entry, conversations, rooms, sign_with_agent
+```
+
+- **AI chat** (`AiChatScreen`, Flutter's `ChatScreen`): the AI chats list on Home opens
+  it; "New chat" next to the heading starts one. A new chat offers two drives and the
+  latest opened as context pills, and the attach button searches for more. The chat is
+  created with the first message (named after it, 40 characters) and both messages are
+  saved in the web app's `ChatLog` format (`parts`, and the attached resources in `ctx`),
+  so the web app reads them too. Markdown answers, tool calls as steps, Stop keeps what
+  has streamed.
+- **The AI route is Flutter's, the account's credits, and only that**: the Flutter app has
+  no own-API-key route, so neither has this one. The active agent signs in to
+  `https://atomic.place` (`POST /api/auth/agent/challenge`, then `/api/auth/agent?if_linked=true`,
+  signed in Rust by `sign_with_agent` so the key never leaves it), the `session_token` cookie
+  is kept sealed by the Keystore next to the agent secret (`SessionStore.accountSession`),
+  `GET ai/status`, `POST ai/consent` ("Turn on AI"), then `POST /api/ai/chat/completions`
+  as an SSE stream. The app runs the tools (`semantic_search`, `get_atomic_resource`) itself
+  and goes on with their results, at most 8 rounds. The model gets the latest 40 messages
+  (and about 24 000 characters) of a long chat.
+- **Long chats** page like Flutter's `ChatWindow`: the newest 50, older pages as the list
+  scrolls up, at most 500 held (the oldest drop near the bottom, the newest far up and
+  come back), "Jump to latest" once scrolled up. Cursors are message ids.
+- **Conversations (DMs, end-to-end encrypted) and chat rooms / meetings** (`ThreadScreen`):
+  bubbles, day separators, a meeting's events as lines, a pending message while sending,
+  the text back in the field when a send fails, a poll every 3 s while open, rooms can be
+  renamed. Conversations are fetched onto the device when needed (`follow_conversation`).
+- The page's `openNative(kind, subject, title)` opens these screens for `chatroom`,
+  `conversation` and `aichat` (answers `true`, as Flutter); the page reads the resource
+  again when the screen closes. Everything else stays `false`.
+
+## Status (stages 1 to 4)
 
 Done and checked only by `cargo test`, JVM tests and a successful build (nothing was
 run on a device or emulator here): store init, agent persistence, first run, sign in,
 drives, Home, resource view, settings, servers, pairing, profile, recovery screens.
 
-Not built: signing in with an atomic.place account (portal, AI credits, Cloud Vault
-rows), agent pictures (emoji or initial only), AI chat, native chat rooms,
-conversations screens. Names of other agents come from the connected server.
+Stage 4 (AI chat, conversations, rooms, perf marks, benchmark build) is also only
+JVM-tested and built; see the list of what never ran below.
+
+Not built: linking a device with a code and the account pages of the portal (credits,
+billing, Cloud Vault rows), agent pictures (emoji or initial only), voice input and file
+or photo attachments in the AI chat, pinning the answer's top while it streams (Flutter's
+`AnswerTop` behaviour; here the list follows the end), an own-API-key AI route (Flutter has
+none). Names of other agents come from the connected server.
+
+Differences from Flutter that are deliberate or forced:
+- Paging reads through the Rust crate over a whole-chat read and cuts it at the id cursor
+  (`rust/src/chat.rs`): the branch's `atomic_lib` has no `read_chat_page`. Correct, but the
+  read cost grows with the chat; swap it for the lib's page read when it lands.
+- The resources attached to a message are kept in the entry's `ctx` as JSON with a title and
+  class (Flutter drops them); the web app only reads `type` and `subject`.
