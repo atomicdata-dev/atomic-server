@@ -1,6 +1,8 @@
 use atomic_lib::Storelike;
 use flutter_rust_bridge::frb;
 
+#[cfg(not(target_arch = "wasm32"))]
+mod compaction_check;
 #[cfg(test)]
 mod peer_tests;
 mod peer_search;
@@ -283,9 +285,19 @@ fn describe_file(check: Option<atomic_lib::db::recovery::FileCheck>) -> String {
 async fn open_store_catching(base_path: &std::path::Path) -> Result<atomic_lib::Db, String> {
     use futures::FutureExt;
     let uploads_path = base_path.join("uploads");
-    let opening = atomic_lib::Db::init_redb_file(base_path, None, &uploads_path);
+    let now = state::now_ms();
+    let policy = compaction_check::startup_policy(base_path, now);
+    let checks = policy.enabled;
+    let opening =
+        atomic_lib::Db::init_redb_file_with_policy(base_path, None, &uploads_path, &policy);
     match std::panic::AssertUnwindSafe(opening).catch_unwind().await {
-        Ok(result) => result.map_err(err),
+        Ok(Ok(store)) => {
+            if checks {
+                compaction_check::record_check(base_path, now);
+            }
+            Ok(store)
+        }
+        Ok(Err(e)) => Err(err(e)),
         Err(panic) => Err(format!(
             "The {}: panic while opening: {}",
             atomic_lib::db::recovery::DAMAGED_STORE,

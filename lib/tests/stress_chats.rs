@@ -345,9 +345,11 @@ fn dir_size(path: &Path) -> u64 {
         .unwrap_or(0)
 }
 
-/// What the Flutter bridge's `open_db` does: open the file (startup
-/// compaction policy included), make sure the search index is caught up, load
-/// the recents index and start its listener.
+/// What the Flutter bridge's `open_db` does: open the file, make sure the
+/// search index is caught up, load the recents index and start its listener.
+/// The bridge runs the startup compaction check at most once a week
+/// (`flutter/rust/src/api/simple/compaction_check.rs`), so a start opens
+/// without it unless `STRESS_COMPACTION_CHECK` is set.
 async fn open_like_the_app(dir: &Path, recents: &Arc<RecentsIndex>) -> (Db, Vec<(String, Duration)>) {
     if std::env::var("STRESS_LOG").is_ok() {
         let _ = tracing_subscriber::fmt()
@@ -356,7 +358,12 @@ async fn open_like_the_app(dir: &Path, recents: &Arc<RecentsIndex>) -> (Db, Vec<
     }
     let mut steps = Vec::new();
     let t = Instant::now();
-    let store = Db::init_redb_file(dir, None, &dir.join("uploads"))
+    let policy = if std::env::var("STRESS_COMPACTION_CHECK").is_ok() {
+        atomic_lib::db::compaction::CompactionPolicy::default()
+    } else {
+        atomic_lib::db::compaction::CompactionPolicy::disabled()
+    };
+    let store = Db::init_redb_file_with_policy(dir, None, &dir.join("uploads"), &policy)
         .await
         .expect("open store");
     steps.push(("init_redb_file".to_string(), t.elapsed()));
