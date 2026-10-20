@@ -64,40 +64,4 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('chat'), findsNothing);
   });
-
-  testWidgets('streamed text fades in piece by piece', (tester) async {
-    var clock = DateTime(2026, 10, 19, 12);
-    var chunks = <(String, DateTime)>[('Hel', clock)];
-    late StateSetter set;
-    await tester.pumpWidget(MaterialApp(
-      home: StatefulBuilder(builder: (context, setState) {
-        set = setState;
-        return Scaffold(
-          body: FadingText(
-            chunks: chunks,
-            style: const TextStyle(color: Colors.white),
-            now: () => clock,
-          ),
-        );
-      }),
-    ));
-    double alpha() {
-      final text = tester.widget<Text>(find.byType(Text));
-      final span = (text.textSpan! as TextSpan).children!.last as TextSpan;
-      return span.style!.color!.a;
-    }
-
-    clock = clock.add(const Duration(milliseconds: 50));
-    await tester.pump(const Duration(milliseconds: 16));
-    expect(alpha(), lessThan(0.5));
-
-    // A new piece starts from nothing while the old one carries on.
-    set(() => chunks = [...chunks, ('lo', clock)]);
-    await tester.pump();
-    expect(alpha(), lessThan(0.1));
-
-    clock = clock.add(const Duration(milliseconds: 500));
-    await tester.pump(const Duration(milliseconds: 16));
-    expect(alpha(), 1.0);
-  });
 }

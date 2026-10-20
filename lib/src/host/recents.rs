@@ -527,7 +527,8 @@ impl RecentsIndex {
     }
 
     /// The `limit` newest chats as `(subject, name, last_activity)`.
-    pub async fn recent_chats(
+    #[cfg(test)]
+    async fn recent_chats(
         &self,
         store: &Db,
         limit: usize,

@@ -35,7 +35,7 @@ MaterialApp(
 | Screens | `ChatsScreen` (home sections, `timeAgo`, `groupChatsByAge`), `ChatScreen` (also `voiceMode`), `ConversationScreen`, `SearchScreen` (also `scopeDrive`), `NewDocumentSheet` |
 | Resources | `openResourceView` and the native view registry, `ResourceView`, `EmbedServer`, `ResourceWebView`, `ResourceRow`, `iconForClass` |
 | AI and voice | `HostedAi`, `voice.dart`, `hosted_voice.dart` (the `voice_*` SharedPreferences keys) |
-| Small widgets | `FadingText`, `AtomicPlaceMark`, `HoldFan` (from `atomic_flutter`, re-exported) |
+| Small widgets | `HoldFan` (from `atomic_flutter`, re-exported) |
 
 ## The bottom bar
 

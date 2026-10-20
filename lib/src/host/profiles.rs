@@ -123,7 +123,7 @@ impl AgentProfiles {
 
     /// The cached profile, never waiting: when it is not cached a lookup
     /// starts in the background and this is `None`, so a later call has it.
-    pub fn cached_or_prefetch(&self, agent: &str) -> Option<String> {
+    fn cached_or_prefetch(&self, agent: &str) -> Option<String> {
         match self.state(agent) {
             State::Found(json) => Some(json),
             State::Failed | State::Pending(_) => None,

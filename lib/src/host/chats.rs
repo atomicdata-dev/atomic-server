@@ -222,7 +222,7 @@ fn log_page_of(store: &Db, subject: &crate::Subject) -> Option<LogPage> {
 
 /// Up to `limit` pages of `chat` older than `before` (all pages when
 /// `None`), newest first.
-pub async fn older_pages(
+async fn older_pages(
     store: &Db,
     chat: &str,
     before: Option<&LogPage>,
@@ -248,7 +248,7 @@ pub async fn older_pages(
 }
 
 /// Up to `limit` pages of `chat` newer than `after`, oldest first.
-pub async fn newer_pages(
+async fn newer_pages(
     store: &Db,
     chat: &str,
     after: &LogPage,

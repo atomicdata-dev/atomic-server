@@ -1,7 +1,7 @@
+import 'package:atomic_flutter/atomic_flutter.dart'
+    show normalizeServerUrl, sameOrigin;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import 'server_url.dart';
 
 /// Persists the atomic session across restarts.
 ///

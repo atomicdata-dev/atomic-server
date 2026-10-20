@@ -1,4 +1,5 @@
-import 'package:atomic_flutter/atomic_flutter.dart' show Perf;
+import 'package:atomic_flutter/atomic_flutter.dart'
+    show Perf, normalizeServerUrl;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:atomic_chat/atomic_chat.dart' show AtomicWordmark;
@@ -6,7 +7,6 @@ import 'package:atomic_flutter/atomic_flutter.dart' as shared;
 import 'package:url_launcher/url_launcher.dart';
 import '../atomic/account_store.dart';
 import '../atomic/atomic_client.dart';
-import '../atomic/server_url.dart';
 import '../atomic/session.dart';
 import '../theme.dart';
 import 'account_link_dialog.dart';
