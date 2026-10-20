@@ -297,6 +297,10 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
         brightness: Brightness.light,
         scaffoldBackgroundColor: AppColors.light.pageBg,
         extensions: const [AppColors.light],
+        // A press shows a faint wash of the text colour, as the embedded page
+        // does, not the default tinted flat rectangle.
+        splashColor: AppColors.light.textPrimary.withValues(alpha: 0.06),
+        highlightColor: AppColors.light.textPrimary.withValues(alpha: 0.08),
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -307,6 +311,10 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
         brightness: Brightness.dark,
         scaffoldBackgroundColor: AppColors.dark.pageBg,
         extensions: const [AppColors.dark],
+        // A press shows a faint wash of the text colour, as the embedded page
+        // does, not the default tinted flat rectangle.
+        splashColor: AppColors.dark.textPrimary.withValues(alpha: 0.06),
+        highlightColor: AppColors.dark.textPrimary.withValues(alpha: 0.08),
       ),
       home: _storeRecovery != null
           ? StoreRecoveryScreen(

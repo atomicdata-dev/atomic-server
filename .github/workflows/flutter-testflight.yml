@@ -1,0 +1,95 @@
+name: Atomic Flutter iOS
+on:
+  push:
+    branches: [codex/atomic-flutter-testflight]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: atomic-flutter-ios-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.7'
+          cache: true
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.10.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Rust iOS target
+        run: rustup target add aarch64-apple-ios
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: flutter/rust
+          key: flutter-ios
+      - name: Build embedded renderer
+        run: bash flutter/scripts/build_embed.sh
+      - name: Get Flutter packages
+        working-directory: flutter
+        run: flutter pub get
+      - name: Build iOS release
+        if: env.APP_STORE_CONNECT_PRIVATE_KEY == ''
+        working-directory: flutter
+        run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
+      - uses: actions/upload-artifact@v4
+        if: env.APP_STORE_CONNECT_PRIVATE_KEY == ''
+        with:
+          name: atomic-ios-unsigned
+          path: flutter/build/ios/iphoneos/Runner.app
+          if-no-files-found: error
+      - name: Prepare temporary Apple signing
+        id: signing
+        if: env.APP_STORE_CONNECT_PRIVATE_KEY != ''
+        working-directory: flutter
+        run: |
+          python3 -m venv "$RUNNER_TEMP/signing-venv"
+          "$RUNNER_TEMP/signing-venv/bin/pip" install --quiet 'cryptography>=43'
+          "$RUNNER_TEMP/signing-venv/bin/python" ios/testflight.py prepare "$RUNNER_TEMP/ios-signing"
+          cp "$RUNNER_TEMP/ios-signing/Signing.xcconfig" ios/Flutter/Signing.xcconfig
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          security create-keychain -p ci "$keychain"
+          security set-keychain-settings -lut 7200 "$keychain"
+          security unlock-keychain -p ci "$keychain"
+          security import "$RUNNER_TEMP/ios-signing/distribution.p12" -k "$keychain" -P "$(cat "$RUNNER_TEMP/ios-signing/p12-password")" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k ci "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp "$RUNNER_TEMP/ios-signing"/*.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+      - name: Build signed IPA
+        if: steps.signing.outcome == 'success'
+        working-directory: flutter
+        run: flutter build ipa --release --export-options-plist="$RUNNER_TEMP/ios-signing/ExportOptions.plist" --build-number=${{ github.run_number }}
+      - uses: actions/upload-artifact@v4
+        if: steps.signing.outcome == 'success'
+        with:
+          name: atomic-place-ipa
+          path: flutter/build/ios/ipa/*.ipa
+          if-no-files-found: error
+      - name: Upload to TestFlight
+        if: steps.signing.outcome == 'success'
+        working-directory: flutter
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          printf '%s\n' "$APP_STORE_CONNECT_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_$APP_STORE_CONNECT_KEY_ID.p8
+          xcrun altool --upload-app --type ios --file build/ios/ipa/*.ipa --apiKey "$APP_STORE_CONNECT_KEY_ID" --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+          echo "atomic.place build ${{ github.run_number }} uploaded to TestFlight; Apple processing is pending." >> "$GITHUB_STEP_SUMMARY"
+      - name: Clean up this run's Apple signing
+        if: always() && steps.signing.outcome != 'skipped'
+        working-directory: flutter
+        run: |
+          if [ -d "$RUNNER_TEMP/ios-signing" ]; then
+            "$RUNNER_TEMP/signing-venv/bin/python" ios/testflight.py cleanup "$RUNNER_TEMP/ios-signing"
+          fi
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" 2>/dev/null || true

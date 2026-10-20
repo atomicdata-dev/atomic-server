@@ -28,7 +28,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.ontola.atomiccanvas_flutter"
+        applicationId "io.ontola.atomic"
         minSdkVersion flutter.minSdkVersion
         targetSdk 36
         versionCode flutterVersionCode.toInteger()

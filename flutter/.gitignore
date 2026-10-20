@@ -58,3 +58,6 @@ assets/embed/*
 !assets/embed/assets/
 assets/embed/assets/*
 !assets/embed/assets/.gitkeep
+
+# Ephemeral CI signing settings
+ios/Flutter/Signing.xcconfig
