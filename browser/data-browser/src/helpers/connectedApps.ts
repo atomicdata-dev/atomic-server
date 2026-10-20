@@ -1,4 +1,4 @@
-import { dataBrowser, type Store } from '@tomic/react';
+import { dataBrowser, isNotEnrolledMessage, type Store } from '@tomic/react';
 
 const APPS = dataBrowser.properties.resources;
 
@@ -17,14 +17,25 @@ export async function listConnectedApps(
   return (drive.get(APPS) as string[] | undefined) ?? [];
 }
 
+/**
+ * The list entry is a convenience; the grants are the record. A node that has
+ * not enrolled the home drive for sync refuses the save, which must not stop
+ * the connection. Any other failure still throws.
+ */
 export async function rememberConnectedApp(
   store: Store,
   home: string,
   agent: string,
 ): Promise<void> {
-  const drive = await store.getResource(home);
-  drive.push(APPS, [agent], true);
-  await drive.save();
+  try {
+    const drive = await store.getResource(home);
+    drive.push(APPS, [agent], true);
+    await drive.save();
+  } catch (e) {
+    if (!isNotEnrolledMessage(e instanceof Error ? e.message : String(e))) {
+      throw e;
+    }
+  }
 }
 
 export async function forgetConnectedApp(

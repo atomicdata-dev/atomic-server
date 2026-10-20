@@ -13223,3 +13223,7 @@ msgstr "Latest changes from each of {0} browsers and apps"
 #: src/components/Vault/VaultStorage.tsx
 msgid "The next backup from that browser or app adds them"
 msgstr "The next backup from that browser or app adds them"
+
+#: src/components/ConnectDrivePicker.tsx
+msgid "All drives"
+msgstr "All drives"
