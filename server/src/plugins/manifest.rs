@@ -1132,6 +1132,25 @@ fn validate_destination(entry: &serde_json::Value) -> Result<(), String> {
             _ => Err(fail(&format!("{what} must be nonempty text"))),
         }
     }
+    // A term to reuse instead of minting one: absolute https, no credentials,
+    // written the way the URL parser writes it.
+    fn subject(value: Option<&Value>, what: &str) -> Result<(), String> {
+        let Some(value) = value else {
+            return Ok(());
+        };
+        let text = text(Some(value), &format!("{what} subject"))?;
+        match url::Url::parse(&text) {
+            Ok(url)
+                if url.scheme() == "https"
+                    && url.username().is_empty()
+                    && url.password().is_none()
+                    && url.as_str() == text =>
+            {
+                Ok(())
+            }
+            _ => Err(fail(&format!("{what} subject must be an https URL"))),
+        }
+    }
     fn shortnames(value: Option<&Value>, what: &str) -> Result<Vec<String>, String> {
         let Some(value) = value else {
             return Ok(Vec::new());
@@ -1160,8 +1179,9 @@ fn validate_destination(entry: &serde_json::Value) -> Result<(), String> {
     for raw in properties {
         let property = object(
             Some(raw),
-            Some(&["shortname", "name", "description", "datatype"]),
+            Some(&["subject", "shortname", "name", "description", "datatype"]),
         )?;
+        subject(property.get("subject"), "property")?;
         let shortname = text(property.get("shortname"), "property shortname")?;
         if !is_shortname(&shortname) {
             return Err(fail(&format!("invalid shortname {shortname}")));
@@ -1185,8 +1205,16 @@ fn validate_destination(entry: &serde_json::Value) -> Result<(), String> {
     for raw in classes {
         let class = object(
             Some(raw),
-            Some(&["shortname", "name", "description", "requires", "recommends"]),
+            Some(&[
+                "subject",
+                "shortname",
+                "name",
+                "description",
+                "requires",
+                "recommends",
+            ]),
         )?;
+        subject(class.get("subject"), "class")?;
         let shortname = text(class.get("shortname"), "class shortname")?;
         if !is_shortname(&shortname) {
             return Err(fail(&format!("invalid shortname {shortname}")));
