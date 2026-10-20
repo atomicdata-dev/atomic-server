@@ -418,7 +418,26 @@ never synced, a connected one drains it). redb then stores 519 MB plus
 - [ ] 3-letter queries are the slowest warm case (5-10 ms): the one-edit
       neighbourhood of three letters still scans the two-letter prefixes.
 
-### Phase 3: the same data in the app (planned, not run)
+### Phase 3: the same data in the app
+
+**Status (2026-10-20):** the tooling is in (`3987c34be` bridge
+`import_ai_chat`, `ffb1e4954` Perf marks `chats all painted`, `chats page`,
+`chat data`/`chat painted`, `65bb1a49c` `perf_android.sh --seed-chats N
+[--chat-scale S]` with the `allchats`, `typing` and `bigchat` steps and PSS
+per stage). The emulator run did not happen: the Mac had 1.9-2.0 GB free,
+under the 3 GB a profile build plus the seeded store needs. To run it:
+
+```
+df -h /                      # >= 3 GB free
+~/Library/Android/sdk/emulator/emulator -avd Phone_A35 -no-snapshot-save -no-boot-anim -no-audio &
+cd flutter && mise exec flutter@3.44 -- flutter build apk --profile --target-platform android-arm64
+scripts/perf_android.sh -s emulator-5554 -a build/app/outputs/flutter-apk/app-profile.apk \
+  --seed-chats 1000 --chat-scale 0.5 --only size -n 1          # once: ~350 MB store
+scripts/perf_android.sh -s emulator-5554 -n 3 \
+  --only cold,allchats,typing,bigchat,memory -o stress.md
+```
+
+The plan it implements (kept for the record):
 
 Waits for a go-ahead (emulator builds conflict with other agents and disk).
 
