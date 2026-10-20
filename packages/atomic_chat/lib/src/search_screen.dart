@@ -96,8 +96,13 @@ class _SearchModel extends ChangeNotifier {
   Object? error;
   String query = '';
 
-  /// The query [hits] answer (they lag the field by the debounce).
+  /// The query [hits] answer (they lag the field while a search runs); empty
+  /// before the first answer, and the list shows the recents until then.
   String hitsFor = '';
+
+  /// Whether the list shows the recently opened instead of hits: nothing
+  /// typed, or no answer yet (no empty frame between the two lists).
+  bool get showsRecent => query.isEmpty || hitsFor.isEmpty;
 
   /// The one drive searched, or null for all of them.
   String? scope;
@@ -107,7 +112,6 @@ class _SearchModel extends ChangeNotifier {
 
 class _SearchScreenState extends State<SearchScreen> {
   final _SearchModel _model = _SearchModel();
-  Timer? _debounce;
   ShellController? _shell;
   late final TextEditingController _text =
       TextEditingController(text: widget.initialQuery);
@@ -157,6 +161,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final query = _model.query;
     _model.query = '';
     _model.hits = const [];
+    _model.hitsFor = '';
     _model.changed();
     _loadRecent(_model.drives);
     if (query.isNotEmpty) _changed(query);
@@ -178,6 +183,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final query = _model.query;
     _model.query = '';
     _model.hits = const [];
+    _model.hitsFor = '';
     _model.recent = _inScope(_model.recent);
     _model.changed();
     _loadRecent(_model.drives);
@@ -262,56 +268,79 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
-    _debounce?.cancel();
     _model.dispose();
     _text.dispose();
     _focus.dispose();
     super.dispose();
   }
 
+  /// Whether a search is under way; a keystroke meanwhile only updates
+  /// [_model.query], which is searched as soon as that one answers.
+  bool _searching = false;
+
+  /// When the field last changed, for the `search keystroke to results` mark.
+  final Stopwatch _typed = Stopwatch();
+
   void _changed(String text) {
     _remember();
-    _debounce?.cancel();
     final query = text.trim();
     if (query == _model.query) return;
     _model.query = query;
     if (query.isEmpty) {
       _model.hits = const [];
+      _model.hitsFor = '';
       _model.changed();
       return;
     }
-    // Typing flips the list from recents to hits once; the debounce then only
-    // swaps the hits.
-    _model.changed();
-    final typed = Stopwatch()..start();
-    _debounce = Timer(const Duration(milliseconds: 120), () async {
-      try {
+    _typed
+      ..reset()
+      ..start();
+    // Searched at once, no debounce: the local store answers in a few ms.
+    // One search at a time; what was typed meanwhile is searched next (only
+    // the latest text). The list keeps what it shows until hits arrive.
+    if (!_searching) unawaited(_search());
+  }
+
+  Future<void> _search() async {
+    _searching = true;
+    try {
+      while (mounted && _model.query.isNotEmpty) {
+        final query = _model.query;
         final scope = _model.scope;
-        final asked = typed.elapsedMilliseconds;
-        final hits = await widget.api.search(query, drive: scope);
-        if (scope != _model.scope) return;
-        if (mounted && query == _model.query) {
+        if (query == _model.hitsFor && _model.error == null) break;
+        final asked = _typed.elapsedMilliseconds;
+        try {
+          final hits = await widget.api.search(query, drive: scope);
+          if (!mounted) return;
+          // Stale: the text or the drive changed while it ran. The loop
+          // searches the new one.
+          if (query != _model.query || scope != _model.scope) continue;
           _model.hits = hits;
           _model.hitsFor = query;
           _model.error = null;
           _model.changed();
           if (!kReleaseMode) {
-            Perf.span('search query', typed.elapsedMilliseconds - asked);
+            Perf.span('search query', _typed.elapsedMilliseconds - asked);
+            final typed = _typed;
             WidgetsBinding.instance.addPostFrameCallback((_) => Perf.span(
                 'search keystroke to results', typed.elapsedMilliseconds));
           }
-        }
-      } catch (e) {
-        if (mounted && query == _model.query) {
+        } catch (e) {
+          if (!mounted) return;
+          if (query != _model.query || scope != _model.scope) continue;
           _model.error = e;
+          _model.hitsFor = query;
           _model.changed();
+          break;
         }
       }
-    });
+    } finally {
+      _searching = false;
+    }
   }
 
   /// What is listed, best first: the first one is shown nearest the field.
-  List<_Item> get _items => _model.query.isEmpty
+  List<_Item> get _items => _model.showsRecent
       ? [
           for (final (:drive, resource: r) in _model.recent)
             (
@@ -448,7 +477,7 @@ class _SearchScreenState extends State<SearchScreen> {
         _model.hitsFor == _model.query) {
       return _nothingFound(c);
     }
-    final heading = _model.query.isEmpty && _model.recent.isNotEmpty;
+    final heading = _model.showsRecent && _model.recent.isNotEmpty;
     return ListView.builder(
       // Best first, drawn from the bottom up: nearest the thumb.
       reverse: true,

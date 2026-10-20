@@ -148,8 +148,13 @@ class FakeApi extends UnimplementedApi {
   @override
   Future<List<SearchHit>> search(String query, {String? drive}) async {
     asked.add(query);
+    final gate = searchGate;
+    if (gate != null) await gate;
     return hits;
   }
+
+  /// When set, a search answers only once it completes.
+  Future<void>? searchGate;
 
   @override
   Future<HostedAi?> hostedAi() async => ai;
@@ -1132,7 +1137,8 @@ void main() {
   });
 
   group('SearchScreen', () {
-    testWidgets('searches as you type, once per pause', (tester) async {
+    testWidgets('searches every keystroke, results in the next frame',
+        (tester) async {
       final api = FakeApi(hits: [
         (
           subject: 'did:ad:9',
@@ -1145,20 +1151,74 @@ void main() {
       ]);
       await tester
           .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: api)));
-
-      await tester.enterText(find.byType(TextField), 'ze');
-      await tester.pump(const Duration(milliseconds: 50));
-      await tester.enterText(find.byType(TextField), 'zebr');
-      await tester.pump(const Duration(milliseconds: 250));
       await tester.pumpAndSettle();
 
-      expect(api.asked, ['zebr']);
+      // No debounce: the keystroke asks at once, and the hits are drawn in
+      // the frame after the answer, without any time passing.
+      await tester.enterText(find.byType(TextField), 'ze');
+      expect(api.asked, ['ze']);
+      await tester.pump();
+      expect(find.text('Zebra'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), 'zebr');
+      await tester.pump();
+      expect(api.asked, ['ze', 'zebr']);
       expect(find.text('Zebra'), findsOneWidget);
       expect(find.text('Folder'), findsOneWidget);
 
       await tester.enterText(find.byType(TextField), '');
       await tester.pumpAndSettle();
       expect(find.text('Zebra'), findsNothing);
+    });
+
+    testWidgets(
+        'one search at a time: typing meanwhile asks for the latest text only, '
+        'and the list keeps what it shows until the answer', (tester) async {
+      final api = FakeApi(
+        recent: [
+          (
+            subject: 'r1',
+            title: 'Opened doc',
+            className: 'Document',
+            openedAt: 1,
+            emoji: null
+          ),
+        ],
+        hits: [
+          (
+            subject: 'did:ad:9',
+            title: 'Zebra',
+            className: 'Folder',
+            drive: '',
+            score: 1.5,
+            emoji: null
+          ),
+        ],
+      );
+      await tester
+          .pumpWidget(app(SearchScreen(drive: 'did:ad:drive', api: api)));
+      await tester.pumpAndSettle();
+      final gate = Completer<void>();
+      api.searchGate = gate.future;
+
+      await tester.enterText(find.byType(TextField), 'z');
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), 'ze');
+      await tester.pump();
+      await tester.enterText(find.byType(TextField), 'zeb');
+      await tester.pump();
+      expect(api.asked, ['z']);
+      // No blank list and no spinner while it runs: the recents stay.
+      expect(find.text('Opened doc'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      api.searchGate = null;
+      gate.complete();
+      await tester.pump();
+      await tester.pump();
+      // The answer for "z" is stale; "ze" was never asked.
+      expect(api.asked, ['z', 'zeb']);
+      expect(find.text('Zebra'), findsOneWidget);
+      expect(find.text('Opened doc'), findsNothing);
     });
 
     testWidgets('sideways with the keyboard up, the field fits',
