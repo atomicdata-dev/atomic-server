@@ -31,7 +31,7 @@ RecentResource _r(String subject, String title) => (
 
 class _Api extends FakeApi {
   _Api()
-      : super(recent: [
+      : super(favoriteList: [
           _r('did:ad:plans', 'Plans'),
           _r('did:ad:notes', 'Notes'),
         ]);

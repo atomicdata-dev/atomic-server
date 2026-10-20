@@ -6,6 +6,7 @@ import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'chat_screen.dart';
 import 'home_sections.dart';
+import 'home_sections_dialog.dart' show homeSectionIcon;
 import 'models.dart';
 import 'native_views.dart';
 import 'profile_avatar.dart';
@@ -157,7 +158,8 @@ class AppBottomBar extends StatelessWidget {
                             onTap: onHome,
                             items: [
                               for (final s in shell.homeSections.value)
-                                HoldFanItem(s.title, s, icon: _sectionIcon(s)),
+                                HoldFanItem(s.title, s,
+                                    icon: homeSectionIcon(s)),
                             ],
                             onSelected: shell.openHomeSection,
                             child: _barIcon(
@@ -385,15 +387,6 @@ const newItems = [
 ];
 
 /// The icon of a Home section in the Home button's menu.
-IconData _sectionIcon(HomeSection s) => switch (s) {
-      HomeSection.notifications => Icons.notifications_none,
-      HomeSection.drives => Icons.folder_outlined,
-      HomeSection.recents => Icons.history,
-      HomeSection.activity => Icons.bolt_outlined,
-      HomeSection.chats => Icons.chat_bubble_outline,
-      HomeSection.favorites => Icons.star_border,
-      HomeSection.messages => Icons.forum_outlined,
-    };
 
 /// A bar icon drawn by a [HoldFan] (an [IconButton] draws its own): in the
 /// main colour when its page is the current one.

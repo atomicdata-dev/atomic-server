@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'assistant_screens_test.dart' show FakeApi, app;
 
 /// Activity on Home is what other members did; the person's own work is
-/// Recents. The host leaves the own changes out of the activity it returns;
+/// not in it (Search lists it). The host leaves the own changes out of the activity it returns;
 /// the Home shows what it returns, in the person's drives only, and names
 /// every member (never "Someone").
 
@@ -27,10 +27,10 @@ ActivityEntry _by(String? actor, String name,
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('own edits are Recents, other members\' are Activity',
+  testWidgets('the activity lists other members\' changes, not the own',
       (tester) async {
     final api = FakeApi(
-      recent: [
+      favoriteList: [
         (
           subject: 'did:ad:mine',
           title: 'My own edit',
@@ -51,8 +51,8 @@ void main() {
 
     double y(Finder f) => tester.getTopLeft(f).dy;
     final activity = y(find.text('Activity'));
-    // The own edit is under Recents, above Activity.
-    expect(y(find.text('My own edit')), lessThan(activity));
+    // The own edit is not an activity row (here it is a favorite, below).
+    expect(y(find.text('My own edit')), greaterThan(activity));
     expect(find.text('My own edit'), findsOneWidget);
 
     expect(find.text('Bob edited · 5 min ago'), findsOneWidget);
@@ -66,7 +66,7 @@ void main() {
   });
 
   testWidgets('no activity from others is one quiet line', (tester) async {
-    final api = FakeApi(recent: [
+    final api = FakeApi(favoriteList: [
       (
         subject: 'did:ad:mine',
         title: 'My own edit',

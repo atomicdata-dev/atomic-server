@@ -59,6 +59,31 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('the Home menu leaves out hidden sections and follows the order',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({
+      homeOrderKey: ['favorites'],
+      homeHiddenKey: ['drives'],
+    });
+    await tester.pumpWidget(_shell(api));
+    await tester.pumpAndSettle();
+    expect(_controller(tester).homeSections.value, [HomeSection.favorites]);
+  });
+
+  testWidgets('a tablet gets the sections dialog centred, at most 420 wide',
+      (tester) async {
+    tester.view.physicalSize = const Size(1600, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_shell(api));
+    await tester.pumpAndSettle();
+    await tester.longPress(find.text('Favorites'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(tester.getSize(find.byType(ReorderableListView)).width,
+        lessThanOrEqualTo(420));
+  });
+
   testWidgets('a tap on Home goes home', (tester) async {
     await tester.pumpWidget(_shell(api));
     await tester.pumpAndSettle();

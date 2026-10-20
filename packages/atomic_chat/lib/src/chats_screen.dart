@@ -1,10 +1,12 @@
 import 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColors, AppColorsExt, HoldFan, HoldFanItem, HoldFanLayout, Perf;
+    show AppColors, AppColorsExt, Perf;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_top_bar.dart';
 import 'home_sections.dart';
+import 'home_sections_dialog.dart';
 
 import 'models.dart';
 import 'slide_back_route.dart';
@@ -19,34 +21,19 @@ import 'new_document_sheet.dart';
 /// Items per section on the home; the rest is behind its "Show all" row.
 const _homeItems = 4;
 
-/// Most items the merged recents list holds.
-const _maxRecents = 100;
-
 /// Most entries the activity feed holds.
 const _maxActivity = 100;
 
-enum _SectionOp { up, down, hide, show }
-
-/// A choice of a heading's hold menu.
-class _SectionAction {
-  final _SectionOp op;
-  final HomeSection section;
-  const _SectionAction(this.op, this.section);
-}
-
-/// How a section folds, what its heading's hold menu offers, and the control
-/// at its right, if any (the activity's "Show mine" filter).
+/// How a section folds, what holding its heading does, and the control at its
+/// right, if any (the activity's "Show mine" filter).
 typedef _Fold = ({
   bool collapsed,
   VoidCallback onToggle,
-  List<HoldFanItem<_SectionAction>> menu,
-  ValueChanged<_SectionAction> onMenu,
+  VoidCallback onHold,
   HomeSection section,
   Widget? trailing,
   ValueChanged<int> onCount,
 });
-
-typedef _Recent = ({String drive, RecentResource resource});
 
 /// How an activity row says what happened (`kind` as the host names it).
 String activityVerb(String kind) => switch (kind) {
@@ -54,7 +41,7 @@ String activityVerb(String kind) => switch (kind) {
       _ => kind,
     };
 
-/// Home screen: one scrollable page of small sections (Drives, Recents, Activity,
+/// Home screen: one scrollable page of small sections (Drives, Activity,
 /// AI Chats), each with its newest few items. A section's heading folds it on
 /// a tap and arranges the sections on a hold. Below the first few items a
 /// "Show all" row lists all of them (in the detail pane on a tablet, a page of
@@ -88,7 +75,6 @@ class ChatsScreen extends StatefulWidget {
 class _ChatsScreenState extends State<ChatsScreen> {
   late Future<List<DriveInfo>> _drives = _timed('drives', _loadDrives());
   late Future<List<ChatSummary>> _chats = _timed('chats', widget.api.chats());
-  late Future<List<_Recent>> _recents = _timed('recents', _loadRecents());
   late Future<List<RecentResource>> _favorites =
       _timed('favorites', widget.api.favorites());
   late Future<List<ConversationRow>> _conversations =
@@ -115,9 +101,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   /// The most recent drive: the one the home opened on, else the first.
   String _drive = '';
-
-  /// Drive subject → name, for the drive shown in front of a recent.
-  Map<String, String> _driveNames = const {};
 
   /// Which sections show, in which order, and which are folded (per device).
   HomeLayout _layout = const HomeLayout();
@@ -171,7 +154,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
       for (final f in <Future<Object?>>[
         _drives,
         _chats,
-        _recents,
         _favorites,
         _conversations,
         _activity,
@@ -191,28 +173,18 @@ class _ChatsScreenState extends State<ChatsScreen> {
     _publishSections();
   }
 
-  /// The hold menu of a section's heading: move it, hide it, and bring back
-  /// the hidden ones.
-  List<HoldFanItem<_SectionAction>> _menuFor(HomeSection s) => [
-        if (_layout.canMove(s, -1))
-          HoldFanItem('Move up', _SectionAction(_SectionOp.up, s), emoji: '⬆️'),
-        if (_layout.canMove(s, 1))
-          HoldFanItem('Move down', _SectionAction(_SectionOp.down, s),
-              emoji: '⬇️'),
-        HoldFanItem('Hide ${s.title}', _SectionAction(_SectionOp.hide, s),
-            emoji: '🙈'),
-        for (final h in _layout.order)
-          if (_layout.hidden.contains(h))
-            HoldFanItem('Show ${h.title}', _SectionAction(_SectionOp.show, h),
-                emoji: '👁️'),
-      ];
-
-  void _applyAction(_SectionAction a) => _setLayout(switch (a.op) {
-        _SectionOp.up => _layout.move(a.section, -1),
-        _SectionOp.down => _layout.move(a.section, 1),
-        _SectionOp.hide => _layout.setHidden(a.section, true),
-        _SectionOp.show => _layout.setHidden(a.section, false),
-      });
+  /// Holding a heading: the dialog that turns sections on and off and
+  /// arranges them. It applies live; a phone gets a bottom sheet, the tablet
+  /// a centred dialog.
+  void _customize() {
+    HapticFeedback.lightImpact();
+    showHomeSectionsDialog(
+      context,
+      layout: () => _layout,
+      onChanged: _setLayout,
+      split: ShellScope.layoutOf(context) == ShellLayout.split,
+    );
+  }
 
   /// Keys of the sections: to scroll one into view and open its full list.
   final Map<HomeSection, GlobalKey<_SectionState<dynamic>>> _sectionKeys = {};
@@ -341,28 +313,13 @@ class _ChatsScreenState extends State<ChatsScreen> {
     _drive = drives.any((d) => d.subject == widget.drive)
         ? widget.drive
         : drives.first.subject;
-    _driveNames = {for (final d in drives) d.subject: d.name};
     if (mounted) _shell?.drive.value = _drive;
     // The most recently visited first.
     return sortDrivesByRecent(widget.api, drives);
   }
 
-  /// What was opened lately in every drive, newest first.
-  Future<List<_Recent>> _loadRecents() async {
-    final drives = await _drives;
-    final lists = await Future.wait([
-      for (final d in drives)
-        widget.api.recentResources(d.subject).then(
-              (list) => [for (final r in list) (drive: d.subject, resource: r)],
-              onError: (Object _) => <_Recent>[],
-            ),
-    ]);
-    return [for (final l in lists) ...l]
-      ..sort((a, b) => b.resource.openedAt.compareTo(a.resource.openedAt));
-  }
-
   /// The activity feed: what other members changed in the person's drives
-  /// (the host leaves out the person's own changes; those are Recents). Its
+  /// (the host leaves out the person's own changes; those are in Search). Its
   /// rows do not carry the resources' own icons, so those are looked up after
   /// the list is out (never blocking it).
   Future<List<ActivityEntry>> _loadActivity() async {
@@ -418,10 +375,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
       _reloadQueued = false;
       if (!mounted) return;
       setState(() {
-        // First: the recents read the drives.
         _drives = _loadDrives();
         _chats = widget.api.chats();
-        _recents = _loadRecents();
         _favorites = widget.api.favorites();
         _conversations = widget.api.conversations();
         _activity = _loadActivity();
@@ -449,7 +404,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   /// Opens [subject] of [drive] and notes the visit once it is left: the
-  /// lists (Recents, the drives' order) do not move under the finger that
+  /// lists (the drives' order) do not move under the finger that
   /// opened it, only when the person goes on.
   Future<void> _visit(Widget screen,
       {required String drive, required String subject}) async {
@@ -568,11 +523,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
         onTap: () => _openChat(chat),
       );
 
-  /// `<drive> · <class> · <when>`: the drive first, when it has a name.
-  Widget _recentRow(_Recent r) =>
-      _resourceRow(r.resource, _openResource, r.drive,
-          driveName: _driveNames[r.drive]);
-
   /// Favorites and conversations are not tied to one drive: they open in the
   /// current one.
   Widget _homeRow(RecentResource r) => _resourceRow(r, _openResource, _drive);
@@ -666,14 +616,17 @@ class _ChatsScreenState extends State<ChatsScreen> {
               },
       );
 
-  Widget _showSectionsButton() => Padding(
+  Widget _emptyHome() => Padding(
         padding: const EdgeInsets.all(32),
-        child: Center(
-          child: TextButton(
-            onPressed: () => _setLayout(const HomeLayout()),
-            child: const Text('Show all sections'),
+        child: Column(children: [
+          Text('All sections are off',
+              style: TextStyle(color: context.appColors.textSecondary)),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _customize,
+            child: const Text('Customize'),
           ),
-        ),
+        ]),
       );
 
   /// One section of the home, with the layout's fold state and hold menu.
@@ -681,8 +634,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     final fold = (
       collapsed: _layout.collapsed.contains(id),
       onToggle: () => _setLayout(_layout.toggleCollapsed(id)),
-      menu: _menuFor(id),
-      onMenu: _applyAction,
+      onHold: _customize,
       section: id,
       trailing: _trailingFor(id),
       onCount: (n) => _noteCount(id, n),
@@ -711,20 +663,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
           rows: (list) => [for (final d in list) _driveRow(d)],
           onShowAll: (list) =>
               _openAll(id, list.length, (i) => _driveRow(list[i])),
-        );
-      case HomeSection.recents:
-        return _Section<_Recent>(
-          key: key,
-          title: id.title,
-          fold: fold,
-          future: _recents,
-          empty: 'Nothing opened yet',
-          rows: (list) => [for (final r in list) _recentRow(r)],
-          total: (list) => list.length.clamp(0, _maxRecents),
-          onShowAll: (list) {
-            final shown = list.take(_maxRecents).toList();
-            _openAll(id, shown.length, (i) => _recentRow(shown[i]));
-          },
         );
       case HomeSection.activity:
         return _Section<ActivityEntry>(
@@ -808,7 +746,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                   for (final id in _layout.visible)
                     if (!(split && id == HomeSection.activity))
                       _sectionFor(id, c),
-                  if (_layout.visible.isEmpty) _showSectionsButton(),
+                  if (_layout.visible.isEmpty) _emptyHome(),
                 ],
               ),
             ),
@@ -923,44 +861,45 @@ class _SectionState<T> extends State<_Section<T>>
     if (list != null && list.isNotEmpty) widget.onShowAll(list);
   }
 
-  /// The heading's title: a tap folds the section, a hold opens the menu to
-  /// move or hide sections. Pressed, a faint rounded wash hugs the title and
+  /// The heading's title: a tap folds the section, a hold opens the dialog to
+  /// show, hide and move sections. Pressed, a faint rounded wash hugs the title and
   /// its chevron (not the row), and the chevron turns instead of changing.
   Widget _foldHeading(BuildContext context) {
     final c = context.appColors;
     final fold = widget.fold;
-    return HoldFan<_SectionAction>(
+    return SizedBox(
       key: ValueKey('section-heading-${fold.section.name}'),
-      size: 48,
-      borderRadius: BorderRadius.circular(8),
-      tooltip: widget.title,
-      menuLabel: 'Arrange sections',
-      layout: HoldFanLayout.list,
-      defaultIndex: null,
-      onTap: fold.onToggle,
-      items: fold.menu,
-      onSelected: fold.onMenu,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Flexible(
-            // A title in proportion to the rows and the bar's 24 dp icons
-            // (it was a 13 sp grey label): 15 sp, nearly the text colour.
-            child: Text(widget.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    color: c.textPrimary.withValues(alpha: 0.85),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600)),
+      height: 48,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: fold.onToggle,
+          onLongPress: fold.onHold,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Flexible(
+                // A title in proportion to the rows and the bar's 24 dp icons
+                // (it was a 13 sp grey label): 15 sp, nearly the text colour.
+                child: Text(widget.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: c.textPrimary.withValues(alpha: 0.85),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(width: 4),
+              AnimatedRotation(
+                turns: fold.collapsed ? -0.25 : 0,
+                duration: const Duration(milliseconds: 150),
+                child:
+                    Icon(Icons.expand_more, size: 22, color: c.textSecondary),
+              ),
+            ]),
           ),
-          const SizedBox(width: 4),
-          AnimatedRotation(
-            turns: fold.collapsed ? -0.25 : 0,
-            duration: const Duration(milliseconds: 150),
-            child: Icon(Icons.expand_more, size: 22, color: c.textSecondary),
-          ),
-        ]),
+        ),
       ),
     );
   }

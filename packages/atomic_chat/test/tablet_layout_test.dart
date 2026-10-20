@@ -30,13 +30,13 @@ RecentResource _r(String subject, String title) => (
       emoji: null,
     );
 
-FakeApi _api() => FakeApi(recent: [
+FakeApi _api() => FakeApi(favoriteList: [
       _r('did:ad:plans', 'Plans'),
       _r('did:ad:notes', 'Notes'),
     ]);
 
-/// Six recents: more than a section shows, so it has a Show all row.
-FakeApi _manyApi() => FakeApi(recent: [
+/// Six favorites: more than a section shows, so it has a Show all row.
+FakeApi _manyApi() => FakeApi(favoriteList: [
       _r('did:ad:plans', 'Plans'),
       _r('did:ad:a', 'Alpha'),
       _r('did:ad:b', 'Beta'),
@@ -145,6 +145,11 @@ void main() {
     testWidgets('a tablet ($name): the bar under a list and a detail pane',
         (tester) async {
       _size(tester, size);
+      // Favorites on top: on a short window the rest would push it under
+      // the bar.
+      SharedPreferences.setMockInitialValues({
+        homeHiddenKey: ['drives', 'chats', 'activity', 'notifications'],
+      });
       final api = _api();
       await tester.pumpWidget(_shell(api));
       await _settle(tester);
@@ -722,15 +727,15 @@ void main() {
         await tester.pumpWidget(_shell(_manyApi()));
         await _settle(tester);
         await tester
-            .tap(find.byKey(const ValueKey('section-show-all-recents')));
+            .tap(find.byKey(const ValueKey('section-show-all-favorites')));
         await _settle(tester);
         final list = tester.getRect(find.byType(ChatsScreen));
         // A page in the detail pane, titled, next to the home.
         final title = find.descendant(
-            of: find.byType(AppTopBar), matching: find.text('Recents'));
+            of: find.byType(AppTopBar), matching: find.text('Favorites'));
         expect(title, findsOneWidget);
         expect(tester.getRect(title).left, greaterThan(list.right));
-        expect(_controller(tester).topKind, ShellPage.listOf('recents'));
+        expect(_controller(tester).topKind, ShellPage.listOf('favorites'));
         // A row of it opens over it; back returns to the list.
         await tester.tap(find.text('Notes').last);
         await _settle(tester);
@@ -750,11 +755,12 @@ void main() {
       _size(tester, _phone);
       await tester.pumpWidget(_shell(_manyApi()));
       await _settle(tester);
-      await tester.tap(find.byKey(const ValueKey('section-show-all-recents')));
+      await tester
+          .tap(find.byKey(const ValueKey('section-show-all-favorites')));
       await _settle(tester);
       expect(
           find.descendant(
-              of: find.byType(AppTopBar), matching: find.text('Recents')),
+              of: find.byType(AppTopBar), matching: find.text('Favorites')),
           findsOneWidget);
       expect(find.byType(BackButton), findsOneWidget);
       await _done(tester);
@@ -790,7 +796,7 @@ void main() {
         await tester.pumpWidget(_shell(_api()));
         await _settle(tester);
         expect(tester.takeException(), isNull);
-        final heading = find.byKey(const ValueKey('section-heading-recents'));
+        final heading = find.byKey(const ValueKey('section-heading-favorites'));
         expect(heading, findsOneWidget);
         expect(tester.getSize(heading).height, 48);
         await _done(tester);
@@ -802,7 +808,7 @@ void main() {
       _size(tester, _phone);
       await tester.pumpWidget(_shell(_api()));
       await _settle(tester);
-      final heading = find.byKey(const ValueKey('section-heading-recents'));
+      final heading = find.byKey(const ValueKey('section-heading-favorites'));
       final ink = find.descendant(of: heading, matching: find.byType(InkWell));
       expect(tester.getSize(ink).width, lessThan(_phone.width / 2));
       expect(tester.widget<InkWell>(ink).borderRadius, isNotNull);
@@ -976,7 +982,7 @@ void main() {
 
   group('the home page next to the sidebar is the activity feed', () {
     FakeApi withActivity({bool none = false}) => FakeApi(
-          recent: [_r('did:ad:plans', 'Plans')],
+          favoriteList: [_r('did:ad:plans', 'Plans')],
           driveList: const [],
           activityList: none
               ? const []
@@ -1043,6 +1049,9 @@ void main() {
 
   group('search on a tablet is a card over the window', () {
     FakeApi searchApi() => FakeApi(recent: [
+          _r('did:ad:plans', 'Plans'),
+          _r('did:ad:notes', 'Notes'),
+        ], favoriteList: [
           _r('did:ad:plans', 'Plans'),
           _r('did:ad:notes', 'Notes'),
         ], hits: [
@@ -1164,25 +1173,6 @@ void main() {
       return titles.toList()..sort((a, b) => tops[a]!.compareTo(tops[b]!));
     }
 
-    testWidgets('Recents: still while a row is open, then the visit counts',
-        (tester) async {
-      _size(tester, _landscape);
-      final api = _VisitApi();
-      await tester.pumpWidget(_shell(api));
-      await _settle(tester);
-      expect(order(tester, ['Plans', 'Notes']), ['Plans', 'Notes']);
-      await tester.tap(find.text('Notes'));
-      await _settle(tester);
-      // Open next to the list, which did not move.
-      expect(find.byType(ResourceView), findsOneWidget);
-      expect(order(tester, ['Plans', 'Notes']), ['Plans', 'Notes']);
-      // On to the next: Notes was visited.
-      await tester.tap(find.text('Plans'));
-      await _settle(tester);
-      expect(order(tester, ['Plans', 'Notes']), ['Notes', 'Plans']);
-      await _done(tester);
-    });
-
     testWidgets('drives: the last visited first, also after a restart',
         (tester) async {
       _size(tester, _landscape);
@@ -1251,7 +1241,7 @@ void main() {
 class _IdentityApi extends FakeApi {
   final ProfileIdentity who;
   _IdentityApi(this.who)
-      : super(recent: [
+      : super(favoriteList: [
           _r('did:ad:plans', 'Plans'),
           _r('did:ad:notes', 'Notes'),
         ]);
@@ -1260,38 +1250,13 @@ class _IdentityApi extends FakeApi {
   Future<ProfileIdentity?> ownIdentity() async => who;
 }
 
-/// Recents as the host keeps them: what was noted as opened goes on top.
+/// Two drives, to see the visits reorder them.
 class _VisitApi extends FakeApi {
-  final List<RecentResource> _recent = [
-    _r('did:ad:plans', 'Plans'),
-    _r('did:ad:notes', 'Notes'),
-  ];
-  int _clock = 10;
-
   _VisitApi()
       : super(driveList: const [
           (subject: 'did:ad:a', name: 'Alpha', emoji: null),
           (subject: 'did:ad:b', name: 'Beta', emoji: null),
         ]);
-
-  @override
-  Future<List<RecentResource>> recentResources(String drive) async =>
-      drive == 'did:ad:a' ? List.of(_recent) : const [];
-
-  @override
-  void noteOpened(String drive, String subject) {
-    super.noteOpened(drive, subject);
-    final i = _recent.indexWhere((r) => r.subject == subject);
-    if (i < 0) return;
-    final r = _recent.removeAt(i);
-    _recent.insert(0, (
-      subject: r.subject,
-      title: r.title,
-      className: r.className,
-      openedAt: ++_clock,
-      emoji: null
-    ));
-  }
 }
 
 /// Activity by others, and the person's own with "Show mine".
