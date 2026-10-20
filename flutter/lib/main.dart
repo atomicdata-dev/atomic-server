@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'src/rust/frb_generated.dart';
 import 'package:atomic_chat/atomic_chat.dart'
-    show AppShell, AppThemeMode, ChatsScreen, ToastController, ToastHost, defaultAttachmentPicker;
+    show AppShell, AppThemeMode, ChatsScreen, ToastController, ToastHost, ToastSeverity, defaultAttachmentPicker;
 import 'assistant/atomic_assistant_api.dart';
 import 'assistant/file_attachment_picker.dart';
 import 'bootstrap.dart';
@@ -235,6 +235,7 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
       _toasts.show(
         _syncToastKey,
         message,
+        severity: ToastSeverity.error,
         icon: Icons.sync_problem,
         actionLabel: 'Retry',
         onAction: () {

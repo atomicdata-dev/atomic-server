@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -34,6 +36,33 @@ void main() {
       c.resolve('sync');
       expect(c.show('sync', 'x'), isTrue);
     });
+  });
+
+  group('ToastPalette contrast', () {
+    double lum(Color c) => c.computeLuminance();
+    double ratio(Color a, Color b) {
+      final l1 = math.max(lum(a), lum(b)), l2 = math.min(lum(a), lum(b));
+      return (l1 + 0.05) / (l2 + 0.05);
+    }
+
+    for (final (name, pal, colors) in [
+      ('light', ToastPalette.light, AppColors.light),
+      ('dark', ToastPalette.dark, AppColors.dark),
+    ]) {
+      test('$name: text, accents and card edge are legible', () {
+        expect(ToastPalette.of(colors), same(pal));
+        expect(ratio(pal.text, pal.card), greaterThanOrEqualTo(4.5));
+        for (final s in ToastSeverity.values) {
+          // Retry label / icon on the card.
+          expect(ratio(pal.accent(s), pal.card), greaterThanOrEqualTo(4.5),
+              reason: '$name ${s.name}');
+        }
+        // Card against the page it floats over, plus border and shadow.
+        expect(ratio(pal.card, colors.bgBody), greaterThanOrEqualTo(3));
+        expect(ratio(pal.card, colors.bg1), greaterThanOrEqualTo(3));
+        expect(pal.border.a, greaterThan(0));
+      });
+    }
   });
 
   group('ToastHost', () {
@@ -76,6 +105,29 @@ void main() {
       // Outside the toast, touches reach the content below.
       await tester.pump(const Duration(seconds: 7));
       expect(find.text('Sync timed out'), findsNothing);
+    });
+
+    testWidgets('card has border, shadow, radius, accent and 48dp action',
+        (tester) async {
+      final c = ToastController();
+      await tester.pumpWidget(app(c, const Size(800, 600)));
+      c.show('e', 'Boom',
+          severity: ToastSeverity.error, actionLabel: 'Retry');
+      await tester.pump(const Duration(milliseconds: 300));
+      final box = tester.widget<Container>(find
+          .descendant(
+              of: find.byKey(const ValueKey('toast-e')),
+              matching: find.byType(Container))
+          .first);
+      final d = box.decoration! as BoxDecoration;
+      expect(d.color, ToastPalette.light.card);
+      expect(d.border, isNotNull);
+      expect(d.boxShadow, isNotEmpty);
+      expect(d.borderRadius, BorderRadius.circular(12));
+      expect(find.byKey(const Key('toast-accent')), findsOneWidget);
+      expect(tester.getSize(find.byType(TextButton)).height,
+          greaterThanOrEqualTo(48));
+      await tester.pump(const Duration(seconds: 7));
     });
 
     testWidgets('two identical notices give one toast', (tester) async {

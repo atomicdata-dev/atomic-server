@@ -3,20 +3,86 @@ import 'dart:async';
 import 'package:atomic_flutter/atomic_flutter.dart';
 import 'package:flutter/material.dart';
 
+/// How serious a notice is; picks the accent colour and default icon.
+enum ToastSeverity { info, success, warning, error }
+
+/// Colours of a toast card: an inverse surface (dark card in light themes,
+/// light card in dark themes) so it never blends with the page.
+@immutable
+class ToastPalette {
+  const ToastPalette({
+    required this.card,
+    required this.text,
+    required this.border,
+    required this.info,
+    required this.success,
+    required this.warning,
+    required this.error,
+  });
+
+  final Color card;
+  final Color text;
+  final Color border;
+  final Color info;
+  final Color success;
+  final Color warning;
+  final Color error;
+
+  static const light = ToastPalette(
+    card: Color(0xFF1F2430),
+    text: Color(0xFFF3F5F9),
+    border: Color(0x33000000), // black 20%
+    info: Color(0xFF9DB4FF),
+    success: Color(0xFF5FD38A),
+    warning: Color(0xFFFFC107),
+    error: Color(0xFFFF8A80),
+  );
+
+  static const dark = ToastPalette(
+    card: Color(0xFFE8EAF0),
+    text: Color(0xFF111418),
+    border: Color(0x33FFFFFF), // white 20%
+    info: Color(0xFF1B50D8),
+    success: Color(0xFF1B6B3A),
+    warning: Color(0xFF8A5A00),
+    error: Color(0xFFB3261E),
+  );
+
+  /// Follows the app's own tokens (not the platform brightness).
+  static ToastPalette of(AppColors colors) =>
+      colors.bgBody.computeLuminance() < 0.5 ? dark : light;
+
+  Color accent(ToastSeverity s) => switch (s) {
+        ToastSeverity.info => info,
+        ToastSeverity.success => success,
+        ToastSeverity.warning => warning,
+        ToastSeverity.error => error,
+      };
+}
+
+IconData _defaultIcon(ToastSeverity s) => switch (s) {
+      ToastSeverity.info => Icons.info_outline,
+      ToastSeverity.success => Icons.check_circle_outline,
+      ToastSeverity.warning => Icons.warning_amber_rounded,
+      ToastSeverity.error => Icons.error_outline,
+    };
+
 /// One notice on screen. Identified by [key]: a second notice with the same
 /// key is the same notice.
 class ToastEntry {
   ToastEntry({
     required this.key,
     required this.message,
-    this.icon = Icons.info_outline,
+    this.severity = ToastSeverity.info,
+    IconData? icon,
     this.actionLabel,
     this.onAction,
     this.duration = const Duration(seconds: 6),
-  });
+  }) : icon = icon ?? _defaultIcon(severity);
 
   final String key;
   final String message;
+  final ToastSeverity severity;
   final IconData icon;
   final String? actionLabel;
   final VoidCallback? onAction;
@@ -49,7 +115,8 @@ class ToastController extends ChangeNotifier {
   bool show(
     String key,
     String message, {
-    IconData icon = Icons.info_outline,
+    ToastSeverity severity = ToastSeverity.info,
+    IconData? icon,
     String? actionLabel,
     VoidCallback? onAction,
     Duration duration = const Duration(seconds: 6),
@@ -68,6 +135,7 @@ class ToastController extends ChangeNotifier {
     _toasts.add(ToastEntry(
       key: key,
       message: message,
+      severity: severity,
       icon: icon,
       actionLabel: actionLabel,
       onAction: onAction,
@@ -230,35 +298,74 @@ class _ToastCardState extends State<_ToastCard> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.appColors;
+    final pal = ToastPalette.of(context.appColors);
     final e = widget.entry;
-    final card = Material(
-      color: colors.surface,
-      elevation: 6,
-      borderRadius: BorderRadius.circular(12),
+    final accent = pal.accent(e.severity);
+    final card = Container(
+      decoration: BoxDecoration(
+        color: pal.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: pal.border, width: 1),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x40000000), // black 25%
+            blurRadius: 20,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
       clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: IntrinsicHeight(
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Icon(e.icon, size: 20, color: colors.textSecondary),
-            const SizedBox(width: 10),
+            Container(key: const Key('toast-accent'), width: 4, color: accent),
             Expanded(
-              child: Text(
-                e.message,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: colors.textPrimary, fontSize: 14),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: accent.withValues(alpha: 0.2),
+                      ),
+                      child: Icon(e.icon, size: 18, color: accent),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        e.message,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: pal.text,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    if (e.actionLabel != null)
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: accent,
+                          minimumSize: const Size(48, 48),
+                          tapTargetSize: MaterialTapTargetSize.padded,
+                          textStyle: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                        onPressed: () {
+                          widget.onDismiss();
+                          e.onAction?.call();
+                        },
+                        child: Text(e.actionLabel!),
+                      ),
+                  ],
+                ),
               ),
             ),
-            if (e.actionLabel != null)
-              TextButton(
-                onPressed: () {
-                  widget.onDismiss();
-                  e.onAction?.call();
-                },
-                child: Text(e.actionLabel!),
-              ),
           ],
         ),
       ),
