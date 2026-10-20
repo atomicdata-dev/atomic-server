@@ -136,7 +136,8 @@ class AndroidEnvironment {
     // cross-compile, so host build scripts are unaffected). \x1f is cargo's
     // CARGO_ENCODED_RUSTFLAGS argument separator. (NDK r28+ makes this default.)
     final rustFlagsValue = '${_libGccWorkaround(targetTempDir, ndkVersionParsed)}'
-        '\x1f-C\x1flink-arg=-Wl,-z,max-page-size=16384';
+        '\x1f-C\x1flink-arg=-Wl,-z,max-page-size=16384'
+        '\x1f-C\x1flink-arg=-Wl,-z,common-page-size=16384';
 
     final runRustTool =
         Platform.isWindows ? 'run_build_tool.cmd' : 'run_build_tool.sh';

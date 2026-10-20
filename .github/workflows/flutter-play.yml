@@ -1,0 +1,85 @@
+name: Atomic Flutter Android
+on:
+  push:
+    branches: [codex/atomic-flutter-testflight]
+    paths:
+      - '.github/workflows/flutter-play.yml'
+      - 'flutter/android/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: atomic-flutter-android-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ATOMIC_CARGO_TARGET_DIR: ${{ github.workspace }}/flutter/rust/target
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.7'
+          cache: true
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.10.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Android build tools
+        run: |
+          rustup target add aarch64-linux-android
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'ndk;27.0.12077973' 'platforms;android-36' 'build-tools;36.0.0'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: flutter/rust
+          key: flutter-android
+          cache-on-failure: true
+      - name: Build embedded renderer
+        run: bash flutter/scripts/build_embed.sh
+      - name: Get Flutter packages
+        working-directory: flutter
+        run: flutter pub get
+      - name: Configure upload signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          key = Path(os.environ['RUNNER_TEMP']) / 'atomic-upload.p12'
+          key.write_bytes(base64.b64decode(os.environ['ANDROID_KEYSTORE_BASE64'], validate=True))
+          key.chmod(0o600)
+          def escape(value):
+              return ''.join('\\u%04x' % ord(c) for c in value)
+          # Existing Atomic key is PKCS12: key and store passwords are identical.
+          values = dict(storeFile=str(key), storePassword=os.environ['ANDROID_KEYSTORE_PASSWORD'],
+                        keyPassword=os.environ['ANDROID_KEYSTORE_PASSWORD'], keyAlias=os.environ['ANDROID_KEY_ALIAS'])
+          config = Path('flutter/android/key.properties')
+          config.write_text(''.join(k + '=' + escape(v) + '\n' for k, v in values.items()))
+          config.chmod(0o600)
+          PY
+      - name: Build signed Play bundle
+        working-directory: flutter
+        run: flutter build appbundle --release --target-platform android-arm64 --build-number=${{ github.run_number }}
+      - name: Verify signature and native page alignment
+        run: |
+          jarsigner -verify flutter/build/app/outputs/bundle/release/app-release.aab
+          python3 flutter/android/verify_bundle.py flutter/build/app/outputs/bundle/release/app-release.aab
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atomic-place-aab
+          path: flutter/build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+      - name: Clean up signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/atomic-upload.p12" flutter/android/key.properties
