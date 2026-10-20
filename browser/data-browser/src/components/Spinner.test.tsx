@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // @wc-ignore-file
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, render } from '@testing-library/react';
 import { ThemeProvider, type DefaultTheme } from 'styled-components';
 import { Spinner } from './Spinner';
 
@@ -48,5 +48,25 @@ describe('Spinner', () => {
     expect(style.alignSelf).toBe('stretch');
     expect(style.height).toBe('100%');
     expect(style.minHeight).toBe('192px');
+  });
+
+  it('with a delay is an empty status until the delay has passed', () => {
+    vi.useFakeTimers();
+
+    try {
+      const { container, getByRole } = renderSpinner({
+        centered: true,
+        delay: 1000,
+      });
+
+      expect(getByRole('status').childElementCount).toBe(0);
+      expect(container.querySelector('svg')).toBeNull();
+
+      act(() => vi.advanceTimersByTime(1000));
+
+      expect(container.querySelector('svg')).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

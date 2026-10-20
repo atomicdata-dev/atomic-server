@@ -66,6 +66,16 @@ import { useNativeChatRoom } from './useNativeChatRoom';
 enableEmbedMode();
 registerEmbedActions();
 
+// The app passes its light or dark mode in the URL (`?scheme=dark`), so the
+// first frame is already in it: a page loaded ahead and shown later must not
+// flash the other one before the app's `setColorScheme` arrives.
+const startScheme = new URLSearchParams(location.search).get('scheme');
+
+if (startScheme === 'dark' || startScheme === 'light') {
+  setHostColorScheme(startScheme);
+  document.documentElement.style.colorScheme = startScheme;
+}
+
 // The app already lays the page out inside the system bars, but the web view
 // still reports their size as `env(safe-area-inset-*)`, so the page would leave
 // that room empty a second time (the canvas toolbar floated 50px above the
