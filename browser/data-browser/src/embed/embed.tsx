@@ -44,16 +44,7 @@ import { ResourceContextMenu } from '../components/ResourceContextMenu';
 import ResourcePage from '../views/ResourcePage';
 import { BreadCrumbs } from '../components/BreadCrumbs';
 import { CalculatedPageHeight } from '../globalCssVars';
-import { paths } from '../routes/paths';
-import { NewRoute } from '../routes/NewResource/NewRoute';
-import { EditRoute } from '../routes/EditRoute';
-import { DataRoute } from '../routes/DataRoute';
-import { HistoryRoute } from '../routes/History/HistoryRoute';
-import { ShareRoute } from '../routes/Share/ShareRoute';
-import { ImportRoute } from '../routes/ImportRoute';
-import { StorageRoute } from '../routes/StorageRoute';
-import { NotificationsRoute } from '../routes/NotificationsRoute';
-import { AppSettingsRoute } from '../routes/AppSettings';
+import { actionPages } from './actionPages';
 import { styled } from 'styled-components';
 import { createFlutterHost } from './flutterHost';
 import { createMockHost } from './mockHost';
@@ -288,23 +279,11 @@ const showRoute = createRoute({
 /** The pages the resource menu leads to: the web app's own route components,
  * mounted under this root (they are made for the app's root, which the embed
  * does not use). */
-const actionRoutes = [
-  [paths.new, NewRoute],
-  [paths.edit, EditRoute],
-  [paths.data, DataRoute],
-  [paths.history, HistoryRoute],
-  [paths.share, ShareRoute],
-  [paths.import, ImportRoute],
-  [paths.storage, StorageRoute],
-  [paths.notifications, NotificationsRoute],
-  [paths.appSettings, AppSettingsRoute],
-].map(([path, source]) =>
+const actionRoutes = actionPages.map(([path, source]) =>
   createRoute({
     getParentRoute: () => rootRoute,
     path: path as string,
-    // @ts-expect-error - options are shared with the app's route of that page
     validateSearch: source.options.validateSearch,
-    // @ts-expect-error - same component, other parent
     component: source.options.component,
   }),
 );
