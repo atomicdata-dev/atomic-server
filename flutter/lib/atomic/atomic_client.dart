@@ -286,6 +286,25 @@ class AtomicClient {
   static Future<int> peerDiscoverSync(String driveSubject) =>
       ffi.peerDiscoverSync(driveSubject: driveSubject);
 
+  /// What the search for this account's other devices is doing: the bridge's
+  /// `peer_search_status` JSON (state, message, detail, retry_in_secs).
+  static Map<String, dynamic> peerSearchStatus() {
+    try {
+      return jsonDecode(ffi.peerSearchStatus()) as Map<String, dynamic>;
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  /// Look for the other devices now: a Search again button, a network change.
+  static void peerSearchAgain() {
+    try {
+      ffi.peerSearchAgain();
+    } catch (e) {
+      debugPrint('peerSearchAgain: $e');
+    }
+  }
+
   /// Start Iroh, sync known peers + pkarr. Use on app open and Settings → Retry.
   static Future<SyncConnectivityReport> syncConnectivityNow() async {
     final json = await ffi.syncConnectivityNow();
@@ -368,6 +387,47 @@ class AtomicClient {
     return origin;
   }
 
+  /// Every https origin [drive]'s pkarr record names whose `/genesis`
+  /// answer verifies against the DID: the servers that host it, found without
+  /// being typed in. Same checks as [discoverHomeServer], all of them kept.
+  static Future<List<String>> verifiedDriveOrigins(
+    String drive, {
+    http.Client? client,
+    Future<List<String>> Function(String drive)? resolve,
+    bool Function(String body, String drive)? verifies,
+    Duration timeout = const Duration(seconds: 4),
+    int maxOrigins = 6,
+  }) async {
+    final origins =
+        (await (resolve ?? _resolveOrigins)(drive)).take(maxOrigins).toList();
+    if (origins.isEmpty) return const [];
+    final http_ = client ?? http.Client();
+    try {
+      final ok = await Future.wait(origins.map((origin) async {
+        try {
+          final request = http.Request(
+              'GET',
+              Uri.parse('$origin/genesis')
+                  .replace(queryParameters: {'subject': drive}))
+            ..followRedirects = false
+            ..headers['Accept'] = 'application/ad+json';
+          final response = await http.Response.fromStream(
+              await http_.send(request).timeout(timeout));
+          return response.statusCode == 200 &&
+              (verifies ?? _verifies)(response.body, drive);
+        } catch (_) {
+          return false;
+        }
+      }));
+      return [
+        for (var i = 0; i < origins.length; i++)
+          if (ok[i]) origins[i]
+      ];
+    } finally {
+      if (client == null) http_.close();
+    }
+  }
+
   static String _short(Object e) {
     final text = '$e'.replaceFirst('Exception: ', '');
     return text.length > 140 ? '${text.substring(0, 140)}…' : text;
@@ -399,6 +459,7 @@ class AtomicClient {
                 'name': (e['name'] ?? '') as String,
                 'last_synced':
                     e['last_synced'] == null ? '' : '${e['last_synced']}',
+                'relay_url': (e['relay_url'] ?? '') as String,
               })
           .toList();
     } catch (_) {

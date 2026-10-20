@@ -86,6 +86,10 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
   late StoreRecoveryNotice? _storeRecovery = widget.storeRecovery;
   final _navKey = GlobalKey<NavigatorState>();
   static const _linkChannel = MethodChannel('app.atomicdata.app/deeplink');
+
+  /// Android says when the network changed (MainActivity): look for the
+  /// other devices again at once instead of at the next backoff step.
+  static const _networkChannel = MethodChannel('app.atomicdata.app/network');
   Timer? _eventPoller;
   bool _backgroundSyncRunning = false;
   final Map<String, DateTime> _lastSyncSnackAt = {};
@@ -98,6 +102,9 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
     AppThemeMode.mode.addListener(_themeChanged);
     _handleInitialLink();
     _linkChannel.setMethodCallHandler(_handleLinkCall);
+    _networkChannel.setMethodCallHandler((call) async {
+      if (call.method == 'changed') AtomicClient.peerSearchAgain();
+    });
     // A cold start resumes in the sign-in screen (`_tryAutoLogin`); this one
     // is for coming back from the background.
   }
@@ -234,7 +241,7 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
         // Only a failure is worth a toast; being connected is the normal case.
         if (report.livePeers == 0 &&
             report.imported == 0 &&
-            !report.message.contains('No peers online')) {
+            !report.message.startsWith('No other device found yet')) {
           _showDebouncedSnack(ctx, 'sync:error', report.message,
               minInterval: const Duration(seconds: 5));
         }

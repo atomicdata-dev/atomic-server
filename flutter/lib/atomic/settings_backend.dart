@@ -95,6 +95,12 @@ class AppSettingsBackend extends shared.AtomicSettingsBackend {
   }
 
   @override
+  shared.PeerSearchInfo? peerSearchStatus() =>
+      shared.PeerSearchInfo.fromJson(AtomicClient.peerSearchStatus());
+  @override
+  void Function() get searchAgain => AtomicClient.peerSearchAgain;
+
+  @override
   shared.AtomicServerBackend get servers => AppServerBackend();
   @override
   Future<void> Function() get signOut => AtomicSession.clear;
@@ -151,4 +157,19 @@ class AppServerBackend extends shared.AtomicServerBackend {
 
   @override
   Future<int> pushWorkspace(String url) => AtomicClient.syncDriveToServer(url);
+
+  /// The servers the active drive's pkarr record names and that prove they
+  /// hold it: added to the known list (not put in use), so a server that hosts
+  /// the drive (an atomic.place node, a self-hosted one) is listed without
+  /// being typed in.
+  @override
+  Future<List<String>> discoverServers() async {
+    final drive = AtomicClient.getActiveDrive();
+    if (drive == null) return const [];
+    final found = await AtomicClient.verifiedDriveOrigins(drive);
+    for (final origin in found) {
+      await AtomicSession.addKnownServer(origin);
+    }
+    return found;
+  }
 }

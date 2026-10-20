@@ -140,4 +140,37 @@ void main() {
       );
     });
   });
+
+  test('every server the record names and that holds the drive is kept',
+      () async {
+    // The drive is on staging and on the atomic.place node; the record also
+    // names an impostor and a dead host. Both real servers are listed, the
+    // others are not.
+    final found = await AtomicClient.verifiedDriveOrigins(
+      drive,
+      client: MockClient((request) async => switch (request.url.host) {
+            'impostor.example' => http.Response('{"wrong":true}', 200),
+            'dead.example' => http.Response('no', 404),
+            _ => http.Response('{"genesis":"ok"}', 200),
+          }),
+      resolve: (_) async => [
+        'https://staging.atomicdata.dev',
+        'https://impostor.example',
+        'https://dead.example',
+        'https://node1.atomicserver.eu',
+      ],
+      verifies: (body, d) => body.contains('"ok"') && d == drive,
+    );
+    expect(found,
+        ['https://staging.atomicdata.dev', 'https://node1.atomicserver.eu']);
+  });
+
+  test('a record with no origins finds no servers', () async {
+    final found = await AtomicClient.verifiedDriveOrigins(
+      drive,
+      client: MockClient((_) async => http.Response('{}', 200)),
+      resolve: (_) async => [],
+    );
+    expect(found, isEmpty);
+  });
 }
