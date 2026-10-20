@@ -278,8 +278,9 @@ open_one() { # $1 = "x y" to tap, $2 = label; records the open's numbers
   wait_log '\[perf\] resource painted' 30 || { back; return 1; }
   local path; path=$(log | grep -Eo 'resource painted (warm|cold)' | head -1 | awk '{print $3}')
   put "open $2 ($path): data in page (ms)" "$(last_ms '\[perf\] resource data')"
-  put "open $2 ($path): painted (ms)" "$(last_ms '\[perf\] resource painted (warm|cold)')"
+  put "open $2 ($path): painted (ms)" "$(last_ms '\[perf\] resource painted (warm|cold) [0-9]')"
   put "open $2 ($path): painted, page's own clock (ms)" "$(last_ms '\[perf\] resource painted in page')"
+  put "open $2 ($path): tap to painted (ms)" "$(last_ms '\[perf\] resource painted (warm|cold) since tap')"
   log >> "$work/open.log"
 }
 if step open || step memory; then
@@ -316,7 +317,7 @@ if step search; then
     wait_log '\[perf\] search keystroke to results' 10 || { back; back; continue; }
     sleep 0.5
     put "search: Rust query (ms)" "$(last_ms '\[perf\] search query')"
-    put "search: last keystroke to results drawn, incl. 120 ms debounce (ms)" "$(last_ms '\[perf\] search keystroke to results')"
+    put "search: last keystroke to results drawn (ms)" "$(last_ms '\[perf\] search keystroke to results')"
     back; sleep 0.5; back; sleep 1
   done
 fi

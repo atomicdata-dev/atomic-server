@@ -151,15 +151,25 @@ class ResourceRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final subject = this.subject;
     final shell = ShellScope.maybeOf(context);
+    final Widget row;
     if (subject == null ||
         shell == null ||
         ShellScope.layoutOf(context) != ShellLayout.split) {
-      return _tile(context);
+      row = _tile(context);
+    } else {
+      row = ValueListenableBuilder<String?>(
+        valueListenable: shell.selected,
+        builder: (context, selected, _) =>
+            _tile(context, selected: selected == subject),
+      );
     }
-    return ValueListenableBuilder<String?>(
-      valueListenable: shell.selected,
-      builder: (context, selected, _) =>
-          _tile(context, selected: selected == subject),
+    final warm = shell?.warm;
+    if (subject == null || onTap == null || warm == null) return row;
+    // The page's first read starts as the finger goes down, not after the
+    // tap and the page's first frame (a scroll just leaves it unused).
+    return Listener(
+      onPointerDown: (_) => warm.prefetch(subject),
+      child: row,
     );
   }
 }

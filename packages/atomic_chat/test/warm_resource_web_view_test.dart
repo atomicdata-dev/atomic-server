@@ -47,6 +47,28 @@ class _Api extends UnimplementedApi {
   Future<String> embedCall(String method, String argsJson) async => '"x"';
 }
 
+class _CountingApi extends UnimplementedApi {
+  final calls = <String>[];
+  @override
+  Future<String> embedCall(String method, String argsJson) async {
+    calls.add('$method $argsJson');
+    return '[${calls.length}]';
+  }
+}
+
+/// Answers each read with one `{s: subject}` row per subject.
+class _RowsApi extends UnimplementedApi {
+  final asked = <List<Object?>>[];
+  @override
+  Future<String> embedCall(String method, String argsJson) async {
+    final subjects = (jsonDecode(argsJson) as List).first as List<Object?>;
+    asked.add(subjects);
+    return jsonEncode([
+      for (final s in subjects) {'s': s}
+    ]);
+  }
+}
+
 void main() {
   final pages = <FakeWarmPage>[];
   late WarmResourceWebView pool;
@@ -120,8 +142,7 @@ void main() {
     expect(page.scripts, isEmpty, reason: 'not before it is up');
     page.becomeReady();
     await pumpEventQueue();
-    expect(
-        page.scripts.single,
+    expect(page.scripts.single,
         allOf(contains('e.show("https://x/next")'), contains('e.show("")')),
         reason: 'shown, then blank: an attached page that already shows '
             'what it is asked for does not paint again');
@@ -156,6 +177,47 @@ void main() {
     await pumpEventQueue();
     expect(AppThemeMode.mode.value, ThemeMode.dark);
     expect(page.scripts, contains('window.__atomicReply(3,true,"true")'));
+  });
+
+  test('a read started on pointer-down answers the page\'s first call once',
+      () async {
+    final api = _CountingApi();
+    pool = WarmResourceWebView(
+        api: api, rewarmDelay: Duration.zero, builder: (_) async => throw 'x');
+    pool.prefetch('did:ad:doc');
+    pool.prefetch('did:ad:doc');
+    expect(api.calls, ['getResourcesWithSnapshots [["did:ad:doc"]]'],
+        reason: 'a second pointer-down right after reads nothing again');
+
+    expect(pool.takePrefetched('getResourcesWithSnapshots', '[["did:ad:x"]]'),
+        isNull,
+        reason: 'another resource');
+    expect(pool.takePrefetched('query', '[["did:ad:doc"]]'), isNull);
+    final answer =
+        pool.takePrefetched('getResourcesWithSnapshots', '[["did:ad:doc"]]');
+    expect(await answer, '[1]');
+    expect(pool.takePrefetched('getResourcesWithSnapshots', '[["did:ad:doc"]]'),
+        isNull,
+        reason: 'taken once; later reads go to the store');
+  });
+
+  test('a prefetched resource read in one batch with others keeps its place',
+      () async {
+    final api = _RowsApi();
+    pool = WarmResourceWebView(
+        api: api, rewarmDelay: Duration.zero, builder: (_) async => throw 'x');
+    pool.prefetch('b');
+    final answer =
+        pool.takePrefetched('getResourcesWithSnapshots', '[["a","b","c"]]');
+    expect(jsonDecode((await answer)!), [
+      {'s': 'a'},
+      {'s': 'b'},
+      {'s': 'c'},
+    ]);
+    expect(api.asked, [
+      ['b'],
+      ['a', 'c'],
+    ]);
   });
 
   test('a failed start leaves no spare and take opens cold', () async {
@@ -267,13 +329,46 @@ void main() {
       final taken = pages.first;
       expect(taken.handler, isNotNull);
       expect(
-          taken.scripts.any(
-              (s) => s.contains('e.open') && s.contains('"https://x/s"')),
+          taken.scripts
+              .any((s) => s.contains('e.open') && s.contains('"https://x/s"')),
           isTrue);
       // The colour scheme reaches the taken page like any other.
       expect(taken.scripts.any((s) => s.contains('setColorScheme')), isTrue);
       expect(pages, hasLength(2), reason: 'the next spare is warming');
       expect(pages.last.released, isFalse);
+      await closeAll(tester);
+    });
+
+    testWidgets('the read started on pointer-down answers the page',
+        (tester) async {
+      final api = _CountingApi();
+      pool = WarmResourceWebView(
+        api: api,
+        rewarmDelay: Duration.zero,
+        builder: (onMessage) async {
+          final p = FakeWarmPage(onMessage);
+          pages.add(p);
+          return p;
+        },
+      )..warmUp();
+      await tester.pump();
+      pages.single.becomeReady();
+      await tester.pump();
+      final shell = ShellController(drive: 'd')..warm = pool;
+      pool.prefetch('https://x/s');
+
+      await openView(tester, shell);
+      final taken = pages.first;
+      taken.handler!(jsonEncode({
+        'id': 7,
+        'method': 'getResourcesWithSnapshots',
+        'args': [
+          ['https://x/s']
+        ],
+      }));
+      await tester.pump();
+      expect(api.calls, hasLength(1), reason: 'not read a second time');
+      expect(taken.scripts, contains('window.__atomicReply(7,true,"[1]")'));
       await closeAll(tester);
     });
 

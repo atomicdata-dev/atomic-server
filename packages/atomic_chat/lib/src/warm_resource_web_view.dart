@@ -331,6 +331,84 @@ class WarmResourceWebView with WidgetsBindingObserver {
     }
   }
 
+  /// The read of a resource started when a finger went down on its row
+  /// ([prefetch]), for the page that opens it ([takePrefetched]).
+  ({String subject, Future<String> answer, Stopwatch age})? _prefetched;
+
+  /// How long a [prefetch]ed read may be used: a tap opens its page well
+  /// within it; a finger that stayed down longer reads again.
+  static const prefetchFresh = Duration(milliseconds: 1500);
+
+  static const _read = 'getResourcesWithSnapshots';
+
+  /// Starts reading [subject] the way an opening page asks for it
+  /// (`getResourcesWithSnapshots`), as a finger goes down on its row: the
+  /// read then runs while the finger lifts and the page slides in, and the
+  /// page's call for it is answered at once.
+  void prefetch(String subject) {
+    if (_disposed || subject.isEmpty) return;
+    final last = _prefetched;
+    if (last != null &&
+        last.subject == subject &&
+        last.age.elapsedMilliseconds < 300) {
+      return;
+    }
+    final answer = api.embedCall(
+        _read,
+        jsonEncode([
+          [subject]
+        ]));
+    // Nobody may take it; a failure is then nobody's.
+    answer.ignore();
+    _prefetched = (subject: subject, answer: answer, age: Stopwatch()..start());
+  }
+
+  /// The answer to the page's call [method] with [argsJson] when it reads
+  /// the [prefetch]ed resource (alone or with others, which are read now),
+  /// once and while fresh; null otherwise: the caller reads itself.
+  Future<String>? takePrefetched(String method, String argsJson) {
+    final p = _prefetched;
+    if (p == null || method != _read) return null;
+    if (!argsJson.contains(jsonEncode(p.subject))) {
+      if (!kReleaseMode) {
+        final shown =
+            argsJson.length > 160 ? argsJson.substring(0, 160) : argsJson;
+        debugPrint('[warm] read of $shown, not the prefetched ${p.subject}');
+      }
+      return null;
+    }
+    final List<Object?> subjects;
+    try {
+      final args = jsonDecode(argsJson);
+      subjects = (args as List).first as List<Object?>;
+    } catch (_) {
+      return null;
+    }
+    final at = subjects.indexOf(p.subject);
+    if (at < 0) return null;
+    _prefetched = null;
+    if (p.age.elapsed > prefetchFresh) return null;
+    if (subjects.length == 1) return p.answer;
+    return () async {
+      try {
+        final others = List<Object?>.of(subjects)..removeAt(at);
+        final both = await Future.wait([
+          p.answer,
+          api.embedCall(method, jsonEncode([others])),
+        ]);
+        // The prefetched row stays text (it can be large); the others are
+        // decoded to put it in its place.
+        final one = both[0].trim();
+        final rows = [
+          for (final r in jsonDecode(both[1]) as List) jsonEncode(r),
+        ]..insert(at, one.substring(1, one.length - 1).trim());
+        return '[${rows.join(',')}]';
+      } catch (_) {
+        return api.embedCall(method, argsJson);
+      }
+    }();
+  }
+
   /// Drops the spare (the app left, or memory is short).
   void release() {
     _rewarm?.cancel();

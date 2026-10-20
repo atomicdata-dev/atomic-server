@@ -117,9 +117,13 @@ class _ResourceViewState extends State<ResourceView>
     });
   }
 
+  /// The shell's warm pool, which may hold a read started on the row's
+  /// pointer-down ([WarmResourceWebView.prefetch]).
+  WarmResourceWebView? _pool;
+
   Future<void> _start() async {
     // A page loaded ahead by the shell, when there is one: no page load.
-    final pool = ShellScope.maybeOf(context)?.warm;
+    final pool = _pool = ShellScope.maybeOf(context)?.warm;
     if (pool != null && widget.path == null && widget.subject.isNotEmpty) {
       final warm = pool.take();
       if (warm != null) {
@@ -346,6 +350,7 @@ class _ResourceViewState extends State<ResourceView>
     if (request['method'] == 'painted') {
       final path = _warm ? 'warm' : 'cold';
       Perf.span('resource painted $path', _clock.elapsedMilliseconds);
+      Perf.sinceTap('resource painted $path');
       Perf.span('resource painted in page $path', request['ms'] as int? ?? -1);
       return;
     }
@@ -374,13 +379,17 @@ class _ResourceViewState extends State<ResourceView>
       debugPrint('[embed] call $method (${message.length} chars)');
     }
     try {
-      final answer = await (widget.call ?? widget.api.embedCall)(
-          method, jsonEncode(_withDrive(method, request['args'])));
+      final args = jsonEncode(_withDrive(method, request['args']));
+      final prefetched =
+          widget.call == null ? _pool?.takePrefetched(method, args) : null;
+      final answer = await (prefetched ??
+          (widget.call ?? widget.api.embedCall)(method, args));
       reply = 'true,${jsonEncode(answer)}';
       if (_firstRead && method == 'getResourcesWithSnapshots') {
         _firstRead = false;
         debugPrint('[embed] first read at $started ms, answered in '
-            '${_clock.elapsedMilliseconds - started} ms');
+            '${_clock.elapsedMilliseconds - started} ms'
+            '${prefetched != null ? ' (read on pointer-down)' : ''}');
         debugPrint(_warm
             ? '[warm] open ${_clock.elapsedMilliseconds} ms first content'
             : '[warm] cold open ${_clock.elapsedMilliseconds} ms first content');
