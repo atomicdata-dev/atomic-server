@@ -47,6 +47,7 @@ interface ConnectAppFormProps {
   subjects: string[];
   selected: string[];
   onToggle: (subject: string, on: boolean) => void;
+  onToggleAll: (on: boolean) => void;
   canEdit: boolean;
   onCanEditChange: (canEdit: boolean) => void;
   error?: string;
@@ -68,6 +69,7 @@ export function ConnectAppForm({
   subjects,
   selected,
   onToggle,
+  onToggleAll,
   canEdit,
   onCanEditChange,
   error,
@@ -84,6 +86,7 @@ export function ConnectAppForm({
         subjects={subjects}
         selected={selected}
         onToggle={onToggle}
+        onToggleAll={onToggleAll}
       />
 
       <Heading>What it can do</Heading>

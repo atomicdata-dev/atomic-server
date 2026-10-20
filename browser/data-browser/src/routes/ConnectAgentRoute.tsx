@@ -10,6 +10,7 @@ import {
 } from '../components/ConnectAppForm';
 import { useSettings } from '../helpers/AppSettings';
 import { rememberConnectedApp } from '../helpers/connectedApps';
+import { signInPath } from '../helpers/returnPath';
 import { useNavigateWithTransition } from '../hooks/useNavigateWithTransition';
 import { pathNames, paths } from './paths';
 import { appRoute } from './RootRoutes';
@@ -104,7 +105,9 @@ function ConnectAgentPage() {
       <ConnectPage>
         <h1>Connect an app</h1>
         <p>Sign in first, then open this link again.</p>
-        <Button onClick={() => navigate(paths.welcome)}>Sign in</Button>
+        <Button onClick={() => navigate(signInPath(window.location))}>
+          Sign in
+        </Button>
       </ConnectPage>
     );
   }
@@ -161,6 +164,7 @@ function ConnectAgentPage() {
         onToggle={(subject, on) =>
           setPicked(toggleSubject(selected, subject, on))
         }
+        onToggleAll={on => setPicked(on ? catalog.subjects : [])}
         canEdit={write}
         onCanEditChange={setWrite}
         error={error}
