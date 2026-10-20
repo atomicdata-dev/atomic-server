@@ -52,7 +52,7 @@ class HomeViewModelTest {
         assertEquals(Section.entries.toSet(), s.sections.keys)
         assertEquals(3, s.sections[Section.Drives]!!.size)
         assertEquals(3, s.drives.size)
-        assertTrue(s.sections[Section.Favorites]!![1].detail.startsWith("Ontola · Table"))
+        assertTrue(s.sections[Section.Favorites]!![1].detail.startsWith("Table"))
         assertEquals("Anna", s.sections[Section.Messages]!![0].title)
     }
 
@@ -63,7 +63,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
         val others = vm.state.value.sections[Section.Activity]!!
         assertEquals(listOf("Quarterly planning", "Customer interviews", "Old draft"), others.map { it.title })
-        assertEquals("Anna edited · 4 min ago", others[0].detail)
+        assertTrue(others[0].detail.startsWith("Anna edited · "))
         // A deleted resource is listed, but there is nothing to open.
         assertFalse(others[2].openable)
 

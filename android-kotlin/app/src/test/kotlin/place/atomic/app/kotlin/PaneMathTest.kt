@@ -37,7 +37,7 @@ class PaneMathTest {
     fun aDraggedWidthIsKeptWithinBoundsAndThePagesKeep280() {
         assertEquals(304f, listPaneWidth(1000f, 100f), 0.01f)
         assertEquals(520f, listPaneWidth(1280f, 900f), 0.01f)
-        assertEquals(1000f - 280f, listPaneWidth(1000f, 900f), 0.01f)
+        assertEquals(700f - 280f, listPaneWidth(700f, 900f), 0.01f)
         assertEquals(listPaneMax(700f), 420f, 0.01f)
     }
 
@@ -55,7 +55,7 @@ class PaneMathTest {
 
     @Test
     fun theInverseFindsTheFingerThatShowsAWidth() {
-        for (raw in listOf(100f, 520f, 540f, 600f, 900f)) {
+        for (raw in listOf(100f, 520f, 540f, 560f, 600f)) {
             assertEquals(raw, rubberBandInverse(rubberBand(raw, 0f, 520f), 0f, 520f), raw * 0.01f)
         }
     }

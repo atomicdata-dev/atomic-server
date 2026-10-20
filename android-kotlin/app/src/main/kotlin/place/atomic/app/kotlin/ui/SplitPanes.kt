@@ -23,7 +23,7 @@ import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemGestures
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -181,7 +181,7 @@ fun SplitPanes(
                 // The sidebar keeps its width while it slides away: no row is laid out again on every frame.
                 Box(Modifier.width(shown.dp).fillMaxHeight().clipToBounds().testTag("sidebar")) {
                     Column(
-                        Modifier.wrapContentSize(Alignment.CenterEnd, unbounded = true).requiredWidth(listFull.dp).fillMaxHeight(),
+                        Modifier.wrapContentWidth(Alignment.End, unbounded = true).requiredWidth(listFull.dp).fillMaxHeight(),
                     ) {
                         Box(Modifier.weight(1f)) { list() }
                         bar()
@@ -190,7 +190,7 @@ fun SplitPanes(
                 if (!gone) Box(Modifier.width(1.dp).fillMaxHeight().background(MaterialTheme.colorScheme.outlineVariant))
                 Box(Modifier.weight(1f).fillMaxHeight().clipToBounds()) {
                     // Laid out at the width it will have once the sidebar has moved, and clipped to what shows.
-                    Box(Modifier.wrapContentSize(Alignment.CenterStart, unbounded = true).requiredWidth(detailWidth.dp).fillMaxHeight()) { detail() }
+                    Box(Modifier.wrapContentWidth(Alignment.Start, unbounded = true).requiredWidth(detailWidth.dp).fillMaxHeight()) { detail() }
                 }
             }
             if (!folded) {
