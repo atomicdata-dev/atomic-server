@@ -24,3 +24,14 @@ flutter build appbundle --release --target-platform android-arm64 --build-number
 ```
 
 Upload `build/app/outputs/bundle/release/app-release.aab` to Play Console.
+
+## First build
+
+Version 1.0.0 (1), CI run 39424359675, artifact `atomic-place-aab`
+(ID 12266865399), built and verified successfully. Manifest identity is
+`io.ontola.atomic`, label `atomic.place`, arm64-v8a only.
+
+SHA-256: `82a8d7fbff6caff2929c266a1a9483e8893943e9ecb209c2e03976eb9717ba89`.
+
+Initial Play Console upload is still pending. App dashboard:
+https://play.google.com/console/u/1/developers/6245351578543299123/app/4973792617288465041/app-dashboard
