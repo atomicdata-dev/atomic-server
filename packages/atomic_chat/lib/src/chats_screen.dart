@@ -700,6 +700,17 @@ class _ChatsScreenState extends State<ChatsScreen> {
           backgroundColor: c.bgBody,
           appBar: AppTopBar(
             titleWidget: const AtomicWordmark(),
+            actions: [
+              // In the sidebar next to the pages: it folds away (the tab at
+              // the left edge, a swipe from it, or Home bring it back).
+              if (ShellScope.layoutOf(context) == ShellLayout.split)
+                IconButton(
+                  tooltip: 'Close sidebar',
+                  icon: const Icon(Icons.menu_open),
+                  onPressed: () =>
+                      ShellScope.maybeOf(context)?.setListCollapsed(true),
+                ),
+            ],
           ),
           // Clamped, with no stretch or glow at the edges: the Material 3
           // stretch overscroll of Android 12+ pulls the whole page past the

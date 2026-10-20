@@ -38,11 +38,10 @@ const _listDrives = 4;
 /// the finger drags to a choice and lets go on it ([HoldFan.opensOnDown]).
 /// Search has the drives on touch and hold.
 ///
-/// On a tablet ([ShellLayout.split]) the bar spans the window under both
-/// panes, its buttons in a group in the middle. Home and Search then show what
-/// the list pane holds (and bring a folded list pane back), the others what
-/// the detail pane shows; Settings stays and the resource's "more" menu comes
-/// after it.
+/// On a tablet ([ShellLayout.split]) the bar is the foot of the sidebar (the
+/// list pane), its buttons in a row from the left and the resource's "more"
+/// menu at the right end. Home and Search then show what the list pane holds,
+/// the others what the detail pane shows; Settings stays.
 class AppBottomBar extends StatelessWidget {
   final AssistantApi api;
   final ShellController shell;
@@ -130,7 +129,9 @@ class AppBottomBar extends StatelessWidget {
                       ),
                     );
                     return Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        mainAxisAlignment: split
+                            ? MainAxisAlignment.start
+                            : MainAxisAlignment.spaceEvenly,
                         children: [
                           _Current(
                             current: homeCurrent,
@@ -181,6 +182,7 @@ class AppBottomBar extends StatelessWidget {
                           ),
                           if (split) ...[
                             settings,
+                            const Spacer(),
                             // Room for it whether or not a resource is open: the
                             // other buttons do not move.
                             SizedBox(
@@ -445,7 +447,16 @@ class _ProfileButton extends StatelessWidget {
             border: Border.all(
                 color: current ? main : Colors.transparent, width: 2),
           ),
-          child: ProfileAvatar.of(who, radius: 12),
+          // Neutral unless the profile is the page shown: the main colour's
+          // tint read as "this is where you are".
+          child: ProfileAvatar.of(who,
+              radius: 12,
+              background: current
+                  ? null
+                  : Theme.of(context).colorScheme.surfaceContainerHighest,
+              foreground: current
+                  ? null
+                  : Theme.of(context).colorScheme.onSurfaceVariant),
         );
         return Tooltip(
           message: label,
@@ -459,7 +470,12 @@ class _ProfileButton extends StatelessWidget {
               radius: 28,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                // Its own height, whatever room the bar is given: without
+                // the factors it took all of it, and next to the pages the
+                // bar (with a signed-in person) then filled the sidebar.
                 child: Center(
+                  widthFactor: 1,
+                  heightFactor: 1,
                   child: showName
                       ? Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 4),

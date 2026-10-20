@@ -36,6 +36,7 @@ Widget _shell(FakeApi api) => app(AppShell(
       api: api,
       drive: 'did:ad:drive',
       warmPool: (_) => null,
+      profile: (_) => const Scaffold(body: Text('profile page')),
       home: ChatsScreen(drive: 'did:ad:drive', api: api),
     ));
 
@@ -469,21 +470,19 @@ void main() {
         final detail = tester.getRect(find.byType(ResourceView));
         expect(detail.bottom, size.height);
         expect(detail.right, size.width);
-        // Folded: a compact bar floats at the bottom of the pages; they end
-        // above it.
+        // Folded: the bar goes with the list, the pages have the window.
         await tester.tap(find.byKey(const Key('list-toggle')));
         await _settle(tester);
-        final compact = tester.getRect(find.byType(AppBottomBar));
-        expect(compact.width, lessThanOrEqualTo(420));
-        expect(compact.bottom, size.height);
-        expect(compact.center.dx, closeTo(size.width / 2, 1));
-        expect(tester.getRect(find.byType(ResourceView)).bottom,
-            closeTo(compact.top, 1));
-        // A resize keeps the fold and the bar.
+        expect(find.byType(AppBottomBar).hitTestable(), findsNothing);
+        expect(tester.getRect(find.byType(ResourceView)), Offset.zero & size);
+        // A resize keeps the fold; unfolded, the bar is back.
         tester.view.physicalSize = (size.flipped) * 2;
         await _settle(tester);
         expect(_controller(tester).listCollapsed.value, isTrue);
-        expect(find.byType(AppBottomBar), findsOneWidget);
+        await tester.tap(find.byTooltip('Show list'));
+        await _settle(tester);
+        expect(tester.getRect(find.byType(AppBottomBar)).width,
+            tester.getRect(find.byType(ChatsScreen)).width);
         await _done(tester);
       });
     }
@@ -582,15 +581,12 @@ void main() {
         expect(find.byType(ChatsScreen).hitTestable(), findsNothing);
         expect(_controller(tester).listCollapsed.value, isTrue);
         expect(tester.state(find.byType(ResourceView)), same(view));
-        final prefs = await SharedPreferences.getInstance();
-        expect(prefs.getBool(listCollapsedKey), isTrue);
 
         await tester.tap(find.byTooltip('Show list'));
         await _settle(tester);
         expect(find.text('Notes'), findsOneWidget);
         expect(tester.getRect(find.byType(ResourceView)).left,
             greaterThanOrEqualTo(320));
-        expect(prefs.getBool(listCollapsedKey), isFalse);
         await _done(tester);
       });
     }
@@ -617,26 +613,11 @@ void main() {
           expect(find.byKey(const Key('nothing-open')), findsOneWidget);
         }
       }
-      // Home in the bar brings it back.
-      await tester.tap(find.byTooltip('Home'));
+      // The tab at the left edge brings it back.
+      await tester.tap(find.byTooltip('Show list'));
       await _settle(tester);
       expect(find.text('Plans').hitTestable(), findsOneWidget);
       expect(listShown(tester), greaterThanOrEqualTo(320));
-      await _done(tester);
-    });
-
-    testWidgets('a new shell starts folded when the device left it so',
-        (tester) async {
-      SharedPreferences.setMockInitialValues({listCollapsedKey: true});
-      _size(tester, _portrait);
-      await tester.pumpWidget(_shell(_api()));
-      await _settle(tester);
-      expect(find.text('Plans').hitTestable(), findsNothing);
-      // Search in the bar unfolds it, with the search.
-      await tester.tap(find.byTooltip('Search'));
-      await _settle(tester);
-      expect(find.byType(SearchScreen).hitTestable(), findsOneWidget);
-      expect(_controller(tester).listCollapsed.value, isFalse);
       await _done(tester);
     });
 
@@ -797,4 +778,149 @@ void main() {
       await _done(tester);
     });
   });
+
+  group('the Samsung Galaxy Tab (SM-X810)', () {
+    // 1752x2800 px at 340 dpi: about 824x1318 dp, 412x... in landscape.
+    void samsung(WidgetTester tester, {bool landscape = false}) {
+      tester.view.devicePixelRatio = 340 / 160;
+      tester.view.physicalSize =
+          landscape ? const Size(2800, 1752) : const Size(1752, 2800);
+      // Gesture navigation: a handle strip under the window's content.
+      tester.view.padding = const FakeViewPadding(bottom: 48 * 340 / 160);
+      tester.view.viewPadding = const FakeViewPadding(bottom: 48 * 340 / 160);
+      addTearDown(tester.view.reset);
+    }
+
+    _IdentityApi named() => _IdentityApi(const ProfileIdentity(name: 'Joep'));
+
+    for (final landscape in [false, true]) {
+      final name = landscape ? 'landscape' : 'portrait';
+      testWidgets('$name, signed in: the list fills the sidebar above the bar',
+          (tester) async {
+        samsung(tester, landscape: landscape);
+        await tester.pumpWidget(_shell(named()));
+        await _settle(tester);
+        final size = tester.view.physicalSize / tester.view.devicePixelRatio;
+        // Open by default, the home's rows on screen.
+        expect(_controller(tester).listCollapsed.value, isFalse);
+        expect(find.text('Plans').hitTestable(), findsOneWidget);
+        final list = tester.getRect(find.byType(ChatsScreen));
+        final bar = tester.getRect(find.byType(AppBottomBar));
+        // The bar: a row at the bottom of the sidebar, exactly its width,
+        // with the system inset under its buttons in its own colour.
+        expect(bar.left, 0);
+        expect(bar.width, list.width);
+        expect(bar.bottom, size.height);
+        expect(bar.height, lessThan(48 + 48 + 24));
+        expect(bar.height, greaterThanOrEqualTo(48 + 48));
+        expect(list.bottom, bar.top);
+        expect(list.height, greaterThan(size.height / 2));
+        // The buttons start at the left of the sidebar.
+        expect(tester.getRect(find.byTooltip('Home')).left, lessThan(24));
+        await _done(tester);
+      });
+    }
+
+    testWidgets('folded: no bar, the pages have the whole window',
+        (tester) async {
+      samsung(tester);
+      await tester.pumpWidget(_shell(named()));
+      await _settle(tester);
+      final size = tester.view.physicalSize / tester.view.devicePixelRatio;
+      await tester.tap(find.text('Plans'));
+      await _settle(tester);
+      await tester.tap(find.byTooltip('Hide list'));
+      await _settle(tester);
+      expect(find.byType(AppBottomBar).hitTestable(), findsNothing);
+      final page = tester.getRect(find.byType(ResourceView));
+      expect(page, Offset.zero & size);
+      // A way back to the list, at the left edge.
+      expect(find.byTooltip('Show list'), findsOneWidget);
+      await tester.tap(find.byTooltip('Show list'));
+      await _settle(tester);
+      expect(find.text('Plans').hitTestable(), findsOneWidget);
+      expect(find.byType(AppBottomBar).hitTestable(), findsOneWidget);
+      await _done(tester);
+    });
+
+    testWidgets('the sidebar header folds it', (tester) async {
+      samsung(tester);
+      await tester.pumpWidget(_shell(named()));
+      await _settle(tester);
+      expect(find.byKey(const Key('atomic-wordmark')), findsOneWidget);
+      await tester.tap(find.byTooltip('Close sidebar'));
+      await _settle(tester);
+      expect(_controller(tester).listCollapsed.value, isTrue);
+      expect(find.text('Plans').hitTestable(), findsNothing);
+      await _done(tester);
+    });
+
+    testWidgets('a fold is not kept for the next start', (tester) async {
+      SharedPreferences.setMockInitialValues({'shell_list_collapsed': true});
+      samsung(tester);
+      await tester.pumpWidget(_shell(named()));
+      await _settle(tester);
+      expect(_controller(tester).listCollapsed.value, isFalse);
+      expect(find.text('Plans').hitTestable(), findsOneWidget);
+      await _done(tester);
+    });
+
+    testWidgets('Home works from a page, a search and the profile',
+        (tester) async {
+      samsung(tester);
+      await tester.pumpWidget(_shell(named()));
+      await _settle(tester);
+      // From the profile page: Home closes it, the home's rows stay.
+      await tester.tap(find.byTooltip('Joep'));
+      await _settle(tester);
+      expect(_controller(tester).topKind, ShellPage.profile);
+      await tester.tap(find.byTooltip('Home'));
+      await _settle(tester);
+      expect(_controller(tester).atHome, isTrue);
+      expect(find.byKey(const Key('nothing-open')), findsOneWidget);
+      expect(find.text('Plans').hitTestable(), findsOneWidget);
+      // From a search in the sidebar: back to the home.
+      await tester.tap(find.byTooltip('Search'));
+      await _settle(tester);
+      expect(find.byType(SearchScreen), findsOneWidget);
+      await tester.tap(find.byTooltip('Home'));
+      await _settle(tester);
+      expect(find.byType(SearchScreen), findsNothing);
+      expect(find.text('Plans').hitTestable(), findsOneWidget);
+      // Folded: Home brings the sidebar back.
+      _controller(tester).setListCollapsed(true);
+      await _settle(tester);
+      expect(find.text('Plans').hitTestable(), findsNothing);
+      await tester.tap(find.byTooltip('Show list'));
+      await _settle(tester);
+      expect(find.text('Plans').hitTestable(), findsOneWidget);
+      await _done(tester);
+    });
+
+    testWidgets('the avatar is not marked when its page is not open',
+        (tester) async {
+      samsung(tester);
+      await tester.pumpWidget(_shell(_IdentityApi(const ProfileIdentity())));
+      await _settle(tester);
+      expect(find.byKey(const ValueKey('current:Profile')), findsNothing);
+      final avatar = tester.widget<CircleAvatar>(find.descendant(
+          of: find.byType(AppBottomBar), matching: find.byType(CircleAvatar)));
+      final main =
+          tester.element(find.byType(AppBottomBar)).appColors.mainSelectedBg;
+      expect(avatar.backgroundColor, isNot(main));
+      await _done(tester);
+    });
+  });
+}
+
+class _IdentityApi extends FakeApi {
+  final ProfileIdentity who;
+  _IdentityApi(this.who)
+      : super(recent: [
+          _r('did:ad:plans', 'Plans'),
+          _r('did:ad:notes', 'Notes'),
+        ]);
+
+  @override
+  Future<ProfileIdentity?> ownIdentity() async => who;
 }

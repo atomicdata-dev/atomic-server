@@ -56,7 +56,8 @@ abstract final class ShellPage {
 }
 
 /// How the shell arranges itself for the width of the window. Both have the
-/// same bottom bar, the width of the window.
+/// same bottom bar: the width of the window on a phone, of the sidebar (the
+/// list pane) next to the pages.
 enum ShellLayout {
   /// A phone: the pages above the bottom bar.
   bar,
@@ -73,8 +74,9 @@ enum ShellLayout {
       width >= splitWidth ? split : bar;
 }
 
-/// SharedPreferences keys of the list pane (per device).
-const listCollapsedKey = 'shell_list_collapsed';
+/// SharedPreferences key of the list pane's dragged width (per device). Its
+/// fold is not kept: every start shows the list (a fold left behind once made
+/// the Samsung tablet start on an empty page with nothing to go back to).
 const listWidthKey = 'shell_list_width';
 
 /// Opens a page's menu; [anchor] is the bar button that asked, in global
@@ -110,8 +112,8 @@ class ShellController extends ChangeNotifier {
   ({String query, String? scope, SearchKind kind}) search =
       (query: '', scope: null, kind: SearchKind.any);
 
-  /// The list pane is folded away: the detail pane has the whole width.
-  /// Remembered per device ([listCollapsedKey]).
+  /// The list pane is folded away: the detail pane has the whole window.
+  /// Kept through resizes and rotation, not across starts.
   final ValueNotifier<bool> listCollapsed = ValueNotifier(false);
 
   /// The list pane's width the person dragged it to; null: one that suits
@@ -123,7 +125,6 @@ class ShellController extends ChangeNotifier {
     if (listCollapsed.value == collapsed) return;
     listCollapsed.value = collapsed;
     _changed();
-    _savePrefs((p) => p.setBool(listCollapsedKey, collapsed));
   }
 
   void setListWidth(double width) {
@@ -131,16 +132,15 @@ class ShellController extends ChangeNotifier {
     _savePrefs((p) => p.setDouble(listWidthKey, width));
   }
 
-  /// Reads the list pane's fold and width as this device left them.
+  /// Reads the list pane's width as this device left it.
   Future<void> loadListPrefs() async {
     try {
       final p = await SharedPreferences.getInstance();
       if (_disposed) return;
-      listCollapsed.value = p.getBool(listCollapsedKey) ?? false;
       listWidth.value = p.getDouble(listWidthKey);
       _changed();
     } catch (_) {
-      // The defaults: shown, at a width that suits the window.
+      // The default: a width that suits the window.
     }
   }
 
@@ -555,9 +555,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   final ValueNotifier<double> _barHeight = ValueNotifier(0);
 
-  /// The same bar in both layouts, the width of the window.
-  /// Keyed: in the split layout it moves between the foot of the list pane
-  /// and a compact bar over the pages (list folded) without being rebuilt.
+  /// The same bar in both layouts: the width of the window on a phone, at
+  /// the foot of the list pane next to the pages. Keyed: a change of layout
+  /// moves it without rebuilding it.
   final GlobalKey _barKey = GlobalKey(debugLabel: 'bar');
   late final Widget _bar = KeyedSubtree(
     key: _barKey,
@@ -758,8 +758,8 @@ class _SplitPanes extends StatefulWidget {
   final Widget list;
   final Widget detail;
 
-  /// The bottom bar: at the foot of the list pane, or, with the list folded
-  /// away, a compact bar at the bottom of the pages.
+  /// The bottom bar: at the foot of the list pane, exactly its width; it
+  /// slides away with it (folded, the pages have the whole window).
   final Widget bar;
   final ValueListenable<double> barHeight;
 
@@ -917,74 +917,47 @@ class _SplitPanesState extends State<_SplitPanes>
                       ),
                       _PaneDivider(shown: !gone),
                       Expanded(
-                        // Full height; with the list folded it ends above the
-                        // compact bar (eased in with the fold).
-                        child: _DetailInset(
-                          barHeight: widget.barHeight,
-                          folded: 1 - _open.value,
-                          // Laid out at the width it will have once the list
-                          // has moved, and clipped to what shows: its web
-                          // view is not resized on every frame (no blank
-                          // strip); a resize by the divider does resize it.
-                          child: LayoutBuilder(builder: (context, box) {
-                            final resizing =
-                                dragging != null && !shell.listCollapsed.value;
-                            final target = shell.listCollapsed.value
-                                ? room
-                                : room - full - 1;
-                            final w = resizing ? box.maxWidth : target;
-                            return ClipRect(
-                              child: OverflowBox(
-                                alignment: Alignment.centerLeft,
-                                minWidth: w,
-                                maxWidth: w,
-                                child: _Pane(
-                                    removeLeft: !gone, child: widget.detail),
-                              ),
-                            );
-                          }),
-                        ),
+                        // The whole height of the window, folded or not.
+                        // Laid out at the width it will have once the list
+                        // has moved, and clipped to what shows: its web view
+                        // is not resized on every frame (no blank strip); a
+                        // resize by the divider does resize it.
+                        child: LayoutBuilder(builder: (context, box) {
+                          final resizing =
+                              dragging != null && !shell.listCollapsed.value;
+                          final target = shell.listCollapsed.value
+                              ? room
+                              : room - full - 1;
+                          final w = resizing ? box.maxWidth : target;
+                          return ClipRect(
+                            child: OverflowBox(
+                              alignment: Alignment.centerLeft,
+                              minWidth: w,
+                              maxWidth: w,
+                              child: _Pane(
+                                  removeLeft: !gone, child: widget.detail),
+                            ),
+                          );
+                        }),
                       ),
                     ],
                   ),
                 ),
-                if (!gone)
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: shown,
-                    child: ClipRect(
-                      child: OverflowBox(
-                        alignment: Alignment.bottomRight,
-                        minHeight: 0,
-                        minWidth: listFull,
-                        maxWidth: listFull,
-                        child: widget.bar,
-                      ),
-                    ),
-                  )
-                else
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints:
-                            const BoxConstraints(maxWidth: compactBarWidth),
-                        child: Material(
-                          elevation: 6,
-                          color: context.appColors.barSurface,
-                          clipBehavior: Clip.antiAlias,
-                          shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.vertical(
-                                  top: Radius.circular(16))),
-                          child: widget.bar,
-                        ),
-                      ),
+                // Flush at the bottom of the list pane, its width; its own
+                // colour runs under the system navigation. No top: it is
+                // as high as its buttons, never the pane's height.
+                Positioned(
+                  left: shown - listFull,
+                  bottom: 0,
+                  width: listFull,
+                  child: Offstage(
+                    offstage: gone,
+                    child: TickerMode(
+                      enabled: !gone,
+                      child: ExcludeFocus(excluding: gone, child: widget.bar),
                     ),
                   ),
+                ),
                 _PaneHandle(
                   at: shown,
                   collapsed: shell.listCollapsed.value,
@@ -999,47 +972,6 @@ class _SplitPanesState extends State<_SplitPanes>
         },
       );
     });
-  }
-}
-
-/// The widest the compact bar over the pages gets (list pane folded).
-const compactBarWidth = 420.0;
-
-/// The detail pane's room: all of the window's height, except that with the
-/// list folded ([folded] 1) it ends above the compact bar, and then sees the
-/// keyboard minus the bar's height (the keyboard covers the bar).
-class _DetailInset extends StatelessWidget {
-  final ValueListenable<double> barHeight;
-  final double folded;
-  final Widget child;
-
-  const _DetailInset(
-      {required this.barHeight, required this.folded, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
-    return ValueListenableBuilder<double>(
-      valueListenable: barHeight,
-      child: child,
-      builder: (context, bar, child) {
-        final reserved = bar * folded;
-        return Padding(
-          padding: EdgeInsets.only(bottom: reserved),
-          child: MediaQuery(
-            data: media.copyWith(
-              padding: media.padding
-                  .copyWith(bottom: media.padding.bottom * (1 - folded)),
-              viewPadding: media.viewPadding
-                  .copyWith(bottom: media.viewPadding.bottom * (1 - folded)),
-              viewInsets: media.viewInsets.copyWith(
-                  bottom: math.max(0, media.viewInsets.bottom - reserved)),
-            ),
-            child: child!,
-          ),
-        );
-      },
-    );
   }
 }
 
