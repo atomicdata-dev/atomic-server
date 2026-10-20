@@ -106,15 +106,42 @@ SHOTS_DIR=/tmp/claude-0/kotlin-shots ./gradlew testDebugUnitTest -Proborazzi.tes
 then start the app: it makes 30 documents/folders, opens each once, adds three
 AI chats and three favorites (`DebugSeed`, compiled out of release).
 
-## Status (stage 1 and 2)
+## Account, sync and settings (stage 3)
 
-Done: store init (once per process, recovery), agent + drive first run, drives,
-recents, AI chats, favorites, messages, live search, store event callback, Home
-screen with Show all, tablet split layout, resource view in the warm WebView
-(stage 2; only checked by JVM tests and a successful build, not run on a device
-or emulator). Not built: AI chat, native chat-room screens (`openNative` answers
-no, so the page draws them), settings page (`path=`), conversations, sync/server connection, settings (avatar is a
-placeholder), pairing. Messages show unknown names for other agents until a
-server is connected. The crate copies the store-opening glue from
-`flutter/rust` because `atomic_flutter_rust` has no `rlib` and cannot be a
-dependency.
+```
+Kotlin  AccountFlow (start-up, sign-in, find the drive)   SettingsModel   PairModel
+           |  Backend interface (CoreBackend = UniFFI; FakeBackend in the JVM tests)
+Rust    session.rs (resume)   sync/ws.rs (WebSocket, reconnects)   sync/peers.rs (Iroh, pkarr, push)
+        sync/discovery.rs (home server, /server, /drive-usage)   pairing.rs   sync_api.rs (exports)
+```
+
+- **The store keeps the active drive, not the agent.** `Db::default_agent` is in
+  memory, so `SessionStore` keeps the secret (AES-GCM key in the Android Keystore,
+  `session/`) and `resume_session` / `resume_agent` loads it on every start. Without
+  it every start was a first run with a new agent.
+- Local writes (Home, the embedded page) go through the real pusher
+  (`state::RealPusher`: outbox drain over WS, live peers, paired devices), not `NoPush`.
+- `sync/ws.rs` and `sync/peers.rs` are copied from `flutter/rust/src/api/simple*`
+  (not a dependency, see above); the WS session additionally reconnects with a 2 s to
+  60 s backoff. All HTTPS goes through `atomic_lib::client`, whose TLS is
+  `lib/src/client/tls.rs`.
+- Screens: login (create, secret to save, sign in with a secret, sync your drive),
+  settings behind the avatar (agent, workspace switcher, this device, servers, paired
+  devices, sync status), pairing (own QR drawn with ZXing, camera frames read with
+  CameraX + ZXing, or a pasted node id), edit profile, store recovery, store-open and
+  startup failures. Components: `SettingsRow`, `AtomicDialog`, `SettingsGroup`,
+  `ErrorBox`, `AtomicScaffold` (`ui/Components.kt`).
+- The manifest now has INTERNET and CAMERA (it had neither); a FileProvider shares
+  the damaged store file.
+- The warm WebView is laid out at screen size before the page loads and gets
+  MATCH_PARENT params when shown (a 0 x 0 view made `100dvh` 0 and the page body blank).
+
+## Status (stages 1 to 3)
+
+Done and checked only by `cargo test`, JVM tests and a successful build (nothing was
+run on a device or emulator here): store init, agent persistence, first run, sign in,
+drives, Home, resource view, settings, servers, pairing, profile, recovery screens.
+
+Not built: signing in with an atomic.place account (portal, AI credits, Cloud Vault
+rows), agent pictures (emoji or initial only), AI chat, native chat rooms,
+conversations screens. Names of other agents come from the connected server.
