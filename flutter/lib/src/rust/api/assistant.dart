@@ -108,6 +108,51 @@ Future<String> readChat({required String subject}) =>
 Future<String> readChatRoom({required String subject}) =>
     RustLib.instance.api.crateApiAssistantReadChatRoom(subject: subject);
 
+/// A window of an AI chat: JSON `{entries, older, newest}`, `entries` as
+/// [`read_chat`] gives them (oldest first), `older` the cursor of the window
+/// before (null at the start of the chat), `newest` the cursor of the last
+/// entry (null for an empty chat).
+Future<String> readChatPage(
+        {required String subject, String? before, required int limit}) =>
+    RustLib.instance.api.crateApiAssistantReadChatPage(
+        subject: subject, before: before, limit: limit);
+
+/// The entries of an AI chat after the `after` cursor: JSON `{entries,
+/// newest, more}`, `newest` the cursor for the next call, `more` when
+/// `limit` cut the list.
+Future<String> readChatAfter(
+        {required String subject, required String after, required int limit}) =>
+    RustLib.instance.api.crateApiAssistantReadChatAfter(
+        subject: subject, after: after, limit: limit);
+
+/// A window of a meeting or chat room: JSON `{messages, older, newest}`,
+/// `messages` as [`read_chat_room`] gives them. See [`read_chat_page`].
+Future<String> readChatRoomPage(
+        {required String subject, String? before, required int limit}) =>
+    RustLib.instance.api.crateApiAssistantReadChatRoomPage(
+        subject: subject, before: before, limit: limit);
+
+/// The messages of a meeting or chat room after `after`: JSON `{messages,
+/// newest, more}`. See [`read_chat_after`].
+Future<String> readChatRoomAfter(
+        {required String subject, required String after, required int limit}) =>
+    RustLib.instance.api.crateApiAssistantReadChatRoomAfter(
+        subject: subject, after: after, limit: limit);
+
+/// A window of a conversation: JSON `{messages, older, newest}`, `messages`
+/// as [`read_conversation`] gives them; only the window is decrypted.
+Future<String> readConversationPage(
+        {required String subject, String? before, required int limit}) =>
+    RustLib.instance.api.crateApiAssistantReadConversationPage(
+        subject: subject, before: before, limit: limit);
+
+/// The messages of a conversation after `after`: JSON `{messages, newest,
+/// more}`.
+Future<String> readConversationAfter(
+        {required String subject, required String after, required int limit}) =>
+    RustLib.instance.api.crateApiAssistantReadConversationAfter(
+        subject: subject, after: after, limit: limit);
+
 /// Post `text` in a meeting or chat room as this device's agent, as the web
 /// app does, so web clients show it. `reply_to` is the `id` of the message it
 /// answers. Returns the entry's id (`<page>#<key>`).

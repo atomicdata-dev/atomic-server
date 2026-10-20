@@ -179,6 +179,102 @@ pub async fn read_chat_room(subject: String) -> Result<String, String> {
     to_json(&chat_rooms().read(db()?, &subject).await.map_err(err)?)
 }
 
+// ── Windows of long chats ────────────────────────────────────────────────
+//
+// A chat can hold hundreds of thousands of messages. The chat screens read it
+// in windows: `*_page(subject, None, 50)` for the newest 50, then
+// `*_page(subject, older, 50)` with the `older` cursor of the window before
+// as the person scrolls up, and `*_after(subject, newest, limit)` to pick up
+// what arrived since (a poll). Cursors are opaque strings; each call reads
+// only what its window covers.
+
+/// A window of an AI chat: JSON `{entries, older, newest}`, `entries` as
+/// [`read_chat`] gives them (oldest first), `older` the cursor of the window
+/// before (null at the start of the chat), `newest` the cursor of the last
+/// entry (null for an empty chat).
+pub async fn read_chat_page(
+    subject: String,
+    before: Option<String>,
+    limit: u32,
+) -> Result<String, String> {
+    to_json(
+        &chats::read_chat_page(db()?, &subject, before.as_deref(), limit as usize)
+            .await
+            .map_err(err)?,
+    )
+}
+
+/// The entries of an AI chat after the `after` cursor: JSON `{entries,
+/// newest, more}`, `newest` the cursor for the next call, `more` when
+/// `limit` cut the list.
+pub async fn read_chat_after(subject: String, after: String, limit: u32) -> Result<String, String> {
+    to_json(
+        &chats::read_chat_after(db()?, &subject, &after, limit as usize)
+            .await
+            .map_err(err)?,
+    )
+}
+
+/// A window of a meeting or chat room: JSON `{messages, older, newest}`,
+/// `messages` as [`read_chat_room`] gives them. See [`read_chat_page`].
+pub async fn read_chat_room_page(
+    subject: String,
+    before: Option<String>,
+    limit: u32,
+) -> Result<String, String> {
+    to_json(
+        &chat_rooms()
+            .read_page(db()?, &subject, before.as_deref(), limit as usize)
+            .await
+            .map_err(err)?,
+    )
+}
+
+/// The messages of a meeting or chat room after `after`: JSON `{messages,
+/// newest, more}`. See [`read_chat_after`].
+pub async fn read_chat_room_after(
+    subject: String,
+    after: String,
+    limit: u32,
+) -> Result<String, String> {
+    to_json(
+        &chat_rooms()
+            .read_after(db()?, &subject, &after, limit as usize)
+            .await
+            .map_err(err)?,
+    )
+}
+
+/// A window of a conversation: JSON `{messages, older, newest}`, `messages`
+/// as [`read_conversation`] gives them; only the window is decrypted.
+pub async fn read_conversation_page(
+    subject: String,
+    before: Option<String>,
+    limit: u32,
+) -> Result<String, String> {
+    to_json(
+        &conversations()
+            .read_page(db()?, &subject, before.as_deref(), limit as usize)
+            .await
+            .map_err(err)?,
+    )
+}
+
+/// The messages of a conversation after `after`: JSON `{messages, newest,
+/// more}`.
+pub async fn read_conversation_after(
+    subject: String,
+    after: String,
+    limit: u32,
+) -> Result<String, String> {
+    to_json(
+        &conversations()
+            .read_after(db()?, &subject, &after, limit as usize)
+            .await
+            .map_err(err)?,
+    )
+}
+
 /// Post `text` in a meeting or chat room as this device's agent, as the web
 /// app does, so web clients show it. `reply_to` is the `id` of the message it
 /// answers. Returns the entry's id (`<page>#<key>`).
