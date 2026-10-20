@@ -1,10 +1,11 @@
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'src/rust/frb_generated.dart';
 import 'package:atomic_chat/atomic_chat.dart'
-    show AppShell, AppThemeMode, ChatsScreen, ToastController, ToastHost, ToastSeverity, defaultAttachmentPicker;
+    show AppShell, AppThemeMode, ChatsScreen, ToastController, ToastHost, defaultAttachmentPicker;
 import 'assistant/atomic_assistant_api.dart';
 import 'assistant/file_attachment_picker.dart';
 import 'bootstrap.dart';
@@ -18,6 +19,7 @@ import 'package:atomic_flutter/atomic_flutter.dart' show Perf;
 import 'theme.dart';
 import 'atomic/atomic_client.dart';
 import 'atomic/session.dart';
+import 'atomic/sync_notice_policy.dart';
 
 void main() async {
   Perf.start();
@@ -102,6 +104,12 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     // The theme chosen on the settings page (the embedded web page).
     AppThemeMode.mode.addListener(_themeChanged);
+    SharedPreferences.getInstance().then((p) {
+      final ms = p.getInt(SyncNoticePolicy.prefsKey);
+      if (ms != null) {
+        _syncNotice.lastShown = DateTime.fromMillisecondsSinceEpoch(ms);
+      }
+    }, onError: (Object e) => debugPrint('Reading the notice time failed: $e'));
     _handleInitialLink();
     _linkChannel.setMethodCallHandler(_handleLinkCall);
     _networkChannel.setMethodCallHandler((call) async {
@@ -157,6 +165,7 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
       AtomicClient.flushDb().catchError(
           (Object e) => debugPrint('Flushing the store failed: $e'));
     }
+    _inForeground = state == AppLifecycleState.resumed;
     if (state == AppLifecycleState.resumed && _loggedIn) {
       _resumeFromSession();
       _startBackgroundSync();
@@ -220,28 +229,28 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
     _startBackgroundSync();
   }
 
-  /// Background sync is quiet about a single failure: a cold radio or a
-  /// device waking from sleep times out once and works on the retry. It
-  /// retries on its own with growing waits and speaks (one small toast, which
-  /// the controller keeps unique and quiet for a while after dismissal) only
-  /// from the [_toastAfterFailures]th failure in a row.
-  static const _toastAfterFailures = 2;
+  /// Background sync retries on its own and is nearly always silent: a cold
+  /// radio or a sleeping device fails once and works on the retry. Only a long
+  /// stretch without reaching any device earns one calm notice (see
+  /// [SyncNoticePolicy]); the details live on the Sync page.
   static const _syncToastKey = 'sync:error';
+  late final _syncNotice = SyncNoticePolicy(
+    onShown: (at) => SharedPreferences.getInstance().then(
+      (p) => p.setInt(SyncNoticePolicy.prefsKey, at.millisecondsSinceEpoch),
+      onError: (Object e) => debugPrint('Saving the notice time failed: $e'),
+    ),
+  );
+  bool _inForeground = true;
 
   void _syncFailed(String message) {
     _syncFailures++;
+    // The raw detail is for developers; the Sync page has the status.
     debugPrint('Background sync failed ($_syncFailures in a row): $message');
-    if (_syncFailures >= _toastAfterFailures) {
+    if (_syncNotice.failed(inForeground: _inForeground)) {
       _toasts.show(
         _syncToastKey,
-        message,
-        severity: ToastSeverity.error,
-        icon: Icons.sync_problem,
-        actionLabel: 'Retry',
-        onAction: () {
-          _syncFailures = 0;
-          _startBackgroundSync();
-        },
+        "Couldn't sync right now. We'll keep trying.",
+        icon: Icons.sync,
       );
     }
     _scheduleSyncRetry();
@@ -249,6 +258,7 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
 
   void _syncSucceeded() {
     _syncFailures = 0;
+    _syncNotice.succeeded();
     _syncRetry?.cancel();
     _toasts.resolve(_syncToastKey);
   }
@@ -293,6 +303,7 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
   void _signedOut() {
     _syncRetry?.cancel();
     _syncFailures = 0;
+    _syncNotice.reset();
     setState(() {
       _loggedIn = false;
     });
