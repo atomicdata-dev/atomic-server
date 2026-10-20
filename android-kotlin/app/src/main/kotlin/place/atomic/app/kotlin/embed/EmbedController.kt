@@ -10,6 +10,8 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.view.View
+import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
@@ -71,15 +73,20 @@ class EmbedController(
         warm()
         val view = webView!!
         holder?.baseContext = activity
-        (view.parent as? android.view.ViewGroup)?.removeView(view)
+        (view.parent as? ViewGroup)?.removeView(view)
+        // Without parameters the holder adds it as wrap_content, which for a
+        // page whose height is `100dvh - …` is no height at all.
+        view.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         view.onResume()
+        // The page measured its viewport while it was away; tell it the real one.
+        view.post { view.evaluateJavascript("window.dispatchEvent(new Event('resize'))", null) }
         return view
     }
 
     /** The screen is gone: the view stays alive for the next resource. */
     fun detach() {
         val view = webView ?: return
-        (view.parent as? android.view.ViewGroup)?.removeView(view)
+        (view.parent as? ViewGroup)?.removeView(view)
         holder?.baseContext = appContext
         view.onPause()
     }
@@ -102,6 +109,7 @@ class EmbedController(
             WebView.setWebContentsDebuggingEnabled(true)
         }
         view.setBackgroundColor(Color.TRANSPARENT)
+        giveScreenSize(view)
         view.settings.apply {
             javaScriptEnabled = true
             // The page's own settings (theme, locale) live in localStorage.
@@ -127,6 +135,23 @@ class EmbedController(
         )
         view.loadUrl(EmbedAssets.PAGE_URL)
         return view
+    }
+
+    /**
+     * A WebView that was never attached is 0 x 0, and the page lays itself out
+     * for the viewport it loads in: `100dvh` and `visualViewport.height` were 0,
+     * so `main` computed to 0px and only the breadcrumb showed (Samsung Tab
+     * S9+). The Flutter host keeps its warm page at screen size. Lay the view
+     * out at the screen's size before the page loads; the screen then resizes it.
+     */
+    private fun giveScreenSize(view: WebView) {
+        val metrics = appContext.resources.displayMetrics
+        view.layoutParams = ViewGroup.LayoutParams(metrics.widthPixels, metrics.heightPixels)
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(metrics.widthPixels, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(metrics.heightPixels, View.MeasureSpec.EXACTLY),
+        )
+        view.layout(0, 0, metrics.widthPixels, metrics.heightPixels)
     }
 
     /** Only [EmbedProtocol.CHANNEL_NAME] is exposed to the page. */

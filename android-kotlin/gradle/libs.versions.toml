@@ -10,6 +10,8 @@ jna = "5.17.0"
 junit = "4.13.2"
 robolectric = "4.15.1"
 roborazzi = "1.50.0"
+camerax = "1.4.2"
+zxing = "3.5.3"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
@@ -26,6 +28,10 @@ compose-material3 = { module = "androidx.compose.material3:material3" }
 compose-material-icons = { module = "androidx.compose.material:material-icons-extended" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
+androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
+androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
+zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
 junit = { module = "junit:junit", version.ref = "junit" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }

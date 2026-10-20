@@ -1,23 +1,13 @@
 package place.atomic.app.kotlin.session
 
+import place.atomic.app.kotlin.MapKeyValue
+import place.atomic.app.kotlin.ReverseBox
+
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-
-class MapKeyValue(val map: MutableMap<String, String> = mutableMapOf()) : KeyValue {
-    override fun getString(key: String) = map[key]
-    override fun putString(key: String, value: String?) {
-        if (value == null) map.remove(key) else map[key] = value
-    }
-}
-
-/** Not secure, only reversible: proves the secret is not stored as it is. */
-class ReverseBox : SecretBox {
-    override fun seal(plain: String) = plain.reversed()
-    override fun open(sealed: String): String? = sealed.reversed()
-}
 
 class SessionStoreTest {
     private val drive = "did:ad:abc"

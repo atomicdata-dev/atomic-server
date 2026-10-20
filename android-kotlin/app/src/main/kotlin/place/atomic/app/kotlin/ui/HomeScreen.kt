@@ -221,23 +221,11 @@ private fun Empty(text: String) {
     Text(text, Modifier.padding(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 16.dp), color = MaterialTheme.atomic.textSecondary)
 }
 
-/** Placeholder for the settings page: the agent's initial in a circle. */
+/** The way into settings: the agent's initial in a circle. */
 @Composable
 private fun Avatar(name: String, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .padding(end = 12.dp)
-            .size(36.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer)
-            .clickable(onClick = onClick)
-            .testTag("avatar"),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            name.trim().take(1).uppercase().ifEmpty { "?" },
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
+    AgentAvatar(
+        name,
+        Modifier.padding(end = 12.dp).clickable(onClick = onClick).testTag("avatar"),
+    )
 }

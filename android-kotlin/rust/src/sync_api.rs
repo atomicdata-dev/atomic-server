@@ -246,3 +246,12 @@ pub async fn own_profile() -> CoreResult<OwnProfile> {
 pub async fn set_own_profile(name: String, description: String) -> CoreResult<()> {
     Ok(atomic_lib::host::own_profile::set_own_profile(&node()?, state::pusher().as_ref(), &name, &description, None).await?)
 }
+
+/// Whether the active drive is stored on this device (the sign-in is done).
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn drive_ready() -> bool {
+    match db() {
+        Ok(store) => session::drive_exists(store).await,
+        Err(_) => false,
+    }
+}

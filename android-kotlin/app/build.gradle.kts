@@ -77,6 +77,11 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     // UniFFI's Kotlin bindings load the Rust library through JNA.
     implementation("${libs.jna.get()}@aar")
+    // Pairing: QR scanning (CameraX frames decoded by ZXing, no Google Play services needed) and drawing this device's own code.
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.zxing.core)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 
