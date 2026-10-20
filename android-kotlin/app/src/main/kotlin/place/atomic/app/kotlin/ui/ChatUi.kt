@@ -1,6 +1,30 @@
 package place.atomic.app.kotlin.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.KeyboardDoubleArrowDown
+import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +42,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material3.Badge
@@ -28,7 +51,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -87,9 +109,13 @@ fun <T> ChatList(
     actions: ChatListActions,
     modifier: Modifier = Modifier,
     state: LazyListState = rememberLazyListState(),
+    /** An answer streams in at the end of [items]: see [FollowAnswer]. */
+    followAnswer: Boolean = false,
     row: @Composable (index: Int, item: T) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val follow = rememberFollowAnswer(state, followAnswer, items.lastOrNull()?.let(key), items.getOrNull(items.size - 2)?.let(key))
     val count = items.size
     val total by rememberUpdatedState(count)
     val onActions by rememberUpdatedState(actions)
@@ -123,6 +149,8 @@ fun <T> ChatList(
             modifier = Modifier.fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
         ) {
+            // Room below the answer, so the question can sit at the top with the answer growing under it.
+            if (follow.spacerPx > 0) item(key = "follow-spacer") { Spacer(Modifier.height(with(density) { follow.spacerPx.toDp() })) }
             items(count, key = { key(items[count - 1 - it]) }) { i ->
                 val index = count - 1 - i
                 val item = items[index]
@@ -141,30 +169,144 @@ fun <T> ChatList(
                 }
             }
         }
-        if (far || unseen > 0) {
-            JumpToLatest(
-                unseen,
-                Modifier.align(Alignment.BottomEnd).padding(12.dp),
-            ) {
-                actions.jumpToLatest()
-                scope.launch { state.scrollToItem(0) }
+        ScrollToBottomButton(
+            wanted = unseen > 0 || detached || far,
+            far = detached || far,
+            unseen = unseen,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp),
+        ) {
+            actions.jumpToLatest()
+            scope.launch { state.scrollToItem(0) }
+        }
+    }
+}
+
+/**
+ * Following an answer as it streams in (Flutter's `_settle`): the question sits
+ * at the top of the list with the answer growing under it ([spacerPx] is the room
+ * below); the list follows the growing answer at the bottom while the answer's top
+ * is in view; once the answer fills the screen its top is held there, so it can be
+ * read from its start. A person who drags the list takes over. Layout-driven, so it
+ * settles after every change of the sizes it watches.
+ */
+class FollowAnswer {
+    var spacerPx by mutableIntStateOf(0)
+    var following by mutableStateOf(false)
+    var pinned by mutableStateOf(false)
+}
+
+/** The smallest gap kept between the question and the top of the list. */
+private const val FOLLOW_GAP_PX = 32
+
+@Composable
+private fun rememberFollowAnswer(state: LazyListState, active: Boolean, answerKey: String?, questionKey: String?): FollowAnswer {
+    val follow = remember { FollowAnswer() }
+    val answer by rememberUpdatedState(answerKey)
+    val question by rememberUpdatedState(questionKey)
+    LaunchedEffect(state) {
+        state.interactionSource.interactions.collect { if (it is DragInteraction.Start) follow.following = false }
+    }
+    LaunchedEffect(active) {
+        if (!active) return@LaunchedEffect
+        follow.spacerPx = 0
+        follow.following = true
+        follow.pinned = false
+        var lastAnswer = -1
+        snapshotFlow {
+            val info = state.layoutInfo
+            val items = info.visibleItemsInfo
+            listOf(
+                items.firstOrNull { it.key == answer }?.size ?: -1,
+                items.firstOrNull { it.key == question }?.size ?: -1,
+                info.viewportEndOffset - info.viewportStartOffset,
+                follow.spacerPx,
+            )
+        }.distinctUntilChanged().collect {
+            if (!follow.following) return@collect
+            val info = state.layoutInfo
+            val items = info.visibleItemsInfo
+            val a = items.firstOrNull { it.key == answer } ?: return@collect
+            val q = items.firstOrNull { it.key == question }
+            val viewport = info.viewportEndOffset - info.viewportStartOffset - info.beforeContentPadding - info.afterContentPadding
+            val grew = if (lastAnswer < 0) 0 else a.size - lastAnswer
+            lastAnswer = a.size
+            if (!follow.pinned) {
+                if (q != null && state.firstVisibleItemIndex <= 1) {
+                    val want = maxOf(0, viewport - FOLLOW_GAP_PX - (q.size + a.size))
+                    if (kotlin.math.abs(want - follow.spacerPx) > 1) {
+                        follow.spacerPx = want
+                        return@collect
+                    }
+                }
+                // The answer's top has reached the top of the list: hold it there.
+                if (a.offset + a.size >= info.viewportEndOffset - info.afterContentPadding - 1) follow.pinned = true
+            } else if (grew > 0) {
+                state.scrollBy(grew.toFloat())
+            }
+        }
+    }
+    return follow
+}
+
+/**
+ * The one "back to the newest message" button of every chat list (Flutter's
+ * `ScrollToBottomButton`): a small round button at the bottom right over the
+ * list, shown only while the list is not at the bottom. It scales and fades in
+ * with a little overshoot, hops once (also when a new message comes in while it
+ * shows), has a double arrow when the newest is further than a screen away, counts
+ * [unseen] messages on a badge, and shrinks away when the list reaches the bottom.
+ */
+@Composable
+fun ScrollToBottomButton(wanted: Boolean, far: Boolean, unseen: Int, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val show = remember { Animatable(if (wanted) 1f else 0f) }
+    val hop = remember { Animatable(0f) }
+    val lastUnseen = remember { mutableIntStateOf(unseen) }
+    LaunchedEffect(wanted) {
+        if (wanted) {
+            launch { hop.snapTo(0f); hop.animateTo(1f, tween(520)) }
+            show.animateTo(1f, spring(dampingRatio = 0.5f, stiffness = 600f))
+        } else {
+            show.animateTo(0f, tween(140))
+        }
+    }
+    LaunchedEffect(unseen) {
+        if (unseen > lastUnseen.intValue && wanted) {
+            hop.snapTo(0f)
+            hop.animateTo(1f, tween(520))
+        }
+        lastUnseen.intValue = unseen
+    }
+    if (show.value <= 0.01f && !wanted) return
+    val haptic = LocalHapticFeedback.current
+    val atomic = MaterialTheme.colorScheme
+    val label = if (unseen > 0) "$unseen new messages" else "Scroll to newest"
+    // 48 dp to hit, 40 dp to see.
+    Box(
+        modifier
+            .size(48.dp)
+            .graphicsLayer { scaleX = show.value; scaleY = show.value; alpha = show.value.coerceIn(0f, 1f) }
+            .semantics { contentDescription = label }
+            .clickable(enabled = wanted, role = Role.Button) { haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); onClick() }
+            .testTag("scroll-to-bottom"),
+        contentAlignment = Alignment.Center,
+    ) {
+        BadgedBox(badge = { if (unseen > 0) Badge { Text(if (unseen > 99) "99+" else "$unseen") } }) {
+            Surface(Modifier.size(40.dp), shape = CircleShape, color = atomic.primaryContainer, shadowElevation = 2.dp) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        if (far) Icons.Outlined.KeyboardDoubleArrowDown else Icons.Outlined.KeyboardArrowDown,
+                        contentDescription = null,
+                        Modifier.size(22.dp).offset { IntOffset(0, (3.dp.toPx() * hopCurve(hop.value)).roundToInt()) },
+                        tint = atomic.onPrimaryContainer,
+                    )
+                }
             }
         }
     }
 }
 
-@Composable
-fun JumpToLatest(unseen: Int, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    SmallFloatingActionButton(onClick, modifier.testTag("jump-to-latest")) {
-        if (unseen > 0) {
-            BadgedBox(badge = { Badge { Text(if (unseen > 99) "99+" else "$unseen") } }) {
-                Icon(Icons.Outlined.ArrowDownward, contentDescription = "$unseen new")
-            }
-        } else {
-            Icon(Icons.Outlined.ArrowDownward, contentDescription = "Jump to latest")
-        }
-    }
-}
+/** 0 -> 1 -> 0 over the hop. */
+internal fun hopCurve(t: Float): Float = if (t <= 0f || t >= 1f) 0f else if (t < 0.4f) t / 0.4f else (1f - t) / 0.6f
 
 /** A day separator line. */
 @Composable

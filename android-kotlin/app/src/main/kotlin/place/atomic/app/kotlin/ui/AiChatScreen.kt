@@ -149,6 +149,7 @@ private fun Body(state: AiChatState, actions: AiChatActions) {
         unseen = state.window.unseen,
         actions = actions.list,
         modifier = Modifier.fillMaxSize(),
+        followAnswer = state.sending,
     ) { _, entry -> MessageRow(entry, entry.id == "partial", actions.onOpenLink) }
 }
 
