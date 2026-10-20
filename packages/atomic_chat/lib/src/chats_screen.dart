@@ -42,6 +42,12 @@ typedef _Fold = ({
 
 typedef _Recent = ({String drive, RecentResource resource});
 
+/// How an activity row says what happened (`kind` as the host names it).
+String activityVerb(String kind) => switch (kind) {
+      'changed' => 'edited',
+      _ => kind,
+    };
+
 /// Home screen: one scrollable page of small sections (Drives, Recents, Activity,
 /// AI Chats), each with its newest few items and a "Show all" for the rest. A
 /// section is one [_Section]; adding another is one more entry in the list.
@@ -241,10 +247,21 @@ class _ChatsScreenState extends State<ChatsScreen> {
       ..sort((a, b) => b.resource.openedAt.compareTo(a.resource.openedAt));
   }
 
-  /// The activity feed; its rows do not carry the resources' own icons, so
-  /// those are looked up after the list is out (never blocking it).
+  /// The activity feed: what other members changed in the person's drives
+  /// (the host leaves out the person's own changes; those are Recents). Its
+  /// rows do not carry the resources' own icons, so those are looked up after
+  /// the list is out (never blocking it).
   Future<List<ActivityEntry>> _loadActivity() async {
-    final list = await widget.api.activity(_maxActivity);
+    final all = await widget.api.activity(_maxActivity);
+    final drives = await _drives.then(
+        (ds) => {for (final d in ds) driveKey(d.subject)},
+        onError: (Object _) => <String>{});
+    final list = drives.isEmpty
+        ? all
+        : [
+            for (final a in all)
+              if (drives.contains(driveKey(a.drive))) a
+          ];
     widget.api.resourceIcons([for (final a in list) a.subject]).then((icons) {
       if (mounted && !_sameIcons(icons)) setState(() => _icons = icons);
     }).catchError((Object _) {});
@@ -432,14 +449,15 @@ class _ChatsScreenState extends State<ChatsScreen> {
     );
   }
 
-  /// `<who> created/changed/deleted · <when>`. A deleted resource is gone, so
+  /// `<who> created/edited/deleted · <when>`. A deleted resource is gone, so
   /// its row is not tappable.
   Widget _activityRow(ActivityEntry a) => ResourceRow(
         subject: a.subject,
         icon: iconForClass(a.className),
         emoji: _icons[a.subject],
         title: a.name.isEmpty ? a.subject : a.name,
-        detail: '${a.actor ?? 'Someone'} ${a.kind} · ${timeAgo(a.at.toInt())}',
+        detail: '${a.actor ?? 'Unknown member'} ${activityVerb(a.kind)} · '
+            '${timeAgo(a.at.toInt())}',
         onTap: a.kind == 'deleted'
             ? null
             : () {
@@ -517,7 +535,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
           title: id.title,
           fold: fold,
           future: _activity,
-          empty: 'No activity yet',
+          empty: 'No activity from others yet',
           rows: (list) => [for (final a in list) _activityRow(a)],
           onShowAll: (list) => _push(_ListPage(title: id.title, children: [
             for (final a in list.take(_maxActivity)) _activityRow(a),

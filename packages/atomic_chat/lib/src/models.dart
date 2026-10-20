@@ -79,7 +79,8 @@ typedef RecentResource = ({
   String? emoji
 });
 
-/// One change in the activity feed.
+/// One change in the activity feed: something another member did (the
+/// person's own changes are not activity; they show in Recents).
 class ActivityEntry {
   final String subject;
   final String drive;
@@ -90,8 +91,8 @@ class ActivityEntry {
   /// Unix ms.
   final int at;
 
-  /// Display name of the agent that did it; null when the store does not
-  /// know who, or does not have that agent's resource.
+  /// Display name of the member that did it: their name, or the start of
+  /// their key (`a3f9…`) while it is not known; null only from an older host.
   final String? actor;
   final String name;
   final String className;
