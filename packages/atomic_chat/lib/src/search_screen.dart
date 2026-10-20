@@ -15,16 +15,54 @@ import 'resource_row.dart';
 import 'native_views.dart';
 import 'list_and_field.dart';
 
+/// What a search looks for: anything, or one kind (a home section's search).
+enum SearchKind {
+  any('', 'Search', 'Recently opened'),
+  drives('Drives', 'Search drives', 'Drives'),
+  chats('AI chats', 'Search AI chats', 'AI chats'),
+  messages('Messages', 'Search messages', 'Messages');
+
+  /// The chip next to the field; empty for [any].
+  final String label;
+  final String hint;
+
+  /// The heading over what is listed before anything is typed.
+  final String heading;
+
+  const SearchKind(this.label, this.hint, this.heading);
+
+  /// Whether a resource of [className] (a shortname or class URL) is of this
+  /// kind.
+  bool matches(String className) {
+    final key = className
+        .split(RegExp(r'[/#]'))
+        .last
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]'), '');
+    return switch (this) {
+      any => true,
+      drives => key == 'drive',
+      chats => key == 'aichat',
+      messages => key == 'conversation' || key == 'chatroom',
+    };
+  }
+}
+
 /// Type-ahead search over every drive; a hit opens in its own drive. [drive]
 /// is only the fallback for what has no drive of its own.
 ///
 /// With [scopeDrive] it searches that drive only (and lists only its recently
 /// opened resources), said next to the field with a way back to every drive.
 /// The scope belongs to this opening of the screen.
+///
+/// With a [kind] other than [SearchKind.any] only resources of that kind are
+/// listed (before anything is typed: all of them), said in a chip next to the
+/// field with a way back to everything.
 class SearchScreen extends StatefulWidget {
   final AssistantApi api;
   final String drive;
   final String? scopeDrive;
+  final SearchKind kind;
 
   /// What the field starts with (a search that moved to the list pane, or
   /// back, when the window changed size).
@@ -35,6 +73,7 @@ class SearchScreen extends StatefulWidget {
     required this.drive,
     required this.api,
     this.scopeDrive,
+    this.kind = SearchKind.any,
     this.initialQuery = '',
   });
 
@@ -44,6 +83,7 @@ class SearchScreen extends StatefulWidget {
     required String drive,
     required AssistantApi api,
     String? scopeDrive,
+    SearchKind kind = SearchKind.any,
     String initialQuery = '',
     RouteSettings? settings,
   }) =>
@@ -54,6 +94,7 @@ class SearchScreen extends StatefulWidget {
                 drive: drive,
                 api: api,
                 scopeDrive: scopeDrive,
+                kind: kind,
                 initialQuery: initialQuery)),
         transitionDuration: const Duration(milliseconds: 140),
         reverseTransitionDuration: const Duration(milliseconds: 110),
@@ -108,6 +149,13 @@ class _SearchModel extends ChangeNotifier {
   /// The one drive searched, or null for all of them.
   String? scope;
 
+  /// What is looked for.
+  SearchKind kind = SearchKind.any;
+
+  /// Every resource of [kind] (not [SearchKind.any]), listed before anything
+  /// is typed; null until read.
+  List<_Item>? ofKind;
+
   void changed() => notifyListeners();
 }
 
@@ -117,12 +165,14 @@ class _SearchScreenState extends State<SearchScreen> {
   late final TextEditingController _text =
       TextEditingController(text: widget.initialQuery);
   final FocusNode _focus = FocusNode();
+  late final ValueNotifier<SearchKind> _hintKind = ValueNotifier(widget.kind);
 
   @override
   void initState() {
     super.initState();
     _shell = ShellScope.maybeOf(context);
     _model.scope = widget.scopeDrive;
+    _model.kind = widget.kind;
     final cache = _shell?.searchCache;
     if (cache != null) {
       _model.drives = cache.drives;
@@ -147,7 +197,11 @@ class _SearchScreenState extends State<SearchScreen> {
     final wasEmpty = _text.text.trim().isEmpty;
     _text.clear();
     _changed('');
-    if (wasEmpty && _model.scope != null) _clearScope();
+    if (wasEmpty && _model.kind != SearchKind.any) {
+      _clearKind();
+    } else if (wasEmpty && _model.scope != null) {
+      _clearScope();
+    }
     _showKeyboard();
   }
 
@@ -178,7 +232,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   /// The shell keeps the text and drive, for a search that moves between a
   /// page and the list pane.
-  void _remember() => _shell?.search = (query: _text.text, scope: _model.scope);
+  void _remember() => _shell?.search =
+      (query: _text.text, scope: _model.scope, kind: _model.kind);
 
   /// [recent] limited to the scope's drive, when there is one.
   List<({String drive, RecentResource resource})> _inScope(
@@ -206,9 +261,28 @@ class _SearchScreenState extends State<SearchScreen> {
     if (query.isNotEmpty) _changed(query);
   }
 
+  /// Back to every kind: the same screen, the query searched again.
+  void _clearKind() {
+    _model.kind = SearchKind.any;
+    _hintKind.value = SearchKind.any;
+    _model.ofKind = null;
+    _remember();
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      _shell?.setKind(
+          route,
+          _model.scope == null
+              ? ShellPage.search
+              : ShellPage.searchIn(_model.scope!));
+    }
+    _model.changed();
+  }
+
   /// A drive in the results is a filter, not a page: the search goes on
-  /// inside it. True when [subject] was taken as such.
+  /// inside it. True when [subject] was taken as such. Not when drives are
+  /// what is looked for: then a drive opens.
   bool _scopeToDrive(String subject, String className) {
+    if (_model.kind == SearchKind.drives) return false;
     final isDrive = className.split(RegExp(r'[/#]')).last == 'Drive' ||
         _model.drives.any((d) => _id(d.subject) == _id(subject));
     if (!isDrive || subject.isEmpty) return false;
@@ -238,7 +312,7 @@ class _SearchScreenState extends State<SearchScreen> {
       if (!mounted) return;
       _model.drives = drives;
       _model.changed();
-      await _loadRecent(drives);
+      await Future.wait([_loadRecent(drives), _loadKind()]);
     } catch (_) {
       // Only names and a convenience: the search itself still works.
     }
@@ -263,6 +337,55 @@ class _SearchScreenState extends State<SearchScreen> {
       if (scope == null) _shell?.searchCache = SearchCache(known, recent);
       if (!mounted || scope != _model.scope) return;
       _model.recent = recent;
+      _model.changed();
+    } catch (_) {
+      // Only a convenience: the search itself still works.
+    }
+  }
+
+  /// Every resource of the kind looked for, for the list before anything is
+  /// typed.
+  Future<void> _loadKind() async {
+    final kind = _model.kind;
+    try {
+      final List<_Item> items = switch (kind) {
+        SearchKind.any => const [],
+        SearchKind.drives => [
+            for (final d in _model.drives)
+              (
+                drive: d.subject,
+                shown: '',
+                subject: d.subject,
+                title: d.name.isEmpty ? 'Untitled drive' : d.name,
+                className: 'Drive',
+                emoji: d.emoji
+              )
+          ],
+        SearchKind.chats => [
+            for (final c in await widget.api.chats())
+              (
+                drive: widget.drive,
+                shown: '',
+                subject: c.subject,
+                title: c.name.isEmpty ? 'Untitled chat' : c.name,
+                className: 'ai-chat',
+                emoji: null
+              )
+          ],
+        SearchKind.messages => [
+            for (final c in await widget.api.conversations())
+              (
+                drive: widget.drive,
+                shown: '',
+                subject: c.resource.subject,
+                title: c.resource.title,
+                className: c.resource.className,
+                emoji: c.resource.emoji
+              )
+          ],
+      };
+      if (!mounted || kind != _model.kind) return;
+      _model.ofKind = items;
       _model.changed();
     } catch (_) {
       // Only a convenience: the search itself still works.
@@ -309,6 +432,7 @@ class _SearchScreenState extends State<SearchScreen> {
   void dispose() {
     _shell?.searchReset.removeListener(_startOver);
     _model.dispose();
+    _hintKind.dispose();
     _text.dispose();
     _focus.dispose();
     super.dispose();
@@ -380,31 +504,35 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   /// What is listed, best first: the first one is shown nearest the field.
-  List<_Item> get _items => _model.showsRecent
-      ? [
-          for (final (:drive, resource: r) in _model.recent)
-            (
-              drive: drive,
-              shown: drive,
-              subject: r.subject,
-              title: r.title,
-              className: r.className,
-              emoji: r.emoji
-            )
-        ]
-      : [
-          for (final h in _model.hits)
-            // Searching in a drive, the drive itself is not a hit.
-            if (_model.scope == null || _id(h.subject) != _id(_model.scope!))
-              (
-                drive: h.drive.isEmpty ? widget.drive : h.drive,
-                shown: h.drive,
-                subject: h.subject,
-                title: h.title,
-                className: h.className,
-                emoji: h.emoji
-              )
-        ];
+  List<_Item> get _items => _model.showsRecent && _model.kind != SearchKind.any
+      ? (_model.ofKind ?? const [])
+      : _model.showsRecent
+          ? [
+              for (final (:drive, resource: r) in _model.recent)
+                (
+                  drive: drive,
+                  shown: drive,
+                  subject: r.subject,
+                  title: r.title,
+                  className: r.className,
+                  emoji: r.emoji
+                )
+            ]
+          : [
+              for (final h in _model.hits)
+                // Searching in a drive, the drive itself is not a hit.
+                if ((_model.scope == null ||
+                        _id(h.subject) != _id(_model.scope!)) &&
+                    _model.kind.matches(h.className))
+                  (
+                    drive: h.drive.isEmpty ? widget.drive : h.drive,
+                    shown: h.drive,
+                    subject: h.subject,
+                    title: h.title,
+                    className: h.className,
+                    emoji: h.emoji
+                  )
+            ];
 
   /// Enter / the keyboard's search action opens the best hit.
   void _openBest() {
@@ -414,21 +542,42 @@ class _SearchScreenState extends State<SearchScreen> {
     _open(i.drive, i.subject, i.title, i.className);
   }
 
-  /// `In: <drive>` with a way back to every drive, while scoped.
+  /// `In: <drive>` with a way back to every drive, while scoped; the kind
+  /// looked for (`Drives`) with a way back to everything.
   Widget _scopeLabel(BuildContext context) {
     final scope = _model.scope;
+    final kind = _model.kind;
+    if (kind != SearchKind.any) {
+      return _chip(context,
+          key: const Key('search-kind'),
+          text: kind.label,
+          clear: 'Search everything',
+          onClear: _clearKind);
+    }
     if (scope == null) return const SizedBox.shrink();
-    final c = context.appColors;
     final name = _model.drives
             .where((d) => _id(d.subject) == _id(scope))
             .map((d) => d.name)
             .where((n) => n.isNotEmpty)
             .firstOrNull ??
         'this drive';
+    return _chip(context,
+        key: const Key('search-scope'),
+        text: 'In: $name',
+        clear: 'Search all drives',
+        onClear: _clearScope);
+  }
+
+  Widget _chip(BuildContext context,
+      {required Key key,
+      required String text,
+      required String clear,
+      required VoidCallback onClear}) {
+    final c = context.appColors;
     return Padding(
       padding: const EdgeInsets.only(left: 8),
       child: Container(
-        key: const Key('search-scope'),
+        key: key,
         padding: const EdgeInsets.only(left: 10),
         constraints: const BoxConstraints(maxWidth: 140),
         decoration: BoxDecoration(
@@ -440,18 +589,18 @@ class _SearchScreenState extends State<SearchScreen> {
           children: [
             Flexible(
               child: Text(
-                'In: $name',
+                text,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: c.mainSelectedFg, fontSize: 12),
               ),
             ),
             IconButton(
-              tooltip: 'Search all drives',
+              tooltip: clear,
               visualDensity: VisualDensity.compact,
               iconSize: 16,
               color: c.mainSelectedFg,
-              onPressed: _clearScope,
+              onPressed: onClear,
               icon: const Icon(Icons.close),
             ),
           ],
@@ -474,25 +623,28 @@ class _SearchScreenState extends State<SearchScreen> {
             Expanded(
               child: Builder(builder: (context) {
                 final c = context.appColors;
-                return TextField(
-                  controller: _text,
-                  focusNode: _focus,
-                  autofocus: true,
-                  textInputAction: TextInputAction.search,
-                  // Keeps the keyboard (and focus) after Enter.
-                  onEditingComplete: () {},
-                  onSubmitted: (_) => _openBest(),
-                  onChanged: _changed,
-                  decoration: InputDecoration(
-                    hintText: 'Search',
-                    filled: true,
-                    fillColor: c.bg1,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(9),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                );
+                // Only the hint follows the kind: typing rebuilds no field.
+                return ValueListenableBuilder<SearchKind>(
+                    valueListenable: _hintKind,
+                    builder: (context, kind, _) => TextField(
+                          controller: _text,
+                          focusNode: _focus,
+                          autofocus: true,
+                          textInputAction: TextInputAction.search,
+                          // Keeps the keyboard (and focus) after Enter.
+                          onEditingComplete: () {},
+                          onSubmitted: (_) => _openBest(),
+                          onChanged: _changed,
+                          decoration: InputDecoration(
+                            hintText: kind.hint,
+                            filled: true,
+                            fillColor: c.bg1,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(9),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ));
               }),
             ),
             ListenableBuilder(
@@ -517,7 +669,7 @@ class _SearchScreenState extends State<SearchScreen> {
         _model.hitsFor == _model.query) {
       return _nothingFound(c);
     }
-    final heading = _model.showsRecent && _model.recent.isNotEmpty;
+    final heading = _model.showsRecent && items.isNotEmpty;
     return ListView.builder(
       // Best first, drawn from the bottom up: nearest the thumb.
       reverse: true,
@@ -526,7 +678,7 @@ class _SearchScreenState extends State<SearchScreen> {
         if (n == items.length) {
           return Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Text('Recently opened',
+            child: Text(_model.kind.heading,
                 style: TextStyle(
                     color: c.textSecondary,
                     fontSize: 13,
@@ -549,7 +701,7 @@ class _SearchScreenState extends State<SearchScreen> {
             children: [
               Text(
                 'Nothing found for “${_model.query}”'
-                '${_model.scope == null ? '' : ' in this drive'}',
+                '${_model.kind != SearchKind.any ? ' in ${_model.kind.label}' : _model.scope == null ? '' : ' in this drive'}',
                 key: const Key('search-nothing-found'),
                 textAlign: TextAlign.center,
                 style: TextStyle(color: c.textSecondary),

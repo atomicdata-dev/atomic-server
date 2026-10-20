@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'covered_insets_freeze.dart';
 import 'app_bottom_bar.dart';
@@ -25,8 +26,27 @@ abstract final class ShellPage {
 
   /// A search in one drive is `search:<drive>`.
   static String searchIn(String drive) => '$search:$drive';
+
+  /// A search for one kind of resource is `search@<kind>`.
+  static String searchOf(SearchKind kind) =>
+      kind == SearchKind.any ? search : '$search@${kind.name}';
+
+  /// The page of a search in [scope] for [kind].
+  static String searchFor({String? scope, SearchKind kind = SearchKind.any}) =>
+      kind != SearchKind.any
+          ? searchOf(kind)
+          : scope == null
+              ? search
+              : searchIn(scope);
+
   static bool isSearch(String? kind) =>
-      kind == search || (kind?.startsWith('$search:') ?? false);
+      kind == search ||
+      (kind?.startsWith('$search:') ?? false) ||
+      (kind?.startsWith('$search@') ?? false);
+
+  /// The full list of a home section (its "All" button) is `list:<name>`.
+  static String listOf(String section) => 'list:$section';
+  static bool isList(String? kind) => kind?.startsWith('list:') ?? false;
 
   static const newChat = 'new-chat';
   static const voiceChat = 'voice-chat';
@@ -35,30 +55,27 @@ abstract final class ShellPage {
   static const settings = 'settings';
 }
 
-/// How the shell arranges itself for the width of the window.
+/// How the shell arranges itself for the width of the window. Both have the
+/// same bottom bar, the width of the window.
 enum ShellLayout {
-  /// A phone: the pages above a bottom bar.
+  /// A phone: the pages above the bottom bar.
   bar,
 
-  /// Wider (a small tablet, a phone sideways): a navigation rail at the
-  /// left instead of the bar, the pages beside it.
-  rail,
-
-  /// A tablet: the rail, the home (or search) as a list pane, and what is
-  /// opened from it in a detail pane next to it.
+  /// A tablet, a phone sideways: above the bar the home (or a search) as a
+  /// list pane, which folds away, and what is opened from it in a detail
+  /// pane next to it.
   split;
 
-  /// Widths (logical pixels) from which the [rail] and the [split] layouts
-  /// are used.
-  static const railWidth = 600.0;
-  static const splitWidth = 720.0;
+  /// The width (logical pixels) from which the [split] layout is used.
+  static const splitWidth = 600.0;
 
-  static ShellLayout forWidth(double width) => width >= splitWidth
-      ? split
-      : width >= railWidth
-          ? rail
-          : bar;
+  static ShellLayout forWidth(double width) =>
+      width >= splitWidth ? split : bar;
 }
+
+/// SharedPreferences keys of the list pane (per device).
+const listCollapsedKey = 'shell_list_collapsed';
+const listWidthKey = 'shell_list_width';
 
 /// Opens a page's menu; [anchor] is the bar button that asked, in global
 /// coordinates, so the menu opens at that button.
@@ -88,9 +105,48 @@ class ShellController extends ChangeNotifier {
   /// from a list), for the list to mark its row; null when none.
   final ValueNotifier<String?> selected = ValueNotifier(null);
 
-  /// The text and drive of the search that is open, so it survives a change
-  /// of layout (it moves between a page and the list pane).
-  ({String query, String? scope}) search = (query: '', scope: null);
+  /// The text, drive and kind of the search that is open, so it survives a
+  /// change of layout (it moves between a page and the list pane).
+  ({String query, String? scope, SearchKind kind}) search =
+      (query: '', scope: null, kind: SearchKind.any);
+
+  /// The list pane is folded away: the detail pane has the whole width.
+  /// Remembered per device ([listCollapsedKey]).
+  final ValueNotifier<bool> listCollapsed = ValueNotifier(false);
+
+  /// The list pane's width the person dragged it to; null: one that suits
+  /// the window. Remembered per device ([listWidthKey]).
+  final ValueNotifier<double?> listWidth = ValueNotifier(null);
+
+  /// Folds the list pane away, or brings it back.
+  void setListCollapsed(bool collapsed) {
+    if (listCollapsed.value == collapsed) return;
+    listCollapsed.value = collapsed;
+    _changed();
+    _savePrefs((p) => p.setBool(listCollapsedKey, collapsed));
+  }
+
+  void setListWidth(double width) {
+    listWidth.value = width;
+    _savePrefs((p) => p.setDouble(listWidthKey, width));
+  }
+
+  /// Reads the list pane's fold and width as this device left them.
+  Future<void> loadListPrefs() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      if (_disposed) return;
+      listCollapsed.value = p.getBool(listCollapsedKey) ?? false;
+      listWidth.value = p.getDouble(listWidthKey);
+      _changed();
+    } catch (_) {
+      // The defaults: shown, at a width that suits the window.
+    }
+  }
+
+  static void _savePrefs(Future<void> Function(SharedPreferences) write) {
+    SharedPreferences.getInstance().then(write).catchError((Object _) {});
+  }
 
   /// Counts taps on the Search button while a search is open (or was popped
   /// back to): the search on top empties its field ([resetSearch]).
@@ -99,7 +155,7 @@ class ShellController extends ChangeNotifier {
   /// The Search button again: the open search starts over (empty field, the
   /// keyboard up; its drive is kept unless the field was empty already).
   void resetSearch() {
-    search = (query: '', scope: search.scope);
+    search = (query: '', scope: search.scope, kind: search.kind);
     searchReset.value++;
   }
 
@@ -194,10 +250,14 @@ class ShellController extends ChangeNotifier {
   }
 
   /// Pushes [route]; next to the list it takes the place of what the detail
-  /// pane showed (a row opens there; it does not pile up).
-  Future<T?> _show<T>(NavigatorState navigator, Route<T> route) => split
-      ? navigator.pushAndRemoveUntil(route, (r) => r.isFirst)
-      : navigator.push(route);
+  /// pane showed (a row opens there; it does not pile up). A resource
+  /// ([overList]) opened from a section's full list ([ShellPage.isList])
+  /// goes over it, and back returns to the list.
+  Future<T?> _show<T>(NavigatorState navigator, Route<T> route,
+          {bool overList = false}) =>
+      split && !(overList && ShellPage.isList(topKind))
+          ? navigator.pushAndRemoveUntil(route, (r) => r.isFirst)
+          : navigator.push(route);
 
   /// Opens the page of a resource picked from a list (the home, search):
   /// pushed on a phone, in the detail pane next to the list. [subject] marks
@@ -212,19 +272,26 @@ class ShellController extends ChangeNotifier {
     // Next to the list the pane just shows it: no slide to wait for.
     final route = SlideBackRoute<T>(builder: builder, instant: split);
     if (subject != null) _details[route] = subject;
-    return _show(navigator, route);
+    return _show(navigator, route, overList: true);
   }
 
   /// Shows [kind] in the list pane ([ShellPage.home] or a search); only in
-  /// the split layout.
+  /// the split layout. A folded list pane comes back.
   void showList(String kind) {
+    setListCollapsed(false);
     if (list.value == kind) return;
     if (ShellPage.isSearch(kind)) {
+      final rest = kind == ShellPage.search
+          ? ''
+          : kind.substring(ShellPage.search.length + 1);
+      final ofKind = kind.startsWith('${ShellPage.search}@');
       search = (
         query: '',
-        scope: kind == ShellPage.search
-            ? null
-            : kind.substring(ShellPage.search.length + 1)
+        scope: ofKind || rest.isEmpty ? null : rest,
+        kind: ofKind
+            ? SearchKind.values
+                .firstWhere((k) => k.name == rest, orElse: () => SearchKind.any)
+            : SearchKind.any,
       );
     }
     list.value = kind;
@@ -314,6 +381,8 @@ class ShellController extends ChangeNotifier {
     _settling?.cancel();
     drive.dispose();
     list.dispose();
+    listCollapsed.dispose();
+    listWidth.dispose();
     selected.dispose();
     searchReset.dispose();
     super.dispose();
@@ -454,27 +523,13 @@ class _AppShellState extends State<AppShell> {
 
   final ValueNotifier<double> _barHeight = ValueNotifier(0);
 
+  /// The same bar in both layouts, the width of the window.
   late final Widget _bar =
       _FrozenBottomPadding(child: AppBottomBar(api: widget.api, shell: _shell));
 
-  /// Under the rail and the panes: the system's bottom inset (the gesture
-  /// handle, a taskbar) in the bar's colour, kept while the keyboard is up
-  /// as the bar is.
-  late final Widget _strip = const _FrozenBottomPadding(child: _BottomStrip());
-
-  late final Widget _rail = AppNavRail(api: widget.api, shell: _shell);
-
-  late final Widget _detail = _Pane(
-    removeLeft: true,
-    child: Stack(children: [
-      ..._spareUnderPages,
-      Positioned.fill(child: _navigator),
-      _DetailMore(shell: _shell),
-    ]),
-  );
-
-  /// The pages on a phone: the navigator, with the warm page under it.
-  late final Widget _phonePages = Stack(children: [
+  /// The pages: the navigator, with the warm page under it. The whole room
+  /// above the bar on a phone, the detail pane next to the list.
+  late final Widget _pages = Stack(children: [
     ..._spareUnderPages,
     Positioned.fill(child: _navigator),
   ]);
@@ -488,7 +543,6 @@ class _AppShellState extends State<AppShell> {
       ];
 
   late final Widget _listPane = _Pane(
-    removeLeft: true,
     removeRight: true,
     child: _ListPane(shell: _shell, api: widget.api, home: _home),
   );
@@ -502,6 +556,7 @@ class _AppShellState extends State<AppShell> {
         (widget.warmPool ?? WarmResourceWebView.forPlatform)(widget.api)
           ?..showAhead = _likelyNext
           ..warmUp();
+    _shell.loadListPrefs();
   }
 
   @override
@@ -531,8 +586,8 @@ class _AppShellState extends State<AppShell> {
     super.dispose();
   }
 
-  /// After a change of layout, a search moves between a page (bar, rail)
-  /// and the list pane (split), keeping its text and drive.
+  /// After a change of layout, a search moves between a page (bar) and the
+  /// list pane (split), keeping its text, drive and kind.
   void _relayout(ShellLayout from, ShellLayout to) {
     if (!mounted || _shell.layout != to) return;
     final navigator = _shell.navigatorKey.currentState;
@@ -561,6 +616,7 @@ class _AppShellState extends State<AppShell> {
               drive: _shell.drive.value,
               api: widget.api,
               scopeDrive: search.scope,
+              kind: search.kind,
               initialQuery: search.query,
               settings: settings));
     }
@@ -580,21 +636,9 @@ class _AppShellState extends State<AppShell> {
           .addPostFrameCallback((_) => _relayout(from, layout));
     }
     final Widget pages = switch (layout) {
-      ShellLayout.bar => _phonePages,
-      ShellLayout.rail => Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [_rail, Expanded(child: _detail)]),
-      ShellLayout.split => LayoutBuilder(
-          builder: (context, box) =>
-              Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            _rail,
-            SizedBox(
-                width: _listWidth(box.maxWidth - AppNavRail.width),
-                child: _listPane),
-            const _PaneDivider(),
-            Expanded(child: _detail),
-          ]),
-        ),
+      ShellLayout.bar => _pages,
+      ShellLayout.split =>
+        _SplitPanes(shell: _shell, list: _listPane, detail: _pages),
     };
     return ShellScope(
       controller: _shell,
@@ -621,9 +665,7 @@ class _AppShellState extends State<AppShell> {
             // The bar stays laid out at full height; the keyboard covers it
             // and the pages get the keyboard minus the bar's height.
             Expanded(child: _PagesInset(barHeight: _barHeight, child: pages)),
-            _MeasureHeight(
-                height: _barHeight,
-                child: layout == ShellLayout.bar ? _bar : _strip),
+            _MeasureHeight(height: _barHeight, child: _bar),
           ]),
         ),
       ),
@@ -632,8 +674,265 @@ class _AppShellState extends State<AppShell> {
 }
 
 /// The list pane's width next to the pages: about two fifths of the room,
-/// at least a phone's narrowest list and at most what a list needs.
-double _listWidth(double room) => (room * 0.4).clamp(280.0, 380.0);
+/// 320 to 400, or the width it was dragged to; the pages keep at least
+/// [_minDetail].
+double listPaneWidth(double room, {double? dragged}) {
+  final max = math.max(_minList, math.min(_maxDragged, room - _minDetail));
+  return (dragged ?? (room * 0.4).clamp(320.0, 400.0))
+      .clamp(_minList, max)
+      .toDouble();
+}
+
+const _minList = 280.0;
+const _maxDragged = 520.0;
+const _minDetail = 280.0;
+
+/// How long the list pane takes to fold away or come back.
+const listFoldDuration = Duration(milliseconds: 140);
+
+/// The list pane and the detail pane side by side, with the divider between
+/// them: a tap on its handle folds the list away (the pages get the whole
+/// width) or brings it back, a drag makes it wider or narrower, and a drag
+/// far to the left folds it. Both panes stay built while it moves.
+class _SplitPanes extends StatefulWidget {
+  final ShellController shell;
+  final Widget list;
+  final Widget detail;
+
+  const _SplitPanes({
+    required this.shell,
+    required this.list,
+    required this.detail,
+  });
+
+  @override
+  State<_SplitPanes> createState() => _SplitPanesState();
+}
+
+class _SplitPanesState extends State<_SplitPanes>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _open = AnimationController(
+    vsync: this,
+    duration: listFoldDuration,
+    value: widget.shell.listCollapsed.value ? 0 : 1,
+  );
+
+  /// The width while the divider is being dragged.
+  double? _dragging;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.shell.listCollapsed.addListener(_fold);
+  }
+
+  @override
+  void dispose() {
+    widget.shell.listCollapsed.removeListener(_fold);
+    _open.dispose();
+    super.dispose();
+  }
+
+  void _fold() {
+    final collapsed = widget.shell.listCollapsed.value;
+    _open.animateTo(collapsed ? 0 : 1, curve: Curves.easeOutCubic);
+  }
+
+  void _toggle() =>
+      widget.shell.setListCollapsed(!widget.shell.listCollapsed.value);
+
+  void _dragStart(double full) {
+    final collapsed = widget.shell.listCollapsed.value;
+    setState(() => _dragging = collapsed ? 0 : full);
+  }
+
+  void _dragUpdate(DragUpdateDetails d, double room) {
+    final w = _dragging;
+    if (w == null) return;
+    setState(() => _dragging = (w + d.delta.dx).clamp(0.0, room - _minDetail));
+  }
+
+  void _dragEnd(double room) {
+    final w = _dragging;
+    setState(() => _dragging = null);
+    if (w == null) return;
+    final shell = widget.shell;
+    if (w < _minList * 0.6) {
+      // From where the finger left it.
+      final full = listPaneWidth(room, dragged: shell.listWidth.value);
+      _open.value = (w / full).clamp(0.0, 1.0);
+      if (shell.listCollapsed.value) {
+        _open.animateTo(0, curve: Curves.easeOutCubic);
+      }
+      shell.setListCollapsed(true);
+      return;
+    }
+    shell.setListWidth(listPaneWidth(room, dragged: w));
+    _open.value = 1;
+    shell.setListCollapsed(false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final shell = widget.shell;
+    return LayoutBuilder(builder: (context, box) {
+      final room = box.maxWidth;
+      return ValueListenableBuilder<double?>(
+        valueListenable: shell.listWidth,
+        builder: (context, dragged, _) {
+          final full = listPaneWidth(room, dragged: dragged);
+          return AnimatedBuilder(
+            animation: _open,
+            builder: (context, _) {
+              final dragging = _dragging;
+              final listFull = dragging == null
+                  ? full
+                  : math.max(_minList, math.min(dragging, room - _minDetail));
+              final shown = dragging ?? full * _open.value;
+              final gone = shown <= 0.5;
+              return Stack(children: [
+                Positioned.fill(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(
+                        width: shown,
+                        // The list keeps its width while it slides away:
+                        // no row is laid out again on every frame.
+                        child: ClipRect(
+                          child: OverflowBox(
+                            alignment: Alignment.centerRight,
+                            minWidth: listFull,
+                            maxWidth: listFull,
+                            child: Offstage(
+                              offstage: gone,
+                              child: TickerMode(
+                                enabled: !gone,
+                                child: ExcludeFocus(
+                                  excluding: gone,
+                                  child: widget.list,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      _PaneDivider(shown: !gone),
+                      Expanded(
+                        child: _Pane(removeLeft: !gone, child: widget.detail),
+                      ),
+                    ],
+                  ),
+                ),
+                _PaneHandle(
+                  at: shown,
+                  collapsed: shell.listCollapsed.value,
+                  onTap: _toggle,
+                  onDragStart: () => _dragStart(full),
+                  onDragUpdate: (d) => _dragUpdate(d, room),
+                  onDragEnd: () => _dragEnd(room),
+                ),
+              ]);
+            },
+          );
+        },
+      );
+    });
+  }
+}
+
+/// The divider's handle: a small tab on the line, half-way down, with a
+/// chevron that says which way a tap folds the list. Along the whole line a
+/// strip takes drags (to resize); the tab is a full touch target.
+class _PaneHandle extends StatelessWidget {
+  /// Where the divider is (the list pane's width now).
+  final double at;
+  final bool collapsed;
+  final VoidCallback onTap;
+  final VoidCallback onDragStart;
+  final GestureDragUpdateCallback onDragUpdate;
+  final VoidCallback onDragEnd;
+
+  const _PaneHandle({
+    required this.at,
+    required this.collapsed,
+    required this.onTap,
+    required this.onDragStart,
+    required this.onDragUpdate,
+    required this.onDragEnd,
+  });
+
+  static const _strip = 16.0;
+  static const _tab = Size(24, 48);
+  static const _target = Size(48, 64);
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    // Folded, the tab sticks out of the left edge.
+    final x = math.max(at, _tab.width / 2);
+    Widget drag(Widget child) => GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onHorizontalDragStart: (_) => onDragStart(),
+          onHorizontalDragUpdate: onDragUpdate,
+          onHorizontalDragEnd: (_) => onDragEnd(),
+          onHorizontalDragCancel: onDragEnd,
+          child: child,
+        );
+    return Positioned.fill(
+      child: LayoutBuilder(builder: (context, box) {
+        final middle = box.maxHeight / 2;
+        return Stack(children: [
+          if (!collapsed)
+            Positioned(
+              left: at - _strip / 2,
+              top: 0,
+              bottom: 0,
+              width: _strip,
+              child: drag(const SizedBox.expand()),
+            ),
+          Positioned(
+            left: x - _target.width / 2,
+            top: middle - _target.height / 2,
+            width: _target.width,
+            height: _target.height,
+            child: drag(Tooltip(
+              message: collapsed ? 'Show list' : 'Hide list',
+              child: Semantics(
+                button: true,
+                label: collapsed ? 'Show list' : 'Hide list',
+                excludeSemantics: true,
+                child: GestureDetector(
+                  key: const Key('list-toggle'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onTap,
+                  child: Center(
+                    child: Container(
+                      width: _tab.width,
+                      height: _tab.height,
+                      decoration: BoxDecoration(
+                        color: c.barSurface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color:
+                                Theme.of(context).colorScheme.outlineVariant),
+                      ),
+                      child: Icon(
+                        collapsed ? Icons.chevron_right : Icons.chevron_left,
+                        size: 18,
+                        color: c.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            )),
+          ),
+        ]);
+      }),
+    );
+  }
+}
 
 /// The first page: the home on a phone; in the split layout the home is in
 /// the list pane, and this shows that nothing is opened yet.
@@ -656,6 +955,7 @@ class _NothingOpen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
+    final shell = ShellScope.maybeOf(context);
     return Scaffold(
       key: const Key('nothing-open'),
       backgroundColor: c.bgBody,
@@ -668,6 +968,19 @@ class _NothingOpen extends StatelessWidget {
             Text('Open something from the list',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: c.textSecondary)),
+            if (shell != null)
+              ValueListenableBuilder<bool>(
+                valueListenable: shell.listCollapsed,
+                builder: (context, collapsed, _) => collapsed
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: TextButton(
+                          onPressed: () => shell.setListCollapsed(false),
+                          child: const Text('Show list'),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
           ]),
         ),
       ),
@@ -708,6 +1021,7 @@ class _ListPane extends StatelessWidget {
                   drive: shell.drive.value,
                   api: api,
                   scopeDrive: shell.search.scope,
+                  kind: shell.search.kind,
                   initialQuery: shell.search.query,
                 ),
               ),
@@ -716,8 +1030,8 @@ class _ListPane extends StatelessWidget {
       );
 }
 
-/// A pane of the wide layouts: the system insets of the sides it does not
-/// touch are not its business (the rail takes the left one).
+/// A pane of the split layout: the system insets of the sides it does not
+/// touch are not its business.
 class _Pane extends StatelessWidget {
   final bool removeLeft;
   final bool removeRight;
@@ -739,68 +1053,15 @@ class _Pane extends StatelessWidget {
 }
 
 class _PaneDivider extends StatelessWidget {
-  const _PaneDivider();
+  final bool shown;
+
+  const _PaneDivider({required this.shown});
 
   /// The theme's divider: a hairline that is quiet in light and dark.
   @override
   Widget build(BuildContext context) => ColoredBox(
       color: Theme.of(context).colorScheme.outlineVariant,
-      child: const SizedBox(width: 1));
-}
-
-/// The bottom system inset under the rail and the panes, in the bar's
-/// colour (the system navigation bar has it too).
-class _BottomStrip extends StatelessWidget {
-  const _BottomStrip();
-
-  @override
-  Widget build(BuildContext context) => ColoredBox(
-        color: context.appColors.barSurface,
-        child: SizedBox(
-            width: double.infinity,
-            height: MediaQuery.paddingOf(context).bottom),
-      );
-}
-
-/// The "more" menu of the resource the detail pane shows, at the pane's top
-/// right (on a phone it is the bar's last button). The page's own header
-/// row is 36 high; the button sits in it.
-class _DetailMore extends StatelessWidget {
-  final ShellController shell;
-
-  const _DetailMore({required this.shell});
-
-  @override
-  Widget build(BuildContext context) {
-    final padding = MediaQuery.paddingOf(context);
-    return Positioned(
-      top: padding.top,
-      right: padding.right,
-      child: ListenableBuilder(
-        listenable: shell,
-        builder: (context, _) {
-          final onMore = shell.topMenu;
-          if (onMore == null) return const SizedBox.shrink();
-          return Builder(
-            builder: (button) => SizedBox(
-              width: 48,
-              height: 36,
-              child: IconButton(
-                key: const Key('detail-more'),
-                tooltip: 'More',
-                padding: EdgeInsets.zero,
-                onPressed: () {
-                  final box = button.findRenderObject() as RenderBox;
-                  onMore(box.localToGlobal(Offset.zero) & box.size);
-                },
-                icon: const Icon(Icons.more_vert),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
+      child: SizedBox(width: shown ? 1 : 0));
 }
 
 /// The pages' region ends above the bar, but the keyboard is drawn over the

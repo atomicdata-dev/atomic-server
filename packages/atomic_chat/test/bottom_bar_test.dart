@@ -141,8 +141,10 @@ void main() {
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
       Rect? anchor;
-      // A tablet: the rail, and the button at the detail pane's top right.
-      expect(find.byType(AppNavRail), findsOneWidget);
+      // A tablet: the same bar, the width of the window, with the menu
+      // after Settings.
+      expect(find.byType(AppBottomBar), findsOneWidget);
+      expect(tester.getSize(find.byType(AppBottomBar)).width, 900);
       final route = _controller(tester).top!;
       _controller(tester).registerMenu(route, (a) => anchor = a);
       await tester.pumpAndSettle();
@@ -151,8 +153,10 @@ void main() {
       final button = tester.getRect(find.byTooltip('More'));
       expect(anchor, isNotNull);
       expect(anchor!.right, closeTo(button.right, 8));
-      // The right end of a 900 wide screen, not its left.
-      expect(anchor!.center.dx, greaterThan(700));
+      expect(anchor!.top, closeTo(button.top, 8));
+      // Right of Settings, which stays.
+      expect(button.left,
+          greaterThan(tester.getRect(find.byTooltip('Settings')).right - 1));
     });
 
     testWidgets('the + and Search lists open next to their own buttons',
@@ -166,11 +170,10 @@ void main() {
         final gesture = await _hold(tester, tooltip);
         final pill =
             tester.getRect(find.byKey(const ValueKey('hold-fan-item-0')));
-        // Right of the rail's button, level with it.
-        expect(pill.left, greaterThan(button.right), reason: tooltip);
-        expect(pill.left - button.right, lessThan(60), reason: tooltip);
-        expect((pill.center.dy - button.center.dy).abs(), lessThan(30),
-            reason: tooltip);
+        // Above the bar's button, over it.
+        expect(pill.bottom, lessThan(button.top), reason: tooltip);
+        expect(pill.left, lessThan(button.right), reason: tooltip);
+        expect(pill.right, greaterThan(button.left), reason: tooltip);
         await gesture.moveTo(const Offset(1, 1));
         await gesture.up();
         await tester.pumpAndSettle();

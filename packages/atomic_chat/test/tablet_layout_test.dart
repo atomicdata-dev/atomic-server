@@ -105,7 +105,7 @@ void main() {
     await tester.pumpWidget(_shell(_api()));
     await _settle(tester);
     expect(find.byType(AppBottomBar), findsOneWidget);
-    expect(find.byType(AppNavRail), findsNothing);
+    expect(find.byKey(const Key('list-toggle')), findsNothing);
     expect(find.byKey(const Key('nothing-open')), findsNothing);
     expect(_controller(tester).layout, ShellLayout.bar);
 
@@ -120,7 +120,6 @@ void main() {
         find.descendant(
             of: find.byType(AppBottomBar), matching: find.byTooltip('More')),
         findsOneWidget);
-    expect(find.byKey(const Key('detail-more')), findsNothing);
     await _done(tester);
   });
 
@@ -129,20 +128,23 @@ void main() {
     ('landscape', _landscape),
     ('a phone sideways', _phoneSideways),
   ]) {
-    testWidgets('a tablet ($name): rail, list pane and detail pane',
+    testWidgets('a tablet ($name): the bar under a list and a detail pane',
         (tester) async {
       _size(tester, size);
       final api = _api();
       await tester.pumpWidget(_shell(api));
       await _settle(tester);
-      expect(find.byType(AppBottomBar), findsNothing);
-      expect(find.byType(AppNavRail), findsOneWidget);
+      // The phone's bar, the width of the window, at the bottom.
+      final bar = tester.getRect(find.byType(AppBottomBar));
+      expect(bar.width, size.width);
+      expect(bar.bottom, size.height);
       expect(_controller(tester).layout, ShellLayout.split);
       // Nothing opened yet.
       expect(find.byKey(const Key('nothing-open')), findsOneWidget);
       final list = tester.getRect(find.byType(ChatsScreen));
-      expect(list.left, AppNavRail.width);
-      expect(list.width, inInclusiveRange(280, 380));
+      expect(list.left, 0);
+      expect(list.width, inInclusiveRange(320, 400));
+      expect(list.bottom, bar.top);
 
       // A row opens in the detail pane, next to the list, and is marked.
       await tester.tap(find.text('Plans'));
@@ -165,7 +167,7 @@ void main() {
       expect(_controller(tester).pages, hasLength(1));
       expect(api.opened, ['did:ad:plans', 'did:ad:notes']);
 
-      // A page of the rail in its place: no row is marked.
+      // A page of the bar in its place: no row is marked.
       await tester.tap(find.byTooltip('Settings'));
       await _settle(tester);
       expect(tile('Notes').selected, isFalse);
@@ -183,44 +185,41 @@ void main() {
     });
   }
 
-  testWidgets('the resource menu is at the detail pane\'s top right',
+  testWidgets('the resource menu is in the bar, after Settings',
       (tester) async {
     _size(tester, _landscape);
     await tester.pumpWidget(_shell(_api()));
     await _settle(tester);
+    expect(find.byTooltip('More'), findsNothing);
     await tester.tap(find.text('Plans'));
     await _settle(tester);
     // The page's menu: registered by the view once the page is up.
-    expect(find.byKey(const Key('detail-more')), findsOneWidget);
-    final more = tester.getRect(find.byKey(const Key('detail-more')));
-    expect(more.right, _landscape.width);
-    expect(more.top, 0);
-    expect(more.height, greaterThanOrEqualTo(36));
-    // No second one in the rail.
-    expect(
-        find.descendant(
-            of: find.byType(AppNavRail), matching: find.byTooltip('More')),
-        findsNothing);
+    final bar = find.byType(AppBottomBar);
+    final more = find.descendant(of: bar, matching: find.byTooltip('More'));
+    expect(more, findsOneWidget);
+    final settings =
+        find.descendant(of: bar, matching: find.byTooltip('Settings'));
+    expect(settings, findsOneWidget);
+    expect(tester.getRect(more).left,
+        greaterThanOrEqualTo(tester.getRect(settings).right - 1));
     await _done(tester);
   });
 
-  testWidgets('a tap on the rail\'s New lists the kinds right of it, on screen',
+  testWidgets('a tap on the bar\'s New lists the kinds above it, on screen',
       (tester) async {
     _size(tester, _landscape);
     await tester.pumpWidget(_shell(_api()));
     await _settle(tester);
     final button = tester.getRect(find.descendant(
-        of: find.byType(AppNavRail), matching: find.byTooltip('New')));
+        of: find.byType(AppBottomBar), matching: find.byTooltip('New')));
     await tester.tap(find.byTooltip('New'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 120));
-    final screen = _landscape;
     var lastTop = -1.0;
     for (final t in ['AI chat', 'AI voice', 'Document', 'Other…']) {
       final r = tester.getRect(find.text(t));
-      expect(r.left, greaterThan(button.right), reason: t);
-      expect(r.right, lessThanOrEqualTo(screen.width), reason: t);
-      expect(r.bottom, lessThanOrEqualTo(screen.height), reason: t);
+      expect(r.bottom, lessThan(button.top), reason: t);
+      expect(r.right, lessThanOrEqualTo(_landscape.width), reason: t);
       expect(r.top, greaterThan(lastTop), reason: t);
       lastTop = r.top;
     }
@@ -228,11 +227,13 @@ void main() {
     await tester.tap(find.text('AI chat'));
     await _settle(tester);
     expect(find.byType(ChatScreen), findsOneWidget);
+    expect(tester.getRect(find.byType(ChatScreen)).left,
+        greaterThan(tester.getRect(find.byType(ChatsScreen)).right));
     expect(find.text('AI voice'), findsNothing);
     await _done(tester);
   });
 
-  testWidgets('the rail opens Settings, Profile and a new chat in the detail',
+  testWidgets('the bar opens Settings, Profile and a new chat in the detail',
       (tester) async {
     _size(tester, _portrait);
     await tester.pumpWidget(app(AppShell(
@@ -286,7 +287,7 @@ void main() {
     expect(find.byType(SearchScreen), findsOneWidget);
     expect(find.byKey(const ValueKey('current:Search')), findsOneWidget);
     final pane = tester.getRect(find.byType(SearchScreen));
-    expect(pane.left, AppNavRail.width);
+    expect(pane.left, 0);
     await tester.enterText(find.byType(TextField), 'fou');
     await tester.pump(const Duration(milliseconds: 200));
     await _settle(tester);
@@ -380,49 +381,48 @@ void main() {
     expect(find.byType(SearchScreen), findsOneWidget);
     expect(_controller(tester).pages, isEmpty);
     expect(find.widgetWithText(TextField, 'plan'), findsOneWidget);
-    expect(tester.getRect(find.byType(SearchScreen)).left, AppNavRail.width);
+    expect(tester.getRect(find.byType(SearchScreen)).left, 0);
     await _done(tester);
   });
 
-  testWidgets('between phone and tablet (rail without list pane)',
+  testWidgets('from 600 wide the list and detail panes, at 599 the phone',
       (tester) async {
     _size(tester, const Size(640, 900));
     await tester.pumpWidget(_shell(_api()));
     await _settle(tester);
-    expect(find.byType(AppNavRail), findsOneWidget);
-    expect(_controller(tester).layout, ShellLayout.rail);
-    expect(find.byKey(const Key('nothing-open')), findsNothing);
+    expect(_controller(tester).layout, ShellLayout.split);
+    expect(tester.getSize(find.byType(ChatsScreen)).width, 320);
     await tester.tap(find.text('Plans'));
     await _settle(tester);
-    // Over the home, beside the rail.
+    // Next to the list.
+    expect(find.text('Notes'), findsOneWidget);
+    expect(tester.getRect(find.byType(ResourceView)).left, greaterThan(320));
+    tester.view.physicalSize = const Size(599, 900) * 2;
+    await _settle(tester);
+    expect(_controller(tester).layout, ShellLayout.bar);
     expect(find.text('Notes'), findsNothing);
-    expect(tester.getRect(find.byType(ResourceView)).left, AppNavRail.width);
     await _done(tester);
   });
 
-  testWidgets('the rail fits a phone sideways at a large font', (tester) async {
+  testWidgets('the bar fits a phone sideways at a large font', (tester) async {
     _size(tester, _phoneSideways);
     tester.platformDispatcher.textScaleFactorTestValue = 1.3;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await tester.pumpWidget(_shell(_api()));
     await _settle(tester);
     expect(tester.takeException(), isNull);
-    for (final label in ['Home', 'Search', 'New', 'Profile', 'Settings']) {
-      expect(
-          find.descendant(
-              of: find.byType(AppNavRail), matching: find.text(label)),
-          findsOneWidget);
-    }
     // Every button is a full 48 dp target.
     for (final tip in ['Home', 'Profile', 'Settings']) {
       final button = find.ancestor(
           of: find.byTooltip(tip), matching: find.byType(IconButton));
-      expect(tester.getSize(button).height, greaterThanOrEqualTo(48),
+      expect(tester.getSize(button.first).height, greaterThanOrEqualTo(48),
           reason: tip);
     }
     for (final tip in ['Search', 'New']) {
-      final button =
-          find.byWidgetPredicate((w) => w is HoldFan && w.tooltip == tip);
+      final button = find.descendant(
+          of: find.byType(AppBottomBar),
+          matching:
+              find.byWidgetPredicate((w) => w is HoldFan && w.tooltip == tip));
       expect(tester.getSize(button).height, greaterThanOrEqualTo(48),
           reason: tip);
     }
@@ -441,5 +441,118 @@ void main() {
         .first);
     expect(composer.width, ReadableWidth.maxWidth);
     await _done(tester);
+  });
+
+  group('the list pane folds away', () {
+    double listShown(WidgetTester tester) {
+      final r = tester.getRect(find.byType(ChatsScreen).hitTestable());
+      return r.right.clamp(0, double.infinity).toDouble();
+    }
+
+    for (final (name, size) in [
+      ('portrait', _portrait),
+      ('landscape', _landscape),
+    ]) {
+      testWidgets('$name: the handle folds and unfolds it, quickly',
+          (tester) async {
+        _size(tester, size);
+        await tester.pumpWidget(_shell(_api()));
+        await _settle(tester);
+        await tester.tap(find.text('Plans'));
+        await _settle(tester);
+        final view = tester.state(find.byType(ResourceView));
+        expect(find.byTooltip('Hide list'), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('list-toggle')));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 70));
+        // Half-way: moving.
+        final mid = tester.getRect(find.byType(ResourceView)).left;
+        expect(mid, greaterThan(1));
+        await tester.pump(const Duration(milliseconds: 90));
+        // Done within 150 ms: the page has the whole width.
+        expect(tester.getRect(find.byType(ResourceView)).left, 0);
+        expect(tester.getRect(find.byType(ResourceView)).width, size.width);
+        expect(find.byType(ChatsScreen).hitTestable(), findsNothing);
+        expect(_controller(tester).listCollapsed.value, isTrue);
+        expect(tester.state(find.byType(ResourceView)), same(view));
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getBool(listCollapsedKey), isTrue);
+
+        await tester.tap(find.byTooltip('Show list'));
+        await _settle(tester);
+        expect(find.text('Notes'), findsOneWidget);
+        expect(tester.getRect(find.byType(ResourceView)).left,
+            greaterThanOrEqualTo(320));
+        expect(prefs.getBool(listCollapsedKey), isFalse);
+        await _done(tester);
+      });
+    }
+
+    testWidgets('folded stays folded through rotation and a phone size',
+        (tester) async {
+      _size(tester, _landscape);
+      await tester.pumpWidget(_shell(_api()));
+      await _settle(tester);
+      final home = tester.state(find.byType(ChatsScreen));
+      await tester.tap(find.byKey(const Key('list-toggle')));
+      await _settle(tester);
+      for (final size in [_portrait, _phone, _landscape]) {
+        tester.view.physicalSize = size * 2;
+        await _settle(tester);
+        expect(tester.state(find.byType(ChatsScreen, skipOffstage: false)),
+            same(home));
+        if (size == _phone) {
+          // The phone shows the home itself.
+          expect(find.text('Plans'), findsOneWidget);
+        } else {
+          expect(find.text('Plans').hitTestable(), findsNothing,
+              reason: '$size');
+          expect(find.byKey(const Key('nothing-open')), findsOneWidget);
+        }
+      }
+      // Home in the bar brings it back.
+      await tester.tap(find.byTooltip('Home'));
+      await _settle(tester);
+      expect(find.text('Plans').hitTestable(), findsOneWidget);
+      expect(listShown(tester), greaterThanOrEqualTo(320));
+      await _done(tester);
+    });
+
+    testWidgets('a new shell starts folded when the device left it so',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({listCollapsedKey: true});
+      _size(tester, _portrait);
+      await tester.pumpWidget(_shell(_api()));
+      await _settle(tester);
+      expect(find.text('Plans').hitTestable(), findsNothing);
+      // Search in the bar unfolds it, with the search.
+      await tester.tap(find.byTooltip('Search'));
+      await _settle(tester);
+      expect(find.byType(SearchScreen).hitTestable(), findsOneWidget);
+      expect(_controller(tester).listCollapsed.value, isFalse);
+      await _done(tester);
+    });
+
+    testWidgets('dragging the divider resizes it, far left folds it',
+        (tester) async {
+      _size(tester, _landscape);
+      await tester.pumpWidget(_shell(_api()));
+      await _settle(tester);
+      final before = tester.getSize(find.byType(ChatsScreen)).width;
+      final handle = tester.getCenter(find.byKey(const Key('list-toggle')));
+      await tester.dragFrom(handle, const Offset(60, 0));
+      await _settle(tester);
+      final wider = tester.getSize(find.byType(ChatsScreen)).width;
+      expect(wider, closeTo(before + 60, 20));
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getDouble(listWidthKey), closeTo(wider, 1));
+      await tester.dragFrom(
+          tester.getCenter(find.byKey(const Key('list-toggle'))),
+          Offset(-wider + 20, 0));
+      await _settle(tester);
+      expect(_controller(tester).listCollapsed.value, isTrue);
+      await _done(tester);
+    });
   });
 }

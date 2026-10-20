@@ -318,8 +318,40 @@ void main() {
     semantics.dispose();
   });
 
-  test('the layouts are a list and a side list: no fan', () {
-    expect(HoldFanLayout.values.map((l) => l.name), ['list', 'side']);
+  testWidgets('a rounded label hugs its child and has no round ripple',
+      (tester) async {
+    var tapped = 0;
+    await tester.pumpWidget(MaterialApp(
+      theme: ThemeData(extensions: const [AppColors.light]),
+      home: Scaffold(
+        body: Row(children: [
+          HoldFan<String>(
+            size: 40,
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => tapped++,
+            items: const [HoldFanItem('Hide', 'hide')],
+            onSelected: (_) {},
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Center(child: Text('Recents')),
+            ),
+          ),
+          const Spacer(),
+        ]),
+      ),
+    ));
+    final target = tester.getSize(find.byType(InkWell));
+    expect(target.width, lessThan(200), reason: 'not the whole row');
+    expect(target.height, 40);
+    final ink = tester.widget<InkWell>(find.byType(InkWell));
+    expect(ink.borderRadius, BorderRadius.circular(8));
+    expect(ink.splashFactory, NoSplash.splashFactory);
+    await tester.tap(find.text('Recents'));
+    expect(tapped, 1);
+  });
+
+  test('the only layout is a list: no fan, no side list', () {
+    expect(HoldFanLayout.values.map((l) => l.name), ['list']);
   });
 
   test('holdFanListLayout stacks the pills vertically, first nearest', () {
@@ -346,31 +378,6 @@ void main() {
     expect(rects[0].top, greaterThan(60));
     expect(rects[1].top, greaterThan(rects[0].bottom));
     expect(rects[2].top, greaterThan(rects[1].bottom));
-  });
-
-  test('holdFanSideLayout stacks the pills right of the button, going down',
-      () {
-    final rects = holdFanSideLayout(
-      anchor: const Offset(40, 200),
-      sizes: const [Size(80, 44), Size(120, 44), Size(100, 44)],
-      bounds: const Rect.fromLTWH(0, 0, 1280, 800),
-    );
-    expect(rects.map((r) => r.width).toSet(), {120});
-    // Right of the button (its right edge is 24 from the centre).
-    expect(rects.first.left, greaterThan(64));
-    expect(rects.first.center.dy, 200);
-    expect(rects[1].top, greaterThan(rects[0].bottom));
-    expect(rects[2].top, greaterThan(rects[1].bottom));
-  });
-
-  test('holdFanSideLayout moves up when it would pass the bottom', () {
-    final rects = holdFanSideLayout(
-      anchor: const Offset(40, 380),
-      sizes: const [Size(80, 44), Size(80, 44), Size(80, 44)],
-      bounds: const Rect.fromLTWH(0, 0, 900, 400),
-    );
-    expect(rects.last.bottom, lessThanOrEqualTo(400));
-    expect(rects.first.top, greaterThanOrEqualTo(0));
   });
 
   testWidgets('a list opens at the short hold and draws no line',
@@ -581,35 +588,5 @@ void main() {
         }
       });
     }
-
-    testWidgets('the side list opens right of a rail button, going down',
-        (tester) async {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(1280, 800);
-      addTearDown(tester.view.reset);
-      await tester.pumpWidget(
-          menuApp(layout: HoldFanLayout.side, at: Alignment.centerLeft));
-      final button = tester.getRect(find.byIcon(Icons.add));
-      await tester.tap(find.byIcon(Icons.add));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 120));
-      final r = rows(tester);
-      expect(r.first.left, greaterThan(button.right));
-      for (var i = 1; i < r.length; i++) {
-        expect(r[i].top, greaterThanOrEqualTo(r[i - 1].bottom - 0.01));
-      }
-      expectOnScreen(tester, const Size(1280, 800));
-      // Hold-drag works the same on the side.
-      await tester.tapAt(const Offset(1270, 3));
-      await tester.pumpAndSettle();
-      final g =
-          await tester.startGesture(tester.getCenter(find.byIcon(Icons.add)));
-      await tester.pump(const Duration(milliseconds: 400));
-      await g.moveTo(tester.getCenter(find.text('Other…')));
-      await tester.pump();
-      await g.up();
-      await tester.pumpAndSettle();
-      expect(picked, ['other']);
-    });
   });
 }
