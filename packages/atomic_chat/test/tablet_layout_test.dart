@@ -262,8 +262,8 @@ void main() {
     expect(find.byType(ChatScreen), findsOneWidget);
     expect(_controller(tester).pages, hasLength(1));
     expect(find.byKey(const ValueKey('current:New')), findsOneWidget);
-    // Home on the home closes what is open.
-    await tester.tap(find.byTooltip('Home'));
+    // Back closes what is open.
+    await tester.binding.handlePopRoute();
     await _settle(tester);
     expect(find.byKey(const Key('nothing-open')), findsOneWidget);
     await _done(tester);
@@ -419,7 +419,7 @@ void main() {
     await _settle(tester);
     expect(tester.takeException(), isNull);
     // Every button is a full 48 dp target.
-    for (final tip in ['Home', 'Profile', 'Settings']) {
+    for (final tip in ['Profile', 'Settings']) {
       final button = find.ancestor(
           of: find.byTooltip(tip), matching: find.byType(IconButton));
       expect(tester.getSize(button.first).height, greaterThanOrEqualTo(48),
@@ -811,12 +811,13 @@ void main() {
         expect(bar.left, 0);
         expect(bar.width, list.width);
         expect(bar.bottom, size.height);
-        expect(bar.height, lessThan(48 + 48 + 24));
-        expect(bar.height, greaterThanOrEqualTo(48 + 48));
         expect(list.bottom, bar.top);
         expect(list.height, greaterThan(size.height / 2));
-        // The buttons start at the left of the sidebar.
-        expect(tester.getRect(find.byTooltip('Home')).left, lessThan(24));
+        // A row of 56 dp above the inset; the first button at the left.
+        expect(bar.height, 56 + 48);
+        final home = tester.getRect(find.byTooltip('Home'));
+        expect(home.left, lessThan(48));
+        expect(home.center.dy, closeTo(bar.top + 28, 1));
         await _done(tester);
       });
     }
@@ -865,34 +866,64 @@ void main() {
       await _done(tester);
     });
 
-    testWidgets('Home works from a page, a search and the profile',
+    testWidgets('Home, Search and the profile next to the sidebar',
         (tester) async {
       samsung(tester);
       await tester.pumpWidget(_shell(named()));
       await _settle(tester);
-      // From the profile page: Home closes it, the home's rows stay.
+      expect(find.byKey(const ValueKey('current:Home')), findsOneWidget);
+      // The profile opens next to the home's rows, marked while shown.
       await tester.tap(find.byTooltip('Joep'));
       await _settle(tester);
       expect(_controller(tester).topKind, ShellPage.profile);
-      await tester.tap(find.byTooltip('Home'));
-      await _settle(tester);
-      expect(_controller(tester).atHome, isTrue);
-      expect(find.byKey(const Key('nothing-open')), findsOneWidget);
+      expect(find.byKey(const ValueKey('current:Profile')), findsOneWidget);
       expect(find.text('Plans').hitTestable(), findsOneWidget);
-      // From a search in the sidebar: back to the home.
+      // A row takes its place; the profile is no longer marked.
+      await tester.tap(find.text('Plans'));
+      await _settle(tester);
+      expect(find.byKey(const ValueKey('current:Profile')), findsNothing);
+      // A search in the sidebar; its back returns to the home.
       await tester.tap(find.byTooltip('Search'));
       await _settle(tester);
       expect(find.byType(SearchScreen), findsOneWidget);
-      await tester.tap(find.byTooltip('Home'));
+      expect(find.byKey(const ValueKey('current:Search')), findsOneWidget);
+      expect(find.byKey(const ValueKey('current:Home')), findsNothing);
+      await tester.tap(find.byType(BackButton));
       await _settle(tester);
       expect(find.byType(SearchScreen), findsNothing);
       expect(find.text('Plans').hitTestable(), findsOneWidget);
-      // Folded: Home brings the sidebar back.
-      _controller(tester).setListCollapsed(true);
+      // The page stayed.
+      expect(find.byType(ResourceView), findsOneWidget);
+      // Home from a search, too.
+      await tester.tap(find.byTooltip('Search'));
       await _settle(tester);
-      expect(find.text('Plans').hitTestable(), findsNothing);
+      await tester.tap(find.byTooltip('Home'));
+      await _settle(tester);
+      expect(find.byType(SearchScreen), findsNothing);
+      expect(find.byKey(const ValueKey('current:Home')), findsOneWidget);
+      // Home on the home closes the page.
+      await tester.tap(find.byTooltip('Home'));
+      await _settle(tester);
+      expect(find.byKey(const Key('nothing-open')), findsOneWidget);
+      await _done(tester);
+    });
+
+    testWidgets('folded: the button at the bottom left opens it',
+        (tester) async {
+      samsung(tester);
+      await tester.pumpWidget(_shell(named()));
+      await _settle(tester);
+      final size = tester.view.physicalSize / tester.view.devicePixelRatio;
+      await tester.tap(find.byTooltip('Close sidebar'));
+      await _settle(tester);
+      final open = tester.getRect(find.byTooltip('Show list'));
+      expect(open.left, lessThan(24));
+      // Above the system inset (48 dp), near the bottom.
+      expect(open.bottom, lessThanOrEqualTo(size.height - 48));
+      expect(open.bottom, greaterThan(size.height - 48 - 32));
       await tester.tap(find.byTooltip('Show list'));
       await _settle(tester);
+      expect(_controller(tester).listCollapsed.value, isFalse);
       expect(find.text('Plans').hitTestable(), findsOneWidget);
       await _done(tester);
     });

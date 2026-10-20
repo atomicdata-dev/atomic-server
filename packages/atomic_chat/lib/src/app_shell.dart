@@ -1006,8 +1006,7 @@ class _PaneHandle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    // Folded, the tab sticks out of the left edge.
-    final x = math.max(at, _tab.width / 2);
+    final x = at;
     Widget drag(Widget child) => GestureDetector(
           behavior: HitTestBehavior.translucent,
           onHorizontalDragStart: (_) => onDragStart(),
@@ -1033,51 +1032,77 @@ class _PaneHandle extends StatelessWidget {
           // gesture inset (Android's back swipe owns the very edge) and is
           // a Flutter widget above the pages' web view, so the web view's
           // own horizontal scrolling is not touched elsewhere.
+          // Opaque: the web view under it (which claims a touch at once)
+          // never sees the swipe.
           if (collapsed)
             Positioned(
               left: MediaQuery.systemGestureInsetsOf(context).left,
               top: 0,
               bottom: 0,
               width: edgeStrip,
-              child: drag(const SizedBox.expand()),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onHorizontalDragStart: (_) => onDragStart(),
+                onHorizontalDragUpdate: onDragUpdate,
+                onHorizontalDragEnd: (d) => onDragEnd(d.primaryVelocity ?? 0),
+                onHorizontalDragCancel: () => onDragEnd(0),
+              ),
             ),
-          Positioned(
-            left: x - _target.width / 2,
-            top: middle - _target.height / 2,
-            width: _target.width,
-            height: _target.height,
-            child: drag(Tooltip(
-              message: collapsed ? 'Show list' : 'Hide list',
-              child: Semantics(
-                button: true,
-                label: collapsed ? 'Show list' : 'Hide list',
-                excludeSemantics: true,
-                child: GestureDetector(
+          // Folded: a button at the bottom left, where the bar was, opens it.
+          if (collapsed)
+            Positioned(
+              left: 8 + MediaQuery.paddingOf(context).left,
+              bottom: 8 + MediaQuery.viewPaddingOf(context).bottom,
+              child: Material(
+                color: c.barSurface,
+                elevation: 2,
+                shape: const CircleBorder(),
+                child: IconButton(
                   key: const Key('list-toggle'),
-                  behavior: HitTestBehavior.opaque,
-                  onTap: onTap,
-                  child: Center(
-                    child: Container(
-                      width: _tab.width,
-                      height: _tab.height,
-                      decoration: BoxDecoration(
-                        color: c.barSurface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color:
-                                Theme.of(context).colorScheme.outlineVariant),
-                      ),
-                      child: Icon(
-                        collapsed ? Icons.chevron_right : Icons.chevron_left,
-                        size: 18,
-                        color: c.textSecondary,
+                  tooltip: 'Show list',
+                  onPressed: onTap,
+                  icon: const Icon(Icons.menu),
+                ),
+              ),
+            ),
+          if (!collapsed)
+            Positioned(
+              left: x - _target.width / 2,
+              top: middle - _target.height / 2,
+              width: _target.width,
+              height: _target.height,
+              child: drag(Tooltip(
+                message: 'Hide list',
+                child: Semantics(
+                  button: true,
+                  label: 'Hide list',
+                  excludeSemantics: true,
+                  child: GestureDetector(
+                    key: const Key('list-toggle'),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onTap,
+                    child: Center(
+                      child: Container(
+                        width: _tab.width,
+                        height: _tab.height,
+                        decoration: BoxDecoration(
+                          color: c.barSurface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color:
+                                  Theme.of(context).colorScheme.outlineVariant),
+                        ),
+                        child: Icon(
+                          Icons.chevron_left,
+                          size: 18,
+                          color: c.textSecondary,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            )),
-          ),
+              )),
+            ),
         ]);
       }),
     );

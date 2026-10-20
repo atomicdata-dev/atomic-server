@@ -39,15 +39,18 @@ const _listDrives = 4;
 /// Search has the drives on touch and hold.
 ///
 /// On a tablet ([ShellLayout.split]) the bar is the foot of the sidebar (the
-/// list pane), its buttons in a row from the left and the resource's "more"
-/// menu at the right end. Home and Search then show what the list pane holds,
-/// the others what the detail pane shows; Settings stays.
+/// list pane). Home and Search show what the sidebar holds (Home on the home
+/// closes the detail page), the others open in the detail pane; Settings
+/// stays and the resource's "more" menu comes last.
 class AppBottomBar extends StatelessWidget {
   final AssistantApi api;
   final ShellController shell;
 
   /// The widest the row of buttons gets on a wide window.
   static const maxButtonsWidth = 560.0;
+
+  /// The height of the row of buttons, above the system inset.
+  static const rowHeight = 56.0;
 
   const AppBottomBar({super.key, required this.api, required this.shell});
 
@@ -64,144 +67,145 @@ class AppBottomBar extends StatelessWidget {
     final split = ShellScope.layoutOf(context) == ShellLayout.split;
     return Material(
       color: c.barSurface,
+      // The row of buttons, centred in its own height; the system inset
+      // (gesture handle, buttons) under it in the bar's colour.
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-          child: Center(
-            heightFactor: 1,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: maxButtonsWidth),
-              child: LayoutBuilder(builder: (context, box) {
-                // Room for the name next to the avatar: a wide sidebar or
-                // window, not a phone.
-                final roomy = box.maxWidth + 16 >= 400;
-                return ListenableBuilder(
-                  listenable: Listenable.merge(
-                      [shell, shell.drive, shell.list, shell.listCollapsed]),
-                  builder: (context, _) {
-                    final onMore = shell.topMenu;
-                    final top = shell.topKind;
-                    final onUser = _actions.onUser;
-                    final list = shell.list.value;
-                    final folded = split && shell.listCollapsed.value;
-                    final newCurrent =
-                        top == ShellPage.newChat || top == ShellPage.voiceChat;
-                    final homeCurrent = split
-                        ? list == ShellPage.home && !folded
-                        : top == ShellPage.home;
-                    final searchCurrent = split
-                        ? ShellPage.isSearch(list) && !folded
-                        : ShellPage.isSearch(top);
-                    // Next to the pages Home shows the home in the list pane (and
-                    // brings it back when folded); on the home it closes what the
-                    // detail pane shows.
-                    final VoidCallback? onHome = split
-                        ? (folded || list != ShellPage.home
-                            ? () => shell.showList(ShellPage.home)
-                            : (shell.atHome ? null : shell.goHome))
-                        : (homeCurrent ? null : shell.goHome);
-                    final more = onMore == null
-                        ? null
-                        : Builder(
-                            key: const ValueKey('more'),
-                            builder: (button) => IconButton(
-                              tooltip: 'More',
-                              onPressed: () {
-                                final box =
-                                    button.findRenderObject() as RenderBox;
-                                onMore(
-                                    box.localToGlobal(Offset.zero) & box.size);
-                              },
-                              icon: const Icon(Icons.more_vert),
-                            ),
-                          );
-                    final settings = _Current(
-                      key: const ValueKey('settings'),
-                      current: top == ShellPage.settings,
-                      label: 'Settings',
-                      child: IconButton(
-                        tooltip: 'Settings',
-                        onPressed: top == ShellPage.settings
-                            ? null
-                            : _actions.settings,
-                        icon: const Icon(Icons.settings_outlined),
-                      ),
-                    );
-                    return Row(
-                        mainAxisAlignment: split
-                            ? MainAxisAlignment.start
-                            : MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _Current(
-                            current: homeCurrent,
-                            label: 'Home',
-                            child: IconButton(
-                              tooltip: 'Home',
-                              onPressed: onHome,
-                              icon: _barIcon(
-                                  context,
-                                  homeCurrent
-                                      ? Icons.home
-                                      : Icons.home_outlined,
-                                  homeCurrent),
-                            ),
-                          ),
-                          _Current(
-                            current: searchCurrent,
-                            label: 'Search',
-                            child: _SearchButton(
-                              api: api,
-                              current: searchCurrent,
-                              onSearch: _openSearch,
-                            ),
-                          ),
-                          _Current(
-                            current: newCurrent,
-                            label: 'New',
-                            child: HoldFan<NewChoice>(
-                              tooltip: 'New',
-                              selected: newCurrent,
-                              tapOpensMenu: true,
-                              // The list at once; a drag from + picks.
-                              opensOnDown: true,
-                              items: newItems,
-                              onSelected: (choice) => _new(context, choice),
-                              child: _barIcon(context, Icons.add, newCurrent),
-                            ),
-                          ),
-                          _Current(
-                            current: top == ShellPage.profile,
-                            label: 'Profile',
-                            child: _ProfileButton(
-                              shell: shell,
-                              current: top == ShellPage.profile,
-                              wide: roomy,
-                              onPressed: onUser,
-                            ),
-                          ),
-                          if (split) ...[
-                            settings,
-                            const Spacer(),
-                            // Room for it whether or not a resource is open: the
-                            // other buttons do not move.
-                            SizedBox(
-                              width: 48,
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 200),
-                                child: more ?? const SizedBox.shrink(),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: SizedBox(
+            height: rowHeight,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: maxButtonsWidth),
+                child: LayoutBuilder(builder: (context, box) {
+                  // Room for the name next to the avatar: a wide sidebar or
+                  // window, not a phone.
+                  final roomy = box.maxWidth + 16 >= 400;
+                  return ListenableBuilder(
+                    listenable: Listenable.merge(
+                        [shell, shell.drive, shell.list, shell.listCollapsed]),
+                    builder: (context, _) {
+                      final onMore = shell.topMenu;
+                      final top = shell.topKind;
+                      final onUser = _actions.onUser;
+                      final list = shell.list.value;
+                      final folded = split && shell.listCollapsed.value;
+                      final newCurrent = top == ShellPage.newChat ||
+                          top == ShellPage.voiceChat;
+                      final homeCurrent = split
+                          ? list == ShellPage.home && !folded
+                          : top == ShellPage.home;
+                      final searchCurrent = split
+                          ? ShellPage.isSearch(list) && !folded
+                          : ShellPage.isSearch(top);
+                      // Next to the pages Home shows the home in the list pane (and
+                      // brings it back when folded); on the home it closes what the
+                      // detail pane shows.
+                      final VoidCallback? onHome = split
+                          ? (folded || list != ShellPage.home
+                              ? () => shell.showList(ShellPage.home)
+                              : (shell.atHome ? null : shell.goHome))
+                          : (homeCurrent ? null : shell.goHome);
+                      final more = onMore == null
+                          ? null
+                          : Builder(
+                              key: const ValueKey('more'),
+                              builder: (button) => IconButton(
+                                tooltip: 'More',
+                                onPressed: () {
+                                  final box =
+                                      button.findRenderObject() as RenderBox;
+                                  onMore(box.localToGlobal(Offset.zero) &
+                                      box.size);
+                                },
+                                icon: const Icon(Icons.more_vert),
+                              ),
+                            );
+                      final settings = _Current(
+                        key: const ValueKey('settings'),
+                        current: top == ShellPage.settings,
+                        label: 'Settings',
+                        child: IconButton(
+                          tooltip: 'Settings',
+                          onPressed: top == ShellPage.settings
+                              ? null
+                              : _actions.settings,
+                          icon: const Icon(Icons.settings_outlined),
+                        ),
+                      );
+                      return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _Current(
+                              current: homeCurrent,
+                              label: 'Home',
+                              child: IconButton(
+                                tooltip: 'Home',
+                                onPressed: onHome,
+                                icon: _barIcon(
+                                    context,
+                                    homeCurrent
+                                        ? Icons.home
+                                        : Icons.home_outlined,
+                                    homeCurrent),
                               ),
                             ),
-                          ] else
-                            // The only button that changes with the page.
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 200),
-                              child: more ?? settings,
+                            _Current(
+                              current: searchCurrent,
+                              label: 'Search',
+                              child: _SearchButton(
+                                api: api,
+                                current: searchCurrent,
+                                onSearch: _openSearch,
+                              ),
                             ),
-                        ]);
-                  },
-                );
-              }),
+                            _Current(
+                              current: newCurrent,
+                              label: 'New',
+                              child: HoldFan<NewChoice>(
+                                tooltip: 'New',
+                                selected: newCurrent,
+                                tapOpensMenu: true,
+                                // The list at once; a drag from + picks.
+                                opensOnDown: true,
+                                items: newItems,
+                                onSelected: (choice) => _new(context, choice),
+                                child: _barIcon(context, Icons.add, newCurrent),
+                              ),
+                            ),
+                            _Current(
+                              current: top == ShellPage.profile,
+                              label: 'Profile',
+                              child: _ProfileButton(
+                                shell: shell,
+                                current: top == ShellPage.profile,
+                                wide: roomy,
+                                onPressed: onUser,
+                              ),
+                            ),
+                            if (split) ...[
+                              settings,
+                              // Room for it whether or not a resource is open: the
+                              // other buttons do not move.
+                              SizedBox(
+                                width: 48,
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 200),
+                                  child: more ?? const SizedBox.shrink(),
+                                ),
+                              ),
+                            ] else
+                              // The only button that changes with the page.
+                              AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 200),
+                                child: more ?? settings,
+                              ),
+                          ]);
+                    },
+                  );
+                }),
+              ),
             ),
           ),
         ),
@@ -440,9 +444,9 @@ class _ProfileButton extends StatelessWidget {
         final name = who.name?.trim() ?? '';
         final label = name.isEmpty ? 'Profile' : name;
         final showName = wide && name.isNotEmpty;
+        // As big as the bar's icons (24 dp); its page on top rings it.
         final avatar = Container(
-          padding: const EdgeInsets.all(2),
-          decoration: BoxDecoration(
+          foregroundDecoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
                 color: current ? main : Colors.transparent, width: 2),

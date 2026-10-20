@@ -773,7 +773,16 @@ class _SearchScreenState extends State<SearchScreen> {
     // Built once per theme: typing and loading only rebuild the list.
     return Scaffold(
       backgroundColor: c.bgBody,
-      appBar: const AppTopBar(title: 'Search'),
+      appBar: AppTopBar(
+        title: 'Search',
+        // In the sidebar next to the pages (no route to pop): back to the
+        // home's list.
+        leading: _shell != null &&
+                _shell!.split &&
+                !(ModalRoute.of(context)?.canPop ?? false)
+            ? BackButton(onPressed: () => _shell!.showList(ShellPage.home))
+            : null,
+      ),
       body: SafeArea(
         top: false,
         bottom: false,

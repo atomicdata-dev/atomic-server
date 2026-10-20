@@ -548,7 +548,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen, skipOffstage: false), findsOneWidget);
       // And a quick tap on another button right after a push is ignored too.
-      await tester.tap(find.byTooltip('Home'));
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Settings'));
       await tester.pump(const Duration(milliseconds: 50));
