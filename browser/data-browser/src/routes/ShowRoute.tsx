@@ -3,6 +3,8 @@ import {
   Client,
   core,
   dataBrowser,
+  server,
+  useArray,
   useResource,
   useStore,
   useString,
@@ -108,6 +110,21 @@ export const ShowComponent: React.FunctionComponent = () => {
   // same address the table's own tab uses.
   const [viewParent] = useString(resource, core.properties.parent);
   const isTableView = resource.hasClasses(dataBrowser.classes.view);
+
+  // A Redirect left behind by "Move..." to another drive: follow it.
+  const [destination] = useString(resource, server.properties.destination);
+  const [classes] = useArray(resource, core.properties.isA);
+  const isRedirect = classes.includes(server.classes.redirect);
+
+  React.useEffect(() => {
+    if (isRedirect && destination) {
+      navigate({
+        to: paths.show,
+        search: { subject: destination },
+        replace: true,
+      });
+    }
+  }, [isRedirect, destination, navigate]);
 
   React.useEffect(() => {
     if (!isTableView || !viewParent || view) {
