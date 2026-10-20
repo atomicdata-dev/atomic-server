@@ -3,6 +3,7 @@ use flutter_rust_bridge::frb;
 
 #[cfg(test)]
 mod peer_tests;
+mod peer_search;
 pub(crate) mod state;
 #[cfg(test)]
 mod store_open_tests;
@@ -73,8 +74,10 @@ async fn ensure_sync_connectivity(store: &atomic_lib::Db) -> Result<(), String> 
     let Some(drive) = store.get_active_drive() else {
         return Ok(());
     };
+    let _ = drive;
+    // `start_peer` also starts the search loop, which announces this device
+    // for the active and the private drive and keeps looking for the others.
     let _ = start_peer().await?;
-    let _ = peer_announce(drive).await;
     Ok(())
 }
 
@@ -743,6 +746,11 @@ fn short_id(node_id: &str) -> &str {
     &node_id[..node_id.len().min(12)]
 }
 
+/// The report's message when the lookup worked and named no other device.
+/// The app keeps it quiet (no toast): it is the normal state of a new account.
+const NO_OTHER_DEVICE_YET: &str =
+    "No other device found yet. Open the app on another device signed in with this account, or pair with QR.";
+
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct SyncConnectivityReport {
     pub imported: i32,
@@ -808,10 +816,15 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
         }
     }
 
-    // pkarr discover when still not live to any peer. The record also names
-    // replicas that are gone (an uninstalled app, an old laptop), so several
-    // are dialled at once and the first that answers wins.
-    if atomic_lib::sync::peer::live_peer_count() == 0 {
+    // pkarr discover, also when some peer is live already: a live server
+    // used to stop this lookup, and then the account's other devices were
+    // never dialled. The record also names replicas that are gone (an
+    // uninstalled app, an old laptop), so several are dialled at once and
+    // the first that answers wins; live ones are skipped
+    // (`sync_drive_with_peer_if_needed`). The search loop keeps looking
+    // after this; wake it, too.
+    peer_search::PEER_SEARCH.search_again();
+    {
         match tokio::time::timeout(PKARR_RESOLVE_TIMEOUT, async {
             let my_node_id = atomic_lib::sync::peer::get_node_id()
                 .ok_or("Peer not started")?
@@ -819,7 +832,18 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
             // Only other devices: a drive on this device alone names none,
             // which is nothing to report (it toasted "No peer on network:
             // Found 1 NodeID(s) but all are ours (…)" on every start).
-            atomic_lib::discovery::resolve_other_node_ids(&drive, Some(&my_node_id)).await
+            let mut others = Vec::new();
+            for search in peer_search::search_drives(store) {
+                for id in
+                    atomic_lib::discovery::resolve_other_node_ids(&search, Some(&my_node_id))
+                        .await?
+                {
+                    if !others.contains(&id) {
+                        others.push(id);
+                    }
+                }
+            }
+            Ok::<_, atomic_lib::AtomicError>(others)
         })
         .await
         {
@@ -847,8 +871,8 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
                     )),
                 }
             }
-            Ok(Err(e)) => errors.push(format!("No peer on network: {e}")),
-            Err(_) => errors.push("Peer lookup timed out (pkarr)".into()),
+            Ok(Err(e)) => errors.push(format!("Could not look for devices: {e}")),
+            Err(_) => errors.push("Could not look for devices: the directory (pkarr) timed out".into()),
         }
     }
 
@@ -888,7 +912,9 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
     } else if imported > 0 {
         "Synced data but no live connection — try again".to_string()
     } else if errors.is_empty() {
-        "No peers online. Open the other device or pair with QR.".to_string()
+        // Said only when the lookup worked and named nobody else; the search
+        // loop keeps looking (`peer_search_status`).
+        NO_OTHER_DEVICE_YET.to_string()
     } else {
         errors.join(" · ")
     };
@@ -1150,24 +1176,46 @@ fn db_event_to_json(event: atomic_lib::DbEvent) -> String {
 pub async fn start_peer() -> Result<String, String> {
     // One endpoint per process: a second caller (the background start after a
     // resume, a sync button) waits for the first instead of binding another.
-    static STARTING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
-    let _starting = STARTING.lock().await;
-    tracing::info!("[start_peer] called");
+    // A failed start is not remembered: the next caller tries again.
     let store = db()?;
-    if let Some(existing) = atomic_lib::sync::peer::get_node_id() {
-        tracing::info!("[start_peer] already running: {existing}");
-        return Ok(existing.to_string());
-    }
-    tracing::info!("[start_peer] starting Iroh endpoint...");
-    let (node_id, _router) = atomic_lib::sync::peer::start(store.as_ref().clone())
-        .await
-        .map_err(|e| {
-            tracing::error!("[start_peer] failed: {e}");
-            format!("Failed to start Iroh: {e}")
-        })?;
-    tracing::info!("[start_peer] OK, NodeID: {node_id}");
+    let node_id = peer_search::PEER_SEARCH
+        .start_with(|| async {
+            tracing::info!("[start_peer] called");
+            if let Some(existing) = atomic_lib::sync::peer::get_node_id() {
+                tracing::info!("[start_peer] already running: {existing}");
+                return Ok(existing.to_string());
+            }
+            tracing::info!("[start_peer] starting Iroh endpoint...");
+            let (node_id, _router) = atomic_lib::sync::peer::start(store.as_ref().clone())
+                .await
+                .map_err(|e| {
+                    tracing::error!("[start_peer] failed: {e}");
+                    format!("Failed to start Iroh: {e}")
+                })?;
+            tracing::info!("[start_peer] OK, NodeID: {node_id}");
+            Ok(node_id.to_string())
+        })
+        .await?;
+    // Returns at once when the loop already runs.
+    peer_search::spawn(store.as_ref().clone(), node_id.clone());
+    Ok(node_id)
+}
 
-    Ok(node_id.to_string())
+/// What the search for this account's other devices is doing, as JSON:
+/// `{"state": "starting" | "searching" | "no_peers_yet" | "connected" |
+/// "failed", "message": "…", "detail": "…" | null, "retry_in_secs"?,
+/// "devices"?, "reason"?, "last_checked_ms": …, "attempts": …}`.
+#[frb(sync)]
+pub fn peer_search_status() -> String {
+    serde_json::to_string(&peer_search::PEER_SEARCH.status()).unwrap_or_else(|_| "{}".into())
+}
+
+/// Look for the other devices now (a "Search again" button, a network
+/// change, the app coming back), dialling the ones that did not answer
+/// recently too.
+#[frb(sync)]
+pub fn peer_search_again() {
+    peer_search::PEER_SEARCH.search_again();
 }
 
 /// Get this device's Iroh NodeID (if peer is running).
