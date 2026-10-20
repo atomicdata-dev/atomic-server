@@ -2,6 +2,7 @@ import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt, Perf;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_top_bar.dart';
@@ -231,16 +232,47 @@ class _ChatsScreenState extends State<ChatsScreen> {
     if (_layout.collapsed.contains(id)) {
       _setLayout(_layout.toggleCollapsed(id));
     }
+    _revealSection(id, thenShowAll: true);
+  }
+
+  /// Scrolls the home so the section [id], just unfolded, can be seen: as
+  /// little as needed when heading and rows fit in the room above the bottom
+  /// bar (none when they already do), and with the heading at the top when
+  /// the section is taller than that. Runs after the frame that lays out the
+  /// rows. The hold menu and a tap on a heading both use it.
+  void _revealSection(HomeSection id, {bool thenShowAll = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      final state = _sectionKeys[id]?.currentState;
       final ctx = _sectionKeys[id]?.currentContext;
-      if (ctx != null) {
-        Scrollable.ensureVisible(ctx,
-            duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
-      }
-      _sectionKeys[id]?.currentState?.showAll();
+      if (ctx != null) _scrollToSection(ctx);
+      if (thenShowAll) state?.showAll();
     });
     WidgetsBinding.instance.scheduleFrame();
+  }
+
+  void _scrollToSection(BuildContext ctx) {
+    final ro = ctx.findRenderObject();
+    final scrollable = Scrollable.maybeOf(ctx);
+    if (ro is! RenderBox || !ro.attached || scrollable == null) return;
+    final position = scrollable.position;
+    final viewport = RenderAbstractViewport.maybeOf(ro);
+    if (viewport == null) return;
+    // The list is padded by the bottom bar, but its viewport runs under it.
+    final inset = MediaQuery.paddingOf(ctx).bottom;
+    final top = viewport.getOffsetToReveal(ro, 0.0).offset;
+    final bottom = viewport.getOffsetToReveal(ro, 1.0).offset + inset;
+    // `bottom` shows the section's end, `top` its heading at the very top;
+    // a section taller than the room gets `top`.
+    final lo = bottom < top ? bottom : top;
+    final target = position.pixels
+        .clamp(lo, top)
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+    if ((target - position.pixels).abs() < 0.5) return;
+    position.animateTo(target,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic);
   }
 
   ShellController? _shell;
@@ -633,7 +665,11 @@ class _ChatsScreenState extends State<ChatsScreen> {
   Widget _sectionFor(HomeSection id, AppColors c) {
     final fold = (
       collapsed: _layout.collapsed.contains(id),
-      onToggle: () => _setLayout(_layout.toggleCollapsed(id)),
+      onToggle: () {
+        final opening = _layout.collapsed.contains(id);
+        _setLayout(_layout.toggleCollapsed(id));
+        if (opening) _revealSection(id);
+      },
       onHold: _customize,
       section: id,
       trailing: _trailingFor(id),
