@@ -75,7 +75,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 631643536;
+  int get rustContentHash => 440329878;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -151,7 +151,8 @@ abstract class RustLibApi extends BaseApi {
   Future<List<ActivityEntry>> crateApiAssistantListActivity(
       {required int limit});
 
-  Future<String> crateApiAssistantListAiChats({required int limit});
+  Future<String> crateApiAssistantListAiChats(
+      {required int limit, required int offset});
 
   Future<String> crateApiAssistantListConversations({required int limit});
 
@@ -223,7 +224,10 @@ abstract class RustLibApi extends BaseApi {
       {required String serverUrl, required String secret, String? driveHint});
 
   Future<String> crateApiAssistantSearch(
-      {String? drive, required String query, required int limit});
+      {String? drive,
+      required String query,
+      required int limit,
+      required List<String> classes});
 
   Future<String> crateApiAssistantSendChatRoomMessage(
       {required String subject, required String text, String? replyTo});
@@ -263,6 +267,8 @@ abstract class RustLibApi extends BaseApi {
   Future<String> crateApiSimpleWaitForSyncEvent();
 
   Future<void> crateApiSimpleWarmResourceHistory({required String subject});
+
+  Future<void> crateApiAssistantWarmSearch();
 
   Future<String> crateApiSimpleWatchChildren({required String parent});
 
@@ -962,11 +968,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<String> crateApiAssistantListAiChats({required int limit}) {
+  Future<String> crateApiAssistantListAiChats(
+      {required int limit, required int offset}) {
     return handler.executeNormal(NormalTask(
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_u_32(limit, serializer);
+        sse_encode_u_32(offset, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
             funcId: 29, port: port_);
       },
@@ -975,7 +983,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         decodeErrorData: sse_decode_String,
       ),
       constMeta: kCrateApiAssistantListAiChatsConstMeta,
-      argValues: [limit],
+      argValues: [limit, offset],
       apiImpl: this,
     ));
   }
@@ -983,7 +991,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiAssistantListAiChatsConstMeta =>
       const TaskConstMeta(
         debugName: "list_ai_chats",
-        argNames: ["limit"],
+        argNames: ["limit", "offset"],
       );
 
   @override
@@ -1753,13 +1761,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @override
   Future<String> crateApiAssistantSearch(
-      {String? drive, required String query, required int limit}) {
+      {String? drive,
+      required String query,
+      required int limit,
+      required List<String> classes}) {
     return handler.executeNormal(NormalTask(
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_opt_String(drive, serializer);
         sse_encode_String(query, serializer);
         sse_encode_u_32(limit, serializer);
+        sse_encode_list_String(classes, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
             funcId: 61, port: port_);
       },
@@ -1768,14 +1780,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         decodeErrorData: sse_decode_String,
       ),
       constMeta: kCrateApiAssistantSearchConstMeta,
-      argValues: [drive, query, limit],
+      argValues: [drive, query, limit, classes],
       apiImpl: this,
     ));
   }
 
   TaskConstMeta get kCrateApiAssistantSearchConstMeta => const TaskConstMeta(
         debugName: "search",
-        argNames: ["drive", "query", "limit"],
+        argNames: ["drive", "query", "limit", "classes"],
       );
 
   @override
@@ -2182,13 +2194,37 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiAssistantWarmSearch() {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 78, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_unit,
+        decodeErrorData: sse_decode_String,
+      ),
+      constMeta: kCrateApiAssistantWarmSearchConstMeta,
+      argValues: [],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiAssistantWarmSearchConstMeta =>
+      const TaskConstMeta(
+        debugName: "warm_search",
+        argNames: [],
+      );
+
+  @override
   Future<String> crateApiSimpleWatchChildren({required String parent}) {
     return handler.executeNormal(NormalTask(
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(parent, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 78, port: port_);
+            funcId: 79, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2213,7 +2249,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(subject, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 79, port: port_);
+            funcId: 80, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,

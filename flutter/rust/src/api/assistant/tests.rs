@@ -87,7 +87,7 @@ async fn a_chat_started_here_takes_messages_in_order_and_is_listed() {
     assert_eq!(texts, [("user", "Hallo"), ("assistant", "Hoi!")]);
 
     pump(&mut rx).await;
-    let list = list_ai_chats(500).await.unwrap();
+    let list = list_ai_chats(500, 0).await.unwrap();
     assert!(list.contains(&chat));
     assert!(list.contains("Phone chat"));
 }
@@ -97,7 +97,7 @@ async fn assistant_search_finds_a_prefix_with_title_and_class() {
     let chat = new_chat("Zebrafinch migration notes").await;
     let drive = shared_drive().await.to_string();
     let hits: Vec<Json> = serde_json::from_str(
-        &search(Some(drive.clone()), "zebraf".into(), 5)
+        &search(Some(drive.clone()), "zebraf".into(), 5, vec![])
             .await
             .unwrap(),
     )
@@ -109,10 +109,45 @@ async fn assistant_search_finds_a_prefix_with_title_and_class() {
     assert_eq!(hit["title"], "Zebrafinch migration notes");
     assert!(hit["class_name"].as_str().is_some_and(|c| !c.is_empty()));
     let other = "https://example.test/not-this-drive".to_string();
-    assert!(!search(Some(other), "zebraf".into(), 5)
+    assert!(!search(Some(other), "zebraf".into(), 5, vec![])
         .await
         .unwrap()
         .contains(&chat));
+}
+
+#[tokio::test]
+async fn assistant_search_filters_the_class_and_pages_the_chats() {
+    let chat = new_chat("Gerenuk pagination chat").await;
+    let drive = shared_drive().await.to_string();
+    for i in 0..5 {
+        db().unwrap()
+            .create_resource(
+                atomic_lib::urls::FOLDER,
+                &drive,
+                &format!("Gerenuk folder {i}"),
+                None,
+            )
+            .await
+            .unwrap();
+    }
+    let only_chats: Vec<Json> = serde_json::from_str(
+        &search(None, "gerenuk".into(), 2, vec!["aichat".into()])
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(only_chats.len(), 1, "{only_chats:?}");
+    assert_eq!(only_chats[0]["subject"], chat.as_str());
+
+    // Pages of one chat each add up to the whole list.
+    let mut rx = db().unwrap().subscribe_events();
+    pump(&mut rx).await;
+    let all: Vec<Json> = serde_json::from_str(&list_ai_chats(1000, 0).await.unwrap()).unwrap();
+    let first: Vec<Json> = serde_json::from_str(&list_ai_chats(1, 0).await.unwrap()).unwrap();
+    let rest: Vec<Json> = serde_json::from_str(&list_ai_chats(1000, 1).await.unwrap()).unwrap();
+    assert_eq!([first, rest].concat(), all);
+
+    warm_search().await.unwrap();
 }
 
 #[tokio::test]
@@ -372,7 +407,7 @@ async fn a_document_created_here_is_in_the_drive_and_found_by_search() {
         r.get(urls::NAME).unwrap().to_string(),
         "Narwhal bridge document"
     );
-    let hits = search(Some(drive.to_string()), "narwhal".into(), 5)
+    let hits = search(Some(drive.to_string()), "narwhal".into(), 5, vec![])
         .await
         .unwrap();
     assert!(hits.contains(&subject), "{hits}");

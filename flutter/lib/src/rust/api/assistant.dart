@@ -12,11 +12,13 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 Future<String> resourceIcons({required List<String> subjects}) =>
     RustLib.instance.api.crateApiAssistantResourceIcons(subjects: subjects);
 
-/// The newest `limit` AI chats of the person (all drives), newest activity first, as JSON
-/// `[{subject, name, last_activity}]` (`last_activity` in ms, 0 when empty).
-/// Read from the recents index, not rebuilt from the chats' pages.
-Future<String> listAiChats({required int limit}) =>
-    RustLib.instance.api.crateApiAssistantListAiChats(limit: limit);
+/// `limit` AI chats of the person (all drives) after the `offset` newest
+/// ones, newest activity first, as JSON `[{subject, name, last_activity}]`
+/// (`last_activity` in ms, 0 when empty). A page shorter than `limit` is the
+/// last. Read from the recents index, not rebuilt from the chats' pages.
+Future<String> listAiChats({required int limit, required int offset}) =>
+    RustLib.instance.api
+        .crateApiAssistantListAiChats(limit: limit, offset: offset);
 
 /// The notifications in the Inbox of the person's private drive (what the web
 /// app recorded there), newest first, one per source, as JSON `[{subject,
@@ -117,11 +119,20 @@ Future<String> sendChatRoomMessage(
 /// Full-text search (type-ahead on the last word) across every drive of this
 /// store, or only in `drive` when given. JSON
 /// `[{subject, title, class_name, drive, score}]`, best first; `drive` is the
-/// drive the hit lives in ("" when unknown).
+/// drive the hit lives in ("" when unknown). `classes` (`drive`, `aichat`,
+/// `conversation`, `chatroom`, or class URLs; empty: any) keeps only
+/// resources of those classes, applied before the limit.
 Future<String> search(
-        {String? drive, required String query, required int limit}) =>
-    RustLib.instance.api
-        .crateApiAssistantSearch(drive: drive, query: query, limit: limit);
+        {String? drive,
+        required String query,
+        required int limit,
+        required List<String> classes}) =>
+    RustLib.instance.api.crateApiAssistantSearch(
+        drive: drive, query: query, limit: limit, classes: classes);
+
+/// Read the search index once so the first keystroke is not cold. Call it
+/// after the first frame; it runs on a blocking thread and never fails.
+Future<void> warmSearch() => RustLib.instance.api.crateApiAssistantWarmSearch();
 
 /// The URL that shows `subject` in the data-browser of the connected server,
 /// for a webview. Errors when no server is connected (`open_ws_sync`).

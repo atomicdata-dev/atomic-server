@@ -21,11 +21,12 @@ pub async fn resource_icons(subjects: Vec<String>) -> Result<String, String> {
     to_json(&lists::resource_icons(db()?, subjects).await)
 }
 
-/// The newest `limit` AI chats of the person (all drives), newest activity first, as JSON
-/// `[{subject, name, last_activity}]` (`last_activity` in ms, 0 when empty).
-/// Read from the recents index, not rebuilt from the chats' pages.
-pub async fn list_ai_chats(limit: u32) -> Result<String, String> {
-    let list = lists::list_ai_chats(db()?, recents(), limit as usize)
+/// `limit` AI chats of the person (all drives) after the `offset` newest
+/// ones, newest activity first, as JSON `[{subject, name, last_activity}]`
+/// (`last_activity` in ms, 0 when empty). A page shorter than `limit` is the
+/// last. Read from the recents index, not rebuilt from the chats' pages.
+pub async fn list_ai_chats(limit: u32, offset: u32) -> Result<String, String> {
+    let list = lists::list_ai_chats_page(db()?, recents(), offset as usize, limit as usize)
         .await
         .map_err(err)?;
     to_json(&list)
@@ -200,9 +201,27 @@ pub async fn send_chat_room_message(
 /// Full-text search (type-ahead on the last word) across every drive of this
 /// store, or only in `drive` when given. JSON
 /// `[{subject, title, class_name, drive, score}]`, best first; `drive` is the
-/// drive the hit lives in ("" when unknown).
-pub async fn search(drive: Option<String>, query: String, limit: u32) -> Result<String, String> {
-    to_json(&lists::search(db()?, drive.as_deref(), &query, limit as usize).map_err(err)?)
+/// drive the hit lives in ("" when unknown). `classes` (`drive`, `aichat`,
+/// `conversation`, `chatroom`, or class URLs; empty: any) keeps only
+/// resources of those classes, applied before the limit.
+pub async fn search(
+    drive: Option<String>,
+    query: String,
+    limit: u32,
+    classes: Vec<String>,
+) -> Result<String, String> {
+    to_json(
+        &lists::search_classes(db()?, drive.as_deref(), &query, limit as usize, &classes)
+            .map_err(err)?,
+    )
+}
+
+/// Read the search index once so the first keystroke is not cold. Call it
+/// after the first frame; it runs on a blocking thread and never fails.
+pub async fn warm_search() -> Result<(), String> {
+    let store = db()?.clone();
+    let _ = tokio::task::spawn_blocking(move || lists::warm_search(&store)).await;
+    Ok(())
 }
 
 /// The URL that shows `subject` in the data-browser of the connected server,

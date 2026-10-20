@@ -37,7 +37,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 631643536;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 440329878;
 
 // Section: executor
 
@@ -1027,11 +1027,13 @@ fn wire__crate__api__assistant__list_ai_chats_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_limit = <u32>::sse_decode(&mut deserializer);
+            let api_offset = <u32>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, String>(
                     (move || async move {
-                        let output_ok = crate::api::assistant::list_ai_chats(api_limit).await?;
+                        let output_ok =
+                            crate::api::assistant::list_ai_chats(api_limit, api_offset).await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -2159,12 +2161,18 @@ fn wire__crate__api__assistant__search_impl(
             let api_drive = <Option<String>>::sse_decode(&mut deserializer);
             let api_query = <String>::sse_decode(&mut deserializer);
             let api_limit = <u32>::sse_decode(&mut deserializer);
+            let api_classes = <Vec<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, String>(
                     (move || async move {
-                        let output_ok =
-                            crate::api::assistant::search(api_drive, api_query, api_limit).await?;
+                        let output_ok = crate::api::assistant::search(
+                            api_drive,
+                            api_query,
+                            api_limit,
+                            api_classes,
+                        )
+                        .await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -2753,6 +2761,41 @@ fn wire__crate__api__simple__warm_resource_history_impl(
         },
     )
 }
+fn wire__crate__api__assistant__warm_search_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "warm_search",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok = crate::api::assistant::warm_search().await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__simple__watch_children_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -3188,8 +3231,9 @@ fn pde_ffi_dispatcher_primary_impl(
         77 => {
             wire__crate__api__simple__warm_resource_history_impl(port, ptr, rust_vec_len, data_len)
         }
-        78 => wire__crate__api__simple__watch_children_impl(port, ptr, rust_vec_len, data_len),
-        79 => wire__crate__api__simple__watch_resource_impl(port, ptr, rust_vec_len, data_len),
+        78 => wire__crate__api__assistant__warm_search_impl(port, ptr, rust_vec_len, data_len),
+        79 => wire__crate__api__simple__watch_children_impl(port, ptr, rust_vec_len, data_len),
+        80 => wire__crate__api__simple__watch_resource_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

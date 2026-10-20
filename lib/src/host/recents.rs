@@ -532,6 +532,18 @@ impl RecentsIndex {
         store: &Db,
         limit: usize,
     ) -> AtomicResult<Vec<(String, String, i64)>> {
+        self.recent_chats_page(store, 0, limit).await
+    }
+
+    /// `limit` chats after the `offset` newest ones (chats that are gone or
+    /// are no AI chat do not count), for paging through all of them: the
+    /// next page starts at `offset + rows already seen`.
+    pub async fn recent_chats_page(
+        &self,
+        store: &Db,
+        offset: usize,
+        limit: usize,
+    ) -> AtomicResult<Vec<(String, String, i64)>> {
         // An index that lost events (a lagged listener) still lists what it
         // has; the listener rescans every chat once the events calm down
         // (0.9 s for 1000 chats). Only an index without chats waits for it.
@@ -548,6 +560,7 @@ impl RecentsIndex {
         });
         chats.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
         let mut out = Vec::new();
+        let mut skipped = 0;
         for (subject, last) in chats {
             if out.len() >= limit {
                 break;
@@ -558,6 +571,10 @@ impl RecentsIndex {
             };
             // Indexes written before chat rooms were told apart hold them.
             if !is_ai_chat(&resource) {
+                continue;
+            }
+            if skipped < offset {
+                skipped += 1;
                 continue;
             }
             out.push((subject, name_of(&resource), last));

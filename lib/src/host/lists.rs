@@ -37,8 +37,19 @@ pub async fn list_ai_chats(
     recents: &RecentsIndex,
     limit: usize,
 ) -> AtomicResult<Vec<Json>> {
+    list_ai_chats_page(store, recents, 0, limit).await
+}
+
+/// [`list_ai_chats`] for paging: `limit` chats after the `offset` newest
+/// ones. A page shorter than `limit` is the last.
+pub async fn list_ai_chats_page(
+    store: &Db,
+    recents: &RecentsIndex,
+    offset: usize,
+    limit: usize,
+) -> AtomicResult<Vec<Json>> {
     Ok(recents
-        .recent_chats(store, limit)
+        .recent_chats_page(store, offset, limit)
         .await?
         .into_iter()
         .map(|(subject, name, last)| json!({ "subject": subject, "name": name, "last_activity": last }))
@@ -312,6 +323,41 @@ pub fn search(
     query: &str,
     limit: usize,
 ) -> AtomicResult<Vec<Json>> {
+    search_classes(store, drive, query, limit, &[])
+}
+
+/// The class URL a search `class` names: a URL as is, or the shortname the
+/// app uses for a kind of thing (`drive`, `aichat`, `conversation`,
+/// `chatroom`; case and punctuation do not matter).
+fn search_class_url(class: &str) -> AtomicResult<String> {
+    if class.contains("://") {
+        return Ok(class.to_string());
+    }
+    let key: String = class
+        .to_lowercase()
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .collect();
+    Ok(match key.as_str() {
+        "drive" => crate::urls::DRIVE,
+        "aichat" => super::rows::AI_CHAT,
+        "conversation" => crate::urls::CONVERSATION,
+        "chatroom" => crate::urls::CHATROOM,
+        _ => return Err(format!("Unknown search class {class:?}").into()),
+    }
+    .to_string())
+}
+
+/// [`search`] for only the resources of one of `classes` (none: any). The
+/// class is filtered in the index, before the result limit: a query whose
+/// best twenty are documents still finds the chat in place 21.
+pub fn search_classes(
+    store: &Db,
+    drive: Option<&str>,
+    query: &str,
+    limit: usize,
+    classes: &[String],
+) -> AtomicResult<Vec<Json>> {
     let scoped = drive.is_some_and(|d| !d.is_empty());
     // Room to move the person's things forward past schema hits.
     let fetch = if scoped {
@@ -319,12 +365,37 @@ pub fn search(
     } else {
         limit.saturating_mul(4)
     };
-    let opts = crate::client::search::SearchOpts {
-        limit: Some(fetch as u32),
-        parents: drive.filter(|d| !d.is_empty()).map(|d| vec![d.to_string()]),
-        ..Default::default()
+    let parents = drive.filter(|d| !d.is_empty()).map(|d| vec![d.to_string()]);
+    let hits = if classes.is_empty() {
+        let opts = crate::client::search::SearchOpts {
+            limit: Some(fetch as u32),
+            parents,
+            ..Default::default()
+        };
+        crate::search::query(store, query.trim(), &opts)?
+    } else {
+        // One indexed filter per class (a kind can be two classes, such as
+        // conversations and chat rooms), merged best first.
+        let mut hits = Vec::new();
+        for class in classes {
+            let opts = crate::client::search::SearchOpts {
+                limit: Some(fetch as u32),
+                parents: parents.clone(),
+                filter_pairs: Some(vec![(
+                    crate::urls::IS_A.to_string(),
+                    search_class_url(class)?,
+                )]),
+                ..Default::default()
+            };
+            hits.extend(crate::search::query(store, query.trim(), &opts)?);
+        }
+        if classes.len() > 1 {
+            hits.sort_by(|a, b| b.score.total_cmp(&a.score));
+            let mut seen = std::collections::HashSet::new();
+            hits.retain(|h| seen.insert(h.subject.to_string()));
+        }
+        hits
     };
-    let hits = crate::search::query(store, query.trim(), &opts)?;
 
     // Local propvals only, and each parent / class is looked up once per
     // query: a search never waits on the network and never decodes a Loro doc.
@@ -364,6 +435,20 @@ pub fn search(
     }
     out.truncate(limit);
     Ok(out)
+}
+
+/// Read the search trees once so the first keystroke does not find them
+/// cold (9-62 ms on a desktop, about 200 ms on a phone). Run it on a
+/// background thread once the first screen is drawn: it only reads, with a
+/// few short queries of the lengths people start with.
+pub fn warm_search(store: &Db) {
+    let opts = crate::client::search::SearchOpts {
+        limit: Some(5),
+        ..Default::default()
+    };
+    for probe in ["e", "a", "te", "sea", "meeting"] {
+        let _ = crate::search::query(store, probe, &opts);
+    }
 }
 
 #[cfg(test)]
@@ -472,6 +557,98 @@ mod tests {
 
     fn sync_subject(tag: &str, n: u64) -> String {
         format!("did:ad:{tag}{:0>58}{n:0>6}==", std::process::id())
+    }
+
+    #[tokio::test]
+    async fn chats_are_paged_without_gaps_or_repeats() {
+        let d = Device::new().await;
+        let mut rx = d.store.subscribe_events();
+        let mut chats = Vec::new();
+        for i in 0..23 {
+            let chat = d.new_chat(&format!("Paged chat {i}")).await;
+            d.add_page(
+                &chat,
+                &[("1-00000001", d.ai_entry("user", "hi", 1_000 + i * 10))],
+            )
+            .await;
+            chats.push(chat);
+        }
+        d.pump(&mut rx).await;
+
+        let all = list_ai_chats(&d.store, &d.recents, 1000).await.unwrap();
+        assert_eq!(all.len(), 23);
+        let mut paged = Vec::new();
+        loop {
+            let page = list_ai_chats_page(&d.store, &d.recents, paged.len(), 10)
+                .await
+                .unwrap();
+            let last = page.len() < 10;
+            paged.extend(page);
+            if last {
+                break;
+            }
+        }
+        assert_eq!(paged, all);
+        // Newest first; a page past the end is empty.
+        assert_eq!(paged[0]["subject"], chats[22].as_str());
+        assert!(list_ai_chats_page(&d.store, &d.recents, 23, 10)
+            .await
+            .unwrap()
+            .is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_class_filter_applies_before_the_result_limit() {
+        let d = Device::new().await;
+        for i in 0..12 {
+            d.store
+                .create_resource(urls::FOLDER, &d.drive, &format!("Quokka folder {i}"), None)
+                .await
+                .unwrap();
+        }
+        let chat = d.new_chat("Quokka chat with a longer title").await;
+        let room = d
+            .store
+            .create_resource(urls::CHATROOM, &d.drive, "Quokka room with a title", None)
+            .await
+            .unwrap();
+
+        // The best three are folders: the chat is not among them...
+        let any = search(&d.store, None, "quokka", 3).unwrap();
+        assert!(!has(&any, &chat));
+        // ...but a filter on the class finds it, and only it.
+        let chats = search_classes(&d.store, None, "quokka", 3, &["aichat".into()]).unwrap();
+        assert_eq!(chats.len(), 1, "{chats:?}");
+        assert!(has(&chats, &chat));
+        // Several classes are merged; a class URL works like a shortname.
+        let both = search_classes(
+            &d.store,
+            None,
+            "quokka",
+            5,
+            &["ai-chat".into(), urls::CHATROOM.into()],
+        )
+        .unwrap();
+        assert!(
+            has(&both, &chat) && has(&both, &room) && both.len() == 2,
+            "{both:?}"
+        );
+        assert!(search_classes(&d.store, None, "quokka", 3, &["nonsense".into()]).is_err());
+        // Typing nothing yet lists none of a class; the filter keeps a drive scope.
+        let scoped =
+            search_classes(&d.store, Some(&d.drive), "quokka", 3, &["aichat".into()]).unwrap();
+        assert!(has(&scoped, &chat));
+    }
+
+    #[tokio::test]
+    async fn warming_the_search_changes_nothing() {
+        let d = Device::new().await;
+        d.store
+            .create_resource(urls::FOLDER, &d.drive, "Zyzzyva notes", None)
+            .await
+            .unwrap();
+        warm_search(&d.store);
+        assert_eq!(search(&d.store, None, "zyzzyva", 5).unwrap().len(), 1);
     }
 
     #[tokio::test]
