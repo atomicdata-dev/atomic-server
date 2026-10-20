@@ -23,12 +23,11 @@ import '../src/rust/api/assistant.dart' as assistant;
 import '../src/rust/api/context.dart' as context;
 import '../src/rust/api/embed.dart' as embed;
 import 'session.dart';
+import '../screens/store_recovery_screen.dart' show StoreRecoveryNotice;
 import '../src/rust/api/simple.dart' as ffi;
-import '../src/rust/api/simple/types.dart'
-    show AgentInfo, VersionMetadata;
+import '../src/rust/api/simple/types.dart' show AgentInfo, VersionMetadata;
 
-export '../src/rust/api/simple/types.dart'
-    show AgentInfo, VersionMetadata;
+export '../src/rust/api/simple/types.dart' show AgentInfo, VersionMetadata;
 
 /// Atomic Data SDK — local-first with optional sync.
 ///
@@ -45,6 +44,17 @@ class AtomicClient {
   // ── 1. Database ──────────────────────────────────────────────────────────
 
   static Future<void> openDb(String path) => ffi.openDb(path: path);
+
+  /// Set when `openDb` found the store damaged and set it aside.
+  static StoreRecoveryNotice? storeRecovery() {
+    final r = ffi.storeRecovery();
+    if (r == null) return null;
+    return StoreRecoveryNotice(
+        keptPath: r.keptPath, reason: r.reason, repaired: r.repaired);
+  }
+
+  /// Make every write so far durable (the app is going to the background).
+  static Future<void> flushDb() => ffi.flushDb();
 
   // ── 2. Agent ─────────────────────────────────────────────────────────────
 

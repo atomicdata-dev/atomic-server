@@ -10,7 +10,9 @@ import 'assistant/file_attachment_picker.dart';
 import 'perf_seed.dart';
 import 'screens/login_screen.dart';
 import 'screens/pair_screen.dart';
+import 'screens/store_recovery_screen.dart';
 import 'screens/sync_screen.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:atomic_flutter/atomic_flutter.dart' show Perf;
 import 'theme.dart';
 import 'atomic/atomic_client.dart';
@@ -26,24 +28,66 @@ void main() async {
   Perf.mark('rust init');
   final dir = await getApplicationDocumentsDirectory();
   Perf.mark('documents dir');
-  await AtomicClient.openDb(dir.path);
+  // Whatever happens here, the app draws something: an error that escaped
+  // `main` before `runApp` left it black for good.
+  final openError = await _openDb(dir.path);
   Perf.mark('db open');
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   await theme;
   defaultAttachmentPicker = const FileSelectorAttachmentPicker();
+  if (openError != null) {
+    runApp(MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: StoreOpenFailedScreen(
+        error: openError,
+        onRetry: () async {
+          final error = await _openDb(dir.path);
+          if (error == null) _runAtomicApp();
+          return error;
+        },
+      ),
+    ));
+    return;
+  }
+  _runAtomicApp();
+}
+
+/// Open the store; the error as text, or null once it is open.
+Future<String?> _openDb(String path) async {
+  try {
+    await AtomicClient.openDb(path);
+    return null;
+  } catch (e) {
+    debugPrint('Opening the local store failed: $e');
+    return '$e';
+  }
+}
+
+void _runAtomicApp() {
   Perf.mark('runApp');
-  runApp(const AtomicApp());
+  runApp(AtomicApp(storeRecovery: AtomicClient.storeRecovery()));
   // The saved session (secure storage: a few hundred ms the first time),
   // read once for the sign-in screen, which builds next. Not earlier: the
   // read competes with the first frame for the main thread.
   AtomicSession.preload();
-  WidgetsBinding.instance
-      .waitUntilFirstFrameRasterized
+  WidgetsBinding.instance.waitUntilFirstFrameRasterized
       .then((_) => Perf.mark('first frame'));
 }
 
+Future<void> _shareDamagedStore(String path) async {
+  await SharePlus.instance.share(ShareParams(
+    files: [XFile(path, mimeType: 'application/octet-stream')],
+    subject: 'Damaged atomic.place store',
+    text: 'The local store the app could not open.',
+  ));
+}
+
 class AtomicApp extends StatefulWidget {
-  const AtomicApp({super.key});
+  const AtomicApp({super.key, this.storeRecovery});
+
+  /// Set when the local store was damaged and replaced at this start: the
+  /// app says so before anything else.
+  final StoreRecoveryNotice? storeRecovery;
 
   @override
   State<AtomicApp> createState() => _AtomicAppState();
@@ -51,6 +95,7 @@ class AtomicApp extends StatefulWidget {
 
 class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
   bool _loggedIn = false;
+  late StoreRecoveryNotice? _storeRecovery = widget.storeRecovery;
   final _navKey = GlobalKey<NavigatorState>();
   static const _linkChannel = MethodChannel('app.atomicdata.app/deeplink');
   Timer? _eventPoller;
@@ -105,6 +150,14 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // In the background Android may kill the app without warning: make the
+    // last writes durable now rather than at the next flush tick.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      AtomicClient.flushDb().catchError(
+          (Object e) => debugPrint('Flushing the store failed: $e'));
+    }
     if (state == AppLifecycleState.resumed && _loggedIn) {
       _resumeFromSession();
       _startBackgroundSync();
@@ -267,18 +320,24 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
         scaffoldBackgroundColor: AppColors.dark.pageBg,
         extensions: const [AppColors.dark],
       ),
-      home: !_loggedIn
-          ? LoginScreen(onLoggedIn: _onLoggedIn)
-          : AppShell(
-              api: const AtomicAssistantApi(),
-              drive: AtomicClient.getActiveDrive() ?? '',
-              profile: (_) => const SyncScreen(),
-              home: ChatsScreen(
-                api: const AtomicAssistantApi(),
-                drive: AtomicClient.getActiveDrive() ?? '',
-                onSignOut: _signedOut,
-              ),
-            ),
+      home: _storeRecovery != null
+          ? StoreRecoveryScreen(
+              notice: _storeRecovery!,
+              onContinue: () => setState(() => _storeRecovery = null),
+              onShare: _shareDamagedStore,
+            )
+          : !_loggedIn
+              ? LoginScreen(onLoggedIn: _onLoggedIn)
+              : AppShell(
+                  api: const AtomicAssistantApi(),
+                  drive: AtomicClient.getActiveDrive() ?? '',
+                  profile: (_) => const SyncScreen(),
+                  home: ChatsScreen(
+                    api: const AtomicAssistantApi(),
+                    drive: AtomicClient.getActiveDrive() ?? '',
+                    onSignOut: _signedOut,
+                  ),
+                ),
     );
   }
 }
