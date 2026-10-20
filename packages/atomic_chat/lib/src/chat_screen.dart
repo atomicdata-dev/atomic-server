@@ -1,6 +1,7 @@
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt, Perf;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -16,6 +17,7 @@ import 'attachments.dart';
 import 'resource_row.dart';
 import 'chat_parts.dart';
 import 'chat_window.dart';
+import 'scroll_to_bottom_button.dart';
 import 'markdown_view.dart';
 import 'tool_step.dart';
 import 'native_views.dart';
@@ -117,7 +119,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     onOlderPage: (ms, n) => Perf.span('chat older page $n', ms),
   );
   late final _keeper = ChatScrollKeeper(_window);
-  bool _far = false;
 
   // Following an answer as it streams in (see [_settle]): the list follows
   // the growing answer at the bottom while the answer's top is in view;
@@ -580,15 +581,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (mounted) setState(() {});
   }
 
-  /// "Jump to latest" shows once scrolled up by more than a screen.
-  void _scrolled() {
-    final far = _keeper.farFromBottom;
-    if (far != _far) setState(() => _far = far);
-  }
-
   Future<void> _readMessages() async {
     _window.addListener(_windowChanged);
-    _keeper.controller.addListener(_scrolled);
     final chat = _chat;
     if (chat == null) {
       setState(() => _noChatYet = true);
@@ -1090,6 +1084,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           key: _listKey,
           controller: _keeper.controller,
           reverse: true,
+          physics: chatScrollPhysics,
+          scrollCacheExtent: const ScrollCacheExtent.viewport(1.5),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + _spacer),
           itemCount: shown.length + (_window.hasOlder ? 1 : 0),
           findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
@@ -1152,17 +1149,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
     return Stack(children: [
       list,
-      if (_far)
-        Positioned(
-          right: 12,
-          bottom: 12,
-          child: JumpToLatest(
-              unseen: 0,
-              onPressed: () async {
-                await _keeper.jumpToLatest();
-                if (mounted) setState(() => _far = false);
-              }),
-        ),
+      ScrollToBottomButton(keeper: _keeper),
     ]);
   }
 

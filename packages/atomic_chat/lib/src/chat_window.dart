@@ -340,6 +340,10 @@ class ChatWindow<T> extends ChangeNotifier {
   }
 }
 
+/// The same scroll physics on every chat list.
+const chatScrollPhysics =
+    AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics());
+
 /// Scroll behaviour of a chat list over a [ChatWindow]: a reversed list
 /// (newest at the bottom, offset 0). Loads older pages within [edge] items
 /// of the top and newer ones near the bottom while detached, keeps the
@@ -361,10 +365,12 @@ class ChatScrollKeeper {
   bool get atBottom =>
       !controller.hasClients || controller.position.pixels <= bottomSlack;
 
-  /// Scrolled up by more than a screen: show "Jump to latest".
+  /// Scrolled up by more than this: the scroll-to-bottom button shows.
+  static const showButtonDistance = 120.0;
+
   bool get farFromBottom =>
       controller.hasClients &&
-      controller.position.pixels > controller.position.viewportDimension;
+      controller.position.pixels > showButtonDistance;
 
   /// The index (from the bottom) the list last built: where the eye is.
   int _lastBuilt = 0;
@@ -398,29 +404,85 @@ class ChatScrollKeeper {
     if (controller.hasClients) controller.jumpTo(0);
   }
 
+  /// Smoothly to the newest message (offset 0). Loads the newest page first
+  /// when the window left it. From far away (over 3 screens) it jumps to
+  /// 1.5 screens above the bottom and animates only the last stretch, over
+  /// 250-600 ms, longer for longer distances.
+  Future<void> scrollToBottom() async {
+    final reload = window.detached || window.unseen > 0;
+    if (reload) {
+      await window.jumpToLatest();
+      // Let the list build the new items before moving.
+      await WidgetsBinding.instance.endOfFrame;
+    }
+    if (!controller.hasClients) return;
+    final pos = controller.position;
+    final view = pos.viewportDimension;
+    if (reload && pos.pixels > 1.5 * view) {
+      controller.jumpTo(pos.maxScrollExtent < 1.5 * view
+          ? pos.maxScrollExtent
+          : 1.5 * view);
+    } else if (pos.pixels > 3 * view) {
+      controller.jumpTo(1.5 * view);
+    }
+    final distance = controller.position.pixels;
+    if (distance <= 0) return;
+    final ms = (250 + distance / view * 100).round().clamp(250, 600);
+    await controller.animateTo(0,
+        duration: Duration(milliseconds: ms), curve: Curves.easeOutCubic);
+  }
+
+  /// Gently to the bottom (a message was sent).
+  void nudgeToBottom() {
+    if (!controller.hasClients || controller.position.pixels <= 0) return;
+    unawaited(controller.animateTo(0,
+        duration: const Duration(milliseconds: 200), curve: Curves.easeOut));
+  }
+
   void dispose() => controller.dispose();
 }
 
-/// The "Jump to latest" button over a chat list: shown when scrolled up by
-/// more than a screen or when new messages wait, with their count.
-class JumpToLatest extends StatelessWidget {
-  final int unseen;
-  final VoidCallback onPressed;
-
-  const JumpToLatest(
-      {super.key, required this.unseen, required this.onPressed});
+/// Wraps a chat row. The newest row may fade and slide in over 150 ms
+/// ([animate] when it is first built); every other row shows at once. The
+/// widget is on every row so a row keeps its state when it stops being the
+/// newest.
+class RowEntrance extends StatefulWidget {
+  final bool animate;
+  final Widget child;
+  const RowEntrance({super.key, required this.animate, required this.child});
 
   @override
-  Widget build(BuildContext context) => FloatingActionButton.small(
-        key: const Key('jump-to-latest'),
-        tooltip: unseen > 0 ? '$unseen new' : 'Jump to latest',
-        onPressed: onPressed,
-        child: unseen > 0
-            ? Badge(
-                label: Text(unseen > 99 ? '99+' : '$unseen'),
-                child: const Icon(Icons.arrow_downward),
-              )
-            : const Icon(Icons.arrow_downward),
+  State<RowEntrance> createState() => _RowEntranceState();
+}
+
+class _RowEntranceState extends State<RowEntrance>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 150),
+    value: widget.animate ? 0 : 1,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.animate) _c.forward();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+        opacity: _c,
+        child: SlideTransition(
+          position: _c.drive(Tween(begin: const Offset(0, 0.25), end: Offset.zero)
+              .chain(CurveTween(curve: Curves.easeOut))),
+          child: widget.child,
+        ),
       );
 }
 

@@ -154,7 +154,7 @@ void main() {
       await tester.drag(list, const Offset(0, 400));
       await tester.pumpAndSettle();
     }
-    expect(find.byKey(const Key('jump-to-latest')), findsOneWidget);
+    expect(find.byKey(const Key('scroll-to-bottom')), findsOneWidget);
     final shown = _built(tester).toList();
     for (var i = 0; i < 3; i++) {
       api.log.add(_line(5000 + i));
@@ -164,10 +164,10 @@ void main() {
     // Nothing moved; the count is on the button.
     expect(_built(tester).toList(), shown);
     expect(find.text('3'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('jump-to-latest')));
+    await tester.tap(find.byKey(const Key('scroll-to-bottom')));
     await tester.pumpAndSettle();
     expect(find.text('Line 5002'), findsOneWidget);
-    expect(find.byKey(const Key('jump-to-latest')), findsNothing);
+    expect(find.byKey(const Key('scroll-to-bottom')), findsNothing);
     await _leave(tester);
   });
 

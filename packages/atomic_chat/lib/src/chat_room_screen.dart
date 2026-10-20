@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt, Perf;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 
 import 'app_top_bar.dart';
 import 'home_sections.dart' show HomeSection;
 import 'chat_window.dart';
+import 'scroll_to_bottom_button.dart';
 import 'assistant_api.dart';
 import 'conversation_screen.dart' show conversationRefresh, messageTime;
 import 'models.dart';
@@ -111,7 +113,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   );
   late final _keeper = ChatScrollKeeper(_window);
   ScrollController get _scroll => _keeper.controller;
-  bool _far = false;
+  String? _prevNewest;
+  String? _enterId;
   bool _hadText = false;
   bool _foreground = true;
   bool _reading = false;
@@ -131,7 +134,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     WidgetsBinding.instance.addObserver(this);
     _input.addListener(_inputChanged);
     _window.addListener(_windowChanged);
-    _scroll.addListener(_scrolled);
     _read();
     _timer = Timer.periodic(conversationRefresh, (_) => _tick());
   }
@@ -171,12 +173,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     if (mounted) setState(() {});
   }
 
-  /// "Jump to latest" shows once scrolled up by more than a screen.
-  void _scrolled() {
-    final far = _keeper.farFromBottom;
-    if (far != _far) setState(() => _far = far);
-  }
-
   /// What arrived since the newest line read; shown at once when at the
   /// bottom, otherwise counted on the "Jump to latest" button.
   Future<void> _read() async {
@@ -196,10 +192,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   /// The list is upside down (newest at offset 0): the bottom is the start.
   void _toBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) {
-        _scroll.animateTo(0,
-            duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
-      }
+      if (mounted) _keeper.nudgeToBottom();
     });
   }
 
@@ -309,9 +302,21 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         (b.createdAt - a.createdAt).abs() <= _groupGap.inMilliseconds;
     final ids = [for (final m in shown) m.id];
     final at = {for (var i = 0; i < ids.length; i++) ids[i]: i};
+    // The newest row slides in, unless it is your own message read back.
+    final newest = ids.last;
+    if (_prevNewest != null && newest != _prevNewest) {
+      final readBack = _prevNewest!.startsWith('pending-') &&
+          !newest.startsWith('pending-') &&
+          shown.last.mine;
+      _enterId = _keeper.atBottom && !readBack ? newest : null;
+    }
+    _prevNewest = newest;
     final list = ListView.builder(
       controller: _scroll,
       reverse: true,
+      physics: chatScrollPhysics,
+      scrollCacheExtent: const ScrollCacheExtent.viewport(1.5),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.all(16),
       itemCount: shown.length + (_window.hasOlder ? 1 : 0),
       findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
@@ -346,29 +351,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
             index > 0 && otherDay(shown[index - 1].createdAt, m.createdAt);
         return KeyedSubtree(
           key: ValueKey(m.id),
-          child: newDay
-              ? Column(children: [
-                  DaySeparator(dayLabel(m.createdAt), color: c.textSecondary),
-                  row,
-                ])
-              : row,
+          child: RowEntrance(
+            animate: m.id == _enterId,
+            child: newDay
+                ? Column(children: [
+                    DaySeparator(dayLabel(m.createdAt), color: c.textSecondary),
+                    row,
+                  ])
+                : row,
+          ),
         );
       },
     );
     final unseen = _window.unseen;
     return Stack(children: [
       list,
-      if (_far || unseen > 0)
-        Positioned(
-          right: 12,
-          bottom: 12,
-          child: JumpToLatest(
-              unseen: unseen,
-              onPressed: () async {
-                await _keeper.jumpToLatest();
-                if (mounted) setState(() => _far = false);
-              }),
-        ),
+      ScrollToBottomButton(keeper: _keeper, unseen: unseen),
     ]);
   }
 

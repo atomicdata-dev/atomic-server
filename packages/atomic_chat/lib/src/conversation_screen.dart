@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt, Perf;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'app_top_bar.dart';
 import 'home_sections.dart' show HomeSection;
 import 'chat_window.dart';
+import 'scroll_to_bottom_button.dart';
 
 import 'models.dart';
 import 'assistant_api.dart';
@@ -82,7 +84,6 @@ class _ConversationScreenState extends State<ConversationScreen>
     }, onError: (Object _) {}));
     _window.addListener(_windowChanged);
     unawaited(_window.open());
-    _scroll.controller.addListener(_scrolled);
     _timer = Timer.periodic(conversationRefresh, (_) => _tick());
   }
 
@@ -121,13 +122,8 @@ class _ConversationScreenState extends State<ConversationScreen>
     if (mounted) setState(() {});
   }
 
-  bool _far = false;
-
-  /// "Jump to latest" shows once scrolled up by more than a screen.
-  void _scrolled() {
-    final far = _scroll.farFromBottom;
-    if (far != _far) setState(() => _far = far);
-  }
+  String? _prevNewest;
+  String? _enterId;
 
   /// What arrived since the newest message read; shown at once when at the
   /// bottom, otherwise counted on the "Jump to latest" button.
@@ -162,6 +158,10 @@ class _ConversationScreenState extends State<ConversationScreen>
     setState(() {
       _pending.add(pending);
       _error = null;
+    });
+    // Your own message animates to the bottom.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scroll.nudgeToBottom();
     });
     _sends = _sends.then((_) async {
       try {
@@ -228,9 +228,20 @@ class _ConversationScreenState extends State<ConversationScreen>
         (b.createdAt - a.createdAt).abs() <= _groupGap.inMilliseconds;
     final ids = [for (final m in shown) m.id];
     final at = {for (var i = 0; i < ids.length; i++) ids[i]: i};
+    final newest = ids.last;
+    if (_prevNewest != null && newest != _prevNewest) {
+      final readBack = _prevNewest!.startsWith('pending-') &&
+          !newest.startsWith('pending-') &&
+          shown.last.mine;
+      _enterId = _scroll.atBottom && !readBack ? newest : null;
+    }
+    _prevNewest = newest;
     final list = ListView.builder(
       controller: _scroll.controller,
       reverse: true,
+      physics: chatScrollPhysics,
+      scrollCacheExtent: const ScrollCacheExtent.viewport(1.5),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.all(16),
       itemCount: shown.length + (_window.hasOlder ? 1 : 0),
       findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
@@ -260,29 +271,22 @@ class _ConversationScreenState extends State<ConversationScreen>
             gapAbove: first);
         return KeyedSubtree(
           key: ValueKey(m.id),
-          child: newDay
-              ? Column(children: [
-                  DaySeparator(dayLabel(m.createdAt), color: c.textSecondary),
-                  bubble,
-                ])
-              : bubble,
+          child: RowEntrance(
+            animate: m.id == _enterId,
+            child: newDay
+                ? Column(children: [
+                    DaySeparator(dayLabel(m.createdAt), color: c.textSecondary),
+                    bubble,
+                  ])
+                : bubble,
+          ),
         );
       },
     );
     final unseen = _window.unseen;
     return Stack(children: [
       list,
-      if (_far || unseen > 0)
-        Positioned(
-          right: 12,
-          bottom: 12,
-          child: JumpToLatest(
-              unseen: unseen,
-              onPressed: () async {
-                await _scroll.jumpToLatest();
-                if (mounted) setState(() => _far = false);
-              }),
-        ),
+      ScrollToBottomButton(keeper: _scroll, unseen: unseen),
     ]);
   }
 
