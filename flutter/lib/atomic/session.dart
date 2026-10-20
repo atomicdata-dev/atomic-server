@@ -50,6 +50,20 @@ class AtomicSession {
     await prefs.setString(_keyDrive, drive);
   }
 
+  static Future<({String serverUrl, String secret, String? drive})?>? _early;
+
+  /// Starts [load] from `main`, once: the sign-in screen takes the result
+  /// with [loadEarly] instead of reading again.
+  static void preload() => _early ??= load();
+
+  /// The [preload]ed session the first time (once), else a fresh [load].
+  static Future<({String serverUrl, String secret, String? drive})?>
+      loadEarly() {
+    final early = _early;
+    _early = null;
+    return early ?? load();
+  }
+
   static Future<({String serverUrl, String secret, String? drive})?>
       load() async {
     final prefs = await SharedPreferences.getInstance();

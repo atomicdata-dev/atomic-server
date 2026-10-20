@@ -101,7 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _tryAutoLogin() async {
     try {
-      final session = await AtomicSession.load();
+      final session = await AtomicSession.loadEarly();
       Perf.once('session loaded');
       if (session == null || session.secret.isEmpty) {
         setState(() => _step = _Step.welcome);

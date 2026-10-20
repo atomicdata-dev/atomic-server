@@ -20,6 +20,8 @@ void main() async {
   Perf.start();
   WidgetsFlutterBinding.ensureInitialized();
   Perf.watchFrames();
+  // Independent of the database, so read while it opens.
+  final theme = AppThemeMode.load();
   await RustLib.init();
   Perf.mark('rust init');
   final dir = await getApplicationDocumentsDirectory();
@@ -27,10 +29,14 @@ void main() async {
   await AtomicClient.openDb(dir.path);
   Perf.mark('db open');
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  await AppThemeMode.load();
+  await theme;
   defaultAttachmentPicker = const FileSelectorAttachmentPicker();
   Perf.mark('runApp');
   runApp(const AtomicApp());
+  // The saved session (secure storage: a few hundred ms the first time),
+  // read once for the sign-in screen, which builds next. Not earlier: the
+  // read competes with the first frame for the main thread.
+  AtomicSession.preload();
   WidgetsBinding.instance
       .waitUntilFirstFrameRasterized
       .then((_) => Perf.mark('first frame'));
@@ -59,7 +65,8 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
     AppThemeMode.mode.addListener(_themeChanged);
     _handleInitialLink();
     _linkChannel.setMethodCallHandler(_handleLinkCall);
-    _resumeFromSession();
+    // A cold start resumes in the sign-in screen (`_tryAutoLogin`); this one
+    // is for coming back from the background.
   }
 
   /// Same path as LoginScreen auto-login: session → WS → Iroh discover fallback.
@@ -104,7 +111,12 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
     }
   }
 
+  bool _listening = false;
+
   void _startEventListener() {
+    // One loop for the app's life (each resume signs in again).
+    if (_listening) return;
+    _listening = true;
     _eventPoller?.cancel();
     // Reactive loop: blocks in Rust until an event arrives
     Future(() async {
