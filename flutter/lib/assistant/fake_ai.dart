@@ -7,9 +7,16 @@ import 'package:flutter/foundation.dart';
 /// builds only (profile, so the chat's frame times can be measured), and only
 /// when built with `--dart-define=FAKE_AI=1`. Never in a release build
 /// ([kReleaseMode] is a constant there, so this is compiled out).
+///
+/// Every reply starts with [fakeAiMark], so it is never taken for the real
+/// AI on a phone that got a test build. Builds for a person's phone omit
+/// the define.
 const bool fakeAiEnabled =
     !kReleaseMode && (_fakeAi == '1' || _fakeAi == 'true');
 const _fakeAi = String.fromEnvironment('FAKE_AI');
+
+/// Opens every reply of the pretend AI.
+const fakeAiMark = '**[FAKE AI, test build]** ';
 
 /// The pretend AI: it searches the drives with the real tool (the first
 /// question of each message), then answers in canned Markdown with a bit of
@@ -45,7 +52,7 @@ Stream<Map<String, dynamic>> _fakeCompletions(
   if (last['role'] == 'user' && canSearch) {
     final asked = _text(last['content']);
     final query = asked.split(RegExp(r'\s+')).take(3).join(' ');
-    yield _delta({'content': 'Let me look in your drives. '});
+    yield _delta({'content': '${fakeAiMark}Let me look in your drives. '});
     await Future<void>.delayed(const Duration(milliseconds: 300));
     yield _delta({
       'tool_calls': [
@@ -78,7 +85,7 @@ Stream<Map<String, dynamic>> _fakeCompletions(
       }
     } catch (_) {}
   }
-  final answer = '$link$_canned';
+  final answer = '$fakeAiMark$link$_canned';
   for (var i = 0; i < answer.length; i += 6) {
     await Future<void>.delayed(const Duration(milliseconds: 16));
     yield _delta({

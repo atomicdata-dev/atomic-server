@@ -44,27 +44,33 @@ import { ResourceContextMenu } from '../components/ResourceContextMenu';
 import ResourcePage from '../views/ResourcePage';
 import { BreadCrumbs } from '../components/BreadCrumbs';
 import { CalculatedPageHeight } from '../globalCssVars';
-import { paths } from '../routes/paths';
-import { NewRoute } from '../routes/NewResource/NewRoute';
-import { EditRoute } from '../routes/EditRoute';
-import { DataRoute } from '../routes/DataRoute';
-import { HistoryRoute } from '../routes/History/HistoryRoute';
-import { ShareRoute } from '../routes/Share/ShareRoute';
-import { ImportRoute } from '../routes/ImportRoute';
-import { StorageRoute } from '../routes/StorageRoute';
-import { NotificationsRoute } from '../routes/NotificationsRoute';
-import { AppSettingsRoute } from '../routes/AppSettings';
+import { actionPages } from './actionPages';
 import { styled } from 'styled-components';
 import { createFlutterHost } from './flutterHost';
 import { createMockHost } from './mockHost';
 import { createFlush } from './flush';
-import { createEmbedStore, registerEmbedActions } from './embedStore';
+import {
+  adoptDriveOf,
+  createEmbedStore,
+  registerEmbedActions,
+} from './embedStore';
 import { closeTopOverlay } from './overlayBack';
 import { reportShown, setActionsHost } from './hostActions';
 import { useNativeChatRoom } from './useNativeChatRoom';
+import { embedTouchCss } from './touchStyle';
 
 enableEmbedMode();
 registerEmbedActions();
+
+// The app passes its light or dark mode in the URL (`?scheme=dark`), so the
+// first frame is already in it: a page loaded ahead and shown later must not
+// flash the other one before the app's `setColorScheme` arrives.
+const startScheme = new URLSearchParams(location.search).get('scheme');
+
+if (startScheme === 'dark' || startScheme === 'light') {
+  setHostColorScheme(startScheme);
+  document.documentElement.style.colorScheme = startScheme;
+}
 
 // The app already lays the page out inside the system bars, but the web view
 // still reports their size as `env(safe-area-inset-*)`, so the page would leave
@@ -95,6 +101,10 @@ new MutationObserver(records => {
 const noScrollbars = document.createElement('style');
 noScrollbars.textContent = '::-webkit-scrollbar { display: none; }';
 document.head.append(noScrollbars);
+
+const touchStyle = document.createElement('style');
+touchStyle.textContent = embedTouchCss;
+document.head.append(touchStyle);
 
 declare global {
   interface Window {
@@ -217,7 +227,23 @@ const showRoute = createRoute({
       return () => reportShown(undefined);
     }, [subject]);
 
-    if (!subject) {
+    // The drive first: the rows of a table are asked of the host's per-drive
+    // index, and a list built before the drive is known stays empty.
+    const [driveOf, setDriveOf] = useState<string>();
+
+    useEffect(() => {
+      let live = true;
+
+      void adoptDriveOf(store, subject).then(() => {
+        if (live) setDriveOf(subject);
+      });
+
+      return () => {
+        live = false;
+      };
+    }, [subject]);
+
+    if (!subject || driveOf !== subject) {
       return null;
     }
 
@@ -253,23 +279,11 @@ const showRoute = createRoute({
 /** The pages the resource menu leads to: the web app's own route components,
  * mounted under this root (they are made for the app's root, which the embed
  * does not use). */
-const actionRoutes = [
-  [paths.new, NewRoute],
-  [paths.edit, EditRoute],
-  [paths.data, DataRoute],
-  [paths.history, HistoryRoute],
-  [paths.share, ShareRoute],
-  [paths.import, ImportRoute],
-  [paths.storage, StorageRoute],
-  [paths.notifications, NotificationsRoute],
-  [paths.appSettings, AppSettingsRoute],
-].map(([path, source]) =>
+const actionRoutes = actionPages.map(([path, source]) =>
   createRoute({
     getParentRoute: () => rootRoute,
     path: path as string,
-    // @ts-expect-error - options are shared with the app's route of that page
     validateSearch: source.options.validateSearch,
-    // @ts-expect-error - same component, other parent
     component: source.options.component,
   }),
 );

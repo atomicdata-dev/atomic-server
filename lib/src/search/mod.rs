@@ -52,7 +52,12 @@ const MAX_PARENT_WALK: usize = 64;
 /// Generate the full 1-edit neighborhood (and prefix-scan it) up to this
 /// token length. Longer tokens use trigrams + verify.
 const EDIT_GEN_MAX_LEN: usize = 12;
-const MIN_FUZZY_LEN: usize = 2;
+/// Shorter tokens are matched as a prefix only. The one-edit neighbourhood of
+/// two letters reaches most of the vocabulary (`se` → every term starting
+/// with `s`, `e`, `?e` or `s?`), each a scan of its own: 30-35 ms per
+/// keystroke on a store with 1000 AI chats (`lib/tests/stress_chats.rs`),
+/// for matches that type-ahead finds anyway one letter later.
+const MIN_FUZZY_LEN: usize = 3;
 
 /// Terms shorter than this are never looked up through trigrams: a query only
 /// uses them for tokens longer than [`EDIT_GEN_MAX_LEN`], and a one-edit match
@@ -470,8 +475,17 @@ pub fn query_timed(
     // surviving documents are exactly what an unscoped run would give them.
     let started = web_time::Instant::now();
     let mut per_token: Vec<HashMap<DocId, f32>> = Vec::with_capacity(tokens.len());
+    // One or two letters typed: only titles. A prefix that short matches a
+    // large part of every body's vocabulary, whose postings cost 7-10 ms per
+    // keystroke on a store of 1000 AI chats, and title hits outrank body hits
+    // anyway; the next letter searches everything.
+    let fields: &[Field] = if tokens.len() == 1 && tokens[0].chars().count() < MIN_FUZZY_LEN {
+        &[Field::Title]
+    } else {
+        &Field::ALL
+    };
     for token in &tokens {
-        per_token.push(score_token(store, token, n_docs, &mut candidates)?);
+        per_token.push(score_token(store, token, n_docs, fields, &mut candidates)?);
     }
 
     // AND: a doc must score on every query token.
@@ -972,17 +986,18 @@ fn score_token(
     store: &Db,
     q: &str,
     n_docs: f32,
+    fields: &[Field],
     candidates: &mut Candidates,
 ) -> AtomicResult<HashMap<DocId, f32>> {
     let mut scores: HashMap<DocId, f32> = HashMap::new();
     let mut seen_terms: HashSet<(u8, String)> = HashSet::new();
 
     // Always prefix-scan the original token (typeahead).
-    collect_prefix(store, q, q, &mut seen_terms)?;
+    collect_prefix(store, q, q, fields, &mut seen_terms)?;
 
     if q.chars().count() >= MIN_FUZZY_LEN && q.chars().count() <= EDIT_GEN_MAX_LEN {
         for variant in one_edits(q) {
-            collect_prefix(store, &variant, q, &mut seen_terms)?;
+            collect_prefix(store, &variant, q, fields, &mut seen_terms)?;
         }
     } else if q.chars().count() > EDIT_GEN_MAX_LEN {
         collect_trigram_candidates(store, q, &mut seen_terms)?;
@@ -1054,12 +1069,13 @@ fn collect_prefix(
     store: &Db,
     prefix_token: &str,
     query: &str,
+    fields: &[Field],
     out: &mut HashSet<(u8, String)>,
 ) -> AtomicResult<()> {
     if prefix_token.is_empty() {
         return Ok(());
     }
-    for field in Field::ALL {
+    for &field in fields {
         let prefix = posting_typeahead_prefix(field, prefix_token);
         for pair in store.kv.scan_prefix(Tree::SearchPostings, &prefix) {
             let (key, _) = pair?;

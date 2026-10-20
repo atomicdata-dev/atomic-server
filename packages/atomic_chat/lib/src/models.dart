@@ -1,6 +1,10 @@
 import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart' show listEquals;
 
 import 'chat_parts.dart';
+import 'chat_window.dart';
 
 /// An AI chat of the active drive; `lastActivity` is unix ms, 0 when empty.
 typedef ChatSummary = ({String subject, String name, int lastActivity});
@@ -79,7 +83,8 @@ typedef RecentResource = ({
   String? emoji
 });
 
-/// One change in the activity feed.
+/// One change in the activity feed: something another member did (the
+/// person's own changes are not activity; they show in Recents).
 class ActivityEntry {
   final String subject;
   final String drive;
@@ -90,8 +95,8 @@ class ActivityEntry {
   /// Unix ms.
   final int at;
 
-  /// Display name of the agent that did it; null when the store does not
-  /// know who, or does not have that agent's resource.
+  /// Display name of the member that did it: their name, or the start of
+  /// their key (`a3f9…`) while it is not known; null only from an older host.
   final String? actor;
   final String name;
   final String className;
@@ -148,6 +153,17 @@ List<DriveInfo> visibleDrives(List<DriveInfo> all, {String? active}) {
 /// The JSON the host's store answers with (`atomic_lib::host`), read into the
 /// types above. A host whose store speaks this JSON can use these directly.
 abstract final class AssistantJson {
+  /// A window `{<field>: [...], older, newest, more}` from the host, its
+  /// items read with [parse] (one of the list parsers below).
+  static ChatPage<T> parsePage<T>(
+      String json, String field, List<T> Function(String) parse) {
+    final m = jsonDecode(json) as Map;
+    return ChatPage<T>(parse(jsonEncode(m[field] ?? const [])),
+        older: m['older'] as String?,
+        newest: m['newest'] as String?,
+        more: m['more'] == true);
+  }
+
   static String? _emoji(Map e) {
     final v = e['emoji'];
     return v is String && v.isNotEmpty ? v : null;
@@ -329,4 +345,44 @@ abstract final class AssistantJson {
   static String textParts(String text) => jsonEncode([
         {'type': 'text', 'text': text}
       ]);
+}
+
+/// Who the person is, for the bar's profile button: the name, picture and
+/// emoji of this device's agent. Every part is optional.
+class ProfileIdentity {
+  final String? name;
+
+  /// The picture's download URL.
+  final String? imageUrl;
+
+  /// The picture's bytes, when this device holds the profile's picture file.
+  final Uint8List? imageBytes;
+  final String? emoji;
+
+  /// The profile has a picture this device could not show yet (the file or
+  /// its bytes have not arrived): worth loading again soon.
+  final bool pendingImage;
+
+  const ProfileIdentity(
+      {this.name,
+      this.imageUrl,
+      this.imageBytes,
+      this.emoji,
+      this.pendingImage = false});
+
+  @override
+  bool operator ==(Object other) =>
+      other is ProfileIdentity &&
+      other.name == name &&
+      other.imageUrl == imageUrl &&
+      other.pendingImage == pendingImage &&
+      (identical(other.imageBytes, imageBytes) ||
+          (other.imageBytes != null &&
+              imageBytes != null &&
+              listEquals(other.imageBytes, imageBytes))) &&
+      other.emoji == emoji;
+
+  @override
+  int get hashCode =>
+      Object.hash(name, imageUrl, imageBytes?.length, emoji, pendingImage);
 }

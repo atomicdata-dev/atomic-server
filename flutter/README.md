@@ -72,6 +72,15 @@ flutter build apk --release --target-platform android-arm,android-x64 \
 
 (`--split-per-abi` also works together with `atomic.allAbis`.)
 
+To put a release build on your own devices, keeping their data:
+
+```bash
+scripts/deploy_release.sh SERIAL...          # adb devices -l for the serials
+scripts/deploy_release.sh --no-build SERIAL  # the APK that is there
+```
+
+It builds the arm64 release APK (cargokit builds the Rust library with `--release`: fat LTO, one codegen unit), refuses an APK with `kernel_blob.bin` (a debug build), installs with `adb install -r`, starts the app and checks it is not `DEBUGGABLE`. Release builds are signed with the debug key, so they replace a debug install from the same machine in place; a device with the app signed by another key fails the install, and the script never uninstalls (that would wipe the store and identity). A debug build is much slower: on the Tablet_A35 emulator a cold start took 1.7 s to the painted home in debug and 0.95 s in a profile build, each Home list read 240 ms against 11-18 ms (`scripts/perf_android.sh --only cold,scroll`).
+
 ### Sync / Pairing
 
 Devices sync via [Iroh](https://iroh.computer) (QUIC peer-to-peer, works through NAT).

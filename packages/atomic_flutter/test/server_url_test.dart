@@ -1,5 +1,5 @@
+import 'package:atomic_flutter/atomic_flutter.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:atomic_app/atomic/server_url.dart';
 
 void main() {
   group('normalizeServerUrl', () {

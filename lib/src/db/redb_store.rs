@@ -138,6 +138,32 @@ impl RedbStore {
         Self,
         Result<super::compaction::CompactionRecord, super::compaction::Skip>,
     )> {
+        Self::new_file_with_options(path, policy, None)
+    }
+
+    /// [`Self::new_file`] with redb's read cache at `cache_bytes` instead of
+    /// its 1 GiB default (for a phone). No startup compaction.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn new_file_with_cache(path: &std::path::Path, cache_bytes: usize) -> AtomicResult<Self> {
+        Self::new_file_with_options(
+            path,
+            &super::compaction::CompactionPolicy::disabled(),
+            Some(cache_bytes),
+        )
+        .map(|(store, _)| store)
+    }
+
+    /// [`Self::new_file_with_policy`], with the read cache at `cache_bytes`
+    /// (redb's default when `None`).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn new_file_with_options(
+        path: &std::path::Path,
+        policy: &super::compaction::CompactionPolicy,
+        cache_bytes: Option<usize>,
+    ) -> AtomicResult<(
+        Self,
+        Result<super::compaction::CompactionRecord, super::compaction::Skip>,
+    )> {
         // `Database::create` with defaults uses a 1 GiB cache and the
         // slow full-scan repair path on any unclean shutdown. On a
         // multi-GB store that's 40+ seconds added to every boot
@@ -149,7 +175,7 @@ impl RedbStore {
         let open_guard = super::recovery::OpenFileGuard::acquire(path)?;
         let t = std::time::Instant::now();
         // A damaged file makes redb panic; this says so in an error instead.
-        let mut db = super::recovery::create_database(path)?;
+        let mut db = super::recovery::create_database_with_cache(path, cache_bytes)?;
         let open_duration = t.elapsed();
         tracing::info!(
             "RedbStore::new_file: Database::create in {:?}",
@@ -693,6 +719,26 @@ mod tests {
         ));
         std::fs::create_dir_all(&dir).unwrap();
         dir.join("atomic.redb")
+    }
+
+    /// A store opened with a small read cache (the phone's) stores and
+    /// reads like any other, also after a reopen.
+    #[test]
+    fn new_file_with_cache_opens_a_working_store() {
+        let path = temp_path("small-cache");
+        {
+            let store = RedbStore::new_file_with_cache(&path, 1 << 20).unwrap();
+            for k in 0..40u8 {
+                store
+                    .insert(Tree::PluginMeta, &[k], &vec![k; 200_000])
+                    .unwrap();
+            }
+        }
+        let store = RedbStore::new_file_with_cache(&path, 1 << 20).unwrap();
+        for k in 0..40u8 {
+            let v = store.get(Tree::PluginMeta, &[k]).unwrap().unwrap();
+            assert!(v.len() == 200_000 && v.iter().all(|b| *b == k));
+        }
     }
 
     /// A store written before redb's table names followed `Tree::name`

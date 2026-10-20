@@ -16,9 +16,33 @@ use serde_json::{json, Map, Value as Json};
 /// writes).
 pub const ICON: &str = "https://atomicdata.dev/properties/icon";
 
+/// The older picture property (a File subject), still read for agents that
+/// carry it.
+pub const IMAGE: &str = "https://atomicdata.dev/properties/image";
+
+/// The largest picture [`file_bytes`] hands out.
+pub const MAX_FILE_BYTES: usize = 16 * 1024 * 1024;
+
+/// The bytes of a File resource's blob, when this store holds both (the File
+/// and its bytes). `None` when either is missing (not synced yet) or the file
+/// is larger than [`MAX_FILE_BYTES`].
+pub async fn file_bytes(store: &Db, file: &str) -> AtomicResult<Option<Vec<u8>>> {
+    let Ok(resource) = store.get_resource_shallow(&file.into()) else {
+        return Ok(None);
+    };
+    let Some(hash) = resource.blob_hash() else {
+        return Ok(None);
+    };
+    let bytes = store.get_blob(&hash).await?;
+    Ok(bytes.filter(|b| !b.is_empty() && b.len() <= MAX_FILE_BYTES))
+}
+
 /// The profile of this device's agent as JSON `{subject, name, description,
-/// emoji?, imageUrl?}`. `imageUrl` is the download URL of the `icon` File when
-/// this store has that File, else the agent's `imageUrl`.
+/// emoji?, imageUrl?, iconFile?}`. `imageUrl` is the download URL of the
+/// `icon` (or older `image`) File when this store has that File with one, else
+/// the agent's `imageUrl`. `iconFile` is that File's subject whenever the
+/// agent has one: files the web app makes are blobs without a download URL,
+/// their bytes come from [`file_bytes`].
 pub async fn own_profile(store: &Db, profiles: &AgentProfiles) -> AtomicResult<Json> {
     let agent = store.get_default_agent()?;
     let subject = agent.subject.to_string();
@@ -55,7 +79,13 @@ pub async fn own_profile(store: &Db, profiles: &AgentProfiles) -> AtomicResult<J
     if !emoji.is_empty() {
         out["emoji"] = json!(emoji);
     }
-    let icon = text(ICON);
+    let icon = match text(ICON) {
+        i if i.is_empty() => text(IMAGE),
+        i => i,
+    };
+    if !icon.is_empty() {
+        out["iconFile"] = json!(icon);
+    }
     let from_icon = (!icon.is_empty())
         .then(|| store.get_resource_shallow(&icon.as_str().into()).ok())
         .flatten()
@@ -177,6 +207,48 @@ mod tests {
         assert!(rows[0]["jsonAd"].as_str().unwrap().contains("Pelican"));
         // The page edits on top of the stored Loro state, not a blank one.
         assert!(rows[0]["snapshot"].is_string());
+    }
+
+    /// The web app's pictures are blobs with no download URL: the profile
+    /// names the File and the host hands out its bytes.
+    #[tokio::test]
+    async fn a_blob_icon_is_named_and_its_bytes_are_readable() {
+        let d = Device::new().await;
+        let bytes = b"\x89PNG not really";
+        let hash = blake3::hash(bytes);
+        d.store.put_blob(hash.as_bytes(), bytes).await.unwrap();
+        let blob = |hex: String| {
+            Some(vec![(
+                urls::BLOB,
+                Value::AtomicUrl(format!("did:ad:blob:{hex}").into()),
+            )])
+        };
+        let file = d
+            .store
+            .create_resource(urls::FILE, &d.drive, "me.png", blob(hash.to_hex().to_string()))
+            .await
+            .unwrap();
+        assert!(file_bytes(&d.store, "https://example.test/none")
+            .await
+            .unwrap()
+            .is_none());
+        set_own_profile(&d.node, &NoPush, "Pelican", "", Some(&file))
+            .await
+            .unwrap();
+        let p = own_profile(&d.store, &AgentProfiles::none()).await.unwrap();
+        assert!(p.get("imageUrl").is_none());
+        assert_eq!(p["iconFile"], file.as_str());
+        assert_eq!(
+            file_bytes(&d.store, &file).await.unwrap().as_deref(),
+            Some(&bytes[..])
+        );
+        // The File is here but its bytes are not (yet).
+        let lost = d
+            .store
+            .create_resource(urls::FILE, &d.drive, "lost.png", blob("ab".repeat(32)))
+            .await
+            .unwrap();
+        assert!(file_bytes(&d.store, &lost).await.unwrap().is_none());
     }
 
     #[tokio::test]

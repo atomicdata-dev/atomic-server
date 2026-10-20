@@ -35,7 +35,7 @@ MaterialApp(
 | Screens | `ChatsScreen` (home sections, `timeAgo`, `groupChatsByAge`), `ChatScreen` (also `voiceMode`), `ConversationScreen`, `SearchScreen` (also `scopeDrive`), `NewDocumentSheet` |
 | Resources | `openResourceView` and the native view registry, `ResourceView`, `EmbedServer`, `ResourceWebView`, `ResourceRow`, `iconForClass` |
 | AI and voice | `HostedAi`, `voice.dart`, `hosted_voice.dart` (the `voice_*` SharedPreferences keys) |
-| Small widgets | `FadingText`, `AtomicPlaceMark`, `HoldFan` (from `atomic_flutter`, re-exported) |
+| Small widgets | `HoldFan` (from `atomic_flutter`, re-exported) |
 
 ## The bottom bar
 
@@ -49,14 +49,15 @@ and ignores a second push within 300 ms (a double tap). A host page opened
 from the bar goes through it as well (`AppShell.profile` is opened as
 `profile`).
 
-Search and New have more choices on touch and hold:
+New lists its kinds on a tap; Search has more choices on touch and hold:
 
-- **New**: tap = a new AI chat. Hold: *AI chat*, *AI voice* (`ChatScreen`
+- **New**: tap = a list (hold = the same list, drag to a row): *AI chat* (always
+  a fresh one; on an empty new chat its field gets the cursor), *AI voice* (`ChatScreen`
   with `voiceMode`: listens at once with the chosen speech engine, sends
   after a pause, reads the answer aloud and listens again until Stop, leaving,
   the app going to the background or an error), *Document* (the native
   `NewDocumentSheet`: name, drive, Create through `AssistantApi.createResource`;
-  the drive is remembered as `new_resource_drive`), *Other* (the web app's
+  the drive is remembered as `new_resource_drive`), *Other…* (the web app's
   `/app/new` page in that drive).
 - **Search**: tap = every drive. Hold: *All drives*, the four drives used
   last, *More…* for the rest; a drive opens `SearchScreen(scopeDrive: …)`,
@@ -64,31 +65,38 @@ Search and New have more choices on touch and hold:
 
 ## HoldFan
 
-A button with a default action on tap and more on touch-and-hold, after the
-colour and width fans of the Atomic drawing tools. It lives in `atomic_flutter` (no
-dependency on this package) and is re-exported here.
+A button with a default action on tap and more on touch-and-hold, or (with
+`tapOpensMenu`, as on New) a list on tap and the same list to drag through on
+hold. It lives in `atomic_flutter` (no dependency on this package) and is
+re-exported here. Choices are always one vertical list (`HoldFanLayout.list`
+above the button, `.side` to the right of a rail button); there is no fan.
 
 ```dart
 HoldFan<String>(
-  tooltip: 'New chat',
-  onTap: newChat,                       // the default action
+  tooltip: 'New',
+  tapOpensMenu: true,                   // a tap lists the items too; without it onTap runs
   items: const [
-    HoldFanItem('AI chat', 'chat'),     // the first is the default, nearest the thumb
-    HoldFanItem('AI voice', 'voice'),
-    HoldFanItem('Document', 'doc', emoji: '📄'),
+    HoldFanItem('AI chat', 'chat', icon: Icons.chat_bubble_outline),
+    HoldFanItem('AI voice', 'voice', icon: Icons.mic_none),
+    HoldFanItem('Document', 'doc', icon: Icons.description_outlined),
   ],
   onSelected: (value) => open(value),
   child: const Icon(Icons.add),         // what the button shows; HoldFan is the tap target
 )
 ```
 
-Hold about 350 ms (a haptic tick) and the pills fan out upwards in the root
-overlay, over a slightly dimmed page, curving towards the middle of the
-screen and kept inside it; slide onto one (a tick per change) and let go to
-pick it. Letting go elsewhere or a cancelled touch picks nothing. Screen
-readers get a long-press action (`menuLabel`, "More options") that lists the
-same items in a plain sheet. `onOpen` runs as the fan opens (to refresh the
-items for next time); `selected` marks it as the current page.
+A tap (with `tapOpensMenu`) opens the list at once as a rounded card of rows
+(icon and label, 48 dp) in the root overlay, over a slightly dimmed page:
+tap a row to pick it; a tap elsewhere, or back (`HoldFan.dismissOpenMenu`,
+called by the shell), closes it. Hold about 250 ms (a haptic tick) and the
+same list opens; slide onto a row (it lights up, a tick per change) and let go
+to pick it. Letting go elsewhere or a cancelled touch picks nothing; letting
+go where the hold began keeps the list open to tap. Without `tapOpensMenu`
+(Search, the Home headings) a hold shows the items as pills in the same kind
+of column. Screen readers get a long-press action (`menuLabel`, "More
+options") that lists the same items in a plain sheet. `onOpen` runs as the
+list opens (to refresh the items for next time); `selected` marks it as the
+current page.
 
 ## Wiring a host
 

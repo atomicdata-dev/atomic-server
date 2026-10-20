@@ -10,7 +10,7 @@
 mod tests;
 
 use super::simple::state::{connected_server, db, err, node};
-use crate::host::{chat_rooms, conversations, pusher, recents, to_json};
+use crate::host::{chat_rooms, conversations, profiles, pusher, recents, to_json};
 use atomic_lib::host::{chats, lists, notifications};
 use flutter_rust_bridge::frb;
 
@@ -21,11 +21,12 @@ pub async fn resource_icons(subjects: Vec<String>) -> Result<String, String> {
     to_json(&lists::resource_icons(db()?, subjects).await)
 }
 
-/// The newest `limit` AI chats of the person (all drives), newest activity first, as JSON
-/// `[{subject, name, last_activity}]` (`last_activity` in ms, 0 when empty).
-/// Read from the recents index, not rebuilt from the chats' pages.
-pub async fn list_ai_chats(limit: u32) -> Result<String, String> {
-    let list = lists::list_ai_chats(db()?, recents(), limit as usize)
+/// `limit` AI chats of the person (all drives) after the `offset` newest
+/// ones, newest activity first, as JSON `[{subject, name, last_activity}]`
+/// (`last_activity` in ms, 0 when empty). A page shorter than `limit` is the
+/// last. Read from the recents index, not rebuilt from the chats' pages.
+pub async fn list_ai_chats(limit: u32, offset: u32) -> Result<String, String> {
+    let list = lists::list_ai_chats_page(db()?, recents(), offset as usize, limit as usize)
         .await
         .map_err(err)?;
     to_json(&list)
@@ -74,8 +75,20 @@ pub struct ActivityEntry {
 
 /// What changed lately in every drive, newest first, by whom. Read from the
 /// recents index, which the store's change events keep.
-pub async fn list_activity(limit: u32) -> Result<Vec<ActivityEntry>, String> {
-    let rows = lists::list_activity(db()?, recents(), limit as usize).await;
+/// `include_own` adds the person's own changes (the feed's "Show mine"),
+/// by `You`.
+pub async fn list_activity(limit: u32, include_own: bool) -> Result<Vec<ActivityEntry>, String> {
+    // Other agents' changes (the person's own are Recents, unless asked for),
+    // each named: by the store, the server's profile, or the start of its key.
+    let rows = lists::list_activity_with(
+        db()?,
+        recents(),
+        &profiles(),
+        None,
+        limit as usize,
+        include_own,
+    )
+    .await;
     Ok(rows
         .into_iter()
         .map(|a| ActivityEntry {
@@ -83,7 +96,7 @@ pub async fn list_activity(limit: u32) -> Result<Vec<ActivityEntry>, String> {
             drive: a.drive,
             kind: a.kind.as_str().to_string(),
             at: a.at,
-            actor: a.actor,
+            actor: Some(a.actor),
             name: a.name,
             class_name: a.class_name,
         })
@@ -176,6 +189,102 @@ pub async fn read_chat_room(subject: String) -> Result<String, String> {
     to_json(&chat_rooms().read(db()?, &subject).await.map_err(err)?)
 }
 
+// ── Windows of long chats ────────────────────────────────────────────────
+//
+// A chat can hold hundreds of thousands of messages. The chat screens read it
+// in windows: `*_page(subject, None, 50)` for the newest 50, then
+// `*_page(subject, older, 50)` with the `older` cursor of the window before
+// as the person scrolls up, and `*_after(subject, newest, limit)` to pick up
+// what arrived since (a poll). Cursors are opaque strings; each call reads
+// only what its window covers.
+
+/// A window of an AI chat: JSON `{entries, older, newest}`, `entries` as
+/// [`read_chat`] gives them (oldest first), `older` the cursor of the window
+/// before (null at the start of the chat), `newest` the cursor of the last
+/// entry (null for an empty chat).
+pub async fn read_chat_page(
+    subject: String,
+    before: Option<String>,
+    limit: u32,
+) -> Result<String, String> {
+    to_json(
+        &chats::read_chat_page(db()?, &subject, before.as_deref(), limit as usize)
+            .await
+            .map_err(err)?,
+    )
+}
+
+/// The entries of an AI chat after the `after` cursor: JSON `{entries,
+/// newest, more}`, `newest` the cursor for the next call, `more` when
+/// `limit` cut the list.
+pub async fn read_chat_after(subject: String, after: String, limit: u32) -> Result<String, String> {
+    to_json(
+        &chats::read_chat_after(db()?, &subject, &after, limit as usize)
+            .await
+            .map_err(err)?,
+    )
+}
+
+/// A window of a meeting or chat room: JSON `{messages, older, newest}`,
+/// `messages` as [`read_chat_room`] gives them. See [`read_chat_page`].
+pub async fn read_chat_room_page(
+    subject: String,
+    before: Option<String>,
+    limit: u32,
+) -> Result<String, String> {
+    to_json(
+        &chat_rooms()
+            .read_page(db()?, &subject, before.as_deref(), limit as usize)
+            .await
+            .map_err(err)?,
+    )
+}
+
+/// The messages of a meeting or chat room after `after`: JSON `{messages,
+/// newest, more}`. See [`read_chat_after`].
+pub async fn read_chat_room_after(
+    subject: String,
+    after: String,
+    limit: u32,
+) -> Result<String, String> {
+    to_json(
+        &chat_rooms()
+            .read_after(db()?, &subject, &after, limit as usize)
+            .await
+            .map_err(err)?,
+    )
+}
+
+/// A window of a conversation: JSON `{messages, older, newest}`, `messages`
+/// as [`read_conversation`] gives them; only the window is decrypted.
+pub async fn read_conversation_page(
+    subject: String,
+    before: Option<String>,
+    limit: u32,
+) -> Result<String, String> {
+    to_json(
+        &conversations()
+            .read_page(db()?, &subject, before.as_deref(), limit as usize)
+            .await
+            .map_err(err)?,
+    )
+}
+
+/// The messages of a conversation after `after`: JSON `{messages, newest,
+/// more}`.
+pub async fn read_conversation_after(
+    subject: String,
+    after: String,
+    limit: u32,
+) -> Result<String, String> {
+    to_json(
+        &conversations()
+            .read_after(db()?, &subject, &after, limit as usize)
+            .await
+            .map_err(err)?,
+    )
+}
+
 /// Post `text` in a meeting or chat room as this device's agent, as the web
 /// app does, so web clients show it. `reply_to` is the `id` of the message it
 /// answers. Returns the entry's id (`<page>#<key>`).
@@ -198,9 +307,27 @@ pub async fn send_chat_room_message(
 /// Full-text search (type-ahead on the last word) across every drive of this
 /// store, or only in `drive` when given. JSON
 /// `[{subject, title, class_name, drive, score}]`, best first; `drive` is the
-/// drive the hit lives in ("" when unknown).
-pub async fn search(drive: Option<String>, query: String, limit: u32) -> Result<String, String> {
-    to_json(&lists::search(db()?, drive.as_deref(), &query, limit as usize).map_err(err)?)
+/// drive the hit lives in ("" when unknown). `classes` (`drive`, `aichat`,
+/// `conversation`, `chatroom`, or class URLs; empty: any) keeps only
+/// resources of those classes, applied before the limit.
+pub async fn search(
+    drive: Option<String>,
+    query: String,
+    limit: u32,
+    classes: Vec<String>,
+) -> Result<String, String> {
+    to_json(
+        &lists::search_classes(db()?, drive.as_deref(), &query, limit as usize, &classes)
+            .map_err(err)?,
+    )
+}
+
+/// Read the search index once so the first keystroke is not cold. Call it
+/// after the first frame; it runs on a blocking thread and never fails.
+pub async fn warm_search() -> Result<(), String> {
+    let store = db()?.clone();
+    let _ = tokio::task::spawn_blocking(move || lists::warm_search(&store)).await;
+    Ok(())
 }
 
 /// The URL that shows `subject` in the data-browser of the connected server,
@@ -253,4 +380,41 @@ pub async fn create_resource_of_class(
     )
     .await
     .map_err(err)
+}
+
+/// Import a whole AI chat at once: an AI chat named `name` in the agent's
+/// private drive with every message of `entries_json`, a JSON array of
+/// `{role, parts, c}` (`parts` as `append_chat_entry` takes them, as an array
+/// or its JSON string; `c` the message's time in ms, now when absent), oldest
+/// first. One commit per 256 messages instead of one per message. Returns the
+/// chat's subject.
+pub async fn import_ai_chat(name: String, entries_json: String) -> Result<String, String> {
+    use atomic_lib::Storelike;
+    let node = node()?;
+    let author = node
+        .db()
+        .get_default_agent()
+        .map_err(err)?
+        .subject
+        .to_string();
+    let raw: Vec<serde_json::Value> = serde_json::from_str(&entries_json).map_err(|e| e.to_string())?;
+    let now = super::simple::state::now_ms();
+    let entries: Vec<atomic_lib::chat_log::Entry> = raw
+        .iter()
+        .map(|e| {
+            let mut entry =
+                atomic_lib::chat_log::Entry::new(author.clone(), "", e["c"].as_i64().unwrap_or(now));
+            let role = e["role"].as_str().unwrap_or("user");
+            let parts = match &e["parts"] {
+                serde_json::Value::String(s) => s.clone(),
+                other => other.to_string(),
+            };
+            entry.extra.insert("role".into(), role.into());
+            entry.extra.insert("parts".into(), parts.as_str().into());
+            entry
+        })
+        .collect();
+    chats::import_ai_chat(&node, pusher().as_ref(), &name, &entries)
+        .await
+        .map_err(err)
 }

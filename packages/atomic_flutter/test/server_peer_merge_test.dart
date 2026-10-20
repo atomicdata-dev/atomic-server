@@ -4,12 +4,30 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _Servers extends AtomicServerBackend {
+  _Servers({
+    List<String>? servers,
+    this.infos = const {},
+    this.discovered = const [],
+  }) : servers = servers ?? ['https://node1.example.org'];
+  final List<String> servers;
+  final Map<String, ServerInfo> infos;
+  final List<String> discovered;
+
   @override
-  Future<List<String>> knownServers() async => ['https://node1.example.org'];
+  Future<List<String>> knownServers() async => servers;
   @override
   Future<String?> activeServer() async => null;
   @override
-  Future<ServerInfo> serverInfo(String url) async => ServerInfo.unknown;
+  Future<ServerInfo> serverInfo(String url) async =>
+      infos[url] ?? ServerInfo.unknown;
+  @override
+  Future<List<String>> discoverServers() async {
+    for (final url in discovered) {
+      if (!servers.contains(url)) servers.add(url);
+    }
+    return discovered;
+  }
+
   @override
   Future<DriveUsage?> driveUsage(String url) async => null;
   @override
@@ -23,8 +41,17 @@ class _Servers extends AtomicServerBackend {
 }
 
 class _Backend extends AtomicSettingsBackend {
-  _Backend(this.peers);
+  _Backend(this.peers, {_Servers? servers, this.search})
+      : _servers = servers ?? _Servers();
   final List<Map<String, String>> peers;
+  final _Servers _servers;
+  PeerSearchInfo? search;
+  int searches = 0;
+
+  @override
+  PeerSearchInfo? peerSearchStatus() => search;
+  @override
+  void Function()? get searchAgain => search == null ? null : () => searches++;
 
   @override
   Future<AtomicIdentity?> getActiveAgent() async => null;
@@ -55,14 +82,15 @@ class _Backend extends AtomicSettingsBackend {
   @override
   Future<void> pair(BuildContext context) async {}
   @override
-  AtomicServerBackend? get servers => _Servers();
+  AtomicServerBackend? get servers => _servers;
 }
 
-Future<void> _pump(WidgetTester tester, List<Map<String, String>> peers) async {
+Future<void> _pump(WidgetTester tester, List<Map<String, String>> peers,
+    {_Backend? backend}) async {
   await tester.pumpWidget(MaterialApp(
     home: Scaffold(
       body: SingleChildScrollView(
-        child: ServerSettingsSection(backend: _Backend(peers)),
+        child: ServerSettingsSection(backend: backend ?? _Backend(peers)),
       ),
     ),
   ));
@@ -118,5 +146,117 @@ void main() {
     await tester.pump();
     expect(copied, id);
     expect(find.text('ID copied'), findsOneWidget);
+  });
+
+  testWidgets('a server that names itself by its first label is that server',
+      (tester) async {
+    await _pump(
+        tester,
+        [
+          {'node_id': 'cc' * 32, 'name': 'staging', 'last_synced': ''},
+        ],
+        backend: _Backend([
+          {'node_id': 'cc' * 32, 'name': 'staging', 'last_synced': ''},
+        ], servers: _Servers(servers: ['https://staging.atomicdata.dev'])));
+
+    expect(find.text('staging.atomicdata.dev'), findsOneWidget);
+    expect(find.text('https://staging.atomicdata.dev'), findsOneWidget);
+    expect(find.byIcon(Icons.phone_android), findsNothing);
+    expect(find.text('staging'), findsNothing);
+  });
+
+  testWidgets('a peer whose node id a listed server reports is that server',
+      (tester) async {
+    final id = 'dd' * 32;
+    final peers = [
+      {'node_id': id, 'name': 'node', 'last_synced': ''},
+    ];
+    await _pump(tester, peers,
+        backend: _Backend(peers,
+            servers: _Servers(
+              servers: ['https://node1.atomicserver.eu'],
+              infos: {
+                'https://node1.atomicserver.eu':
+                    ServerInfo(nodeId: id, version: '1'),
+              },
+            )));
+
+    expect(find.byIcon(Icons.phone_android), findsNothing);
+    expect(find.text('https://node1.atomicserver.eu'), findsOneWidget);
+    expect(find.text('Copy ID'), findsOneWidget);
+  });
+
+  testWidgets('an atomic-server whose address is unknown is not a phone',
+      (tester) async {
+    await _pump(tester, [
+      {
+        'node_id': 'ee' * 32,
+        'name': '896f7bd5-atomic-server',
+        'last_synced': '',
+        'relay_url': 'https://euw1-1.relay.iroh.network./',
+      },
+    ]);
+
+    expect(find.byIcon(Icons.phone_android), findsNothing);
+    expect(find.byIcon(Icons.cloud_outlined), findsWidgets);
+    expect(find.textContaining('Server, address unknown'), findsOneWidget);
+    expect(
+        find.textContaining('via euw1-1.relay.iroh.network'), findsOneWidget);
+  });
+
+  testWidgets('servers the drive record names join the list', (tester) async {
+    await _pump(tester, [],
+        backend: _Backend([],
+            servers: _Servers(
+                servers: ['https://staging.atomicdata.dev'],
+                discovered: ['https://node1.atomicserver.eu'])));
+
+    expect(find.text('node1.atomicserver.eu'), findsOneWidget);
+    expect(find.text('staging.atomicdata.dev'), findsOneWidget);
+  });
+
+  testWidgets('the device search says what it does, and can search again',
+      (tester) async {
+    final backend = _Backend([],
+        search: const PeerSearchInfo(
+          state: 'no_peers_yet',
+          message: 'No other device found yet',
+          detail: 'No other device has announced this workspace yet.',
+          retryInSecs: 10,
+        ));
+    await _pump(tester, [], backend: backend);
+
+    expect(find.text('No other device found yet · trying again in 10 s'),
+        findsOneWidget);
+    expect(find.textContaining('has announced'), findsNothing);
+    await tester.tap(find.textContaining('No other device found yet'));
+    await tester.pump();
+    expect(find.textContaining('has announced'), findsOneWidget);
+
+    await tester.tap(find.text('Search again'));
+    await tester.pump();
+    expect(backend.searches, 1);
+
+    backend.search = const PeerSearchInfo(
+        state: 'searching', message: 'Looking for devices…');
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.text('Looking for devices…'), findsOneWidget);
+    expect(find.text('Search again'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a failed search shows why at once', (tester) async {
+    await _pump(tester, [],
+        backend: _Backend([],
+            search: const PeerSearchInfo(
+              state: 'failed',
+              message:
+                  "Can't look for devices: the device directory could not be reached",
+              detail:
+                  'pkarr relay https://dns.iroh.link/pkarr unreachable: dns error',
+              retryInSecs: 15,
+            )));
+    expect(find.textContaining('dns error'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
   });
 }

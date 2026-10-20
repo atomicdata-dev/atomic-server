@@ -289,6 +289,13 @@ Widget shellApp(ChatsScreen home, {Brightness brightness = Brightness.light}) =>
     app(AppShell(api: home.api, drive: home.drive, home: home),
         brightness: brightness);
 
+/// A tap on + lists the kinds; AI chat starts a new chat.
+Future<void> tapNewChat(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('New'));
+  await tester.pump();
+  await tester.tap(find.text('AI chat'));
+}
+
 void main() {
   group('ChatsScreen', () {
     // On a phone, scrolling the home back up never reached the top: each
@@ -315,7 +322,6 @@ void main() {
           for (var i = 0; i < 6; i++)
             (subject: 'did:ad:drive$i', name: 'Drive $i', emoji: '📁'),
         ],
-        recent: [for (var i = 0; i < 6; i++) res('r$i')],
         favoriteList: [for (var i = 0; i < 6; i++) res('f$i')],
         conversationList: [for (var i = 0; i < 6; i++) res('c$i')],
         activityList: [for (var i = 0; i < 6; i++) _activity('a$i', 'A $i')],
@@ -343,7 +349,7 @@ void main() {
 
       final position =
           tester.state<ScrollableState>(find.byType(Scrollable).first).position;
-      expect(position.maxScrollExtent, greaterThan(1000));
+      expect(position.maxScrollExtent, greaterThan(800));
 
       // Down to the bottom, one finger stroke at a time.
       final list = find.byType(ListView).first;
@@ -445,6 +451,9 @@ void main() {
       await tester.tap(find.text('Polle in Team chat'));
       await tester.pump();
       expect(api.markedRead, ['n1']);
+      // Noted once the page is left (no list moves under the finger).
+      expect(api.opened, isEmpty);
+      await _leave(tester);
       expect(api.opened, ['did:ad:teamchat']);
       await tester.pump(const Duration(milliseconds: 500));
     });
@@ -536,39 +545,129 @@ void main() {
       expect(find.text('A chat'), findsOneWidget);
     });
 
-    testWidgets('holding a heading moves and hides sections', (tester) async {
-      final api = FakeApi(
-        chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
-      );
-      await tester
-          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
-      await tester.pumpAndSettle();
-      double y(String t) => tester.getTopLeft(find.text(t)).dy;
-      expect(y('Drives'), lessThan(y('AI chats')));
+    group('holding a heading opens the Home sections dialog', () {
+      setUp(() => SharedPreferences.setMockInitialValues({}));
 
-      Future<void> pick(String heading, String item) async {
-        final gesture =
-            await tester.startGesture(tester.getCenter(find.text(heading)));
-        await tester.pump(const Duration(milliseconds: 400));
+      Future<void> pumpHome(WidgetTester tester) async {
+        final api = FakeApi(
+          chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
+          favoriteList: [
+            (
+              subject: 'f1',
+              title: 'A star',
+              className: 'Document',
+              openedAt: 1,
+              emoji: null
+            ),
+          ],
+        );
+        await tester
+            .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
         await tester.pumpAndSettle();
-        final target = tester.getCenter(find.text(item));
-        await gesture.moveTo(target);
+      }
+
+      Future<void> hold(WidgetTester tester, String heading) async {
+        await tester.longPress(find.text(heading));
+        await tester.pumpAndSettle();
+      }
+
+      double y(WidgetTester tester, String t) =>
+          tester.getTopLeft(find.text(t).first).dy;
+
+      Finder box(String title) => find.descendant(
+          of: find.byKey(ValueKey('home-section-${_name(title)}')),
+          matching: find.byType(Checkbox));
+
+      testWidgets('it lists every section with a checkbox', (tester) async {
+        await pumpHome(tester);
+        await hold(tester, 'AI chats');
+        expect(find.text('Home sections'), findsOneWidget);
+        for (final s in HomeSection.values) {
+          expect(
+              find.descendant(
+                  of: find.byKey(ValueKey('home-section-${s.name}')),
+                  matching: find.byType(Checkbox)),
+              findsOneWidget,
+              reason: s.title);
+        }
+        expect(find.text('Reset to default'), findsOneWidget);
+      });
+
+      testWidgets('unchecking hides the section on Home, at once',
+          (tester) async {
+        await pumpHome(tester);
+        expect(find.text('A star'), findsOneWidget);
+        await hold(tester, 'Favorites');
+        await tester.tap(box('Favorites'));
+        await tester.pumpAndSettle();
+        expect(find.text('A star'), findsNothing);
+        await tester.tap(box('Favorites'));
+        await tester.pumpAndSettle();
+        expect(find.text('A star'), findsOneWidget);
+      });
+
+      testWidgets('dragging a row changes the Home order and it is kept',
+          (tester) async {
+        await pumpHome(tester);
+        expect(y(tester, 'AI chats'), lessThan(y(tester, 'Favorites')));
+        await hold(tester, 'AI chats');
+        // Drag Favorites up by two rows (above Activity and AI chats).
+        final handle = find.descendant(
+            of: find.byKey(const ValueKey('home-section-favorites')),
+            matching: find.byIcon(Icons.drag_handle));
+        final g = await tester.startGesture(tester.getCenter(handle));
+        await tester.pump(const Duration(milliseconds: 100));
+        await g.moveBy(const Offset(0, -60));
         await tester.pump();
-        await gesture.up();
+        await g.moveBy(const Offset(0, -60));
+        await tester.pump();
+        await g.up();
         await tester.pumpAndSettle();
-      }
+        await tester.tap(find.text('Done'));
+        await tester.pumpAndSettle();
+        expect(y(tester, 'Favorites'), lessThan(y(tester, 'AI chats')));
 
-      // Move AI chats up past Activity, Recents and Drives.
-      for (var i = 0; i < 3; i++) {
-        await pick('AI chats', '⬆️ Move up');
-      }
-      expect(y('AI chats'), lessThan(y('Drives')));
+        // A fresh screen with the same stored prefs: same order.
+        await tester.pumpWidget(const SizedBox());
+        await pumpHome(tester);
+        expect(y(tester, 'Favorites'), lessThan(y(tester, 'AI chats')));
+      });
 
-      await pick('Drives', '🙈 Hide Drives');
-      expect(find.text('Drives'), findsNothing);
+      testWidgets('reset to default brings everything back', (tester) async {
+        await pumpHome(tester);
+        await hold(tester, 'AI chats');
+        await tester.tap(box('AI chats'));
+        await tester.pumpAndSettle();
+        expect(find.text('A chat'), findsNothing);
+        await tester.tap(find.text('Reset to default'));
+        await tester.pumpAndSettle();
+        expect(find.text('A chat'), findsOneWidget);
+      });
 
-      await pick('AI chats', '👁️ Show Drives');
-      expect(find.text('Drives'), findsOneWidget);
+      testWidgets('all off shows a Customize button that reopens it',
+          (tester) async {
+        await pumpHome(tester);
+        await hold(tester, 'AI chats');
+        for (final s in HomeSection.values) {
+          await tester.tap(box(s.title));
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(find.text('Done'));
+        await tester.pumpAndSettle();
+        expect(find.text('Customize'), findsOneWidget);
+        await tester.tap(find.text('Customize'));
+        await tester.pumpAndSettle();
+        expect(find.text('Home sections'), findsOneWidget);
+      });
+
+      testWidgets('a stored "recents" is ignored', (tester) async {
+        SharedPreferences.setMockInitialValues({
+          homeOrderKey: ['recents', 'chats'],
+          homeHiddenKey: ['recents'],
+        });
+        await pumpHome(tester);
+        expect(find.text('A chat'), findsOneWidget);
+      });
     });
 
     testWidgets('keeps the old rows while a reload is pending', (tester) async {
@@ -649,7 +748,7 @@ void main() {
     });
 
     // Seen on a phone: a document made with New, typed in and found with
-    // Search was missing from Recents and Activity back on the home, which
+    // Search was missing from Activity back on the home, which
     // only reloaded after pages it had opened itself.
     testWidgets('reads its lists again when a page of the bar closes',
         (tester) async {
@@ -669,11 +768,11 @@ void main() {
       expect(api.calls['chats'], greaterThan(1));
     });
 
-    testWidgets('sections come in order: Drives, Recents, AI chats',
+    testWidgets('sections come in order: Drives, AI chats, Favorites',
         (tester) async {
       final api = FakeApi(
         chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
-        recent: [
+        favoriteList: [
           (
             subject: 'r1',
             title: 'A doc',
@@ -687,8 +786,9 @@ void main() {
           .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       double y(String t) => tester.getTopLeft(find.text(t)).dy;
-      expect(y('Drives'), lessThan(y('Recents')));
-      expect(y('Recents'), lessThan(y('AI chats')));
+      expect(y('Drives'), lessThan(y('AI chats')));
+      expect(y('AI chats'), lessThan(y('Favorites')));
+      // No "Show all" text: an All button per section with something in it.
       expect(find.text('Show all'), findsNothing);
     });
 
@@ -739,8 +839,11 @@ void main() {
       ResourceView.serverFactory = () async => throw 'no server in a test';
       await tester.tap(find.text('Alice, Bob'));
       await tester.pumpAndSettle();
-      expect(api.opened, ['m1']);
       expect(find.byType(ResourceView), findsOneWidget);
+      // Noted once the page is left (no list moves under the finger).
+      expect(api.opened, isEmpty);
+      await _leave(tester);
+      expect(api.opened, ['m1']);
     });
 
     testWidgets('Messages rows show the newest message and open natively',
@@ -783,7 +886,8 @@ void main() {
           .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       expect(find.text('Fav 4'), findsNothing);
-      await tester.tap(find.text('Show all'));
+      await tester
+          .tap(find.byKey(const ValueKey('section-show-all-favorites')));
       await tester.pumpAndSettle();
       expect(find.text('Fav 5'), findsOneWidget);
     });
@@ -800,18 +904,18 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Chat 3'), findsOneWidget);
       expect(find.text('Chat 4'), findsNothing);
-      expect(find.text('Show all'), findsOneWidget);
+      expect(find.text('Show all (6)'), findsOneWidget);
 
-      await tester.tap(find.text('Show all'));
+      await tester.tap(find.byKey(const ValueKey('section-show-all-chats')));
       await tester.pumpAndSettle();
       expect(find.text('Chat 5'), findsOneWidget);
       expect(find.text('Today'), findsOneWidget);
     });
 
-    testWidgets('Activity sits between Recents and AI chats', (tester) async {
+    testWidgets('Activity sits between Drives and AI chats', (tester) async {
       final api = FakeApi(
         chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
-        recent: [
+        favoriteList: [
           (
             subject: 'r1',
             title: 'A doc',
@@ -826,19 +930,19 @@ void main() {
           .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       double y(String t) => tester.getTopLeft(find.text(t)).dy;
-      expect(y('Recents'), lessThan(y('Activity')));
+      expect(y('Drives'), lessThan(y('Activity')));
       expect(y('Activity'), lessThan(y('AI chats')));
-      expect(find.text('Ann changed · 5 min ago'), findsOneWidget);
+      expect(find.text('Ann edited · 5 min ago'), findsOneWidget);
     });
 
     testWidgets('says so when there is no activity', (tester) async {
       await tester
           .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
-      expect(find.text('No activity yet'), findsOneWidget);
+      expect(find.text('No activity from others yet'), findsOneWidget);
     });
 
-    testWidgets('activity shows 4, Show all appears only above 4',
+    testWidgets('activity shows 4, Show all appears with more than 4',
         (tester) async {
       Future<void> pump(int n) async {
         await tester.pumpWidget(Container());
@@ -850,16 +954,45 @@ void main() {
         await tester.pumpAndSettle();
       }
 
+      await pump(0);
+      expect(find.textContaining('Show all'), findsNothing);
+
       await pump(4);
       expect(find.text('Item 3'), findsOneWidget);
-      expect(find.text('Show all'), findsNothing);
+      expect(find.textContaining('Show all'), findsNothing);
 
       await pump(6);
       expect(find.text('Item 3'), findsOneWidget);
       expect(find.text('Item 4'), findsNothing);
-      await tester.tap(find.text('Show all'));
+      await tester.tap(find.byKey(const ValueKey('section-show-all-activity')));
       await tester.pumpAndSettle();
       expect(find.text('Item 5'), findsOneWidget);
+    });
+
+    testWidgets(
+        'headings are a title and a chevron: no search, + or list '
+        'buttons', (tester) async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final api = FakeApi(
+        chatList: [
+          for (var i = 0; i < 6; i++)
+            (subject: 'c$i', name: 'Chat $i', lastActivity: now),
+        ],
+        activityList: [_activity('a1', 'Plan')],
+      );
+      await tester
+          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
+      await tester.pumpAndSettle();
+      expect(find.byType(IconButton), findsNothing);
+      expect(find.byIcon(Icons.search), findsNothing);
+      expect(find.byIcon(Icons.add), findsNothing);
+      expect(find.byIcon(Icons.format_list_bulleted), findsNothing);
+      // The Activity filter stays.
+      expect(find.byType(ShowMineChip), findsOneWidget);
+      // The Show all row is a 48 dp row at the rows' 16 dp inset.
+      final row = find.byKey(const ValueKey('section-show-all-chats'));
+      expect(tester.getSize(row).height, 48);
+      expect(tester.getTopLeft(find.text('Show all (6)')).dx, 16);
     });
 
     testWidgets('a deleted entry is not tappable, a changed one opens',
@@ -871,7 +1004,7 @@ void main() {
       await tester
           .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
-      expect(find.text('Someone deleted · 5 min ago'), findsOneWidget);
+      expect(find.text('Unknown member deleted · 5 min ago'), findsOneWidget);
       ListTile tile(String title) => tester.widget<ListTile>(
           find.ancestor(of: find.text(title), matching: find.byType(ListTile)));
       expect(tile('Old note').onTap, isNull);
@@ -880,71 +1013,6 @@ void main() {
       await tester.tap(find.text('Fresh note'));
       await tester.pumpAndSettle();
       expect(find.byType(ResourceView), findsOneWidget);
-    });
-
-    testWidgets('recents merge all drives, newest first', (tester) async {
-      final api = _PerDrive(
-        driveList: [
-          (subject: 'did:ad:a', name: 'Alpha', emoji: null),
-          (subject: 'did:ad:b', name: 'Beta', emoji: null),
-        ],
-        byDrive: {
-          'did:ad:a': [
-            (
-              subject: 'a1',
-              title: 'Old a',
-              className: '',
-              openedAt: 10,
-              emoji: null
-            ),
-            (
-              subject: 'a2',
-              title: 'Newest a',
-              className: '',
-              openedAt: 50,
-              emoji: null
-            ),
-          ],
-          'did:ad:b': [
-            (
-              subject: 'b1',
-              title: 'Mid b',
-              className: '',
-              openedAt: 30,
-              emoji: null
-            ),
-            (
-              subject: 'b2',
-              title: 'Oldest b',
-              className: '',
-              openedAt: 5,
-              emoji: null
-            ),
-            (
-              subject: 'b3',
-              title: 'Second b',
-              className: '',
-              openedAt: 40,
-              emoji: null
-            ),
-          ],
-        },
-      );
-      await tester.pumpWidget(app(ChatsScreen(drive: 'did:ad:a', api: api)));
-      await tester.pumpAndSettle();
-      double y(String t) => tester.getTopLeft(find.text(t)).dy;
-      expect(y('Newest a'), lessThan(y('Second b')));
-      expect(y('Second b'), lessThan(y('Mid b')));
-      expect(y('Mid b'), lessThan(y('Old a')));
-      expect(find.text('Oldest b'), findsNothing);
-      // The drive's name comes before the class in the subtitle.
-      expect(find.textContaining('Beta'), findsWidgets);
-      expect(find.textContaining('Alpha'), findsWidgets);
-
-      ResourceView.serverFactory = () async => throw 'no server in a test';
-      await tester.tap(find.text('Second b'));
-      await tester.pump();
-      expect(api.opened, ['b3']);
     });
 
     testWidgets('a drive opens as a resource page', (tester) async {
@@ -980,7 +1048,7 @@ void main() {
           shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
       expect(find.byType(TextField), findsNothing);
-      final tips = ['Search', 'New chat', 'Profile', 'Settings'];
+      final tips = ['Search', 'New', 'Profile', 'Settings'];
       for (final t in tips) {
         expect(find.byTooltip(t), findsOneWidget);
       }
@@ -1009,7 +1077,7 @@ void main() {
       await tester.pumpWidget(
           shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen), findsOneWidget);
     });
@@ -1037,9 +1105,9 @@ void main() {
   });
 
   group('resource icons', () {
-    testWidgets('home Recents shows the emoji of a row that has one',
+    testWidgets('home Favorites shows the emoji of a row that has one',
         (tester) async {
-      final api = FakeApi(recent: [
+      final api = FakeApi(favoriteList: [
         (
           subject: 'r1',
           title: 'Fox doc',
@@ -1317,6 +1385,9 @@ void main() {
       ResourceView.serverFactory = () async => throw 'no server in a test';
       await tester.tap(find.text('Opened doc'));
       await tester.pump();
+      // Noted once the page is left (no list moves under the finger).
+      expect(api.opened, isEmpty);
+      await _leave(tester);
       expect(api.opened, ['r1']);
     });
 
@@ -1340,6 +1411,9 @@ void main() {
 
       await tester.tap(find.text('Zebra'));
       await tester.pump();
+      // Noted once the page is left (no list moves under the finger).
+      expect(api.opened, isEmpty);
+      await _leave(tester);
       expect(api.opened, ['did:ad:9']);
     });
   });
@@ -1394,8 +1468,11 @@ void main() {
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
-      expect(api.opened, ['did:ad:1']);
       expect(find.byType(ResourceView), findsOneWidget);
+      // Noted once the page is left (no list moves under the finger).
+      expect(api.opened, isEmpty);
+      await _leave(tester);
+      expect(api.opened, ['did:ad:1']);
     });
 
     testWidgets('Enter without hits opens nothing', (tester) async {
@@ -1502,6 +1579,9 @@ void main() {
       ResourceView.serverFactory = () async => throw 'no server in a test';
       await tester.tap(find.text('Zebra work'));
       await tester.pump();
+      // Noted once the page is left (no list moves under the finger).
+      expect(api.opened, isEmpty);
+      await _leave(tester);
       expect(api.opened, ['did:ad:b']);
       expect(api.openedDrives, ['did:ad:work']);
     });
@@ -2129,7 +2209,7 @@ void main() {
           shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi(ai: ai()))));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen), findsOneWidget);
       expect(find.text('Message'), findsOneWidget);
@@ -2234,8 +2314,8 @@ void main() {
 
     Future<void> pumpHome(WidgetTester tester) async {
       ResourceView.serverFactory = () async => throw 'no server in a test';
-      await tester.pumpWidget(shellApp(
-          ChatsScreen(drive: 'did:ad:drive', api: FakeApi(recent: [doc]))));
+      await tester.pumpWidget(shellApp(ChatsScreen(
+          drive: 'did:ad:drive', api: FakeApi(favoriteList: [doc]))));
       await tester.pumpAndSettle();
     }
 
@@ -2334,18 +2414,18 @@ void main() {
     testWidgets('buttons keep their order: search, new chat, profile, last',
         (tester) async {
       await pumpHome(tester);
-      expect(x(tester, 'Search'), lessThan(x(tester, 'New chat')));
-      expect(x(tester, 'New chat'), lessThan(x(tester, 'Profile')));
+      expect(x(tester, 'Search'), lessThan(x(tester, 'New')));
+      expect(x(tester, 'New'), lessThan(x(tester, 'Profile')));
       expect(x(tester, 'Profile'), lessThan(x(tester, 'Settings')));
       final xs = [
-        for (final t in ['Search', 'New chat', 'Profile']) x(tester, t)
+        for (final t in ['Search', 'New', 'Profile']) x(tester, t)
       ];
 
       await tester.tap(find.text('A doc'));
       await tester.pumpAndSettle();
       expect(x(tester, 'Profile'), lessThan(x(tester, 'More')));
       expect([
-        for (final t in ['Search', 'New chat', 'Profile']) x(tester, t)
+        for (final t in ['Search', 'New', 'Profile']) x(tester, t)
       ], xs);
     });
 
@@ -2361,7 +2441,7 @@ void main() {
       expect(find.byTooltip('Settings'), findsNothing);
 
       // Another page over the resource: no menu of its own, so Settings.
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen), findsOneWidget);
       expect(find.byTooltip('Settings'), findsOneWidget);
@@ -2438,7 +2518,7 @@ void main() {
           .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       expect(find.text('Today'), findsNothing);
-      await tester.tap(find.text('Show all'));
+      await tester.tap(find.byKey(const ValueKey('section-show-all-chats')));
       await tester.pumpAndSettle();
       expect(find.text('Today'), findsOneWidget);
       expect(find.text('Earlier'), findsOneWidget);
@@ -2643,7 +2723,7 @@ void main() {
       await tester.pumpWidget(
           shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen), findsOneWidget);
       // Home sits first in the row.
@@ -2726,3 +2806,14 @@ class _SlowNotifications extends FakeApi {
   @override
   Future<List<NotificationItem>> notifications() => pending;
 }
+
+/// Leaves the page on top: what was opened is noted as visited then.
+Future<void> _leave(WidgetTester tester) async {
+  await tester.pump(const Duration(milliseconds: 500));
+  await tester.binding.handlePopRoute();
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
+}
+
+String _name(String title) =>
+    HomeSection.values.firstWhere((s) => s.title == title).name;

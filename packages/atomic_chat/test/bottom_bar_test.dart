@@ -59,7 +59,7 @@ class _SlowChatApi extends _BarApi {
 ShellController _controller(WidgetTester tester) =>
     tester.widget<ShellScope>(find.byType(ShellScope)).controller;
 
-/// Touch and hold the bar button with [tooltip]; the fan is open after.
+/// Touch and hold the bar button with [tooltip]; the list is open after.
 Future<TestGesture> _hold(WidgetTester tester, String tooltip) async {
   final gesture = await tester.startGesture(tester.getCenter(
       find.byWidgetPredicate((w) => w is HoldFan && w.tooltip == tooltip)));
@@ -86,6 +86,13 @@ Future<void> _settle(WidgetTester tester) async {
 
 bool _current(String label) =>
     find.byKey(ValueKey('current:$label')).evaluate().isNotEmpty;
+
+/// A tap on + lists the kinds; AI chat starts a new chat.
+Future<void> tapNewChat(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('New'));
+  await tester.pump();
+  await tester.tap(find.text('AI chat'));
+}
 
 void main() {
   setUp(() {
@@ -128,44 +135,40 @@ void main() {
       addTearDown(tester.view.reset);
     }
 
-    testWidgets('the More menu is asked to open at the More button',
+    testWidgets('the bar next to the list has no More button, only six',
         (tester) async {
       wide(tester);
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
-      Rect? anchor;
-      // A tablet: the rail, and the button at the detail pane's top right.
-      expect(find.byType(AppNavRail), findsOneWidget);
+      // A tablet: the same bar, the width of the list pane. A page's menu
+      // is shown by the page itself, never by the bar.
+      expect(find.byType(AppBottomBar), findsOneWidget);
+      expect(tester.getSize(find.byType(AppBottomBar)).width, 360);
       final route = _controller(tester).top!;
-      _controller(tester).registerMenu(route, (a) => anchor = a);
+      _controller(tester).registerMenu(route, (_) {});
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('More'));
-      await tester.pump();
-      final button = tester.getRect(find.byTooltip('More'));
-      expect(anchor, isNotNull);
-      expect(anchor!.right, closeTo(button.right, 8));
-      // The right end of a 900 wide screen, not its left.
-      expect(anchor!.center.dx, greaterThan(700));
+      expect(
+          find.descendant(
+              of: find.byType(AppBottomBar), matching: find.byTooltip('More')),
+          findsNothing);
+      expect(find.byTooltip('Close sidebar'), findsOneWidget);
     });
 
-    testWidgets('the + and Search fans open next to their own buttons',
+    testWidgets('the + and Search lists open next to their own buttons',
         (tester) async {
       wide(tester);
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
-      for (final (tooltip, item) in [
-        ('New chat', 'AI chat'),
-        ('Search', 'All drives')
-      ]) {
+      for (final tooltip in ['New', 'Search']) {
         final button = tester.getRect(find
             .byWidgetPredicate((w) => w is HoldFan && w.tooltip == tooltip));
         final gesture = await _hold(tester, tooltip);
-        final pill = tester.getRect(find.text(item).last);
-        // Right of the rail's button, level with it.
-        expect(pill.left, greaterThan(button.right), reason: tooltip);
-        expect(pill.left - button.right, lessThan(60), reason: tooltip);
-        expect((pill.center.dy - button.center.dy).abs(), lessThan(30),
-            reason: tooltip);
+        final pill =
+            tester.getRect(find.byKey(const ValueKey('hold-fan-item-0')));
+        // Above the bar's button, over it.
+        expect(pill.bottom, lessThan(button.top), reason: tooltip);
+        expect(pill.left, lessThan(button.right), reason: tooltip);
+        expect(pill.right, greaterThan(button.left), reason: tooltip);
         await gesture.moveTo(const Offset(1, 1));
         await gesture.up();
         await tester.pumpAndSettle();
@@ -174,30 +177,146 @@ void main() {
   });
 
   group('New (+)', () {
-    testWidgets('a tap still opens a new chat; holding offers the four kinds',
+    testWidgets('a tap lists the kinds; picking AI chat starts a chat',
         (tester) async {
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
-      final gesture = await _hold(tester, 'New chat');
-      for (final t in ['AI chat', 'AI voice', 'Document', 'Other']) {
+      await tester.tap(find.byTooltip('New'));
+      await tester.pump();
+      // Nothing is made by the tap itself.
+      expect(find.byType(ChatScreen), findsNothing);
+      final rows = [
+        for (final t in [
+          'AI chat',
+          'AI voice',
+          'Document',
+          'New chat room',
+          'New drive',
+          'Other…'
+        ])
+          tester.getRect(find.text(t)),
+      ];
+      for (var i = 1; i < rows.length; i++) {
+        expect(rows[i].top, greaterThan(rows[i - 1].top), reason: 'order');
+      }
+      final bar = tester.getRect(find.byTooltip('New'));
+      expect(rows.last.bottom, lessThan(bar.top), reason: 'above the +');
+      for (final r in rows) {
+        expect(r.left, greaterThanOrEqualTo(0));
+        expect(r.right, lessThanOrEqualTo(360));
+      }
+      await tester.tap(find.text('AI chat'));
+      await tester.pumpAndSettle();
+      final chat = tester.widget<ChatScreen>(find.byType(ChatScreen));
+      expect(chat.subject, isNull);
+      expect(chat.voiceMode, isFalse);
+      expect(find.text('AI chat'), findsNothing);
+    });
+
+    testWidgets('a tap outside closes the list and starts nothing',
+        (tester) async {
+      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('New'));
+      await tester.pump();
+      await tester.tapAt(const Offset(180, 60));
+      await tester.pumpAndSettle();
+      expect(find.text('AI chat'), findsNothing);
+      expect(find.byType(ChatScreen), findsNothing);
+    });
+
+    testWidgets('back closes the list and keeps the page', (tester) async {
+      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('New'));
+      await tester.pump();
+      expect(find.text('AI chat'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('AI chat'), findsNothing);
+      expect(_controller(tester).topKind, ShellPage.settings);
+    });
+
+    testWidgets(
+        'holding lists the kinds and the drag picks the one under '
+        'the finger', (tester) async {
+      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpAndSettle();
+      final gesture = await _hold(tester, 'New');
+      for (final t in [
+        'AI chat',
+        'AI voice',
+        'Document',
+        'New chat room',
+        'New drive',
+        'Other…'
+      ]) {
         expect(find.text(t), findsOneWidget);
       }
+      // Letting go off the list picks nothing.
       await gesture.moveTo(const Offset(1, 1));
       await gesture.up();
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen), findsNothing);
+      expect(find.text('AI chat'), findsNothing);
 
-      await tester.tap(find.byTooltip('New chat'));
-      await tester.pumpAndSettle();
+      await _pick(tester, await _hold(tester, 'New'), 'AI chat');
       final chat = tester.widget<ChatScreen>(find.byType(ChatScreen));
       expect(chat.subject, isNull);
       expect(chat.voiceMode, isFalse);
     });
 
+    testWidgets('a swipe opens the list at once; a drag picks', (tester) async {
+      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpAndSettle();
+      final gesture = await tester.startGesture(tester.getCenter(
+          find.byWidgetPredicate((w) => w is HoldFan && w.tooltip == 'New')));
+      // No wait for a hold: the frame after the swipe passes the slop.
+      await gesture.moveBy(const Offset(0, -12));
+      await tester.pump();
+      expect(find.text('AI voice'), findsOneWidget);
+      await gesture.moveTo(tester.getCenter(find.text('AI voice')));
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(
+          tester.widget<ChatScreen>(find.byType(ChatScreen)).voiceMode, isTrue);
+    });
+
+    testWidgets('AI chat from inside a chat with messages is a fresh chat',
+        (tester) async {
+      final api = _BarApi(
+        ai: HostedAi(
+          status: {'enabled': true, 'consent': true, 'model': 'm'},
+          stream: (messages, model) => Stream.value('ok'),
+          enable: () async => {},
+        ),
+      );
+      await tester.pumpWidget(_shell(api));
+      await tester.pumpAndSettle();
+      await tapNewChat(tester);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Hi');
+      await tester.pump();
+      await tester.tap(find.byTooltip('Send'));
+      await tester.pumpAndSettle();
+      await tapNewChat(tester);
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatScreen, skipOffstage: false), findsNWidgets(2));
+      final top = tester.widget<ChatScreen>(find.byType(ChatScreen));
+      expect(top.subject, isNull);
+      // And again on that empty one: no third chat, its field gets the cursor.
+      await tapNewChat(tester);
+      await tester.pumpAndSettle();
+      expect(find.byType(ChatScreen, skipOffstage: false), findsNWidgets(2));
+    });
+
     testWidgets('AI voice opens a new chat in voice mode', (tester) async {
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
-      await _pick(tester, await _hold(tester, 'New chat'), 'AI voice');
+      await _pick(tester, await _hold(tester, 'New'), 'AI voice');
       final chat = tester.widget<ChatScreen>(find.byType(ChatScreen));
       expect(chat.voiceMode, isTrue);
       expect(chat.subject, isNull);
@@ -211,7 +330,7 @@ void main() {
       final api = _BarApi();
       await tester.pumpWidget(_shell(api));
       await tester.pumpAndSettle();
-      await _pick(tester, await _hold(tester, 'New chat'), 'Document');
+      await _pick(tester, await _hold(tester, 'New'), 'Document');
       expect(find.text('New document'), findsOneWidget);
       // The last used drive is preselected.
       expect(
@@ -240,12 +359,30 @@ void main() {
       final api = _BarApi()..createError = 'Drive is read-only';
       await tester.pumpWidget(_shell(api));
       await tester.pumpAndSettle();
-      await _pick(tester, await _hold(tester, 'New chat'), 'Document');
+      await _pick(tester, await _hold(tester, 'New'), 'Document');
       await tester.tap(find.text('Create'));
       await tester.pumpAndSettle();
       expect(find.text('Drive is read-only'), findsOneWidget);
       expect(find.text('New document'), findsOneWidget);
       expect(find.byType(ResourceView), findsNothing);
+    });
+
+    testWidgets('New chat room and New drive open the web forms',
+        (tester) async {
+      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpAndSettle();
+      await _pick(tester, await _hold(tester, 'New'), 'New chat room');
+      var view = tester.widget<ResourceView>(find.byType(ResourceView));
+      expect(view.title, 'New chat room');
+      expect(Uri.parse(view.path!).path, '/app/new');
+      expect(
+          Uri.parse(view.path!).queryParameters['classSubject'], chatRoomClass);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await _pick(tester, await _hold(tester, 'New'), 'New drive');
+      view = tester.widget<ResourceView>(find.byType(ResourceView));
+      expect(view.title, 'New drive');
+      expect(view.path, '/app/new-drive');
     });
 
     testWidgets('Other opens the web New page in the last drive',
@@ -254,7 +391,7 @@ void main() {
           {newResourceDriveKey: 'did:ad:work'});
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
-      await _pick(tester, await _hold(tester, 'New chat'), 'Other');
+      await _pick(tester, await _hold(tester, 'New'), 'Other…');
       final view = tester.widget<ResourceView>(find.byType(ResourceView));
       expect(Uri.parse(view.path!).path, '/app/new');
       expect(Uri.parse(view.path!).queryParameters['parentSubject'],
@@ -263,7 +400,7 @@ void main() {
   });
 
   group('Search hold', () {
-    testWidgets('a drive from the fan scopes the search, and x clears it',
+    testWidgets('a drive from the list scopes the search, and x clears it',
         (tester) async {
       final api = _BarApi();
       await tester.pumpWidget(_shell(api));
@@ -271,7 +408,7 @@ void main() {
       final gesture = await _hold(tester, 'Search');
       expect(find.text('All drives'), findsOneWidget);
       expect(find.text('Home'), findsWidgets);
-      await _pick(tester, gesture, '💼 Work');
+      await _pick(tester, gesture, 'Work');
 
       final screen = tester.widget<SearchScreen>(find.byType(SearchScreen));
       expect(screen.scopeDrive, 'did:ad:work');
@@ -286,7 +423,36 @@ void main() {
       expect(api.searched.last, ('plan', null));
     });
 
-    testWidgets('picking a drive in the results filters the search to it',
+    testWidgets('tapping a drive in the results opens it, no scope',
+        (tester) async {
+      final api = _BarApi()
+        ..searchHits = const [
+          (
+            subject: 'did:ad:work',
+            title: 'Work drive',
+            className: 'Drive',
+            drive: 'did:ad:home',
+            score: 1.0,
+            emoji: null
+          ),
+        ];
+      await tester.pumpWidget(_shell(api));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Search'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'wor');
+      await tester.pump(const Duration(milliseconds: 200));
+      final searches = api.searched.length;
+      await tester.tap(find.text('Work drive'));
+      await tester.pumpAndSettle();
+      expect(find.text('In: Work'), findsNothing);
+      expect(api.searched.length, searches, reason: 'not searched again');
+      expect(find.byKey(const Key('search-scope')), findsNothing);
+      expect(find.byType(SearchScreen), findsNothing,
+          reason: 'the drive page is on top of the search');
+    });
+
+    testWidgets('the search-in icon of a drive result scopes the search',
         (tester) async {
       final api = _BarApi()
         ..searchHits = const [
@@ -306,7 +472,7 @@ void main() {
       expect(find.byKey(const Key('search-scope')), findsNothing);
       await tester.enterText(find.byType(TextField), 'wor');
       await tester.pump(const Duration(milliseconds: 200));
-      await tester.tap(find.text('Work drive'));
+      await tester.tap(find.byTooltip('Search in Work drive'));
       await tester.pump(const Duration(milliseconds: 200));
       expect(find.byType(SearchScreen), findsOneWidget);
       expect(find.text('In: Work'), findsOneWidget);
@@ -351,7 +517,7 @@ void main() {
       await tester.tap(find.byTooltip('Search'));
       await tester.pumpAndSettle();
       expect(iconColor('Search'), AppColors.light.main);
-      expect(iconColor('New chat'), isNot(AppColors.light.main));
+      expect(iconColor('New'), isNot(AppColors.light.main));
       // No dot widget (a small circle) is drawn under the current button.
       expect(
           find.byWidgetPredicate((w) =>
@@ -374,9 +540,9 @@ void main() {
       expect(_current('Search'), isTrue);
       expect(_current('Home'), isFalse);
 
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
-      expect(_current('New chat'), isTrue);
+      expect(_current('New'), isTrue);
       expect(_current('Search'), isFalse);
 
       await tester.tap(find.byTooltip('Profile'));
@@ -402,10 +568,10 @@ void main() {
       await tester.tap(find.byTooltip('Settings'));
       await tester.pumpAndSettle();
       expect(find.byType(ResourceView), findsOneWidget);
-      // Choosing AI chat from the fan while a new chat is on top: the same.
-      await tester.tap(find.byTooltip('New chat'));
+      // Choosing AI chat from the list while a new chat is on top: the same.
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
-      await _pick(tester, await _hold(tester, 'New chat'), 'AI chat');
+      await _pick(tester, await _hold(tester, 'New'), 'AI chat');
       expect(find.byType(ChatScreen), findsOneWidget);
     });
 
@@ -432,13 +598,13 @@ void main() {
     testWidgets('a double tap pushes once', (tester) async {
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pump(const Duration(milliseconds: 50));
-      await tester.tap(find.byTooltip('New chat'), warnIfMissed: false);
+      await tester.tap(find.byTooltip('New'), warnIfMissed: false);
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen, skipOffstage: false), findsOneWidget);
       // And a quick tap on another button right after a push is ignored too.
-      await tester.tap(find.byTooltip('Home'));
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Settings'));
       await tester.pump(const Duration(milliseconds: 50));
@@ -458,14 +624,14 @@ void main() {
       );
       await tester.pumpWidget(_shell(api));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'Hi');
       await tester.pump();
       await tester.tap(find.byTooltip('Send'));
       await tester.pumpAndSettle();
-      expect(_current('New chat'), isFalse);
-      await tester.tap(find.byTooltip('New chat'));
+      expect(_current('New'), isFalse);
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen, skipOffstage: false), findsNWidgets(2));
     });
@@ -493,7 +659,7 @@ void main() {
         final api = _SlowChatApi(ai: ai());
         await tester.pumpWidget(_shell(api));
         await tester.pumpAndSettle();
-        await tester.tap(find.byTooltip('New chat'));
+        await tapNewChat(tester);
         await tester.pumpAndSettle();
         await tester.enterText(find.byType(TextField), 'Hi there');
         await tester.pump();
@@ -501,7 +667,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
         expect(find.text('Hi there'), findsOneWidget);
 
-        await tester.tap(find.byTooltip('New chat'));
+        await tapNewChat(tester);
         await tester.pumpAndSettle();
         // A new, empty chat is the one shown.
         expect(find.text('New chat'), findsWidgets);
@@ -518,11 +684,11 @@ void main() {
         (tester) async {
       await tester.pumpWidget(_shell(_BarApi(ai: ai())));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pump();
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen, skipOffstage: false), findsOneWidget);
       // Its field has the cursor.
@@ -533,9 +699,9 @@ void main() {
     testWidgets('on a voice chat it opens a typed one', (tester) async {
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
-      await _pick(tester, await _hold(tester, 'New chat'), 'AI voice');
+      await _pick(tester, await _hold(tester, 'New'), 'AI voice');
       expect(_controller(tester).topKind, ShellPage.voiceChat);
-      await tester.tap(find.byTooltip('New chat'));
+      await tapNewChat(tester);
       await tester.pumpAndSettle();
       expect(_controller(tester).topKind, ShellPage.newChat);
       expect(tester.widget<ChatScreen>(find.byType(ChatScreen).last).voiceMode,

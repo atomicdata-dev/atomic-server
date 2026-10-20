@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 enum HomeSection {
   notifications('Notifications'),
   drives('Drives'),
-  recents('Recents'),
   activity('Activity'),
   chats('AI chats'),
   favorites('Favorites'),
@@ -97,6 +96,17 @@ class HomeLayout {
   HomeLayout setHidden(HomeSection s, bool hide) => _with(
         hidden: hide ? (Set.of(hidden)..add(s)) : (Set.of(hidden)..remove(s)),
       );
+
+  /// The full order with the row at `from` moved to index `to`
+  /// ([ReorderableListView.onReorderItem] indices).
+  HomeLayout reorder(int from, int to) {
+    final list = List.of(order);
+    list.insert(to, list.removeAt(from));
+    return _with(order: list);
+  }
+
+  /// Default order, every section on; folds are kept.
+  HomeLayout reset() => HomeLayout(collapsed: collapsed);
 
   bool canMove(HomeSection s, int delta) => _neighbour(s, delta) != null;
 

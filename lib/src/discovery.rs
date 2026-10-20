@@ -126,6 +126,15 @@ fn build_packet(
 /// touch) are kept, so the packet always carries every known value.
 /// `http_origin` goes through [`public_https_origin`]; an unusable one is
 /// skipped. Does nothing when there is nothing to publish.
+///
+/// The record is shared by every replica of the drive, so this is a
+/// read-modify-write by many writers. Two rules keep one writer from erasing
+/// the others:
+/// - when the current record cannot be read (relay unreachable, a timeout, a
+///   5xx), nothing is published: a packet built from an empty read would name
+///   this replica alone and drop every other device from the drive;
+/// - the write names the timestamp it read (compare-and-swap); when another
+///   replica wrote in between, the record is read again and merged again.
 pub async fn publish_drive_record(
     drive_did: &str,
     iroh_node_id: Option<&str>,
@@ -137,28 +146,60 @@ pub async fn publish_drive_record(
     }
     let keypair = drive_did_to_pkarr_keypair(drive_did)?;
     let client = build_client()?;
-    let mut record = resolve_record_raw(&client, &keypair.public_key()).await;
 
-    if let Some(id) = iroh_node_id {
-        add_node_id(&mut record.node_ids, id);
+    const ATTEMPTS: usize = 3;
+    let mut last_conflict = String::new();
+    for attempt in 0..ATTEMPTS {
+        let current = fetch_packet(&keypair.public_key()).await.map_err(|e| {
+            format!("Not publishing drive record: could not read the current one first ({e})")
+        })?;
+        let mut record = current.as_ref().map(parse_record).unwrap_or_default();
+        let cas = current.as_ref().map(|p| p.timestamp());
+        let before = record.clone();
+
+        if let Some(id) = iroh_node_id {
+            add_node_id(&mut record.node_ids, id);
+        }
+        if let Some(origin) = &origin {
+            push_unique(&mut record.http_origins, origin);
+        }
+
+        let packet = build_packet(&keypair, &record)?;
+        match client.publish(&packet, cas).await {
+            Ok(()) => {
+                tracing::info!(
+                    "Discovery: published drive {} ({} NodeIDs, {} origins; read {} NodeIDs{})",
+                    short(drive_did),
+                    record.node_ids.len(),
+                    record.http_origins.len(),
+                    before.node_ids.len(),
+                    if attempt > 0 {
+                        ", after a conflict"
+                    } else {
+                        ""
+                    }
+                );
+                return Ok(());
+            }
+            Err(pkarr::errors::PublishError::Concurrency(e)) => {
+                tracing::info!(
+                    "Discovery: drive {} changed while publishing ({e}), merging again",
+                    short(drive_did)
+                );
+                last_conflict = e.to_string();
+                continue;
+            }
+            Err(e) => return Err(format!("Failed to publish to pkarr relay: {e}").into()),
+        }
     }
-    if let Some(origin) = &origin {
-        push_unique(&mut record.http_origins, origin);
-    }
+    Err(
+        format!("Failed to publish to pkarr relay after {ATTEMPTS} conflicts: {last_conflict}")
+            .into(),
+    )
+}
 
-    let packet = build_packet(&keypair, &record)?;
-    client
-        .publish(&packet, None)
-        .await
-        .map_err(|e| format!("Failed to publish to pkarr relay: {e}"))?;
-
-    tracing::debug!(
-        "Discovery: published drive {} ({} NodeIDs, {} origins)",
-        drive_did,
-        record.node_ids.len(),
-        record.http_origins.len()
-    );
-    Ok(())
+fn short(did: &str) -> &str {
+    &did[..did.len().min(24)]
 }
 
 /// Publish an Iroh NodeID for a drive via the pkarr relay.
@@ -192,9 +233,15 @@ pub async fn resolve_other_node_ids(
     exclude_node_id: Option<&str>,
 ) -> AtomicResult<Vec<String>> {
     let keypair = drive_did_to_pkarr_keypair(drive_did)?;
-    let client = build_client()?;
-    let node_ids = resolve_node_ids_raw(&client, &keypair.public_key()).await;
-    Ok(other_node_ids(node_ids, exclude_node_id))
+    let node_ids = resolve_record_raw(&keypair.public_key()).await?.node_ids;
+    let others = other_node_ids(node_ids.clone(), exclude_node_id);
+    tracing::info!(
+        "Discovery: drive {} names {} NodeIDs, {} of other devices",
+        short(drive_did),
+        node_ids.len(),
+        others.len()
+    );
+    Ok(others)
 }
 
 fn other_node_ids(node_ids: Vec<String>, exclude_node_id: Option<&str>) -> Vec<String> {
@@ -209,8 +256,7 @@ pub async fn resolve_node_ids_filtered(
     exclude_node_id: Option<&str>,
 ) -> AtomicResult<Vec<String>> {
     let keypair = drive_did_to_pkarr_keypair(drive_did)?;
-    let client = build_client()?;
-    let node_ids = resolve_node_ids_raw(&client, &keypair.public_key()).await;
+    let node_ids = resolve_record_raw(&keypair.public_key()).await?.node_ids;
 
     if node_ids.is_empty() {
         return Err(format!("No peers found for drive {drive_did}").into());
@@ -238,8 +284,7 @@ pub async fn resolve_node_ids_filtered(
 /// [`genesis_body_verifies`].
 pub async fn resolve_drive_record(drive_did: &str) -> AtomicResult<DriveRecord> {
     let keypair = drive_did_to_pkarr_keypair(drive_did)?;
-    let client = build_client()?;
-    Ok(resolve_record_raw(&client, &keypair.public_key()).await)
+    resolve_record_raw(&keypair.public_key()).await
 }
 
 const MAX_GENESIS_BODY_BYTES: usize = 256 * 1024;
@@ -276,20 +321,55 @@ pub fn genesis_body_verifies(body: &str, drive_did: &str) -> bool {
         .is_ok()
 }
 
-/// Resolve all NodeIDs from the pkarr relay for a given public key.
-async fn resolve_node_ids_raw(
-    client: &pkarr::Client,
-    public_key: &pkarr::PublicKey,
-) -> Vec<String> {
-    resolve_record_raw(client, public_key).await.node_ids
+/// Resolve both lists from the pkarr relay for a given public key. Empty when
+/// the relay has no record; an error when the relay could not be asked, so a
+/// caller can tell "no other device announced this drive" from "we could not
+/// look" (`pkarr::Client::resolve` folds both into `None`).
+async fn resolve_record_raw(public_key: &pkarr::PublicKey) -> AtomicResult<DriveRecord> {
+    Ok(fetch_packet(public_key)
+        .await?
+        .as_ref()
+        .map(parse_record)
+        .unwrap_or_default())
 }
 
-/// Resolve both lists from the pkarr relay for a given public key.
-async fn resolve_record_raw(client: &pkarr::Client, public_key: &pkarr::PublicKey) -> DriveRecord {
-    match client.resolve(public_key).await {
-        Some(packet) => parse_record(&packet),
-        None => DriveRecord::default(),
+/// The relay's current packet for `public_key`: `None` for a 404, an error for
+/// anything that is not an answer (no network, DNS, TLS, a timeout, a 5xx, a
+/// packet that does not verify).
+async fn fetch_packet(public_key: &pkarr::PublicKey) -> AtomicResult<Option<pkarr::SignedPacket>> {
+    fetch_packet_from(RELAY_URL, public_key).await
+}
+
+async fn fetch_packet_from(
+    relay: &str,
+    public_key: &pkarr::PublicKey,
+) -> AtomicResult<Option<pkarr::SignedPacket>> {
+    let url = format!("{relay}/{}", public_key.to_z32());
+    let client = crate::client::helpers::http_client_builder()
+        .build()
+        .map_err(|e| format!("pkarr relay client: {e}"))?;
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("pkarr relay {relay} unreachable: {e}"))?;
+    let status = response.status();
+    if status == reqwest::StatusCode::NOT_FOUND {
+        return Ok(None);
     }
+    if !status.is_success() {
+        return Err(format!("pkarr relay {relay} answered {status}").into());
+    }
+    let body = response
+        .bytes()
+        .await
+        .map_err(|e| format!("pkarr relay {relay}: reading the answer failed: {e}"))?;
+    if body.is_empty() {
+        return Ok(None);
+    }
+    pkarr::SignedPacket::from_relay_payload(public_key, &body)
+        .map(Some)
+        .map_err(|e| format!("pkarr relay {relay} sent a packet that does not verify: {e}").into())
 }
 
 /// The JSON string array in the TXT record named `label`, or empty.
@@ -372,6 +452,17 @@ fn build_client() -> AtomicResult<pkarr::Client> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A relay that cannot be reached is an error, not an empty record: an
+    /// empty read is what made a publish erase every other device from the
+    /// drive's record, and what made a lookup say "no peers online".
+    #[tokio::test]
+    async fn an_unreachable_relay_is_an_error_not_an_empty_record() {
+        let keypair = drive_did_to_pkarr_keypair(&fake_drive_did(0x31)).unwrap();
+        let result = fetch_packet_from("http://127.0.0.1:9/pkarr", &keypair.public_key()).await;
+        let err = result.expect_err("unreachable relay must be an error");
+        assert!(err.to_string().contains("unreachable"), "{err}");
+    }
 
     #[test]
     fn only_our_own_node_id_is_no_other_device() {

@@ -15,7 +15,10 @@
 //! the text parts of an AI-style entry); an entry without any text is left out.
 
 use super::{
-    chats::{append_entry, chat_entries},
+    chats::{
+        append_entry, chat_entries, entry_json, read_log_after, read_log_before, LogCursor,
+        LogWindow,
+    },
     conversations::{agent_name, same_agent},
     profiles::AgentProfiles,
     rows::{name_of, row_resource},
@@ -60,6 +63,113 @@ impl ChatRooms {
     /// or "Unknown member", `c` the time in ms. Read from the local store only.
     pub async fn read(&self, store: &Db, chat: &str) -> AtomicResult<Vec<Json>> {
         let lines = read_lines(store, chat).await?;
+        self.lines_json(store, lines).await
+    }
+
+    /// A window of the room's lines, as JSON `{messages, older, newest}`:
+    /// `messages` the newest `limit` lines before the `before` cursor (the
+    /// newest of all when `None`), oldest first, as [`Self::read`] gives
+    /// them; `older` the cursor for the window before this one (null at the
+    /// start), `newest` the log cursor of the last entry (for
+    /// [`Self::read_after`]). Old `Message` resources are merged in by time:
+    /// those in the time span of the window's log entries, and below the
+    /// oldest entry once the log is exhausted (`limit` at a time). Reads the
+    /// pages the window covers, whatever the length of the room.
+    pub async fn read_page(
+        &self,
+        store: &Db,
+        chat: &str,
+        before: Option<&str>,
+        limit: usize,
+    ) -> AtomicResult<Json> {
+        let limit = limit.max(1);
+        let cursor = before.map(RoomCursor::decode).transpose()?;
+        let (log_before, log_done, hi) = match &cursor {
+            Some(c) => (c.log.clone(), c.log.is_none(), Some((c.at, c.id.clone()))),
+            None => (None, false, None),
+        };
+        let window = if log_done {
+            LogWindow::default()
+        } else {
+            read_log_before(store, chat, log_before.as_ref(), limit).await?
+        };
+        let mut keys = std::collections::HashSet::new();
+        let mut lines: Vec<Line> = Vec::new();
+        for (c, entry) in &window.entries {
+            keys.insert(c.key.clone());
+            if let Some((at, json)) = entry_json(&c.page.subject, &c.key, entry) {
+                lines.extend(line_of_entry(&json, at));
+            }
+        }
+        // The log's window spans [lo, hi); below lo is the next window's.
+        let lo = window
+            .more
+            .then(|| {
+                window
+                    .entries
+                    .first()
+                    .and_then(|(_, e)| crate::chat_log::entry_created_at(e))
+            })
+            .flatten();
+        let cap = if window.more { usize::MAX } else { limit };
+        let (legacy, legacy_more) = legacy_lines(store, chat, lo, hi.as_ref(), &keys, cap).await?;
+        let oldest_legacy = legacy
+            .iter()
+            .min_by(|a, b| (a.created_at, &a.id).cmp(&(b.created_at, &b.id)))
+            .map(|l| (l.created_at, l.id.clone()));
+        lines.extend(legacy);
+        lines.sort_by(|a, b| (a.created_at, &a.id).cmp(&(b.created_at, &b.id)));
+
+        let older = if window.more {
+            Some(RoomCursor {
+                log: window.entries.first().map(|(c, _)| c.clone()),
+                at: lo.unwrap_or(0),
+                id: String::new(),
+            })
+        } else if legacy_more {
+            oldest_legacy.map(|(at, id)| RoomCursor { log: None, at, id })
+        } else {
+            None
+        };
+        let newest = window.entries.last().map(|(c, _)| c.encode());
+        Ok(json!({
+            "messages": self.lines_json(store, lines).await?,
+            "older": older.map(|c| c.encode()),
+            "newest": newest,
+        }))
+    }
+
+    /// The log entries of the room after `after` (a `newest` cursor), as
+    /// JSON `{messages, newest, more}` like [`crate::host::chats::read_chat_after`].
+    /// Old `Message` resources are not polled: only older clients write them.
+    pub async fn read_after(
+        &self,
+        store: &Db,
+        chat: &str,
+        after: &str,
+        limit: usize,
+    ) -> AtomicResult<Json> {
+        let cursor = LogCursor::decode(after)?;
+        let window = read_log_after(store, chat, &cursor, limit).await?;
+        let mut lines = Vec::new();
+        for (c, entry) in &window.entries {
+            if let Some((at, json)) = entry_json(&c.page.subject, &c.key, entry) {
+                lines.extend(line_of_entry(&json, at));
+            }
+        }
+        let newest = window
+            .entries
+            .last()
+            .map(|(c, _)| c.encode())
+            .unwrap_or_else(|| after.to_string());
+        Ok(json!({
+            "messages": self.lines_json(store, lines).await?,
+            "newest": newest,
+            "more": window.more,
+        }))
+    }
+
+    async fn lines_json(&self, store: &Db, lines: Vec<Line>) -> AtomicResult<Vec<Json>> {
         let me = store
             .get_default_agent()
             .map(|a| a.subject.to_string())
@@ -189,6 +299,165 @@ fn line_of_entry(entry: &Json, created_at: i64) -> Option<Line> {
     })
 }
 
+/// Where a window of a room ends: the log cursor of its oldest entry (`None`
+/// once the log is exhausted) and the bound below which old `Message`
+/// resources go to the next window: `(at, id)`, exclusive (an empty `id`
+/// excludes every message at `at` or later). Opaque to the app.
+#[derive(Clone, Debug, PartialEq)]
+struct RoomCursor {
+    log: Option<LogCursor>,
+    at: i64,
+    id: String,
+}
+
+impl RoomCursor {
+    fn encode(&self) -> String {
+        json!({ "l": self.log.as_ref().map(LogCursor::encode), "t": self.at, "s": self.id })
+            .to_string()
+    }
+
+    fn decode(cursor: &str) -> AtomicResult<Self> {
+        let bad = || format!("Not a chat room cursor: {cursor}");
+        let json: Json = serde_json::from_str(cursor).map_err(|_| bad())?;
+        let log = match json.get("l").and_then(Json::as_str) {
+            Some(log) => Some(LogCursor::decode(log)?),
+            None => None,
+        };
+        Ok(Self {
+            log,
+            at: json.get("t").and_then(Json::as_i64).ok_or_else(bad)?,
+            id: json
+                .get("s")
+                .and_then(Json::as_str)
+                .unwrap_or_default()
+                .to_string(),
+        })
+    }
+}
+
+/// The line of an old `Message` (or `FollowEvent`) resource; `None` for any
+/// other child, one without text, or one moved into the log (its migrated
+/// key is in `keys`).
+fn legacy_line(
+    subject: &Subject,
+    resource: &crate::Resource,
+    keys: &std::collections::HashSet<String>,
+) -> Option<Line> {
+    let classes = resource
+        .get(urls::IS_A)
+        .ok()
+        .and_then(|v| v.to_subjects(None).ok())
+        .unwrap_or_default();
+    let event = classes.iter().any(|c| c == urls::FOLLOW_EVENT);
+    if !event && !classes.iter().any(|c| c == urls::MESSAGE) {
+        return None;
+    }
+    let text = resource
+        .get(urls::DESCRIPTION)
+        .map(|v| v.to_string())
+        .unwrap_or_default();
+    if text.trim().is_empty() {
+        return None;
+    }
+    let at = resource
+        .get(urls::CREATED_AT)
+        .ok()
+        .and_then(|v| v.to_int().ok())
+        .unwrap_or(0);
+    let id = subject.to_string();
+    if keys.contains(&crate::chat_log::migrated_entry_key(at, &id)) {
+        return None;
+    }
+    let author = resource
+        .get(urls::CREATED_BY)
+        .map(|v| v.to_string())
+        .ok()
+        .or_else(|| resource.genesis_signer())
+        .unwrap_or_default();
+    let reply_to = resource
+        .get(urls::REPLY_TO)
+        .ok()
+        .map(|v| v.to_string())
+        .filter(|r| !r.is_empty());
+    Some(Line {
+        id,
+        author,
+        text,
+        created_at: at,
+        event,
+        reply_to,
+    })
+}
+
+/// Old `Message` (and `FollowEvent`) resources under `chat` made at `lo` or
+/// later (any time when `None`) and before `hi` (exclusive, see
+/// [`RoomCursor`]), newest first, at most `cap`; and whether more were left.
+/// Through a sorted index per class, so the cost follows the window, not the
+/// room (the log pages, whose `createdAt` says nothing about their entries'
+/// times when history was imported, are not in it).
+async fn legacy_lines(
+    store: &Db,
+    chat: &str,
+    lo: Option<i64>,
+    hi: Option<&(i64, String)>,
+    keys: &std::collections::HashSet<String>,
+    cap: usize,
+) -> AtomicResult<(Vec<Line>, bool)> {
+    const BATCH: usize = 64;
+    let drive = crate::host::chats::drive_scope(store, chat);
+    let mut out: Vec<Line> = Vec::new();
+    let mut more = false;
+    for class in [urls::MESSAGE, urls::FOLLOW_EVENT] {
+        let mut taken = 0;
+        let mut offset = 0;
+        'class: loop {
+            let mut q = Query::new_prop_val(urls::PARENT, chat).class_filter(class);
+            q.drive = Some(drive.clone());
+            q.sort_by = Some(urls::CREATED_AT.to_string());
+            q.sort_desc = true;
+            q.start_val = lo.map(crate::Value::Timestamp);
+            q.end_val = hi.map(|(at, _)| crate::Value::Timestamp(*at));
+            q.offset = offset;
+            q.limit = Some(BATCH);
+            let subjects = store.query_page(&q).await?;
+            let n = subjects.len();
+            for subject in subjects {
+                let Ok(resource) = store.get_resource(&subject).await else {
+                    continue;
+                };
+                let Some(line) = legacy_line(&subject, &resource, keys) else {
+                    continue;
+                };
+                if let Some((at, id)) = hi {
+                    // `(at, "")` sorts below every `(at, id)`: all at `at` go.
+                    if (line.created_at, line.id.as_str()) >= (*at, id.as_str()) {
+                        continue;
+                    }
+                }
+                if taken >= cap {
+                    more = true;
+                    break 'class;
+                }
+                taken += 1;
+                out.push(line);
+            }
+            if n < BATCH {
+                break;
+            }
+            offset += BATCH;
+        }
+    }
+    // Newest first, cut to `cap` over both classes.
+    out.sort_by(|a, b| (b.created_at, &b.id).cmp(&(a.created_at, &a.id)));
+    // A resource of both classes.
+    out.dedup_by(|a, b| a.id == b.id);
+    if out.len() > cap {
+        out.truncate(cap);
+        more = true;
+    }
+    Ok((out, more))
+}
+
 /// The lines of the log under `chat` and its old `Message` resources, oldest
 /// first. An old message whose entry exists (it was moved into the log) is
 /// left out, as in the web app.
@@ -214,50 +483,7 @@ async fn read_lines(store: &Db, chat: &str) -> AtomicResult<Vec<Line>> {
         let Ok(resource) = store.get_resource(subject).await else {
             continue;
         };
-        let classes = resource
-            .get(urls::IS_A)
-            .ok()
-            .and_then(|v| v.to_subjects(None).ok())
-            .unwrap_or_default();
-        let event = classes.iter().any(|c| c == urls::FOLLOW_EVENT);
-        if !event && !classes.iter().any(|c| c == urls::MESSAGE) {
-            continue;
-        }
-        let text = resource
-            .get(urls::DESCRIPTION)
-            .map(|v| v.to_string())
-            .unwrap_or_default();
-        if text.trim().is_empty() {
-            continue;
-        }
-        let at = resource
-            .get(urls::CREATED_AT)
-            .ok()
-            .and_then(|v| v.to_int().ok())
-            .unwrap_or(0);
-        let id = subject.to_string();
-        if keys.contains(&crate::chat_log::migrated_entry_key(at, &id)) {
-            continue;
-        }
-        let author = resource
-            .get(urls::CREATED_BY)
-            .map(|v| v.to_string())
-            .ok()
-            .or_else(|| resource.genesis_signer())
-            .unwrap_or_default();
-        let reply_to = resource
-            .get(urls::REPLY_TO)
-            .ok()
-            .map(|v| v.to_string())
-            .filter(|r| !r.is_empty());
-        lines.push(Line {
-            id,
-            author,
-            text,
-            created_at: at,
-            event,
-            reply_to,
-        });
+        lines.extend(legacy_line(subject, &resource, &keys));
     }
     lines.sort_by(|a, b| (a.created_at, &a.id).cmp(&(b.created_at, &b.id)));
     Ok(lines)
@@ -430,6 +656,91 @@ mod tests {
         let texts: Vec<&str> = lines.iter().map(|l| l["text"].as_str().unwrap()).collect();
         assert_eq!(texts, ["Old message", "New message"]);
         assert_eq!(lines[0]["mine"], true);
+    }
+
+    const T0: i64 = 1_700_000_000_000;
+
+    async fn old_message(d: &Device, room: &str, text: &str, at: i64) {
+        let author = d.store.get_default_agent().unwrap().subject.to_string();
+        let mut r = crate::Resource::new_generate_subject(&d.store).unwrap();
+        r.set_unsafe(urls::PARENT.into(), Value::AtomicUrl(room.into()))
+            .unwrap();
+        r.set_unsafe(
+            urls::IS_A.into(),
+            Value::ResourceArray(vec![urls::MESSAGE.into()]),
+        )
+        .unwrap();
+        r.set_unsafe(urls::DESCRIPTION.into(), Value::String(text.into()))
+            .unwrap();
+        r.set_unsafe(urls::CREATED_AT.into(), Value::Integer(at))
+            .unwrap();
+        r.set_unsafe(
+            urls::CREATED_BY.into(),
+            Value::AtomicUrl(author.as_str().into()),
+        )
+        .unwrap();
+        r.save_locally(&d.store).await.unwrap();
+    }
+
+    /// A room read window by window: log entries and old `Message`
+    /// resources merged by time, each line once, also the old messages from
+    /// before the log began.
+    #[tokio::test]
+    async fn room_windows_merge_old_messages_by_time() {
+        let d = Device::new().await;
+        let room = d.new_chat("Long room").await;
+        let entries: Vec<Entry> = (0..700)
+            .map(|i| entry(&d, &format!("e{i:04}"), T0 + 10_000 + i * 10))
+            .collect();
+        crate::host::chats::import_entries(&d.node, &NoPush, &room, &entries)
+            .await
+            .unwrap();
+        // Between entries, and long before the log.
+        for (i, at) in [10_005i64, 13_335, 16_995, 17_000_000]
+            .iter()
+            .chain((0..30).map(|i| 100 + i * 10).collect::<Vec<_>>().iter())
+            .map(|at| T0 + at)
+            .enumerate()
+        {
+            old_message(&d, &room, &format!("old{i:02}@{at}"), at).await;
+        }
+
+        let all = rooms().read(&d.store, &room).await.unwrap();
+        let want: Vec<&str> = all.iter().map(|l| l["text"].as_str().unwrap()).collect();
+        assert_eq!(want.len(), 734);
+
+        let mut texts: Vec<String> = Vec::new();
+        let mut cursor: Option<String> = None;
+        for _ in 0..100 {
+            let window = rooms()
+                .read_page(&d.store, &room, cursor.as_deref(), 64)
+                .await
+                .unwrap();
+            let mut page: Vec<String> = window["messages"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|l| l["text"].as_str().unwrap().to_string())
+                .collect();
+            page.extend(texts);
+            texts = page;
+            cursor = window["older"].as_str().map(str::to_string);
+            if cursor.is_none() {
+                break;
+            }
+        }
+        assert_eq!(texts, want);
+
+        let first = rooms().read_page(&d.store, &room, None, 10).await.unwrap();
+        let newest = first["newest"].as_str().unwrap().to_string();
+        send_message(&d.node, &NoPush, &room, "fresh", None)
+            .await
+            .unwrap();
+        let after = rooms()
+            .read_after(&d.store, &room, &newest, 50)
+            .await
+            .unwrap();
+        assert_eq!(after["messages"][0]["text"], "fresh");
     }
 
     #[tokio::test]

@@ -21,12 +21,12 @@ void main() {
   test('move swaps with the visible neighbour and skips hidden sections', () {
     var layout = const HomeLayout()
         .setHidden(HomeSection.notifications, true)
-        .setHidden(HomeSection.recents, true);
+        .setHidden(HomeSection.favorites, true);
     expect(layout.canMove(HomeSection.drives, -1), isFalse);
     layout = layout.move(HomeSection.activity, -1);
     expect(layout.visible.take(2), [HomeSection.activity, HomeSection.drives]);
-    // Recents kept its slot in the full order.
-    expect(layout.order.contains(HomeSection.recents), isTrue);
+    // Favorites kept its slot in the full order.
+    expect(layout.order.contains(HomeSection.favorites), isTrue);
   });
 
   test('stored names: unknown dropped, new sections go to their place', () {
@@ -44,13 +44,13 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await const HomeLayout()
         .move(HomeSection.chats, -1)
-        .toggleCollapsed(HomeSection.recents)
+        .toggleCollapsed(HomeSection.favorites)
         .setHidden(HomeSection.messages, true)
         .save();
     final loaded = await HomeLayout.load();
     expect(loaded.order.indexOf(HomeSection.chats),
         HomeSection.values.indexOf(HomeSection.chats) - 1);
-    expect(loaded.collapsed, {HomeSection.recents});
+    expect(loaded.collapsed, {HomeSection.favorites});
     expect(loaded.hidden, {HomeSection.messages});
   });
 }

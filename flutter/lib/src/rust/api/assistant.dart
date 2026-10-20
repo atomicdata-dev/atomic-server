@@ -12,11 +12,13 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 Future<String> resourceIcons({required List<String> subjects}) =>
     RustLib.instance.api.crateApiAssistantResourceIcons(subjects: subjects);
 
-/// The newest `limit` AI chats of the person (all drives), newest activity first, as JSON
-/// `[{subject, name, last_activity}]` (`last_activity` in ms, 0 when empty).
-/// Read from the recents index, not rebuilt from the chats' pages.
-Future<String> listAiChats({required int limit}) =>
-    RustLib.instance.api.crateApiAssistantListAiChats(limit: limit);
+/// `limit` AI chats of the person (all drives) after the `offset` newest
+/// ones, newest activity first, as JSON `[{subject, name, last_activity}]`
+/// (`last_activity` in ms, 0 when empty). A page shorter than `limit` is the
+/// last. Read from the recents index, not rebuilt from the chats' pages.
+Future<String> listAiChats({required int limit, required int offset}) =>
+    RustLib.instance.api
+        .crateApiAssistantListAiChats(limit: limit, offset: offset);
 
 /// The notifications in the Inbox of the person's private drive (what the web
 /// app recorded there), newest first, one per source, as JSON `[{subject,
@@ -33,8 +35,12 @@ Future<void> markNotificationRead({required String subject}) =>
 
 /// What changed lately in every drive, newest first, by whom. Read from the
 /// recents index, which the store's change events keep.
-Future<List<ActivityEntry>> listActivity({required int limit}) =>
-    RustLib.instance.api.crateApiAssistantListActivity(limit: limit);
+/// `include_own` adds the person's own changes (the feed's "Show mine"),
+/// by `You`.
+Future<List<ActivityEntry>> listActivity(
+        {required int limit, required bool includeOwn}) =>
+    RustLib.instance.api
+        .crateApiAssistantListActivity(limit: limit, includeOwn: includeOwn);
 
 /// Record that this device opened `subject` in `drive`. Local to the device:
 /// nothing is committed or synced.
@@ -106,6 +112,51 @@ Future<String> readChat({required String subject}) =>
 Future<String> readChatRoom({required String subject}) =>
     RustLib.instance.api.crateApiAssistantReadChatRoom(subject: subject);
 
+/// A window of an AI chat: JSON `{entries, older, newest}`, `entries` as
+/// [`read_chat`] gives them (oldest first), `older` the cursor of the window
+/// before (null at the start of the chat), `newest` the cursor of the last
+/// entry (null for an empty chat).
+Future<String> readChatPage(
+        {required String subject, String? before, required int limit}) =>
+    RustLib.instance.api.crateApiAssistantReadChatPage(
+        subject: subject, before: before, limit: limit);
+
+/// The entries of an AI chat after the `after` cursor: JSON `{entries,
+/// newest, more}`, `newest` the cursor for the next call, `more` when
+/// `limit` cut the list.
+Future<String> readChatAfter(
+        {required String subject, required String after, required int limit}) =>
+    RustLib.instance.api.crateApiAssistantReadChatAfter(
+        subject: subject, after: after, limit: limit);
+
+/// A window of a meeting or chat room: JSON `{messages, older, newest}`,
+/// `messages` as [`read_chat_room`] gives them. See [`read_chat_page`].
+Future<String> readChatRoomPage(
+        {required String subject, String? before, required int limit}) =>
+    RustLib.instance.api.crateApiAssistantReadChatRoomPage(
+        subject: subject, before: before, limit: limit);
+
+/// The messages of a meeting or chat room after `after`: JSON `{messages,
+/// newest, more}`. See [`read_chat_after`].
+Future<String> readChatRoomAfter(
+        {required String subject, required String after, required int limit}) =>
+    RustLib.instance.api.crateApiAssistantReadChatRoomAfter(
+        subject: subject, after: after, limit: limit);
+
+/// A window of a conversation: JSON `{messages, older, newest}`, `messages`
+/// as [`read_conversation`] gives them; only the window is decrypted.
+Future<String> readConversationPage(
+        {required String subject, String? before, required int limit}) =>
+    RustLib.instance.api.crateApiAssistantReadConversationPage(
+        subject: subject, before: before, limit: limit);
+
+/// The messages of a conversation after `after`: JSON `{messages, newest,
+/// more}`.
+Future<String> readConversationAfter(
+        {required String subject, required String after, required int limit}) =>
+    RustLib.instance.api.crateApiAssistantReadConversationAfter(
+        subject: subject, after: after, limit: limit);
+
 /// Post `text` in a meeting or chat room as this device's agent, as the web
 /// app does, so web clients show it. `reply_to` is the `id` of the message it
 /// answers. Returns the entry's id (`<page>#<key>`).
@@ -117,11 +168,20 @@ Future<String> sendChatRoomMessage(
 /// Full-text search (type-ahead on the last word) across every drive of this
 /// store, or only in `drive` when given. JSON
 /// `[{subject, title, class_name, drive, score}]`, best first; `drive` is the
-/// drive the hit lives in ("" when unknown).
+/// drive the hit lives in ("" when unknown). `classes` (`drive`, `aichat`,
+/// `conversation`, `chatroom`, or class URLs; empty: any) keeps only
+/// resources of those classes, applied before the limit.
 Future<String> search(
-        {String? drive, required String query, required int limit}) =>
-    RustLib.instance.api
-        .crateApiAssistantSearch(drive: drive, query: query, limit: limit);
+        {String? drive,
+        required String query,
+        required int limit,
+        required List<String> classes}) =>
+    RustLib.instance.api.crateApiAssistantSearch(
+        drive: drive, query: query, limit: limit, classes: classes);
+
+/// Read the search index once so the first keystroke is not cold. Call it
+/// after the first frame; it runs on a blocking thread and never fails.
+Future<void> warmSearch() => RustLib.instance.api.crateApiAssistantWarmSearch();
 
 /// The URL that shows `subject` in the data-browser of the connected server,
 /// for a webview. Errors when no server is connected (`open_ws_sync`).
@@ -153,6 +213,17 @@ Future<String> createResourceOfClass(
         required String name}) =>
     RustLib.instance.api.crateApiAssistantCreateResourceOfClass(
         drive: drive, classUrl: classUrl, name: name);
+
+/// Import a whole AI chat at once: an AI chat named `name` in the agent's
+/// private drive with every message of `entries_json`, a JSON array of
+/// `{role, parts, c}` (`parts` as `append_chat_entry` takes them, as an array
+/// or its JSON string; `c` the message's time in ms, now when absent), oldest
+/// first. One commit per 256 messages instead of one per message. Returns the
+/// chat's subject.
+Future<String> importAiChat(
+        {required String name, required String entriesJson}) =>
+    RustLib.instance.api
+        .crateApiAssistantImportAiChat(name: name, entriesJson: entriesJson);
 
 /// One line of the activity feed.
 class ActivityEntry {

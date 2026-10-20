@@ -33,6 +33,8 @@ void main() {
         ToolState.outputAvailable);
     final text = events.whereType<AiTextDelta>().map((e) => e.text).join();
     expect(text, contains('[Trip](did:ad:x)'));
+    // Never mistaken for the real AI.
+    expect(text, startsWith(fakeAiMark));
     expect(text, contains('```dart'));
   });
 

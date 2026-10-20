@@ -3,6 +3,8 @@
 //! per row.
 
 use super::{
+    own_profile::own_profile,
+    profiles::{same_agent, short_agent, AgentProfiles},
     recents::{ActivityKind, RecentsIndex},
     rows::{emoji_of, first_class, name_of, resource_row, row_resource, with_emoji, DriveCache},
 };
@@ -35,8 +37,19 @@ pub async fn list_ai_chats(
     recents: &RecentsIndex,
     limit: usize,
 ) -> AtomicResult<Vec<Json>> {
+    list_ai_chats_page(store, recents, 0, limit).await
+}
+
+/// [`list_ai_chats`] for paging: `limit` chats after the `offset` newest
+/// ones. A page shorter than `limit` is the last.
+pub async fn list_ai_chats_page(
+    store: &Db,
+    recents: &RecentsIndex,
+    offset: usize,
+    limit: usize,
+) -> AtomicResult<Vec<Json>> {
     Ok(recents
-        .recent_chats(store, limit)
+        .recent_chats_page(store, offset, limit)
         .await?
         .into_iter()
         .map(|(subject, name, last)| json!({ "subject": subject, "name": name, "last_activity": last }))
@@ -51,44 +64,187 @@ pub struct ActivityRow {
     pub kind: ActivityKind,
     /// Unix ms.
     pub at: i64,
-    /// Display name of the agent that did it; `None` when the store does not
-    /// know who, or does not have that agent's resource.
-    pub actor: Option<String>,
+    /// Subject of the agent that did it (never this device's own agent).
+    pub actor_subject: String,
+    /// Display name of that agent: its name when the store or the server's
+    /// profile has one, else the start of its key (`a3f9…`).
+    pub actor: String,
     pub name: String,
     pub class_name: String,
 }
 
-/// What changed lately in every drive, newest first, by whom. Read from the
-/// recents index, which the store's change events keep.
-pub async fn list_activity(store: &Db, recents: &RecentsIndex, limit: usize) -> Vec<ActivityRow> {
-    let mut names: HashMap<String, Option<String>> = Default::default();
-    let mut out = Vec::new();
-    for a in recents.activity(limit) {
-        let actor = match &a.actor {
-            None => None,
-            Some(agent) => match names.get(agent) {
-                Some(name) => name.clone(),
-                None => {
-                    let name = row_resource(store, &Subject::from(agent.as_str()))
-                        .await
-                        .map(|r| name_of(&r))
-                        .filter(|n| !n.is_empty());
-                    names.insert(agent.clone(), name.clone());
-                    name
-                }
-            },
-        };
-        out.push(ActivityRow {
-            subject: a.subject,
-            drive: a.drive,
-            kind: a.kind,
-            at: a.at,
-            actor,
-            name: a.name,
-            class_name: a.class_name,
-        });
+/// How long [`list_activity`] waits for the server's profiles of agents it
+/// cannot name from the store. The lookups go on after it; the next read has
+/// the names.
+const PROFILE_WAIT: std::time::Duration = std::time::Duration::from_millis(250);
+
+/// The name of `agent` as far as this device knows it without waiting: the
+/// own agent's from its profile ([`own_profile`]), another agent's from its
+/// resource in the store, else from the server's profile cache (starting a
+/// lookup when it is not cached). `None` when nothing names it yet.
+pub async fn agent_name(store: &Db, profiles: &AgentProfiles, agent: &str) -> Option<String> {
+    let own = store.get_default_agent().ok();
+    if own
+        .as_ref()
+        .is_some_and(|own| same_agent(&own.subject.to_string(), agent))
+    {
+        if let Some(name) = own.as_ref().and_then(|own| own.name.clone()) {
+            if !name.trim().is_empty() {
+                return Some(name);
+            }
+        }
+        return own_profile(store, profiles)
+            .await
+            .ok()
+            .and_then(|p| p["name"].as_str().map(str::to_string))
+            .filter(|n| !n.trim().is_empty());
     }
-    out
+    if let Some(name) = row_resource(store, &Subject::from(agent))
+        .await
+        .map(|r| name_of(&r))
+        .filter(|n| !n.trim().is_empty())
+    {
+        return Some(name);
+    }
+    profiles
+        .name_or_prefetch(agent)
+        .filter(|n| !n.trim().is_empty())
+}
+
+/// What other agents changed lately in the person's drives, newest first, by
+/// whom; `drive` keeps one drive's. This device's own agent's changes are
+/// left out (they are in Recents), in any spelling of its subject, and so are
+/// changes nobody can be named for (see [`super::recents`]). Read from the
+/// recents index, which the store's change events keep.
+pub async fn list_activity(
+    store: &Db,
+    recents: &RecentsIndex,
+    profiles: &AgentProfiles,
+    drive: Option<&str>,
+    limit: usize,
+) -> Vec<ActivityRow> {
+    list_activity_with(store, recents, profiles, drive, limit, false).await
+}
+
+/// [`list_activity`], with the person's own changes too when `include_own`
+/// (the feed's "Show mine"); those are by `You`.
+pub async fn list_activity_with(
+    store: &Db,
+    recents: &RecentsIndex,
+    profiles: &AgentProfiles,
+    drive: Option<&str>,
+    limit: usize,
+    include_own: bool,
+) -> Vec<ActivityRow> {
+    let own = store
+        .get_default_agent()
+        .ok()
+        .map(|a| a.subject.to_string());
+    let drive = drive.map(drive_key);
+    let entries: Vec<_> = recents
+        .activity(usize::MAX)
+        .into_iter()
+        .filter(|a| {
+            let Some(actor) = a.actor.as_deref() else {
+                return false;
+            };
+            if !include_own && own.as_deref().is_some_and(|own| same_agent(own, actor)) {
+                return false;
+            }
+            drive.as_ref().is_none_or(|d| drive_key(&a.drive) == *d)
+        })
+        .take(limit)
+        .collect();
+
+    let mut names: HashMap<String, Option<String>> = Default::default();
+    for a in &entries {
+        let agent = a.actor.clone().unwrap_or_default();
+        if let std::collections::hash_map::Entry::Vacant(slot) = names.entry(agent.clone()) {
+            slot.insert(agent_name(store, profiles, &agent).await);
+        }
+    }
+    // Give the server's profiles a moment; the lookups started above.
+    let unnamed: Vec<String> = names
+        .iter()
+        .filter(|(_, n)| n.is_none())
+        .map(|(a, _)| a.clone())
+        .collect();
+    if !unnamed.is_empty() {
+        let lookups = futures::future::join_all(unnamed.iter().map(|a| profiles.get(a)));
+        let _ = tokio::time::timeout(PROFILE_WAIT, lookups).await;
+        for agent in unnamed {
+            let name = profiles.name_or_prefetch(&agent);
+            names.insert(agent, name);
+        }
+    }
+
+    entries
+        .into_iter()
+        .map(|a| {
+            let actor_subject = a.actor.unwrap_or_default();
+            let actor = if own.as_deref().is_some_and(|own| same_agent(own, &actor_subject)) {
+                "You".to_string()
+            } else {
+                names
+                    .get(&actor_subject)
+                    .cloned()
+                    .flatten()
+                    .unwrap_or_else(|| short_agent(&actor_subject))
+            };
+            ActivityRow {
+                subject: a.subject,
+                drive: a.drive,
+                kind: a.kind,
+                at: a.at,
+                actor_subject,
+                actor,
+                name: a.name,
+                class_name: a.class_name,
+            }
+        })
+        .collect()
+}
+
+/// Put `drives` in the order every drive list shows them: the `active`
+/// drive first, then the most recently used (opened here, or changed by the
+/// person: [`RecentsIndex::drive_last_used`]), then the never-used ones by
+/// name. `subject_and_name` reads a drive's subject and name.
+pub fn order_drives_by_use<T>(
+    store: &Db,
+    recents: &RecentsIndex,
+    drives: Vec<T>,
+    subject_and_name: impl Fn(&T) -> (&str, &str),
+) -> Vec<T> {
+    let own = store
+        .get_default_agent()
+        .ok()
+        .map(|a| a.subject.to_string());
+    let active = store.get_active_drive().map(|d| drive_key(&d));
+    let mut keyed: Vec<(bool, i64, String, T)> = drives
+        .into_iter()
+        .map(|d| {
+            let (subject, name) = subject_and_name(&d);
+            (
+                active.as_deref() == Some(drive_key(subject).as_str()),
+                recents.drive_last_used(subject, own.as_deref()),
+                name.to_lowercase(),
+                d,
+            )
+        })
+        .collect();
+    // Stable: equal drives keep the store's order.
+    keyed.sort_by(|a, b| {
+        b.0.cmp(&a.0)
+            .then(b.1.cmp(&a.1))
+            .then_with(|| a.2.cmp(&b.2))
+    });
+    keyed.into_iter().map(|k| k.3).collect()
+}
+
+/// A drive's subject in one spelling (`did:ad:` / `atomic:`, without a
+/// query), for comparing drives.
+fn drive_key(drive: &str) -> String {
+    crate::identifiers::canonicalize_scheme(&Subject::from(drive).pure_id())
 }
 
 /// The `limit` resources of `drive` this device opened last, newest first, as
@@ -184,15 +340,79 @@ pub fn search(
     query: &str,
     limit: usize,
 ) -> AtomicResult<Vec<Json>> {
+    search_classes(store, drive, query, limit, &[])
+}
+
+/// The class URL a search `class` names: a URL as is, or the shortname the
+/// app uses for a kind of thing (`drive`, `aichat`, `conversation`,
+/// `chatroom`; case and punctuation do not matter).
+fn search_class_url(class: &str) -> AtomicResult<String> {
+    if class.contains("://") {
+        return Ok(class.to_string());
+    }
+    let key: String = class
+        .to_lowercase()
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .collect();
+    Ok(match key.as_str() {
+        "drive" => crate::urls::DRIVE,
+        "aichat" => super::rows::AI_CHAT,
+        "conversation" => crate::urls::CONVERSATION,
+        "chatroom" => crate::urls::CHATROOM,
+        _ => return Err(format!("Unknown search class {class:?}").into()),
+    }
+    .to_string())
+}
+
+/// [`search`] for only the resources of one of `classes` (none: any). The
+/// class is filtered in the index, before the result limit: a query whose
+/// best twenty are documents still finds the chat in place 21.
+pub fn search_classes(
+    store: &Db,
+    drive: Option<&str>,
+    query: &str,
+    limit: usize,
+    classes: &[String],
+) -> AtomicResult<Vec<Json>> {
     let scoped = drive.is_some_and(|d| !d.is_empty());
     // Room to move the person's things forward past schema hits.
-    let fetch = if scoped { limit } else { limit.saturating_mul(4) };
-    let opts = crate::client::search::SearchOpts {
-        limit: Some(fetch as u32),
-        parents: drive.filter(|d| !d.is_empty()).map(|d| vec![d.to_string()]),
-        ..Default::default()
+    let fetch = if scoped {
+        limit
+    } else {
+        limit.saturating_mul(4)
     };
-    let hits = crate::search::query(store, query.trim(), &opts)?;
+    let parents = drive.filter(|d| !d.is_empty()).map(|d| vec![d.to_string()]);
+    let hits = if classes.is_empty() {
+        let opts = crate::client::search::SearchOpts {
+            limit: Some(fetch as u32),
+            parents,
+            ..Default::default()
+        };
+        crate::search::query(store, query.trim(), &opts)?
+    } else {
+        // One indexed filter per class (a kind can be two classes, such as
+        // conversations and chat rooms), merged best first.
+        let mut hits = Vec::new();
+        for class in classes {
+            let opts = crate::client::search::SearchOpts {
+                limit: Some(fetch as u32),
+                parents: parents.clone(),
+                filter_pairs: Some(vec![(
+                    crate::urls::IS_A.to_string(),
+                    search_class_url(class)?,
+                )]),
+                ..Default::default()
+            };
+            hits.extend(crate::search::query(store, query.trim(), &opts)?);
+        }
+        if classes.len() > 1 {
+            hits.sort_by(|a, b| b.score.total_cmp(&a.score));
+            let mut seen = std::collections::HashSet::new();
+            hits.retain(|h| seen.insert(h.subject.to_string()));
+        }
+        hits
+    };
 
     // Local propvals only, and each parent / class is looked up once per
     // query: a search never waits on the network and never decodes a Loro doc.
@@ -232,6 +452,20 @@ pub fn search(
     }
     out.truncate(limit);
     Ok(out)
+}
+
+/// Read the search trees once so the first keystroke does not find them
+/// cold (9-62 ms on a desktop, about 200 ms on a phone). Run it on a
+/// background thread once the first screen is drawn: it only reads, with a
+/// few short queries of the lengths people start with.
+pub fn warm_search(store: &Db) {
+    let opts = crate::client::search::SearchOpts {
+        limit: Some(5),
+        ..Default::default()
+    };
+    for probe in ["e", "a", "te", "sea", "meeting"] {
+        let _ = crate::search::query(store, probe, &opts);
+    }
 }
 
 #[cfg(test)]
@@ -340,6 +574,98 @@ mod tests {
 
     fn sync_subject(tag: &str, n: u64) -> String {
         format!("did:ad:{tag}{:0>58}{n:0>6}==", std::process::id())
+    }
+
+    #[tokio::test]
+    async fn chats_are_paged_without_gaps_or_repeats() {
+        let d = Device::new().await;
+        let mut rx = d.store.subscribe_events();
+        let mut chats = Vec::new();
+        for i in 0..23 {
+            let chat = d.new_chat(&format!("Paged chat {i}")).await;
+            d.add_page(
+                &chat,
+                &[("1-00000001", d.ai_entry("user", "hi", 1_000 + i * 10))],
+            )
+            .await;
+            chats.push(chat);
+        }
+        d.pump(&mut rx).await;
+
+        let all = list_ai_chats(&d.store, &d.recents, 1000).await.unwrap();
+        assert_eq!(all.len(), 23);
+        let mut paged = Vec::new();
+        loop {
+            let page = list_ai_chats_page(&d.store, &d.recents, paged.len(), 10)
+                .await
+                .unwrap();
+            let last = page.len() < 10;
+            paged.extend(page);
+            if last {
+                break;
+            }
+        }
+        assert_eq!(paged, all);
+        // Newest first; a page past the end is empty.
+        assert_eq!(paged[0]["subject"], chats[22].as_str());
+        assert!(list_ai_chats_page(&d.store, &d.recents, 23, 10)
+            .await
+            .unwrap()
+            .is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_class_filter_applies_before_the_result_limit() {
+        let d = Device::new().await;
+        for i in 0..12 {
+            d.store
+                .create_resource(urls::FOLDER, &d.drive, &format!("Quokka folder {i}"), None)
+                .await
+                .unwrap();
+        }
+        let chat = d.new_chat("Quokka chat with a longer title").await;
+        let room = d
+            .store
+            .create_resource(urls::CHATROOM, &d.drive, "Quokka room with a title", None)
+            .await
+            .unwrap();
+
+        // The best three are folders: the chat is not among them...
+        let any = search(&d.store, None, "quokka", 3).unwrap();
+        assert!(!has(&any, &chat));
+        // ...but a filter on the class finds it, and only it.
+        let chats = search_classes(&d.store, None, "quokka", 3, &["aichat".into()]).unwrap();
+        assert_eq!(chats.len(), 1, "{chats:?}");
+        assert!(has(&chats, &chat));
+        // Several classes are merged; a class URL works like a shortname.
+        let both = search_classes(
+            &d.store,
+            None,
+            "quokka",
+            5,
+            &["ai-chat".into(), urls::CHATROOM.into()],
+        )
+        .unwrap();
+        assert!(
+            has(&both, &chat) && has(&both, &room) && both.len() == 2,
+            "{both:?}"
+        );
+        assert!(search_classes(&d.store, None, "quokka", 3, &["nonsense".into()]).is_err());
+        // Typing nothing yet lists none of a class; the filter keeps a drive scope.
+        let scoped =
+            search_classes(&d.store, Some(&d.drive), "quokka", 3, &["aichat".into()]).unwrap();
+        assert!(has(&scoped, &chat));
+    }
+
+    #[tokio::test]
+    async fn warming_the_search_changes_nothing() {
+        let d = Device::new().await;
+        d.store
+            .create_resource(urls::FOLDER, &d.drive, "Zyzzyva notes", None)
+            .await
+            .unwrap();
+        warm_search(&d.store);
+        assert_eq!(search(&d.store, None, "zyzzyva", 5).unwrap().len(), 1);
     }
 
     #[tokio::test]
@@ -583,9 +909,30 @@ mod tests {
         assert_eq!(icons[&with], "🦊");
     }
 
+    /// Answers one profile for every agent.
+    struct Named(&'static str);
+
+    #[async_trait::async_trait]
+    impl crate::host::AgentProfileFetcher for Named {
+        async fn fetch_agent_resource(&self, _agent: &str) -> Option<String> {
+            Some(json!({ urls::NAME: self.0 }).to_string())
+        }
+    }
+
+    /// `agent` renames `subject` with a commit applied here (as a commit frame
+    /// would).
+    async fn edit_as(d: &Device, agent: &crate::agents::Agent, subject: &str, name: &str) {
+        let mut r = d.store.get_resource(&subject.into()).await.unwrap();
+        r.set_string(urls::NAME.into(), name, &d.store)
+            .await
+            .unwrap();
+        r.save_as(agent, &d.store).await.unwrap();
+    }
+
     #[tokio::test]
-    async fn activity_follows_creates_and_deletes_and_skips_chats() {
+    async fn activity_is_what_other_agents_did() {
         let d = Device::new().await;
+        let none = AgentProfiles::none();
         let mut rx = d.store.subscribe_events();
         let folder = d
             .store
@@ -594,32 +941,164 @@ mod tests {
             .unwrap();
         let chat = d.new_chat("Activity chat").await;
         d.pump(&mut rx).await;
+        // The index saw the own creation, signed by this device's agent...
+        let raw = d.recents.activity(500);
+        let own = raw.iter().find(|a| a.subject == folder).unwrap();
+        assert_eq!(own.kind, ActivityKind::Created);
+        assert!(own.actor.is_some());
+        // ...but that is the person's own work, not activity.
+        assert!(list_activity(&d.store, &d.recents, &none, None, 500)
+            .await
+            .is_empty());
+        // With "Show mine" it is there, by You.
+        let mine = list_activity_with(&d.store, &d.recents, &none, None, 500, true).await;
+        let row = mine.iter().find(|a| a.subject == folder).unwrap();
+        assert_eq!(row.actor, "You");
 
-        let list = list_activity(&d.store, &d.recents, 500).await;
-        let entry = list.iter().find(|a| a.subject == folder).unwrap();
-        assert_eq!(entry.kind, ActivityKind::Created);
-        assert_eq!(entry.name, "Activity folder");
-        assert!(entry.at > 0);
+        // Another member edits it, a few times in a row: one entry.
+        let bob = crate::agents::Agent::new(Some("Bob")).unwrap();
+        for name in ["By Bob", "By Bob again", "By Bob, final"] {
+            edit_as(&d, &bob, &folder, name).await;
+        }
+        d.pump(&mut rx).await;
+        let list = list_activity(&d.store, &d.recents, &none, None, 500).await;
+        assert_eq!(list.len(), 1, "{list:?}");
+        let entry = &list[0];
+        assert_eq!(entry.subject, folder);
+        assert_eq!(entry.kind, ActivityKind::Changed);
+        assert_eq!(entry.name, "By Bob, final");
+        assert_eq!(entry.drive, d.drive);
+        assert!(same_agent(&entry.actor_subject, &bob.subject.to_string()));
+        // Nobody can name Bob here: the start of his key, never "someone".
+        assert_eq!(entry.actor, short_agent(&bob.subject.to_string()));
+        assert!(entry.actor.ends_with('…'));
         assert!(list.iter().all(|a| a.subject != chat));
-        // The signer comes from the stored commit, and is named.
-        let raw = d
-            .recents
-            .activity(500)
-            .into_iter()
-            .find(|a| a.subject == folder)
-            .unwrap();
-        assert!(raw.actor.is_some());
-        assert_eq!(entry.actor.as_deref(), Some("Test device"));
 
-        d.store
-            .remove_resource(&folder.as_str().into())
+        // A second member is a row of their own; the person's own edit after
+        // them adds nothing and takes nothing away.
+        let carol = crate::agents::Agent::new(Some("Carol")).unwrap();
+        edit_as(&d, &carol, &folder, "By Carol").await;
+        d.pump(&mut rx).await;
+        let mut own_edit = d.store.get_resource(&folder.as_str().into()).await.unwrap();
+        own_edit
+            .set_string(urls::NAME.into(), "By me", &d.store)
+            .await
+            .unwrap();
+        d.node.save_locally(&mut own_edit).await.unwrap();
+        d.pump(&mut rx).await;
+        let named = AgentProfiles::new(std::sync::Arc::new(Named("Carol")));
+        let list = list_activity(&d.store, &d.recents, &named, None, 500).await;
+        let actors: Vec<&str> = list.iter().map(|a| a.actor.as_str()).collect();
+        assert_eq!(list.len(), 2, "{actors:?}");
+        // Newest first; the server's profile names Carol (and here Bob too).
+        assert!(same_agent(
+            &list[0].actor_subject,
+            &carol.subject.to_string()
+        ));
+        assert_eq!(list[0].actor, "Carol");
+        assert!(same_agent(&list[1].actor_subject, &bob.subject.to_string()));
+
+        // The drive filter.
+        assert_eq!(
+            list_activity(&d.store, &d.recents, &none, Some(&d.drive), 500)
+                .await
+                .len(),
+            2
+        );
+        assert!(
+            list_activity(&d.store, &d.recents, &none, Some("did:ad:elsewhere"), 500)
+                .await
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn drives_are_ordered_by_use_with_the_active_one_first() {
+        let d = Device::new().await;
+        let mut rx = d.store.subscribe_events();
+        let mut make = Vec::new();
+        for name in ["Zebra", "apple", "Mango", "Kiwi"] {
+            make.push(d.store.create_drive(name).await.unwrap());
+        }
+        let [zebra, apple, mango, kiwi] = <[String; 4]>::try_from(make).unwrap();
+        d.pump(&mut rx).await;
+        // Kiwi: a resource in it was opened; Mango: opened earlier. The rest
+        // never (creating a drive is not using it).
+        d.recents.note_opened(&kiwi, "did:ad:in-kiwi", i64::MAX / 2);
+        d.recents.note_opened(&mango, &mango, i64::MAX / 4);
+        let order = |active: &str| {
+            d.store.set_active_drive(active).unwrap();
+            let drives = vec![
+                (zebra.clone(), "Zebra"),
+                (apple.clone(), "apple"),
+                (mango.clone(), "Mango"),
+                (kiwi.clone(), "Kiwi"),
+                (d.drive.clone(), "Test device"),
+            ];
+            order_drives_by_use(&d.store, &d.recents, drives, |(s, n)| (s.as_str(), *n))
+                .into_iter()
+                .map(|(_, n)| n)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            order(&zebra),
+            ["Zebra", "Kiwi", "Mango", "apple", "Test device"]
+        );
+        // The active drive in the other spelling is still the active one.
+        let atomic = crate::identifiers::canonicalize_scheme(&apple);
+        let did = match atomic.strip_prefix("atomic:") {
+            Some(rest) => format!("did:ad:{rest}"),
+            None => atomic,
+        };
+        assert_eq!(order(&did)[0], "apple");
+
+        // An edit by the person in a drive counts as using it.
+        let mut rx = d.store.subscribe_events();
+        let in_apple = d
+            .store
+            .create_resource(urls::FOLDER, &apple, "Apple notes", None)
             .await
             .unwrap();
         d.pump(&mut rx).await;
-        let list = list_activity(&d.store, &d.recents, 500).await;
-        let entry = list.iter().find(|a| a.subject == folder).unwrap();
-        assert_eq!(entry.kind, ActivityKind::Deleted);
-        assert_eq!(entry.name, "Activity folder");
+        assert!(
+            d.recents.drive_last_used(
+                &apple,
+                Some(&d.store.get_default_agent().unwrap().subject.to_string())
+            ) > 0,
+            "{in_apple}"
+        );
+        d.recents.note_opened(&kiwi, "did:ad:in-kiwi", 1);
+        d.recents.note_opened(&mango, &mango, 1);
+        assert_eq!(
+            order(&zebra),
+            ["Zebra", "apple", "Kiwi", "Mango", "Test device"]
+        );
+    }
+
+    #[tokio::test]
+    async fn agents_are_named_from_the_own_profile_the_store_or_the_server() {
+        let d = Device::new().await;
+        let none = AgentProfiles::none();
+        let own = d.store.get_default_agent().unwrap().subject.to_string();
+        // The own agent, also when spelled `atomic:`.
+        assert_eq!(
+            agent_name(&d.store, &none, &own).await.as_deref(),
+            Some("Test device")
+        );
+        let atomic = crate::identifiers::canonicalize_scheme(&own);
+        assert_eq!(
+            agent_name(&d.store, &none, &atomic).await.as_deref(),
+            Some("Test device")
+        );
+        // Another agent the store does not hold: the server's profile.
+        let bob = crate::agents::Agent::new(None).unwrap().subject.to_string();
+        assert_eq!(agent_name(&d.store, &none, &bob).await, None);
+        let named = AgentProfiles::new(std::sync::Arc::new(Named("Bob")));
+        named.get(&bob).await;
+        assert_eq!(
+            agent_name(&d.store, &named, &bob).await.as_deref(),
+            Some("Bob")
+        );
     }
 
     /// Times the home lists over 3 drives x 20 resources (run with
@@ -675,7 +1154,9 @@ mod tests {
             store.get_resource_shallow_call_count(),
         );
         let t = std::time::Instant::now();
-        let activity = list_activity(store, &d.recents, 30).await.len();
+        let activity = list_activity(store, &d.recents, &AgentProfiles::none(), None, 30)
+            .await
+            .len();
         let activity_ms = t.elapsed().as_secs_f64() * 1000.0;
         println!(
             "[timing] recents {rows} rows over {} drives: {recents_ms:.1} ms (full reads {full}, shallow {shallow}); activity {activity} rows: {activity_ms:.1} ms",

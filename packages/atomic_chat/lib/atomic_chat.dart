@@ -10,19 +10,24 @@ export 'package:atomic_flutter/atomic_flutter.dart'
 export 'src/assistant_api.dart';
 export 'src/models.dart';
 export 'src/chat_parts.dart';
+export 'src/chat_window.dart';
+export 'src/scroll_to_bottom_button.dart';
 export 'src/hosted_ai.dart';
 export 'src/ai_tools.dart';
 
 // The shell: pages above a bottom bar that never moves.
 export 'src/app_shell.dart';
 export 'src/app_bottom_bar.dart';
+export 'src/profile_avatar.dart';
 export 'src/app_top_bar.dart';
 export 'src/app_theme.dart';
 export 'src/slide_back_route.dart';
 export 'src/covered_insets_freeze.dart';
+export 'src/toast.dart';
 
 // Screens.
 export 'src/chats_screen.dart';
+export 'src/home_sections.dart';
 export 'src/chat_room_screen.dart';
 export 'src/chat_screen.dart';
 export 'src/conversation_screen.dart';
@@ -42,9 +47,7 @@ export 'src/voice.dart';
 export 'src/hosted_voice.dart';
 
 // Small widgets.
-export 'src/fading_text.dart';
 export 'src/markdown_view.dart';
 export 'src/tool_step.dart';
 export 'src/attachments.dart';
 export 'src/list_and_field.dart';
-export 'src/atomic_place_mark.dart';

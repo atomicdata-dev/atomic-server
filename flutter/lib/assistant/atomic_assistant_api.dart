@@ -1,7 +1,10 @@
+
 import 'package:atomic_chat/atomic_chat.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../atomic/account_store.dart';
 import '../atomic/atomic_client.dart';
+import '../atomic/own_profile.dart';
 import 'fake_ai.dart';
 
 /// The app's [AssistantApi]: the local node through [AtomicClient] (the Rust
@@ -12,13 +15,24 @@ class AtomicAssistantApi extends AssistantApi {
   @override
   Future<List<DriveInfo>> drives() => AtomicClient.listDrivesWithNames();
   @override
-  Future<List<ChatSummary>> chats() => AtomicClient.listAiChats();
+  Future<List<ChatSummary>> chats() =>
+      AtomicClient.listAiChats(limit: AssistantApi.chatsPageSize);
+  @override
+  Future<List<ChatSummary>> chatsPage(
+          {required int offset, required int limit}) =>
+      AtomicClient.listAiChats(limit: limit, offset: offset);
   @override
   Future<List<ChatMessage>> messages(String chat) =>
       AtomicClient.readChat(chat);
   @override
   Future<List<SearchHit>> search(String query, {String? drive}) =>
       AtomicClient.search(query, drive: drive);
+  @override
+  Future<List<SearchHit>> searchClasses(String query,
+          {String? drive, required List<String> classes}) =>
+      AtomicClient.search(query, drive: drive, classes: classes);
+  @override
+  Future<void> warmSearch() => AtomicClient.warmSearch();
   @override
   Future<List<RecentResource>> recentResources(String drive) =>
       AtomicClient.recentResources(drive);
@@ -51,6 +65,9 @@ class AtomicAssistantApi extends AssistantApi {
   Future<List<ActivityEntry>> activity(int limit) =>
       AtomicClient.activity(limit: limit);
   @override
+  Future<List<ActivityEntry>> activityWithMine(int limit) =>
+      AtomicClient.activity(limit: limit, includeOwn: true);
+  @override
   Future<Map<String, String>> resourceIcons(List<String> subjects) =>
       AtomicClient.resourceIcons(subjects);
   @override
@@ -59,6 +76,25 @@ class AtomicAssistantApi extends AssistantApi {
   @override
   Future<String?> agentName() async =>
       (await AtomicClient.getActiveAgent())?.name;
+
+  @override
+  Future<ProfileIdentity?> ownIdentity() async {
+    final agent = await AtomicClient.getActiveAgent();
+    if (agent == null) return null;
+    try {
+      final p = await OwnProfile.load();
+      return ProfileIdentity(
+          name: p.name ?? agent.name,
+          imageUrl: p.imageUrl,
+          imageBytes: p.imageBytes,
+          emoji: p.emoji,
+          pendingImage: p.pendingImage);
+    } catch (e) {
+      debugPrint('Own profile not read: $e');
+      // Not read now: the shell keeps the picture it has and asks again.
+      return ProfileIdentity(name: agent.name, pendingImage: true);
+    }
+  }
 
   /// The linked account's AI. With no session saved, the active agent signs
   /// the account in first (as the web app does).
@@ -84,6 +120,32 @@ class AtomicAssistantApi extends AssistantApi {
   @override
   Future<List<ChatEntry>> chatEntries(String chat) =>
       AtomicClient.readChatEntries(chat);
+  @override
+  Future<ChatPage<ChatEntry>> chatEntriesPage(String chat,
+          {String? before, int limit = 50}) =>
+      AtomicClient.readChatEntriesPage(chat, before: before, limit: limit);
+  @override
+  Future<ChatPage<ChatEntry>> chatEntriesAfter(String chat, String after,
+          {int limit = 100}) =>
+      AtomicClient.readChatEntriesAfter(chat, after, limit: limit);
+  @override
+  Future<ChatPage<ChatRoomMessage>> chatRoomMessagesPage(String subject,
+          {String? before, int limit = 50}) =>
+      AtomicClient.readChatRoomPage(subject, before: before, limit: limit);
+  @override
+  Future<ChatPage<ChatRoomMessage>> chatRoomMessagesAfter(
+          String subject, String after,
+          {int limit = 100}) =>
+      AtomicClient.readChatRoomAfter(subject, after, limit: limit);
+  @override
+  Future<ChatPage<ConversationMessage>> conversationMessagesPage(String subject,
+          {String? before, int limit = 50}) =>
+      AtomicClient.readConversationPage(subject, before: before, limit: limit);
+  @override
+  Future<ChatPage<ConversationMessage>> conversationMessagesAfter(
+          String subject, String after,
+          {int limit = 100}) =>
+      AtomicClient.readConversationAfter(subject, after, limit: limit);
   @override
   Future<void> addEntry(String chat, String role, List<ChatPart> parts) =>
       AtomicClient.appendChatEntryParts(chat, role, parts);

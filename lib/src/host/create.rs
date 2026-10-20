@@ -94,12 +94,15 @@ mod tests {
             .find(|a| a.subject == subject)
             .expect("listed in the activity");
         assert_eq!(created.actor.as_deref(), Some(agent.as_str()));
-        let row = lists::list_activity(&d.store, &d.recents, 500)
-            .await
-            .into_iter()
-            .find(|a| a.subject == subject)
-            .unwrap();
-        assert_eq!(row.name, "Pelican notes");
+        // The person's own work is not "activity" (that is others'), so the
+        // feed leaves it out.
+        let profiles = crate::host::profiles::AgentProfiles::none();
+        assert!(
+            lists::list_activity(&d.store, &d.recents, &profiles, None, 500)
+                .await
+                .iter()
+                .all(|a| a.subject != subject)
+        );
 
         // Found by search in its drive.
         let hits = lists::search(&d.store, Some(&d.drive), "pelican", 5).unwrap();

@@ -4,6 +4,7 @@ import {
   NativeCryptoProvider,
   Store,
   type ClientDbWorker,
+  server,
   type NativeChannel,
 } from '@tomic/react';
 import { registerCustomCreateActions } from '../components/forms/NewForm/CustomCreateActions';
@@ -54,4 +55,33 @@ export async function createEmbedStore(
 export function registerEmbedActions(): void {
   registerCustomCreateActions();
   registerCustomDeleteDialogs();
+}
+
+/**
+ * Makes the drive of `subject` the store's current drive. A table (or any
+ * list narrowed by a second constraint, like the rows of its class) asks the
+ * host's index, which is kept per drive: with no current drive the page
+ * skipped the host, found no server (`noServer`) and listed no rows at all,
+ * so a table looked empty. The web app sets it from its stored choice; this
+ * page has none, so it follows what it shows.
+ */
+export async function adoptDriveOf(
+  store: Pick<Store, 'getResource' | 'getResourceAncestry' | 'getDrive'> & {
+    setDrive(drive: string): void;
+  },
+  subject: string,
+): Promise<void> {
+  try {
+    const resource = await store.getResource(subject);
+    const ancestry = await store.getResourceAncestry(resource);
+    const top = ancestry.at(-1);
+
+    if (!top || top === store.getDrive()) return;
+
+    const root = await store.getResource(top);
+
+    if (root.hasClasses(server.classes.drive)) store.setDrive(top);
+  } catch {
+    // The page still shows the resource; only its lists can come up short.
+  }
 }

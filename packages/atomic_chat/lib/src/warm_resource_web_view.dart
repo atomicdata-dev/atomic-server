@@ -6,6 +6,7 @@ import 'package:atomic_flutter/atomic_flutter.dart' show Perf;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
@@ -21,6 +22,10 @@ abstract interface class ReleasablePage {
 
 /// An embedded page that is loaded without a screen: whoever takes it
 /// becomes the one the page's messages go to.
+///
+/// Its [build] gives the same [GlobalKey]ed subtree every time, so the web
+/// view moves from the pool's hidden slot ([WarmPageSlot]) to the page that
+/// takes it without being made again.
 abstract class WarmPage implements EmbedPage, ReleasablePage {
   /// True once the page said it is up (`window.atomicEmbed` exists).
   bool get isReady;
@@ -46,6 +51,12 @@ class WebViewEmbedPage implements WarmPage {
   WebViewEmbedPage._(this.controller);
 
   final WebViewController controller;
+
+  /// Keeps the web view's platform view (its Android view, attached to the
+  /// window, and its texture) when [build] moves from the pool's hidden slot
+  /// to the page that takes it: Flutter moves a [GlobalKey]'s subtree
+  /// instead of making it again.
+  final _hostKey = GlobalKey(debugLabel: 'embed page');
   final _ready = Completer<void>();
   final _created = Stopwatch()..start();
   void Function(String message)? _onMessage;
@@ -150,11 +161,14 @@ class WebViewEmbedPage implements WarmPage {
   // The page owns every touch on it (scrolling a long menu or document must
   // not be taken over by the swipe back when a finger drifts sideways).
   @override
-  Widget build() => WebViewWidget(
-        controller: controller,
-        gestureRecognizers: const {
-          Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new),
-        },
+  Widget build() => KeyedSubtree(
+        key: _hostKey,
+        child: WebViewWidget(
+          controller: controller,
+          gestureRecognizers: const {
+            Factory<OneSequenceGestureRecognizer>(EagerGestureRecognizer.new),
+          },
+        ),
       );
 
   @override
@@ -176,6 +190,12 @@ class WebViewEmbedPage implements WarmPage {
 /// Keeps one embedded page loaded and hidden (booted, Loro compiled), so
 /// opening a resource is a `show(subject)` instead of a 13 MB page load.
 ///
+/// Once ready the spare is also in the widget tree ([WarmPageSlot], under the
+/// shell's pages, at the size a resource page gives it, not painted): its
+/// Android view is attached to the window and laid out before the tap, so
+/// taking it costs no attach (about 450 ms of the main thread on the
+/// emulator) and no resize. It notifies its listeners when that changes.
+///
 /// - [warmUp] starts the spare (once; a second call does nothing).
 /// - [take] hands it over when it is ready and starts the next one, so there
 ///   is always one spare and never more than one (memory). A page that is not
@@ -185,13 +205,13 @@ class WebViewEmbedPage implements WarmPage {
 ///
 /// Until it is taken the pool answers the page's own calls (the agent, the
 /// store's init) from [api].
-class WarmResourceWebView with WidgetsBindingObserver {
+class WarmResourceWebView with WidgetsBindingObserver, ChangeNotifier {
   WarmResourceWebView({
     required this.api,
     WarmPageBuilder? builder,
     this.rewarmDelay = const Duration(milliseconds: 600),
     this.backgroundGrace = const Duration(minutes: 5),
-  }) : _builder = builder ?? _defaultBuilder {
+  }) : _customBuilder = builder {
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -203,7 +223,7 @@ class WarmResourceWebView with WidgetsBindingObserver {
           : null;
 
   final AssistantApi api;
-  final WarmPageBuilder _builder;
+  final WarmPageBuilder? _customBuilder;
 
   /// Wait before the next spare starts loading after one was taken, so the
   /// open animation of the resource is not competing with a 13 MB load.
@@ -239,11 +259,56 @@ class WarmResourceWebView with WidgetsBindingObserver {
   /// The spare is loaded and can be taken.
   bool get isReady => _warm?.isReady ?? false;
 
-  static Future<WarmPage> _defaultBuilder(
-      void Function(String message) onMessage) async {
+  /// The ready spare, for [WarmPageSlot] to keep in the tree; null when there
+  /// is none, it is still loading, or it was taken.
+  WarmPage? get attached => isReady ? _warm : null;
+
+  /// The app's light or dark mode (`light`/`dark`), set by the shell: a new
+  /// spare paints its first frame in it (`?scheme=`) and a spare is told when
+  /// it changes, so a taken page never flashes the other one.
+  String? get colorScheme => _scheme;
+  String? _scheme;
+  set colorScheme(String? scheme) {
+    if (scheme == _scheme) return;
+    _scheme = scheme;
+    final page = _warm;
+    if (page != null && page.isReady) unawaited(_tellScheme(page));
+  }
+
+  Future<void> _tellScheme(WarmPage page) async {
+    final scheme = _scheme;
+    if (scheme == null) return;
+    try {
+      await page
+          .runJavaScript("window.atomicEmbed?.setColorScheme?.('$scheme')");
+    } catch (_) {}
+  }
+
+  Future<WarmPage> _build(void Function(String message) onMessage) async {
+    final custom = _customBuilder;
+    if (custom != null) return custom(onMessage);
     final server = await ResourceView.serverFactory();
-    return WebViewEmbedPage.create(server.page,
-        onMessage: onMessage, pollReady: true);
+    final scheme = _scheme;
+    return WebViewEmbedPage.create(
+        scheme == null
+            ? server.page
+            : server.page.replace(queryParameters: {'scheme': scheme}),
+        onMessage: onMessage,
+        pollReady: true);
+  }
+
+  /// Tells [WarmPageSlot] the spare changed. Never while the tree builds (a
+  /// page takes the spare in its `initState`): then after that frame.
+  void _changed() {
+    if (_disposed) return;
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (!_disposed) notifyListeners();
+      });
+    } else {
+      notifyListeners();
+    }
   }
 
   /// Starts loading the spare, unless there is one.
@@ -256,7 +321,7 @@ class WarmResourceWebView with WidgetsBindingObserver {
     unawaited(() async {
       WarmPage? page;
       try {
-        page = await _builder((m) => _answer(page, m));
+        page = await _build((m) => _answer(page, m));
         if (_disposed || generation != _generation) {
           page.release();
           return;
@@ -266,13 +331,20 @@ class WarmResourceWebView with WidgetsBindingObserver {
         await page.whenReady;
         debugPrint('[warm] spare ready after ${clock.elapsedMilliseconds} ms');
         Perf.once('warm ready');
+        if (_disposed || !identical(_warm, page)) return;
+        // Into the tree (attached, laid out), in the app's colours.
+        _changed();
+        await _tellScheme(page);
         await _showAhead(page, generation);
       } catch (e) {
         failures++;
         debugPrint('[warm] spare failed: $e');
         if (generation == _generation) {
           _starting = false;
-          if (identical(_warm, page)) _warm = null;
+          if (identical(_warm, page)) {
+            _warm = null;
+            _changed();
+          }
         }
         page?.release();
       }
@@ -318,6 +390,9 @@ class WarmResourceWebView with WidgetsBindingObserver {
     }
     _warm = null;
     _generation++;
+    // The taker builds the page in this frame; the slot lets go of it (and
+    // learns of the next spare) after it.
+    _changed();
     _scheduleRewarm();
     return page;
   }
@@ -414,15 +489,22 @@ class WarmResourceWebView with WidgetsBindingObserver {
     _rewarm?.cancel();
     _generation++;
     _starting = false;
-    _warm?.release();
+    final page = _warm;
     _warm = null;
+    if (page != null) {
+      page.release();
+      _changed();
+    }
   }
 
+  @override
   void dispose() {
-    _disposed = true;
+    if (_disposed) return;
     _trim?.cancel();
     release();
+    _disposed = true;
     WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override
@@ -481,4 +563,41 @@ class WarmResourceWebView with WidgetsBindingObserver {
       await page.runJavaScript('window.__atomicReply($id,$reply)');
     } catch (_) {}
   }
+}
+
+/// Where the pool's ready spare lives until a page takes it: in the tree,
+/// laid out where and as large as a resource page shows it (under the status
+/// bar, above the keyboard), not painted, not touchable, not read out. The
+/// shell puts it under its pages, filling the same box as its navigator.
+///
+/// Not painted is not gone: the platform view is created by layout, so its
+/// Android view is attached and keeps drawing into its texture, and the page
+/// that takes it paints that texture in its first frame. (On Android the
+/// web view is a texture layer: opacity 0 only leaves the layer out.)
+class WarmPageSlot extends StatelessWidget {
+  final WarmResourceWebView pool;
+
+  const WarmPageSlot({super.key, required this.pool});
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: pool,
+        builder: (context, _) {
+          final page = pool.attached;
+          if (page == null) return const SizedBox.shrink();
+          return IgnorePointer(
+            child: ExcludeSemantics(
+              child: Opacity(
+                opacity: 0,
+                child: Padding(
+                  // A resource page's Scaffold ends above the keyboard.
+                  padding: EdgeInsets.only(
+                      bottom: MediaQuery.viewInsetsOf(context).bottom),
+                  child: SafeArea(bottom: false, child: page.build()),
+                ),
+              ),
+            ),
+          );
+        },
+      );
 }

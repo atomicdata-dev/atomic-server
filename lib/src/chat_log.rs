@@ -33,51 +33,6 @@ pub const FIELD_KINDS: &str = "k";
 /// `CHAT_LOG_CAPACITY` in `browser/data-browser/src/helpers/chatLog.ts`.
 pub const CHAT_LOG_CAPACITY: usize = 256;
 
-/// The page of `chat` a new entry goes to: the newest page (by `createdAt`,
-/// then subject), if it has room; `None` when a first or next page must be
-/// made. The same rule as `pageWithRoom` in
-/// `browser/data-browser/src/helpers/chatLog.ts`, so both clients fill one page.
-pub async fn page_with_room(
-    store: &impl crate::Storelike,
-    chat: &str,
-) -> AtomicResult<Option<crate::Subject>> {
-    let pages = store
-        .query(&crate::storelike::Query::new_prop_val(
-            crate::urls::PARENT,
-            chat,
-        ))
-        .await?;
-    let mut newest: Option<(i64, crate::Resource)> = None;
-    for subject in &pages.subjects {
-        let Ok(page) = store.get_resource(subject).await else {
-            continue;
-        };
-        if !crate::hierarchy::is_chat_log(&page) {
-            continue;
-        }
-        let created_at = page
-            .get(crate::urls::CREATED_AT)
-            .ok()
-            .and_then(|v| v.to_int().ok())
-            .unwrap_or(0);
-        let newer = newest.as_ref().is_none_or(|(best, best_page)| {
-            created_at > *best
-                || (created_at == *best
-                    && page.get_subject().as_str() > best_page.get_subject().as_str())
-        });
-        if newer {
-            newest = Some((created_at, page));
-        }
-    }
-    let Some((_, page)) = newest else {
-        return Ok(None);
-    };
-    let has_room = page
-        .build_state_doc()
-        .is_ok_and(|doc| doc.entries().len() < CHAT_LOG_CAPACITY);
-    Ok(has_room.then(|| page.get_subject().clone()))
-}
-
 /// `<createdAt hex>-<8 random hex>`.
 pub fn new_entry_key(created_at: i64) -> String {
     use rand::Rng;

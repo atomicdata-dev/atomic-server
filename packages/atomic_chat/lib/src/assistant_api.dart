@@ -1,4 +1,5 @@
 import 'chat_parts.dart';
+import 'chat_window.dart';
 import 'hosted_ai.dart';
 import 'models.dart';
 
@@ -12,14 +13,38 @@ abstract class AssistantApi {
   /// The agent's drives worth showing (see [visibleDrives]).
   Future<List<DriveInfo>> drives();
 
-  /// The person's newest AI chats, across all drives.
+  /// How many chats [chats] returns at most, and the size of the pages the
+  /// full list is read in ([chatsPage]).
+  static const chatsPageSize = 50;
+
+  /// The person's newest AI chats, across all drives (the first
+  /// [chatsPageSize]).
   Future<List<ChatSummary>> chats();
+
+  /// [limit] chats after the [offset] newest ones, newest first; fewer than
+  /// [limit] means there are no more. A host that cannot page lists only
+  /// [chats].
+  Future<List<ChatSummary>> chatsPage(
+          {required int offset, required int limit}) async =>
+      offset == 0 ? chats() : const [];
 
   /// The text messages of an AI chat, oldest first.
   Future<List<ChatMessage>> messages(String chat);
 
   /// Searches every drive, or only [drive] when given.
   Future<List<SearchHit>> search(String query, {String? drive});
+
+  /// [search] for only resources of one of [classes] (`drive`, `aichat`,
+  /// `conversation`, `chatroom`), chosen before the result limit, so a query
+  /// whose best hits are documents still finds a chat. A host that cannot
+  /// filter searches everything; the screen drops the rest.
+  Future<List<SearchHit>> searchClasses(String query,
+          {String? drive, required List<String> classes}) =>
+      search(query, drive: drive);
+
+  /// Reads the search index once so the first keystroke is not cold; called
+  /// after the home is drawn. Best effort.
+  Future<void> warmSearch() async {}
 
   /// What this device opened lately in [drive], newest first.
   Future<List<RecentResource>> recentResources(String drive);
@@ -52,8 +77,13 @@ abstract class AssistantApi {
   /// Sends [text] in a meeting or chat room as this device's agent.
   Future<void> sendChatRoomMessage(String subject, String text);
 
-  /// What changed lately in every drive, newest first, by whom.
+  /// What changed lately in every drive, newest first, by whom: what other
+  /// members did.
   Future<List<ActivityEntry>> activity(int limit);
+
+  /// [activity] with the person's own changes too (the feed's "Show mine"),
+  /// whose actor is `You`.
+  Future<List<ActivityEntry>> activityWithMine(int limit) => activity(limit);
 
   /// The emojis (`{subject: emoji}`) of those of [subjects] that have one.
   Future<Map<String, String>> resourceIcons(List<String> subjects);
@@ -63,6 +93,10 @@ abstract class AssistantApi {
 
   /// The name of this device's agent, if known.
   Future<String?> agentName();
+
+  /// The name, picture and emoji of this device's agent for the bar's profile
+  /// button; null when unknown (the button then shows a person icon).
+  Future<ProfileIdentity?> ownIdentity() async => null;
 
   /// The AI of the linked account; null when none is linked.
   Future<HostedAi?> hostedAi();
@@ -88,6 +122,43 @@ abstract class AssistantApi {
   /// the text parts with [addMessage].
   Future<void> addEntry(String chat, String role, List<ChatPart> parts) =>
       addMessage(chat, role, ChatEntry.textOf(parts));
+
+  // Windows of long chats (see [ChatWindow]): the newest [limit] items
+  // before the cursor [before] (null: the newest of all), and the items
+  // after a `newest` cursor. A host that reads a chat whole can leave these:
+  // they cut the whole list, with positions in it for cursors.
+
+  /// A window of an AI chat's messages.
+  Future<ChatPage<ChatEntry>> chatEntriesPage(String chat,
+          {String? before, int limit = 50}) async =>
+      pageOfAll(await chatEntries(chat), before, limit);
+
+  /// The messages of an AI chat after [after].
+  Future<ChatPage<ChatEntry>> chatEntriesAfter(String chat, String after,
+          {int limit = 100}) async =>
+      afterOfAll(await chatEntries(chat), after, limit);
+
+  /// A window of a meeting's or chat room's lines.
+  Future<ChatPage<ChatRoomMessage>> chatRoomMessagesPage(String subject,
+          {String? before, int limit = 50}) async =>
+      pageOfAll(await chatRoomMessages(subject), before, limit);
+
+  /// The lines of a meeting or chat room after [after].
+  Future<ChatPage<ChatRoomMessage>> chatRoomMessagesAfter(
+          String subject, String after,
+          {int limit = 100}) async =>
+      afterOfAll(await chatRoomMessages(subject), after, limit);
+
+  /// A window of a conversation's messages (only those are decrypted).
+  Future<ChatPage<ConversationMessage>> conversationMessagesPage(String subject,
+          {String? before, int limit = 50}) async =>
+      pageOfAll(await conversationMessages(subject), before, limit);
+
+  /// The messages of a conversation after [after].
+  Future<ChatPage<ConversationMessage>> conversationMessagesAfter(
+          String subject, String after,
+          {int limit = 100}) async =>
+      afterOfAll(await conversationMessages(subject), after, limit);
 
   /// Readable text of [subject] (for an AI's context), at most [maxChars].
   Future<String> resourceText(String subject, {int maxChars = 4000});

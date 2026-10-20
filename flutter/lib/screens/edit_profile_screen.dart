@@ -1,9 +1,8 @@
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
-import 'package:atomic_chat/atomic_chat.dart' show AppTopBar;
+import 'package:atomic_chat/atomic_chat.dart' show AppTopBar, ProfileAvatar;
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
-import 'sync_screen.dart' show AgentAvatar;
 
 /// Edits the person's own profile: their name and description, saved as a
 /// commit by their agent (synced like any other edit). The picture is shown,
@@ -12,8 +11,8 @@ import 'sync_screen.dart' show AgentAvatar;
 /// Pops with true when saved.
 class EditProfileScreen extends StatefulWidget {
   final shared.AtomicIdentity agent;
-  final Future<void> Function({required String name, required String description})
-      save;
+  final Future<void> Function(
+      {required String name, required String description}) save;
 
   const EditProfileScreen({super.key, required this.agent, required this.save});
 
@@ -82,9 +81,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           Center(
-            child: AgentAvatar(
+            child: ProfileAvatar(
               name: _name.text,
               imageUrl: widget.agent.imageUrl,
+              imageBytes: widget.agent.imageBytes,
               emoji: widget.agent.emoji,
               radius: 44,
             ),

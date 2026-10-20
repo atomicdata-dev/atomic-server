@@ -7,6 +7,7 @@ import 'package:atomic_chat/atomic_chat.dart'
         AssistantJson,
         ChatEntry,
         ChatMessage,
+        ChatPage,
         ChatPart,
         ChatRoomMessage,
         ChatSummary,
@@ -77,8 +78,13 @@ class AtomicClient {
   static Future<AgentInfo?> getActiveAgent() => ffi.getActiveAgent();
 
   /// The active agent's profile as JSON `{subject, name, description, emoji?,
-  /// imageUrl?}`.
+  /// imageUrl?, iconFile?}`.
   static Future<String> getOwnProfile() => ffi.getOwnProfile();
+
+  /// The bytes of a File resource (a profile picture) this device holds, else
+  /// null (the File or its bytes have not arrived).
+  static Future<Uint8List?> readFileBytes(String file) =>
+      ffi.readFileBytes(file: file);
 
   /// Save the active agent's name and description (a commit by the agent).
   static Future<void> setAgentProfile(String name, String description) =>
@@ -121,9 +127,11 @@ class AtomicClient {
   // ── 4b. Assistant reads (AI chats, search, web view) ─────────────────────
   // The JSON of `atomic_lib::host` is read by `AssistantJson` (atomic_chat).
 
-  /// The person's newest AI chats, across all drives.
-  static Future<List<ChatSummary>> listAiChats({int limit = 50}) async =>
-      AssistantJson.parseChats(await assistant.listAiChats(limit: limit));
+  /// The person's newest AI chats, across all drives. [offset] skips that many newer chats, to page through all of them.
+  static Future<List<ChatSummary>> listAiChats(
+          {int limit = 50, int offset = 0}) async =>
+      AssistantJson.parseChats(
+          await assistant.listAiChats(limit: limit, offset: offset));
 
   /// Remember that this device opened [subject]; local, nothing is synced.
   static void noteResourceOpened(String drive, String subject) =>
@@ -186,8 +194,11 @@ class AtomicClient {
           await assistant.resourceIcons(subjects: subjects));
 
   /// What changed lately in every drive, newest first, by whom.
-  static Future<List<ActivityEntry>> activity({int limit = 100}) async => [
-        for (final a in await assistant.listActivity(limit: limit))
+  static Future<List<ActivityEntry>> activity(
+          {int limit = 100, bool includeOwn = false}) async =>
+      [
+        for (final a in await assistant.listActivity(
+            limit: limit, includeOwn: includeOwn))
           ActivityEntry(
             subject: a.subject,
             drive: a.drive,
@@ -202,6 +213,11 @@ class AtomicClient {
   /// Starts an AI chat named [name] in the private drive; returns its subject.
   static Future<String> createAiChat(String name) =>
       assistant.createAiChat(name: name);
+
+  /// Imports a whole AI chat in one go: [entriesJson] is a JSON array of
+  /// `{role, parts, c}`, oldest first. Returns the chat's subject.
+  static Future<String> importAiChat(String name, String entriesJson) =>
+      assistant.importAiChat(name: name, entriesJson: entriesJson);
 
   /// Creates a resource of [classUrl] named [name] ("Untitled" when empty)
   /// in [drive], signed here and synced like any other edit; returns its
@@ -240,16 +256,80 @@ class AtomicClient {
       AssistantJson.parseChatMessages(
           await assistant.readChat(subject: subject));
 
+  /// A window of an AI chat: the newest [limit] messages before [before]
+  /// (null: the newest of all), with cursors for the windows around it.
+  static Future<ChatPage<ChatEntry>> readChatEntriesPage(String subject,
+          {String? before, int limit = 50}) async =>
+      AssistantJson.parsePage(
+          await assistant.readChatPage(
+              subject: subject, before: before, limit: limit),
+          'entries',
+          AssistantJson.parseChatEntries);
+
+  /// The messages of an AI chat after the cursor [after].
+  static Future<ChatPage<ChatEntry>> readChatEntriesAfter(
+          String subject, String after, {int limit = 100}) async =>
+      AssistantJson.parsePage(
+          await assistant.readChatAfter(
+              subject: subject, after: after, limit: limit),
+          'entries',
+          AssistantJson.parseChatEntries);
+
+  /// A window of a meeting or chat room (see [readChatEntriesPage]).
+  static Future<ChatPage<ChatRoomMessage>> readChatRoomPage(String subject,
+          {String? before, int limit = 50}) async =>
+      AssistantJson.parsePage(
+          await assistant.readChatRoomPage(
+              subject: subject, before: before, limit: limit),
+          'messages',
+          AssistantJson.parseChatRoomMessages);
+
+  /// The lines of a meeting or chat room after the cursor [after].
+  static Future<ChatPage<ChatRoomMessage>> readChatRoomAfter(
+          String subject, String after, {int limit = 100}) async =>
+      AssistantJson.parsePage(
+          await assistant.readChatRoomAfter(
+              subject: subject, after: after, limit: limit),
+          'messages',
+          AssistantJson.parseChatRoomMessages);
+
+  /// A window of a conversation; only its messages are decrypted.
+  static Future<ChatPage<ConversationMessage>> readConversationPage(
+          String subject,
+          {String? before,
+          int limit = 50}) async =>
+      AssistantJson.parsePage(
+          await assistant.readConversationPage(
+              subject: subject, before: before, limit: limit),
+          'messages',
+          AssistantJson.parseConversationMessages);
+
+  /// The messages of a conversation after the cursor [after].
+  static Future<ChatPage<ConversationMessage>> readConversationAfter(
+          String subject, String after, {int limit = 100}) async =>
+      AssistantJson.parsePage(
+          await assistant.readConversationAfter(
+              subject: subject, after: after, limit: limit),
+          'messages',
+          AssistantJson.parseConversationMessages);
+
   /// Every message of an AI chat with all its parts, oldest first.
   static Future<List<ChatEntry>> readChatEntries(String subject) async =>
       AssistantJson.parseChatEntries(
           await assistant.readChat(subject: subject));
 
-  /// Searches every drive; only in [drive] when it is given.
+  /// Searches every drive; only in [drive] when it is given. With [classes]
+  /// (`drive`, `aichat`, `conversation`, `chatroom`) only resources of those
+  /// classes, chosen before the [limit] cuts the list.
   static Future<List<SearchHit>> search(String query,
-          {String? drive, int limit = 20}) async =>
-      AssistantJson.parseHits(
-          await assistant.search(drive: drive, query: query, limit: limit));
+          {String? drive,
+          int limit = 20,
+          List<String> classes = const []}) async =>
+      AssistantJson.parseHits(await assistant.search(
+          drive: drive, query: query, limit: limit, classes: classes));
+
+  /// Reads the search index once so the first keystroke is not cold.
+  static Future<void> warmSearch() => assistant.warmSearch();
 
   /// Where the connected server's web app shows [subject]. Throws when no
   /// server is connected.
@@ -285,6 +365,25 @@ class AtomicClient {
   /// Discover a peer via DHT and sync. Combines lookup + sync.
   static Future<int> peerDiscoverSync(String driveSubject) =>
       ffi.peerDiscoverSync(driveSubject: driveSubject);
+
+  /// What the search for this account's other devices is doing: the bridge's
+  /// `peer_search_status` JSON (state, message, detail, retry_in_secs).
+  static Map<String, dynamic> peerSearchStatus() {
+    try {
+      return jsonDecode(ffi.peerSearchStatus()) as Map<String, dynamic>;
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  /// Look for the other devices now: a Search again button, a network change.
+  static void peerSearchAgain() {
+    try {
+      ffi.peerSearchAgain();
+    } catch (e) {
+      debugPrint('peerSearchAgain: $e');
+    }
+  }
 
   /// Start Iroh, sync known peers + pkarr. Use on app open and Settings → Retry.
   static Future<SyncConnectivityReport> syncConnectivityNow() async {
@@ -368,6 +467,47 @@ class AtomicClient {
     return origin;
   }
 
+  /// Every https origin [drive]'s pkarr record names whose `/genesis`
+  /// answer verifies against the DID: the servers that host it, found without
+  /// being typed in. Same checks as [discoverHomeServer], all of them kept.
+  static Future<List<String>> verifiedDriveOrigins(
+    String drive, {
+    http.Client? client,
+    Future<List<String>> Function(String drive)? resolve,
+    bool Function(String body, String drive)? verifies,
+    Duration timeout = const Duration(seconds: 4),
+    int maxOrigins = 6,
+  }) async {
+    final origins =
+        (await (resolve ?? _resolveOrigins)(drive)).take(maxOrigins).toList();
+    if (origins.isEmpty) return const [];
+    final http_ = client ?? http.Client();
+    try {
+      final ok = await Future.wait(origins.map((origin) async {
+        try {
+          final request = http.Request(
+              'GET',
+              Uri.parse('$origin/genesis')
+                  .replace(queryParameters: {'subject': drive}))
+            ..followRedirects = false
+            ..headers['Accept'] = 'application/ad+json';
+          final response = await http.Response.fromStream(
+              await http_.send(request).timeout(timeout));
+          return response.statusCode == 200 &&
+              (verifies ?? _verifies)(response.body, drive);
+        } catch (_) {
+          return false;
+        }
+      }));
+      return [
+        for (var i = 0; i < origins.length; i++)
+          if (ok[i]) origins[i]
+      ];
+    } finally {
+      if (client == null) http_.close();
+    }
+  }
+
   static String _short(Object e) {
     final text = '$e'.replaceFirst('Exception: ', '');
     return text.length > 140 ? '${text.substring(0, 140)}…' : text;
@@ -399,6 +539,7 @@ class AtomicClient {
                 'name': (e['name'] ?? '') as String,
                 'last_synced':
                     e['last_synced'] == null ? '' : '${e['last_synced']}',
+                'relay_url': (e['relay_url'] ?? '') as String,
               })
           .toList();
     } catch (_) {

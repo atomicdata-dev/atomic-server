@@ -87,7 +87,7 @@ async fn a_chat_started_here_takes_messages_in_order_and_is_listed() {
     assert_eq!(texts, [("user", "Hallo"), ("assistant", "Hoi!")]);
 
     pump(&mut rx).await;
-    let list = list_ai_chats(500).await.unwrap();
+    let list = list_ai_chats(500, 0).await.unwrap();
     assert!(list.contains(&chat));
     assert!(list.contains("Phone chat"));
 }
@@ -97,7 +97,7 @@ async fn assistant_search_finds_a_prefix_with_title_and_class() {
     let chat = new_chat("Zebrafinch migration notes").await;
     let drive = shared_drive().await.to_string();
     let hits: Vec<Json> = serde_json::from_str(
-        &search(Some(drive.clone()), "zebraf".into(), 5)
+        &search(Some(drive.clone()), "zebraf".into(), 5, vec![])
             .await
             .unwrap(),
     )
@@ -109,10 +109,45 @@ async fn assistant_search_finds_a_prefix_with_title_and_class() {
     assert_eq!(hit["title"], "Zebrafinch migration notes");
     assert!(hit["class_name"].as_str().is_some_and(|c| !c.is_empty()));
     let other = "https://example.test/not-this-drive".to_string();
-    assert!(!search(Some(other), "zebraf".into(), 5)
+    assert!(!search(Some(other), "zebraf".into(), 5, vec![])
         .await
         .unwrap()
         .contains(&chat));
+}
+
+#[tokio::test]
+async fn assistant_search_filters_the_class_and_pages_the_chats() {
+    let chat = new_chat("Gerenuk pagination chat").await;
+    let drive = shared_drive().await.to_string();
+    for i in 0..5 {
+        db().unwrap()
+            .create_resource(
+                atomic_lib::urls::FOLDER,
+                &drive,
+                &format!("Gerenuk folder {i}"),
+                None,
+            )
+            .await
+            .unwrap();
+    }
+    let only_chats: Vec<Json> = serde_json::from_str(
+        &search(None, "gerenuk".into(), 2, vec!["aichat".into()])
+            .await
+            .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(only_chats.len(), 1, "{only_chats:?}");
+    assert_eq!(only_chats[0]["subject"], chat.as_str());
+
+    // Pages of one chat each add up to the whole list.
+    let mut rx = db().unwrap().subscribe_events();
+    pump(&mut rx).await;
+    let all: Vec<Json> = serde_json::from_str(&list_ai_chats(1000, 0).await.unwrap()).unwrap();
+    let first: Vec<Json> = serde_json::from_str(&list_ai_chats(1, 0).await.unwrap()).unwrap();
+    let rest: Vec<Json> = serde_json::from_str(&list_ai_chats(1000, 1).await.unwrap()).unwrap();
+    assert_eq!([first, rest].concat(), all);
+
+    warm_search().await.unwrap();
 }
 
 #[tokio::test]
@@ -158,7 +193,7 @@ async fn favorites_come_from_the_private_drive_newest_first() {
 }
 
 #[tokio::test]
-async fn activity_follows_creates_and_deletes() {
+async fn activity_lists_other_agents_changes_not_the_own() {
     let drive = shared_drive().await.to_string();
     let store = db().unwrap();
     let mut rx = store.subscribe_events();
@@ -167,20 +202,24 @@ async fn activity_follows_creates_and_deletes() {
         .await
         .unwrap();
     pump(&mut rx).await;
+    // Made here, by the person: Recents, not Activity.
+    let list = list_activity(500, false).await.unwrap();
+    assert!(list.iter().all(|a| a.subject != folder));
 
-    let list = list_activity(500).await.unwrap();
-    let entry = list.iter().find(|a| a.subject == folder).unwrap();
-    assert_eq!(entry.kind, "created");
-    assert_eq!(entry.name, "Activity folder");
-
-    store
-        .remove_resource(&folder.as_str().into())
+    // Another member renames it.
+    let bob = Agent::new(Some("Bob")).unwrap();
+    let mut r = store.get_resource(&folder.as_str().into()).await.unwrap();
+    r.set_string(urls::NAME.into(), "Renamed by Bob", store.as_ref())
         .await
         .unwrap();
+    r.save_as(&bob, store.as_ref()).await.unwrap();
     pump(&mut rx).await;
-    let list = list_activity(500).await.unwrap();
+    let list = list_activity(500, false).await.unwrap();
     let entry = list.iter().find(|a| a.subject == folder).unwrap();
-    assert_eq!(entry.kind, "deleted");
+    assert_eq!(entry.kind, "changed");
+    assert_eq!(entry.name, "Renamed by Bob");
+    let actor = entry.actor.as_deref().unwrap();
+    assert!(!actor.is_empty() && actor != "Someone", "{actor}");
 }
 
 #[tokio::test]
@@ -368,7 +407,7 @@ async fn a_document_created_here_is_in_the_drive_and_found_by_search() {
         r.get(urls::NAME).unwrap().to_string(),
         "Narwhal bridge document"
     );
-    let hits = search(Some(drive.to_string()), "narwhal".into(), 5)
+    let hits = search(Some(drive.to_string()), "narwhal".into(), 5, vec![])
         .await
         .unwrap();
     assert!(hits.contains(&subject), "{hits}");
@@ -415,4 +454,21 @@ async fn the_inbox_is_listed_and_a_notification_marked_read_through_the_bridge()
     let list: Vec<Json> = serde_json::from_str(&list_notifications(50).await.unwrap()).unwrap();
     let found = list.iter().find(|n| n["subject"] == subject).unwrap();
     assert_eq!(found["read"], true);
+}
+
+#[tokio::test]
+async fn an_imported_chat_reads_back_in_order() {
+    shared_drive().await;
+    let entries = json!([
+        { "role": "user", "parts": [{ "type": "text", "text": "Vraag" }], "c": 1_000 },
+        { "role": "assistant", "parts": "[{\"type\":\"text\",\"text\":\"Antwoord\"}]", "c": 2_000 },
+    ]);
+    let chat = import_ai_chat("Imported".into(), entries.to_string())
+        .await
+        .unwrap();
+    let read: Json = serde_json::from_str(&read_chat(chat).await.unwrap()).unwrap();
+    assert_eq!(read[0]["role"], "user");
+    assert_eq!(read[0]["parts"][0]["text"], "Vraag");
+    assert_eq!(read[1]["parts"][0]["text"], "Antwoord");
+    assert_eq!(read[1]["c"], 2_000);
 }

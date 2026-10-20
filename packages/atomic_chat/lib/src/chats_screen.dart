@@ -1,9 +1,13 @@
 import 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColors, AppColorsExt, HoldFan, HoldFanItem, HoldFanLayout, Perf;
+    show AppColors, AppColorsExt, Perf;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderAbstractViewport;
+import 'package:flutter/services.dart' show HapticFeedback;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'app_top_bar.dart';
 import 'home_sections.dart';
+import 'home_sections_dialog.dart';
 
 import 'models.dart';
 import 'slide_back_route.dart';
@@ -13,39 +17,38 @@ import 'chat_screen.dart';
 import 'resource_row.dart';
 import 'resource_view.dart';
 import 'native_views.dart';
+import 'new_document_sheet.dart';
 
-/// Items per section on the home; the rest is behind "Show all".
+/// Items per section on the home; the rest is behind its "Show all" row.
 const _homeItems = 4;
-
-/// Most items the merged recents list holds.
-const _maxRecents = 100;
 
 /// Most entries the activity feed holds.
 const _maxActivity = 100;
 
-enum _SectionOp { up, down, hide, show }
-
-/// A choice of a heading's hold menu.
-class _SectionAction {
-  final _SectionOp op;
-  final HomeSection section;
-  const _SectionAction(this.op, this.section);
-}
-
-/// How a section folds and what its heading's hold menu offers.
+/// How a section folds, what holding its heading does, and the control at its
+/// right, if any (the activity's "Show mine" filter).
 typedef _Fold = ({
   bool collapsed,
   VoidCallback onToggle,
-  List<HoldFanItem<_SectionAction>> menu,
-  ValueChanged<_SectionAction> onMenu,
+  VoidCallback onHold,
+  HomeSection section,
+  Widget? trailing,
+  ValueChanged<int> onCount,
 });
 
-typedef _Recent = ({String drive, RecentResource resource});
+/// How an activity row says what happened (`kind` as the host names it).
+String activityVerb(String kind) => switch (kind) {
+      'changed' => 'edited',
+      _ => kind,
+    };
 
-/// Home screen: one scrollable page of small sections (Drives, Recents, Activity,
-/// AI Chats), each with its newest few items and a "Show all" for the rest. A
-/// section is one [_Section]; adding another is one more entry in the list.
-/// Every section shows as soon as its own data arrives.
+/// Home screen: one scrollable page of small sections (Drives, Activity,
+/// AI Chats), each with its newest few items. A section's heading folds it on
+/// a tap and arranges the sections on a hold. Below the first few items a
+/// "Show all" row lists all of them (in the detail pane on a tablet, a page of
+/// its own on a phone). Search and New are the bar's. A section is one
+/// [_Section]; adding another is one more entry in the list. Every section
+/// shows as soon as its own data arrives.
 class ChatsScreen extends StatefulWidget {
   final AssistantApi api;
 
@@ -73,7 +76,6 @@ class ChatsScreen extends StatefulWidget {
 class _ChatsScreenState extends State<ChatsScreen> {
   late Future<List<DriveInfo>> _drives = _timed('drives', _loadDrives());
   late Future<List<ChatSummary>> _chats = _timed('chats', widget.api.chats());
-  late Future<List<_Recent>> _recents = _timed('recents', _loadRecents());
   late Future<List<RecentResource>> _favorites =
       _timed('favorites', widget.api.favorites());
   late Future<List<ConversationRow>> _conversations =
@@ -101,9 +103,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
   /// The most recent drive: the one the home opened on, else the first.
   String _drive = '';
 
-  /// Drive subject → name, for the drive shown in front of a recent.
-  Map<String, String> _driveNames = const {};
-
   /// Which sections show, in which order, and which are folded (per device).
   HomeLayout _layout = const HomeLayout();
 
@@ -111,9 +110,41 @@ class _ChatsScreenState extends State<ChatsScreen> {
   void initState() {
     super.initState();
     if (!kReleaseMode) _markLoaded();
+    // Once the home is drawn: read the search index so the first keystroke is
+    // not the first read.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.api.warmSearch().catchError((Object _) {});
+    });
     HomeLayout.load().then((layout) {
       if (mounted) setState(() => _layout = layout);
+      _publishSections();
     });
+    _loadMine();
+  }
+
+  /// SharedPreferences key: the activity feed's "Show mine" (per device).
+  static const showMineKey = 'activity_show_mine';
+
+  /// The activity feed shows the person's own changes too.
+  bool _mine = false;
+
+  Future<void> _loadMine() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      if (mounted && (p.getBool(showMineKey) ?? false)) _setMine(true);
+    } catch (_) {}
+  }
+
+  void _setMine(bool mine) {
+    if (mine == _mine) return;
+    setState(() {
+      _mine = mine;
+      _activity = _loadActivity();
+    });
+    _publishActivity();
+    SharedPreferences.getInstance()
+        .then((p) => p.setBool(showMineKey, mine))
+        .catchError((Object _) => false);
   }
 
   /// `[perf] home data` once every list of the first load is in, and `home
@@ -122,7 +153,11 @@ class _ChatsScreenState extends State<ChatsScreen> {
     Perf.once('home start');
     Future.wait<Object?>([
       for (final f in <Future<Object?>>[
-        _drives, _chats, _recents, _favorites, _conversations, _activity,
+        _drives,
+        _chats,
+        _favorites,
+        _conversations,
+        _activity,
         _notifications,
       ])
         f.then((_) => null, onError: (Object _) => null),
@@ -136,30 +171,110 @@ class _ChatsScreenState extends State<ChatsScreen> {
   void _setLayout(HomeLayout layout) {
     setState(() => _layout = layout);
     layout.save();
+    _publishSections();
   }
 
-  /// The hold menu of a section's heading: move it, hide it, and bring back
-  /// the hidden ones.
-  List<HoldFanItem<_SectionAction>> _menuFor(HomeSection s) => [
-        if (_layout.canMove(s, -1))
-          HoldFanItem('Move up', _SectionAction(_SectionOp.up, s), emoji: '⬆️'),
-        if (_layout.canMove(s, 1))
-          HoldFanItem('Move down', _SectionAction(_SectionOp.down, s),
-              emoji: '⬇️'),
-        HoldFanItem('Hide ${s.title}', _SectionAction(_SectionOp.hide, s),
-            emoji: '🙈'),
-        for (final h in _layout.order)
-          if (_layout.hidden.contains(h))
-            HoldFanItem('Show ${h.title}', _SectionAction(_SectionOp.show, h),
-                emoji: '👁️'),
-      ];
+  /// Holding a heading: the dialog that turns sections on and off and
+  /// arranges them. It applies live; a phone gets a bottom sheet, the tablet
+  /// a centred dialog.
+  void _customize() {
+    HapticFeedback.lightImpact();
+    showHomeSectionsDialog(
+      context,
+      layout: () => _layout,
+      onChanged: _setLayout,
+      split: ShellScope.layoutOf(context) == ShellLayout.split,
+    );
+  }
 
-  void _applyAction(_SectionAction a) => _setLayout(switch (a.op) {
-        _SectionOp.up => _layout.move(a.section, -1),
-        _SectionOp.down => _layout.move(a.section, 1),
-        _SectionOp.hide => _layout.setHidden(a.section, true),
-        _SectionOp.show => _layout.setHidden(a.section, false),
-      });
+  /// Keys of the sections: to scroll one into view and open its full list.
+  final Map<HomeSection, GlobalKey<_SectionState<dynamic>>> _sectionKeys = {};
+
+  /// How many rows each section has (once read), for the Home button's menu.
+  final Map<HomeSection, int> _counts = {};
+
+  void _noteCount(HomeSection id, int n) {
+    if (_counts[id] == n) return;
+    _counts[id] = n;
+    _publishSections();
+  }
+
+  /// Hands the Home button the sections it can jump to: the visible ones
+  /// that have something, in the home's order. Next to the detail pane the
+  /// activity is not a section of the home.
+  void _publishSections() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final shell = _shell;
+      if (!mounted || shell == null) return;
+      final split = shell.split;
+      final list = [
+        for (final s in _layout.visible)
+          if (s != HomeSection.notifications &&
+              !(split && s == HomeSection.activity) &&
+              (_counts[s] ?? 0) > 0)
+            s
+      ];
+      if (!listEquals(list, shell.homeSections.value)) {
+        shell.homeSections.value = list;
+      }
+    });
+  }
+
+  int _handledRequest = 0;
+
+  /// The Home button's menu picked a section: unfold it, scroll it into
+  /// view and open its full list.
+  void _onSectionRequest() {
+    final req = _shell?.sectionRequest.value;
+    if (req == null || req.n == _handledRequest) return;
+    _handledRequest = req.n;
+    final id = req.section;
+    if (_layout.collapsed.contains(id)) {
+      _setLayout(_layout.toggleCollapsed(id));
+    }
+    _revealSection(id, thenShowAll: true);
+  }
+
+  /// Scrolls the home so the section [id], just unfolded, can be seen: as
+  /// little as needed when heading and rows fit in the room above the bottom
+  /// bar (none when they already do), and with the heading at the top when
+  /// the section is taller than that. Runs after the frame that lays out the
+  /// rows. The hold menu and a tap on a heading both use it.
+  void _revealSection(HomeSection id, {bool thenShowAll = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final state = _sectionKeys[id]?.currentState;
+      final ctx = _sectionKeys[id]?.currentContext;
+      if (ctx != null) _scrollToSection(ctx);
+      if (thenShowAll) state?.showAll();
+    });
+    WidgetsBinding.instance.scheduleFrame();
+  }
+
+  void _scrollToSection(BuildContext ctx) {
+    final ro = ctx.findRenderObject();
+    final scrollable = Scrollable.maybeOf(ctx);
+    if (ro is! RenderBox || !ro.attached || scrollable == null) return;
+    final position = scrollable.position;
+    final viewport = RenderAbstractViewport.maybeOf(ro);
+    if (viewport == null) return;
+    // The list is padded by the bottom bar, but its viewport runs under it.
+    final inset = MediaQuery.paddingOf(ctx).bottom;
+    final top = viewport.getOffsetToReveal(ro, 0.0).offset;
+    final bottom = viewport.getOffsetToReveal(ro, 1.0).offset + inset;
+    // `bottom` shows the section's end, `top` its heading at the very top;
+    // a section taller than the room gets `top`.
+    final lo = bottom < top ? bottom : top;
+    final target = position.pixels
+        .clamp(lo, top)
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+    if ((target - position.pixels).abs() < 0.5) return;
+    position.animateTo(target,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic);
+  }
+
   ShellController? _shell;
 
   @override
@@ -168,9 +283,14 @@ class _ChatsScreenState extends State<ChatsScreen> {
     final shell = ShellScope.maybeOf(context);
     if (!identical(shell, _shell)) {
       _shell?.removeListener(_onShellChanged);
+      _shell?.sectionRequest.removeListener(_onSectionRequest);
       shell?.addListener(_onShellChanged);
+      shell?.sectionRequest.addListener(_onSectionRequest);
+      _handledRequest = shell?.sectionRequest.value?.n ?? 0;
     }
     _shell = shell;
+    _publishActivity();
+    _publishSections();
     // The profile button of the shell signs out through the home.
     if (_profile != null) _shell?.onUser = _settings;
   }
@@ -208,6 +328,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
   @override
   void dispose() {
     _shell?.removeListener(_onShellChanged);
+    _shell?.sectionRequest.removeListener(_onSectionRequest);
+    _shell?.homeSections.value = const [];
+    _shell?.activity.value = null;
     if (_shell?.onUser == _settings) _shell?.onUser = null;
     super.dispose();
   }
@@ -222,33 +345,51 @@ class _ChatsScreenState extends State<ChatsScreen> {
     _drive = drives.any((d) => d.subject == widget.drive)
         ? widget.drive
         : drives.first.subject;
-    _driveNames = {for (final d in drives) d.subject: d.name};
     if (mounted) _shell?.drive.value = _drive;
-    return drives;
+    // The most recently visited first.
+    return sortDrivesByRecent(widget.api, drives);
   }
 
-  /// What was opened lately in every drive, newest first.
-  Future<List<_Recent>> _loadRecents() async {
-    final drives = await _drives;
-    final lists = await Future.wait([
-      for (final d in drives)
-        widget.api.recentResources(d.subject).then(
-              (list) => [for (final r in list) (drive: d.subject, resource: r)],
-              onError: (Object _) => <_Recent>[],
-            ),
-    ]);
-    return [for (final l in lists) ...l]
-      ..sort((a, b) => b.resource.openedAt.compareTo(a.resource.openedAt));
-  }
-
-  /// The activity feed; its rows do not carry the resources' own icons, so
-  /// those are looked up after the list is out (never blocking it).
+  /// The activity feed: what other members changed in the person's drives
+  /// (the host leaves out the person's own changes; those are in Search). Its
+  /// rows do not carry the resources' own icons, so those are looked up after
+  /// the list is out (never blocking it).
   Future<List<ActivityEntry>> _loadActivity() async {
-    final list = await widget.api.activity(_maxActivity);
+    final all = _mine
+        ? await widget.api.activityWithMine(_maxActivity)
+        : await widget.api.activity(_maxActivity);
+    final drives = await _drives.then(
+        (ds) => {for (final d in ds) driveKey(d.subject)},
+        onError: (Object _) => <String>{});
+    final list = drives.isEmpty
+        ? all
+        : [
+            for (final a in all)
+              if (drives.contains(driveKey(a.drive))) a
+          ];
     widget.api.resourceIcons([for (final a in list) a.subject]).then((icons) {
-      if (mounted && !_sameIcons(icons)) setState(() => _icons = icons);
+      if (mounted && !_sameIcons(icons)) {
+        setState(() => _icons = icons);
+        _publishActivity();
+      }
     }).catchError((Object _) {});
     return list;
+  }
+
+  /// Hands the activity feed to the shell, for the detail pane while nothing
+  /// is open next to the home (the split layout shows it there, big, instead
+  /// of as a section). The rows are the home's own.
+  void _publishActivity() {
+    final shell = _shell;
+    if (shell == null) return;
+    final future = _activity;
+    future
+        .then((list) => list, onError: (Object _) => <ActivityEntry>[])
+        .then((list) {
+      if (!mounted || !identical(future, _activity)) return;
+      shell.activity.value =
+          (entries: list, row: _activityRow, mine: _mine, onMine: _setMine);
+    });
   }
 
   bool _sameIcons(Map<String, String> icons) =>
@@ -266,19 +407,20 @@ class _ChatsScreenState extends State<ChatsScreen> {
       _reloadQueued = false;
       if (!mounted) return;
       setState(() {
+        _drives = _loadDrives();
         _chats = widget.api.chats();
-        _recents = _loadRecents();
         _favorites = widget.api.favorites();
         _conversations = widget.api.conversations();
         _activity = _loadActivity();
         _notifications = _loadNotifications();
       });
+      _publishActivity();
     });
     // A frame must run for the callback to fire.
     WidgetsBinding.instance.scheduleFrame();
   }
 
-  /// Whether `screen` can have changed what the home lists: a "Show all" list
+  /// Whether `screen` can have changed what the home lists: a section's list
   /// and a settings page only show things (what is opened from a list
   /// reloads by itself when it is closed).
   static bool _changesData(Widget screen) =>
@@ -286,12 +428,65 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   /// Opens [screen]: pushed over the home on a phone, in the detail pane
   /// next to it on a tablet. [subject] is what it shows, to mark its row.
-  Future<void> _push(Widget screen, {String? subject}) async {
-    await openFromList<void>(context, (_) => screen, subject: subject);
+  Future<void> _push(Widget screen,
+      {String? subject, VoidCallback? onLeave}) async {
+    await openFromList<void>(context, (_) => screen,
+        subject: subject, onLeave: onLeave);
+    if (mounted && _changesData(screen)) _reload();
+  }
+
+  /// Opens [subject] of [drive] and notes the visit once it is left: the
+  /// lists (the drives' order) do not move under the finger that
+  /// opened it, only when the person goes on.
+  Future<void> _visit(Widget screen,
+      {required String drive, required String subject}) async {
+    await openFromList<void>(context, (_) => screen, subject: subject,
+        onLeave: () {
+      widget.api.noteOpened(drive, subject);
+      noteDriveVisited(drive);
+    });
     if (mounted && _changesData(screen)) _reload();
   }
 
   WidgetBuilder? get _profile => widget.profile ?? _shell?.profile;
+
+  /// A section's full list: in the detail pane next to the home (where the
+  /// resources open), a page of its own on a phone. Opened once. The rows are
+  /// built when they scroll into view, from [item].
+  void _openAll(HomeSection id, int count, Widget Function(int) item) =>
+      _openPage(
+          id, (_) => _ListPage(title: id.title, count: count, item: item));
+
+  /// The AI chats' full list: pages of chats from the host, the next one
+  /// read when the list is scrolled near its end, so every chat is reachable.
+  /// [first] is what the home already has.
+  void _openAllChats(HomeSection id, List<ChatSummary> first, AppColors c) =>
+      _openPage(
+          id,
+          (_) => _ChatsPage(
+                title: id.title,
+                api: widget.api,
+                first: first,
+                colors: c,
+                row: _chatRow,
+              ));
+
+  void _openPage(HomeSection id, WidgetBuilder page) {
+    final shell = _shell;
+    if (shell != null && shell.navigatorKey.currentState != null) {
+      shell.openPage<void>(ShellPage.listOf(id.name), page);
+      return;
+    }
+    Navigator.of(context).push(SlideBackRoute<void>(builder: page));
+  }
+
+  /// The control at the right of a section's heading: only the activity's
+  /// "Show mine" filter.
+  Widget? _trailingFor(HomeSection id) => id == HomeSection.activity
+      ? Padding(
+          padding: const EdgeInsets.only(left: 4, right: 8),
+          child: ShowMineChip(value: _mine, onChanged: _setMine))
+      : null;
 
   Future<void> _settings() async {
     final profile = _profile;
@@ -325,14 +520,14 @@ class _ChatsScreenState extends State<ChatsScreen> {
       subject: chat?.subject);
 
   void _openResource(String drive, RecentResource r) {
-    widget.api.noteOpened(drive, r.subject);
-    _push(
+    _visit(
         openResourceView(
             api: widget.api,
             drive: drive,
             subject: r.subject,
             title: r.title,
             className: r.className),
+        drive: drive,
         subject: r.subject);
   }
 
@@ -349,7 +544,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
                 drive: d.subject,
                 subject: d.subject,
                 title: d.name),
-            subject: d.subject),
+            subject: d.subject,
+            // The drives' order follows the visit once it is left.
+            onLeave: () => noteDriveVisited(d.subject)),
       );
 
   Widget _chatRow(ChatSummary chat) => ResourceRow(
@@ -357,11 +554,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
         title: chat.name.isEmpty ? 'Untitled chat' : chat.name,
         onTap: () => _openChat(chat),
       );
-
-  /// `<drive> · <class> · <when>`: the drive first, when it has a name.
-  Widget _recentRow(_Recent r) =>
-      _resourceRow(r.resource, _openResource, r.drive,
-          driveName: _driveNames[r.drive]);
 
   /// Favorites and conversations are not tied to one drive: they open in the
   /// current one.
@@ -406,10 +598,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
       }, onError: (Object _) {});
     }
     if (n.about.isEmpty) return;
-    widget.api.noteOpened(_drive, n.about);
-    _push(
+    _visit(
         openResourceView(
             api: widget.api, drive: _drive, subject: n.about, title: ''),
+        drive: _drive,
         subject: n.about);
   }
 
@@ -432,48 +624,58 @@ class _ChatsScreenState extends State<ChatsScreen> {
     );
   }
 
-  /// `<who> created/changed/deleted · <when>`. A deleted resource is gone, so
+  /// `<who> created/edited/deleted · <when>`. A deleted resource is gone, so
   /// its row is not tappable.
   Widget _activityRow(ActivityEntry a) => ResourceRow(
         subject: a.subject,
         icon: iconForClass(a.className),
         emoji: _icons[a.subject],
         title: a.name.isEmpty ? a.subject : a.name,
-        detail: '${a.actor ?? 'Someone'} ${a.kind} · ${timeAgo(a.at.toInt())}',
+        detail: '${a.actor ?? 'Unknown member'} ${activityVerb(a.kind)} · '
+            '${timeAgo(a.at.toInt())}',
         onTap: a.kind == 'deleted'
             ? null
             : () {
-                widget.api.noteOpened(a.drive, a.subject);
-                _push(
+                _visit(
                     openResourceView(
                         api: widget.api,
                         drive: a.drive,
                         subject: a.subject,
                         title: a.name,
                         className: a.className),
+                    drive: a.drive,
                     subject: a.subject);
               },
       );
 
-  Widget _showSectionsButton() => Padding(
+  Widget _emptyHome() => Padding(
         padding: const EdgeInsets.all(32),
-        child: Center(
-          child: TextButton(
-            onPressed: () => _setLayout(const HomeLayout()),
-            child: const Text('Show all sections'),
+        child: Column(children: [
+          Text('All sections are off',
+              style: TextStyle(color: context.appColors.textSecondary)),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _customize,
+            child: const Text('Customize'),
           ),
-        ),
+        ]),
       );
 
   /// One section of the home, with the layout's fold state and hold menu.
   Widget _sectionFor(HomeSection id, AppColors c) {
-    final key = ValueKey(id);
     final fold = (
       collapsed: _layout.collapsed.contains(id),
-      onToggle: () => _setLayout(_layout.toggleCollapsed(id)),
-      menu: _menuFor(id),
-      onMenu: _applyAction,
+      onToggle: () {
+        final opening = _layout.collapsed.contains(id);
+        _setLayout(_layout.toggleCollapsed(id));
+        if (opening) _revealSection(id);
+      },
+      onHold: _customize,
+      section: id,
+      trailing: _trailingFor(id),
+      onCount: (n) => _noteCount(id, n),
     );
+    final key = _sectionKeys[id] ??= GlobalKey<_SectionState<dynamic>>();
     switch (id) {
       case HomeSection.notifications:
         return _Section<NotificationItem>(
@@ -484,9 +686,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
           empty: 'No notifications',
           hideEmpty: true,
           rows: (list) => [for (final n in list) _notificationRow(n)],
-          onShowAll: (list) => _push(_ListPage(
-              title: id.title,
-              children: [for (final n in list) _notificationRow(n)])),
+          onShowAll: (list) =>
+              _openAll(id, list.length, (i) => _notificationRow(list[i])),
         );
       case HomeSection.drives:
         return _Section<DriveInfo>(
@@ -496,20 +697,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
           future: _drives,
           empty: 'No drives yet',
           rows: (list) => [for (final d in list) _driveRow(d)],
-          onShowAll: (list) => _push(_ListPage(
-              title: id.title, children: [for (final d in list) _driveRow(d)])),
-        );
-      case HomeSection.recents:
-        return _Section<_Recent>(
-          key: key,
-          title: id.title,
-          fold: fold,
-          future: _recents,
-          empty: 'Nothing opened yet',
-          rows: (list) => [for (final r in list) _recentRow(r)],
-          onShowAll: (list) => _push(_ListPage(title: id.title, children: [
-            for (final r in list.take(_maxRecents)) _recentRow(r),
-          ])),
+          onShowAll: (list) =>
+              _openAll(id, list.length, (i) => _driveRow(list[i])),
         );
       case HomeSection.activity:
         return _Section<ActivityEntry>(
@@ -517,11 +706,13 @@ class _ChatsScreenState extends State<ChatsScreen> {
           title: id.title,
           fold: fold,
           future: _activity,
-          empty: 'No activity yet',
+          empty: _mine ? 'Nothing changed yet' : 'No activity from others yet',
           rows: (list) => [for (final a in list) _activityRow(a)],
-          onShowAll: (list) => _push(_ListPage(title: id.title, children: [
-            for (final a in list.take(_maxActivity)) _activityRow(a),
-          ])),
+          total: (list) => list.length.clamp(0, _maxActivity),
+          onShowAll: (list) {
+            final shown = list.take(_maxActivity).toList();
+            _openAll(id, shown.length, (i) => _activityRow(shown[i]));
+          },
         );
       case HomeSection.chats:
         return _Section<ChatSummary>(
@@ -531,12 +722,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
           future: _chats,
           empty: 'No chats yet',
           rows: (list) => [for (final chat in list) _chatRow(chat)],
-          onShowAll: (list) => _push(_ListPage(title: id.title, children: [
-            for (final (label, group) in groupChatsByAge(list)) ...[
-              _Heading(label, c),
-              for (final chat in group) _chatRow(chat),
-            ],
-          ])),
+          onShowAll: (list) => _openAllChats(id, list, c),
         );
       case HomeSection.favorites:
         return _Section<RecentResource>(
@@ -547,8 +733,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
           empty: 'No favorites yet',
           hideEmpty: true,
           rows: (list) => [for (final r in list) _homeRow(r)],
-          onShowAll: (list) => _push(_ListPage(
-              title: id.title, children: [for (final r in list) _homeRow(r)])),
+          onShowAll: (list) =>
+              _openAll(id, list.length, (i) => _homeRow(list[i])),
         );
       case HomeSection.messages:
         return _Section<ConversationRow>(
@@ -559,9 +745,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
           empty: 'No messages yet',
           hideEmpty: true,
           rows: (list) => [for (final r in list) _conversationRow(r)],
-          onShowAll: (list) => _push(_ListPage(
-              title: id.title,
-              children: [for (final r in list) _conversationRow(r)])),
+          onShowAll: (list) =>
+              _openAll(id, list.length, (i) => _conversationRow(list[i])),
         );
     }
   }
@@ -569,6 +754,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
+    final split = ShellScope.layoutOf(context) == ShellLayout.split;
     return FutureBuilder<List<DriveInfo>>(
       future: _drives,
       builder: (context, snapshot) {
@@ -592,8 +778,11 @@ class _ChatsScreenState extends State<ChatsScreen> {
               child: ListView(
                 physics: const ClampingScrollPhysics(),
                 children: [
-                  for (final id in _layout.visible) _sectionFor(id, c),
-                  if (_layout.visible.isEmpty) _showSectionsButton(),
+                  // Next to the pages the activity is the detail pane's.
+                  for (final id in _layout.visible)
+                    if (!(split && id == HomeSection.activity))
+                      _sectionFor(id, c),
+                  if (_layout.visible.isEmpty) _emptyHome(),
                 ],
               ),
             ),
@@ -622,9 +811,9 @@ ResourceRow _resourceRow(RecentResource r,
       onTap: () => onOpen(drive, r),
     );
 
-/// One home section: a header with "Show all" (only when there are more than
-/// [_homeItems]), the first few rows, and the loading, error or empty state
-/// while there is nothing to list.
+/// One home section: a heading, the first [_homeItems] rows, a "Show all"
+/// row when there are more, and the loading, error or empty state while
+/// there is nothing to list.
 ///
 /// Stale while revalidating: when [future] is replaced, the rows of the
 /// previous one stay until the new data is there, so a refresh neither
@@ -644,13 +833,12 @@ class _Section<T> extends StatefulWidget {
   final List<Widget> Function(List<T>) rows;
   final void Function(List<T>) onShowAll;
 
+  /// How many rows the full list holds, when fewer than the section has.
+  final int Function(List<T>)? total;
+
   /// Show nothing at all (no heading) while there is nothing to list, while
   /// it is still being read, and when the data cannot be read.
   final bool hideEmpty;
-
-  /// Most rows "Show all" lists in place (the split layout, where the home
-  /// is the list pane and a page of its own would go to the detail pane).
-  final int maxRows;
 
   const _Section({
     super.key,
@@ -660,8 +848,8 @@ class _Section<T> extends StatefulWidget {
     required this.empty,
     required this.rows,
     required this.onShowAll,
+    this.total,
     this.hideEmpty = false,
-    this.maxRows = 100,
   });
 
   @override
@@ -675,9 +863,6 @@ class _SectionState<T> extends State<_Section<T>>
   @override
   bool get wantKeepAlive => true;
   Object? _error;
-
-  /// Every row is listed in place (split layout).
-  bool _all = false;
 
   @override
   void initState() {
@@ -698,6 +883,7 @@ class _SectionState<T> extends State<_Section<T>>
         _list = list;
         _error = null;
       });
+      widget.fold.onCount(list.length);
     }, onError: (Object e) {
       if (!mounted || widget.future != future) return;
       // Keep what is on screen; an error shows only when there is nothing.
@@ -705,36 +891,78 @@ class _SectionState<T> extends State<_Section<T>>
     });
   }
 
-  /// The heading: a tap folds the section, a hold opens the menu to move or
-  /// hide sections.
+  /// Opens the section's full list (the "Show all" row), if it has rows.
+  void showAll() {
+    final list = _list;
+    if (list != null && list.isNotEmpty) widget.onShowAll(list);
+  }
+
+  /// The heading's title: a tap folds the section, a hold opens the dialog to
+  /// show, hide and move sections. Pressed, a faint rounded wash hugs the title and
+  /// its chevron (not the row), and the chevron turns instead of changing.
   Widget _foldHeading(BuildContext context) {
     final c = context.appColors;
     final fold = widget.fold;
-    return HoldFan<_SectionAction>(
-      width: double.infinity,
-      size: 40,
-      tooltip: widget.title,
-      menuLabel: 'Arrange sections',
-      layout: HoldFanLayout.list,
-      defaultIndex: null,
-      onTap: fold.onToggle,
-      items: fold.menu,
-      onSelected: fold.onMenu,
-      child: Padding(
-        padding: const EdgeInsets.only(left: 16, top: 8),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Text(widget.title,
-                style: TextStyle(
-                    color: c.textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600)),
-            const SizedBox(width: 4),
-            Icon(fold.collapsed ? Icons.chevron_right : Icons.expand_more,
-                size: 18, color: c.textSecondary),
-          ]),
+    return SizedBox(
+      key: ValueKey('section-heading-${fold.section.name}'),
+      height: 48,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: fold.onToggle,
+          onLongPress: fold.onHold,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Flexible(
+                // A title in proportion to the rows and the bar's 24 dp icons
+                // (it was a 13 sp grey label): 15 sp, nearly the text colour.
+                child: Text(widget.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: c.textPrimary.withValues(alpha: 0.85),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(width: 4),
+              AnimatedRotation(
+                turns: fold.collapsed ? -0.25 : 0,
+                duration: const Duration(milliseconds: 150),
+                child:
+                    Icon(Icons.expand_more, size: 22, color: c.textSecondary),
+              ),
+            ]),
+          ),
         ),
+      ),
+    );
+  }
+
+  /// The heading row: the title at the left, the section's filter (if any)
+  /// at the right.
+  Widget _headingRow(BuildContext context) {
+    final fold = widget.fold;
+    final trailing = fold.trailing;
+    // 48 dp like the bar's buttons (more with a large font), with room
+    // above it between sections; the title at the rows' 16 dp inset.
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
+        child: Row(children: [
+          const SizedBox(width: 8),
+          // The title as wide as it is (and no wider than the room).
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _foldHeading(context),
+            ),
+          ),
+          if (trailing != null) trailing,
+          const SizedBox(width: 4),
+        ]),
       ),
     );
   }
@@ -751,33 +979,10 @@ class _SectionState<T> extends State<_Section<T>>
     if (widget.hideEmpty && (error != null || (list?.isEmpty ?? true))) {
       return const SizedBox.shrink();
     }
-    final more = list != null && list.length > _homeItems;
-    // In the list pane next to the detail pane, "Show all" lists the rest in
-    // place: a page of its own would cover what is opened.
-    final inPlace = ShellScope.layoutOf(context) == ShellLayout.split;
-    final all = inPlace && _all;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [
-          Expanded(child: _foldHeading(context)),
-          // Same size, weight and padding as the heading, so the two sit on
-          // one baseline.
-          if (more && !widget.fold.collapsed)
-            InkWell(
-              onTap: inPlace
-                  ? () => setState(() => _all = !_all)
-                  : () => widget.onShowAll(list),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                child: Text(all ? 'Show less' : 'Show all',
-                    style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600)),
-              ),
-            ),
-        ]),
+        _headingRow(context),
         if (widget.fold.collapsed)
           const SizedBox.shrink()
         else if (error != null)
@@ -793,18 +998,58 @@ class _SectionState<T> extends State<_Section<T>>
         else if (list.isEmpty)
           _Empty(widget.empty, c)
         else
-          ...widget.rows(list.take(all ? widget.maxRows : _homeItems).toList()),
+          ...widget.rows(list.take(_homeItems).toList()),
+        if (!widget.fold.collapsed &&
+            error == null &&
+            list != null &&
+            list.length > _homeItems)
+          _ShowAllRow(
+            key: ValueKey('section-show-all-${widget.fold.section.name}'),
+            count: widget.total?.call(list) ?? list.length,
+            onTap: () => widget.onShowAll(list),
+          ),
       ],
     );
   }
 }
 
-/// A full-height page listing everything of one section.
+/// The last row of a section with more than [_homeItems] rows: "Show all (N)",
+/// at the rows' inset and 48 dp high.
+class _ShowAllRow extends StatelessWidget {
+  final int count;
+  final VoidCallback onTap;
+
+  const _ShowAllRow({super.key, required this.count, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text('Show all ($count)',
+                  style: TextStyle(
+                      color: context.appColors.main,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ),
+      );
+}
+
+/// A full-height page listing everything of one section: [count] rows, each
+/// built by [item] only when it scrolls into view.
 class _ListPage extends StatelessWidget {
   final String title;
-  final List<Widget> children;
+  final int count;
+  final Widget Function(int index) item;
 
-  const _ListPage({required this.title, required this.children});
+  const _ListPage(
+      {required this.title, required this.count, required this.item});
 
   @override
   Widget build(BuildContext context) {
@@ -813,7 +1058,143 @@ class _ListPage extends StatelessWidget {
       backgroundColor: c.bgBody,
       appBar: AppTopBar(title: title),
       body: SafeArea(
-          top: false, bottom: false, child: ListView(children: children)),
+          top: false,
+          bottom: false,
+          child: ListView.builder(
+              itemCount: count, itemBuilder: (_, i) => item(i))),
+    );
+  }
+}
+
+/// How close to the end of the chats (in rows) the next page is read.
+const _chatsPrefetch = 10;
+
+/// The AI chats' full list: [first] (what the home read), then pages from the
+/// host as the list is scrolled within [_chatsPrefetch] rows of its end, under
+/// headings by age. Only the rows in view are built.
+class _ChatsPage extends StatefulWidget {
+  final String title;
+  final AssistantApi api;
+  final List<ChatSummary> first;
+  final AppColors colors;
+  final Widget Function(ChatSummary) row;
+
+  const _ChatsPage({
+    required this.title,
+    required this.api,
+    required this.first,
+    required this.colors,
+    required this.row,
+  });
+
+  @override
+  State<_ChatsPage> createState() => _ChatsPageState();
+}
+
+/// A row of the list: a heading (a String) or a chat.
+typedef _ChatEntry = Object;
+
+class _ChatsPageState extends State<_ChatsPage> {
+  /// Since the page was made, for the `chats all painted` mark.
+  final Stopwatch _opened = Stopwatch()..start();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => Perf.span(
+        'chats all painted ${_chats.length}', _opened.elapsedMilliseconds));
+  }
+
+  late List<ChatSummary> _chats = widget.first;
+  late List<_ChatEntry> _entries = _entriesOf(_chats);
+
+  /// No more pages: the last one was short, or reading one failed.
+  late bool _done = widget.first.length < AssistantApi.chatsPageSize;
+  bool _loading = false;
+
+  static List<_ChatEntry> _entriesOf(List<ChatSummary> chats) => [
+        for (final (label, group) in groupChatsByAge(chats)) ...[
+          label,
+          ...group
+        ],
+      ];
+
+  Future<void> _loadMore() async {
+    if (_loading || _done) return;
+    _loading = true;
+    final watch = Stopwatch()..start();
+    try {
+      final page = await widget.api
+          .chatsPage(offset: _chats.length, limit: AssistantApi.chatsPageSize);
+      Perf.span('chats page ${_chats.length}+${page.length}',
+          watch.elapsedMilliseconds);
+      if (!mounted) return;
+      final known = {for (final c in _chats) c.subject};
+      setState(() {
+        _chats = [
+          ..._chats,
+          for (final c in page)
+            if (known.add(c.subject)) c
+        ];
+        _entries = _entriesOf(_chats);
+        if (page.length < AssistantApi.chatsPageSize) _done = true;
+      });
+    } catch (_) {
+      // Keep what is shown; do not ask again in a loop.
+      if (mounted) setState(() => _done = true);
+    } finally {
+      _loading = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    // A spinner row while more may come.
+    final count = _entries.length + (_done ? 0 : 1);
+    return Scaffold(
+      backgroundColor: c.bgBody,
+      appBar: AppTopBar(title: widget.title),
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: ListView.builder(
+          key: const Key('chats-all-list'),
+          itemCount: count,
+          findChildIndexCallback: (key) {
+            if (key is! ValueKey<String>) return null;
+            final i = _entries.indexWhere((e) => switch (e) {
+                  final ChatSummary chat => 'chat-${chat.subject}' == key.value,
+                  final String label => 'heading-$label' == key.value,
+                  _ => false,
+                });
+            return i < 0 ? null : i;
+          },
+          itemBuilder: (context, i) {
+            if (i >= count - _chatsPrefetch) _loadMore();
+            if (i >= _entries.length) {
+              return const Padding(
+                key: ValueKey('chats-loading'),
+                padding: EdgeInsets.all(16),
+                child: Center(
+                    child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2))),
+              );
+            }
+            return switch (_entries[i]) {
+              final ChatSummary chat => KeyedSubtree(
+                  key: ValueKey('chat-${chat.subject}'),
+                  child: widget.row(chat)),
+              final String label => KeyedSubtree(
+                  key: ValueKey('heading-$label'),
+                  child: _Heading(label, widget.colors)),
+              _ => const SizedBox.shrink(),
+            };
+          },
+        ),
+      ),
     );
   }
 }

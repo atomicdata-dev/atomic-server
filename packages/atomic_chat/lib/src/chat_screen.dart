@@ -1,9 +1,12 @@
 import 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColors, AppColorsExt;
+    show AppColors, AppColorsExt, Perf;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'app_top_bar.dart';
+import 'home_sections.dart' show HomeSection;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models.dart';
@@ -13,6 +16,8 @@ import 'ai_tools.dart';
 import 'attachments.dart';
 import 'resource_row.dart';
 import 'chat_parts.dart';
+import 'chat_window.dart';
+import 'scroll_to_bottom_button.dart';
 import 'markdown_view.dart';
 import 'tool_step.dart';
 import 'native_views.dart';
@@ -99,9 +104,50 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _input = TextEditingController();
   final _focus = FocusNode();
   String? _chat;
-  List<ChatEntry> _messages = const [];
-  Object? _loadError;
-  bool _loaded = false;
+
+  /// The window of the chat on screen: its newest messages, older ones read
+  /// as the list scrolls up, and the ones written here added at the end
+  /// (see [ChatWindow]). A chat can be very long; only this is held.
+  late final ChatWindow<ChatEntry> _window = ChatWindow(
+    readPage: (before, limit) =>
+        widget.api.chatEntriesPage(_chat!, before: before, limit: limit),
+    // Only this screen writes the chat while it is open: nothing is polled;
+    // this reads the newest pages back after a far scroll up dropped them.
+    readAfter: (after, limit) =>
+        widget.api.chatEntriesAfter(_chat!, after, limit: limit),
+    idOf: (m) => m.id,
+    onOlderPage: (ms, n) => Perf.span('chat older page $n', ms),
+  );
+  late final _keeper = ChatScrollKeeper(_window);
+
+  // Following an answer as it streams in (see [_settle]): the list follows
+  // the growing answer at the bottom while the answer's top is in view;
+  // once the answer fills the screen its top is held there, so it can be
+  // read from its start. A person who scrolls takes over.
+  final _listKey = GlobalKey();
+  final _sentKey = GlobalKey();
+  final _answerKey = GlobalKey();
+
+  /// The question just sent and the answer to it (`partial` while it
+  /// streams), or on opening the chat its newest answer.
+  String? _sentId;
+  String? _answerId;
+
+  /// Following the answer at the bottom.
+  bool _follow = false;
+
+  /// The answer's top reached the top of the list: held there.
+  bool _pinned = false;
+
+  /// Room below the answer so the question can sit at the top of the list
+  /// with the answer growing under it.
+  double _spacer = 0;
+  double? _answerHeight;
+  bool _settleQueued = false;
+  List<ChatEntry> get _messages => _window.items;
+  Object? get _loadError => _window.error;
+  bool _noChatYet = false;
+  bool get _loaded => _window.loaded || _noChatYet;
 
   /// The AI of the linked account, once looked up; null when there is none.
   HostedAi? _ai;
@@ -213,6 +259,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void dispose() {
     _flush?.cancel();
     _sub?.cancel();
+    _window.removeListener(_windowChanged);
+    _window.dispose();
+    _keeper.dispose();
     _input.removeListener(_inputChanged);
     WidgetsBinding.instance.removeObserver(this);
     _listenSession++;
@@ -525,30 +574,109 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (mounted) setState(() => _noSpeechHint = false);
   }
 
+  /// Since the screen was made, for the `chat data` / `chat painted` marks.
+  final Stopwatch _opened = Stopwatch()..start();
+
+  void _windowChanged() {
+    if (mounted) setState(() {});
+  }
+
   Future<void> _readMessages() async {
+    _window.addListener(_windowChanged);
     final chat = _chat;
     if (chat == null) {
-      setState(() => _loaded = true);
+      setState(() => _noChatYet = true);
       return;
     }
-    try {
-      final messages = await widget.api.chatEntries(chat);
-      if (mounted) {
-        setState(() {
-          _messages = messages;
-          _loaded = true;
-          _loadError = null;
-        });
-        if (messages.isEmpty) _readPicker();
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loadError = e;
-          _loaded = true;
-        });
-      }
+    await _window.open();
+    if (!mounted || _window.error != null) return;
+    final messages = _window.items;
+    // Back in a chat whose newest answer is longer than the screen: open at
+    // its start, not at its end.
+    if (messages.isNotEmpty && messages.last.role == 'assistant') {
+      setState(() => _answerId = messages.last.id);
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showAnswerStart());
     }
+    Perf.span('chat data ${messages.length}', _opened.elapsedMilliseconds);
+    WidgetsBinding.instance.addPostFrameCallback((_) => Perf.span(
+        'chat painted ${messages.length}', _opened.elapsedMilliseconds));
+    if (messages.isEmpty) _readPicker();
+  }
+
+  /// The list's box and the top line answers are held at (below the
+  /// list's padding), in global coordinates.
+  (RenderBox, double)? _listBox() {
+    final list = _listKey.currentContext?.findRenderObject();
+    if (list is! RenderBox || !list.hasSize || !list.attached) return null;
+    return (list, list.localToGlobal(Offset.zero).dy + 16);
+  }
+
+  RenderBox? _boxOf(GlobalKey key) {
+    final box = key.currentContext?.findRenderObject();
+    return box is RenderBox && box.hasSize && box.attached ? box : null;
+  }
+
+  /// Scroll so the answer's top is at the top of the list, when it is
+  /// above it (an answer taller than the screen).
+  void _showAnswerStart() {
+    final list = _listBox();
+    final answer = _boxOf(_answerKey);
+    if (list == null || answer == null || !_keeper.controller.hasClients) {
+      return;
+    }
+    final top = answer.localToGlobal(Offset.zero).dy;
+    if (top < list.$2 - 0.5) {
+      final pos = _keeper.controller.position;
+      pos.jumpTo(math.min(pos.maxScrollExtent, pos.pixels + list.$2 - top));
+    }
+  }
+
+  void _queueSettle() {
+    if (_settleQueued) return;
+    _settleQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _settle());
+  }
+
+  /// After each frame while an answer streams in: make room below it so the
+  /// question sits at the top; follow it at the bottom while its top is in
+  /// view; then hold its top there. When the person scrolled away (or the
+  /// top is held), what is on screen stays put as the answer grows (in an
+  /// upside-down list a growing last message pushes everything up).
+  void _settle() {
+    _settleQueued = false;
+    if (!mounted || !_keeper.controller.hasClients) return;
+    final list = _listBox();
+    final answer = _boxOf(_answerKey);
+    if (list == null || answer == null) return;
+    final pos = _keeper.controller.position;
+    final h = answer.size.height;
+    final grew = _answerHeight == null ? 0.0 : h - _answerHeight!;
+    _answerHeight = h;
+    if (_follow && !_pinned) {
+      final sent = _boxOf(_sentKey);
+      if (sent != null && pos.pixels <= 0.5) {
+        final span = answer.localToGlobal(Offset(0, h)).dy -
+            sent.localToGlobal(Offset.zero).dy;
+        final want = math.max(0.0, list.$1.size.height - 32 - span);
+        if ((want - _spacer).abs() > 0.5) {
+          setState(() => _spacer = want);
+          return;
+        }
+      }
+      final top = answer.localToGlobal(Offset.zero).dy;
+      if (top < list.$2 - 0.5) {
+        _pinned = true;
+        pos.jumpTo(pos.pixels + list.$2 - top);
+      }
+    } else if (grew.abs() > 0.01 && pos.pixels > 0.5) {
+      pos.jumpTo(math.min(pos.maxScrollExtent, pos.pixels + grew));
+    }
+  }
+
+  /// A drag by the person ends following the answer.
+  bool _onScrollStart(ScrollStartNotification n) {
+    if (n.dragDetails != null) _follow = false;
+    return false;
   }
 
   /// A new chat is for writing: the field gets the cursor as soon as it can.
@@ -724,12 +852,21 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final name = text.isNotEmpty
         ? text
         : (userParts.whereType<FilePart>().first.filename ?? 'Attachment');
-    final asked = [..._messages, userMessage];
+    _window.add(userMessage);
+    // What the model reads: the window (the newest messages at least); the
+    // AI cuts a long one to its latest part.
+    final asked = _window.items;
+    if (_keeper.controller.hasClients) _keeper.controller.jumpTo(0);
     setState(() {
       _sending = true;
       _error = null;
-      _messages = asked;
       _partial = [];
+      // The question goes to the top, the answer grows below it.
+      _sentId = userMessage.id;
+      _answerId = 'partial';
+      _follow = true;
+      _pinned = false;
+      _answerHeight = null;
     });
     // Written in: New makes another chat from now on, also while the chat
     // itself is still being created.
@@ -825,7 +962,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             await widget.api.addEntry(chat, 'assistant', saved);
           }
         });
-        if (mounted) _messages = [..._messages, reply];
+        if (mounted) _window.add(reply);
+        // The saved answer takes the streamed one's place (and its key).
+        _answerId = reply.id;
       }
       if (mounted) {
         setState(() {
@@ -906,17 +1045,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    return Scaffold(
-      backgroundColor: c.bgBody,
-      appBar: AppTopBar(
-        title: widget.title.isEmpty
-            ? (_chat == null
-                ? (widget.voiceMode ? 'Voice chat' : 'New chat')
-                : 'Untitled chat')
-            : widget.title,
-      ),
-      body: ListAndField(list: _list(c), field: _composer(c)),
-    );
+    return SectionBack(
+        section: HomeSection.chats,
+        child: Scaffold(
+          backgroundColor: c.bgBody,
+          appBar: AppTopBar(
+            title: widget.title.isEmpty
+                ? (_chat == null
+                    ? (widget.voiceMode ? 'Voice chat' : 'New chat')
+                    : 'Untitled chat')
+                : widget.title,
+          ),
+          body: ListAndField(list: _list(c), field: _composer(c)),
+        ));
   }
 
   Widget _list(AppColors c) {
@@ -933,33 +1074,83 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             id: 'partial', role: 'assistant', createdAt: 0, parts: _partial!),
     ];
     if (shown.isEmpty) return _noAi ? _noAiState(c) : _picker(c);
-    return LayoutBuilder(
-      builder: (context, box) => ListView.builder(
-        reverse: true,
-        padding: const EdgeInsets.all(16),
-        itemCount: shown.length,
-        itemBuilder: (context, i) {
-          final m = shown[shown.length - 1 - i];
-          final mine = m.role == 'user';
-          return Align(
-            alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              constraints: BoxConstraints(
-                // An answer may hold code and tables: a little wider.
-                maxWidth: (box.maxWidth - 32) * (mine ? 0.85 : 0.95),
+    final ids = [for (final m in shown) m.id];
+    final at = {for (var i = 0; i < ids.length; i++) ids[i]: i};
+    if (_sending) _queueSettle();
+    final list = LayoutBuilder(
+      builder: (context, box) => NotificationListener<ScrollStartNotification>(
+        onNotification: _onScrollStart,
+        child: ListView.builder(
+          key: _listKey,
+          controller: _keeper.controller,
+          reverse: true,
+          physics: chatScrollPhysics,
+          scrollCacheExtent: const ScrollCacheExtent.viewport(1.5),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + _spacer),
+          itemCount: shown.length + (_window.hasOlder ? 1 : 0),
+          findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
+          itemBuilder: (context, i) {
+            if (i == shown.length) {
+              // The top: older messages are being read.
+              return const Padding(
+                padding: EdgeInsets.all(12),
+                child: Center(
+                    child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))),
+              );
+            }
+            _keeper.built(i);
+            final index = shown.length - 1 - i;
+            final m = shown[index];
+            final mine = m.role == 'user';
+            final newDay = m.createdAt > 0 &&
+                (index == 0 && !_window.hasOlder ||
+                    index > 0 &&
+                        shown[index - 1].createdAt > 0 &&
+                        otherDay(shown[index - 1].createdAt, m.createdAt));
+            final bubble = Align(
+              alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                constraints: BoxConstraints(
+                  // An answer may hold code and tables: a little wider.
+                  maxWidth: (box.maxWidth - 32) * (mine ? 0.85 : 0.95),
+                ),
+                decoration: BoxDecoration(
+                  color: mine ? c.mainSelectedBg : c.bg1,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: _bubble(c, m, mine),
               ),
-              decoration: BoxDecoration(
-                color: mine ? c.mainSelectedBg : c.bg1,
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: _bubble(c, m, mine),
-            ),
-          );
-        },
+            );
+            final keyed = m.id == _answerId
+                ? KeyedSubtree(key: _answerKey, child: bubble)
+                : m.id == _sentId
+                    ? KeyedSubtree(key: _sentKey, child: bubble)
+                    : bubble;
+            return KeyedSubtree(
+              key: ValueKey(m.id),
+              child: newDay
+                  ? Column(children: [
+                      DaySeparator(dayLabel(m.createdAt),
+                          color: c.textSecondary),
+                      keyed,
+                    ])
+                  : keyed,
+            );
+          },
+        ),
       ),
     );
+    return Stack(children: [
+      list,
+      ScrollToBottomButton(keeper: _keeper),
+    ]);
   }
 
   /// What a message shows: its text in Markdown, its tool calls as steps.
