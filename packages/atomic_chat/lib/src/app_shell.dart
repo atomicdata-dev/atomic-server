@@ -814,6 +814,15 @@ double listPaneWidth(double room, {double? dragged}) {
       .toDouble();
 }
 
+/// [width] (plus the 1 dp divider after it) on a whole number of physical
+/// pixels. The detail pane's web view is a texture: placed at a fraction of a
+/// pixel (400 dp + 1 dp is 852.125 px at 2.125) it is resampled, and its
+/// text and lines turn blurry. A zero or hidden width stays as it is.
+double snapPaneWidth(double width, double devicePixelRatio) {
+  if (width <= 0.5 || devicePixelRatio <= 0) return width;
+  return ((width + 1) * devicePixelRatio).round() / devicePixelRatio - 1;
+}
+
 /// Room for the bar's six 48 dp slots and its padding.
 const _minList = 304.0;
 const _maxDragged = 520.0;
@@ -1054,10 +1063,11 @@ class _SplitPanesState extends State<_SplitPanes>
     final shell = widget.shell;
     return LayoutBuilder(builder: (context, box) {
       final room = box.maxWidth;
+      final dpr = MediaQuery.devicePixelRatioOf(context);
       return ValueListenableBuilder<double?>(
         valueListenable: shell.listWidth,
         builder: (context, dragged, _) {
-          final full = listPaneWidth(room, dragged: dragged);
+          final full = snapPaneWidth(listPaneWidth(room, dragged: dragged), dpr);
           return AnimatedBuilder(
             animation: _open,
             builder: (context, _) {
@@ -1065,7 +1075,8 @@ class _SplitPanesState extends State<_SplitPanes>
               final listFull = dragging == null
                   ? full
                   : math.max(_minList, math.min(dragging, room - _minDetail));
-              final shown = dragging ?? full * _open.value;
+              final shown =
+                  snapPaneWidth(dragging ?? full * _open.value, dpr);
               final gone = shown <= 0.5;
               return Stack(children: [
                 Positioned.fill(

@@ -123,6 +123,10 @@ class _ResourceViewState extends State<ResourceView>
   /// a resource first shows the last one, or its own loading state.
   bool _revealed = true;
 
+  /// A page of the app's own (`path`) has settled on a resource, such as the
+  /// one its new-resource form just created.
+  bool _resourceShown = false;
+
   /// The placeholder is gone (faded out).
   bool _skeletonGone = true;
   Timer? _revealCap;
@@ -451,6 +455,11 @@ class _ResourceViewState extends State<ResourceView>
     }
     final id = request['id'] as int;
     final method = request['method'] as String;
+    // A form of the app (new resource) that ended on the resource it made:
+    // that is a resource now, and gets the room.
+    if (method == 'opened' && widget.path != null && !_resourceShown) {
+      if (mounted) setState(() => _resourceShown = true);
+    }
     if (method == 'openNative') {
       await _answerOpenNative(id, request['args']);
       return;
@@ -635,7 +644,9 @@ class _ResourceViewState extends State<ResourceView>
 /// [ReadableWidth.maxWidth] wide in a wide pane. A resource gets the room.
 extension on _ResourceViewState {
   Widget _readable(Widget page) =>
-      widget.path != null ? ReadableWidth(child: page) : page;
+      widget.path != null && !_resourceShown
+          ? ReadableWidth(child: page)
+          : page;
 }
 
 /// What a resource page shows until its web view shows the resource: the
