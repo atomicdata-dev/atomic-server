@@ -96,8 +96,13 @@ tap_text() {
 }
 
 back() { a shell input keyevent 4; }
-# The home, whatever page is open (the bar's Home button pops back to it).
-go_home() { tap_text Home 2>/dev/null || back; sleep 1; }
+# The home, whatever page is open (the bar's Home button pops back to it);
+# the app brought back to the front when it is not (never a blind back,
+# which leaves the app from its home).
+go_home() {
+  tap_text Home 2>/dev/null || { a shell am start -n $ACT >/dev/null; sleep 2; tap_text Home 2>/dev/null || true; }
+  sleep 1
+}
 
 start_cold() {
   a shell am force-stop $PKG
@@ -274,12 +279,12 @@ if step open || step memory; then
       go_home; sleep 4
       # The spare is ready: a warm open.
       at=$(find_text "${doc%%:*}"); [ -n "$at" ] || { note "not on screen: ${doc%%:*}"; continue; }
-      open_one "$at" "${doc#*:}"; back; sleep 2
+      open_one "$at" "${doc#*:}" || true; back; sleep 2
       # Cold: take the spare and leave at once, then open the same row (now
       # on top of Recents) again before the next spare is up.
       at=$(find_text "${doc%%:*}"); [ -n "$at" ] || continue
-      a shell input tap $at; sleep 0.4; back; sleep 0.3
-      open_one "$at" "${doc#*:}"; back
+      a shell input tap $at; sleep 0.6; back; sleep 0.8
+      open_one "$at" "${doc#*:}" || true; back
     done
   done
   if step memory; then
