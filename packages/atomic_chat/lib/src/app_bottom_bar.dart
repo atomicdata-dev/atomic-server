@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'chat_screen.dart';
+import 'home_sections.dart';
 import 'models.dart';
 import 'native_views.dart';
 import 'profile_avatar.dart';
@@ -88,7 +89,8 @@ class AppBottomBar extends StatelessWidget {
                       shell.drive,
                       shell.list,
                       shell.listCollapsed,
-                      shell.searching
+                      shell.searching,
+                      shell.homeSections
                     ]),
                     builder: (context, _) {
                       final onMore = shell.topMenu;
@@ -144,10 +146,20 @@ class AppBottomBar extends StatelessWidget {
                         _Current(
                           current: homeCurrent,
                           label: 'Home',
-                          child: IconButton(
+                          child: HoldFan<HomeSection>(
                             tooltip: 'Home',
-                            onPressed: onHome,
-                            icon: _barIcon(
+                            selected: homeCurrent,
+                            menuLabel: 'Home sections',
+                            cardMenu: true,
+                            // A tap goes home; hold and drag to a section.
+                            defaultIndex: null,
+                            onTap: onHome,
+                            items: [
+                              for (final s in shell.homeSections.value)
+                                HoldFanItem(s.title, s, icon: _sectionIcon(s)),
+                            ],
+                            onSelected: shell.openHomeSection,
+                            child: _barIcon(
                                 context,
                                 homeCurrent ? Icons.home : Icons.home_outlined,
                                 homeCurrent),
@@ -369,6 +381,17 @@ const newItems = [
   HoldFanItem('Document', NewChoice.document, icon: Icons.description_outlined),
   HoldFanItem('Other…', NewChoice.other, icon: Icons.add_box_outlined),
 ];
+
+/// The icon of a Home section in the Home button's menu.
+IconData _sectionIcon(HomeSection s) => switch (s) {
+      HomeSection.notifications => Icons.notifications_none,
+      HomeSection.drives => Icons.folder_outlined,
+      HomeSection.recents => Icons.history,
+      HomeSection.activity => Icons.bolt_outlined,
+      HomeSection.chats => Icons.chat_bubble_outline,
+      HomeSection.favorites => Icons.star_border,
+      HomeSection.messages => Icons.forum_outlined,
+    };
 
 /// A bar icon drawn by a [HoldFan] (an [IconButton] draws its own): in the
 /// main colour when its page is the current one.

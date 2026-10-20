@@ -46,6 +46,7 @@ typedef _Fold = ({
   HomeSection section,
   VoidCallback? onSearch,
   Widget? plus,
+  ValueChanged<int> onCount,
 });
 
 typedef _Recent = ({String drive, RecentResource resource});
@@ -135,6 +136,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     });
     HomeLayout.load().then((layout) {
       if (mounted) setState(() => _layout = layout);
+      _publishSections();
     });
     _loadMine();
   }
@@ -189,6 +191,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   void _setLayout(HomeLayout layout) {
     setState(() => _layout = layout);
     layout.save();
+    _publishSections();
   }
 
   /// The hold menu of a section's heading: move it, hide it, and bring back
@@ -213,6 +216,64 @@ class _ChatsScreenState extends State<ChatsScreen> {
         _SectionOp.hide => _layout.setHidden(a.section, true),
         _SectionOp.show => _layout.setHidden(a.section, false),
       });
+
+  /// Keys of the sections: to scroll one into view and open its full list.
+  final Map<HomeSection, GlobalKey<_SectionState<dynamic>>> _sectionKeys = {};
+
+  /// How many rows each section has (once read), for the Home button's menu.
+  final Map<HomeSection, int> _counts = {};
+
+  void _noteCount(HomeSection id, int n) {
+    if (_counts[id] == n) return;
+    _counts[id] = n;
+    _publishSections();
+  }
+
+  /// Hands the Home button the sections it can jump to: the visible ones
+  /// that have something, in the home's order. Next to the detail pane the
+  /// activity is not a section of the home.
+  void _publishSections() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final shell = _shell;
+      if (!mounted || shell == null) return;
+      final split = shell.split;
+      final list = [
+        for (final s in _layout.visible)
+          if (s != HomeSection.notifications &&
+              !(split && s == HomeSection.activity) &&
+              (_counts[s] ?? 0) > 0)
+            s
+      ];
+      if (!listEquals(list, shell.homeSections.value)) {
+        shell.homeSections.value = list;
+      }
+    });
+  }
+
+  int _handledRequest = 0;
+
+  /// The Home button's menu picked a section: unfold it, scroll it into
+  /// view and open its full list.
+  void _onSectionRequest() {
+    final req = _shell?.sectionRequest.value;
+    if (req == null || req.n == _handledRequest) return;
+    _handledRequest = req.n;
+    final id = req.section;
+    if (_layout.collapsed.contains(id)) {
+      _setLayout(_layout.toggleCollapsed(id));
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final ctx = _sectionKeys[id]?.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(ctx,
+            duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+      }
+      _sectionKeys[id]?.currentState?.showAll();
+    });
+    WidgetsBinding.instance.scheduleFrame();
+  }
+
   ShellController? _shell;
 
   @override
@@ -221,10 +282,14 @@ class _ChatsScreenState extends State<ChatsScreen> {
     final shell = ShellScope.maybeOf(context);
     if (!identical(shell, _shell)) {
       _shell?.removeListener(_onShellChanged);
+      _shell?.sectionRequest.removeListener(_onSectionRequest);
       shell?.addListener(_onShellChanged);
+      shell?.sectionRequest.addListener(_onSectionRequest);
+      _handledRequest = shell?.sectionRequest.value?.n ?? 0;
     }
     _shell = shell;
     _publishActivity();
+    _publishSections();
     // The profile button of the shell signs out through the home.
     if (_profile != null) _shell?.onUser = _settings;
   }
@@ -262,6 +327,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
   @override
   void dispose() {
     _shell?.removeListener(_onShellChanged);
+    _shell?.sectionRequest.removeListener(_onSectionRequest);
+    _shell?.homeSections.value = const [];
     _shell?.activity.value = null;
     if (_shell?.onUser == _settings) _shell?.onUser = null;
     super.dispose();
@@ -666,7 +733,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   /// One section of the home, with the layout's fold state and hold menu.
   Widget _sectionFor(HomeSection id, AppColors c) {
-    final key = ValueKey(id);
     final kind = _searchKind(id);
     final fold = (
       collapsed: _layout.collapsed.contains(id),
@@ -676,7 +742,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
       section: id,
       onSearch: kind == null ? null : () => _search(kind),
       plus: _plusFor(id),
+      onCount: (n) => _noteCount(id, n),
     );
+    final key = _sectionKeys[id] ??= GlobalKey<_SectionState<dynamic>>();
     switch (id) {
       case HomeSection.notifications:
         return _Section<NotificationItem>(
@@ -892,11 +960,18 @@ class _SectionState<T> extends State<_Section<T>>
         _list = list;
         _error = null;
       });
+      widget.fold.onCount(list.length);
     }, onError: (Object e) {
       if (!mounted || widget.future != future) return;
       // Keep what is on screen; an error shows only when there is nothing.
       if (_list == null) setState(() => _error = e);
     });
+  }
+
+  /// Opens the section's full list (the heading's All button), if it has rows.
+  void showAll() {
+    final list = _list;
+    if (list != null && list.isNotEmpty) widget.onShowAll(list);
   }
 
   /// The heading's title: a tap folds the section, a hold opens the menu to

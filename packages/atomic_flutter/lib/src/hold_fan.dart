@@ -60,6 +60,10 @@ class HoldFan<T> extends StatefulWidget {
   /// rows each an icon and a label, and a hold opens that same card.
   final bool tapOpensMenu;
 
+  /// Draw the list as the menu card (an icon and a label per row) also
+  /// when a tap does [onTap]: a hold opens the card, a drag picks a row.
+  final bool cardMenu;
+
   /// With [tapOpensMenu]: the card opens as the finger goes down, with no
   /// wait for a hold. Moving the finger more than [holdFanDragSlop] drags
   /// through the rows (the one under it marked) and letting go picks one,
@@ -112,6 +116,7 @@ class HoldFan<T> extends StatefulWidget {
     required this.onSelected,
     this.onTap,
     this.tapOpensMenu = false,
+    this.cardMenu = false,
     this.opensOnDown = false,
     this.defaultIndex = 0,
     this.tooltip,
@@ -318,7 +323,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
       bounds.right - media.padding.right,
       bounds.bottom,
     );
-    final card = widget.tapOpensMenu;
+    final card = widget.tapOpensMenu || widget.cardMenu;
     final sizes = [
       for (final item in _shown)
         card
