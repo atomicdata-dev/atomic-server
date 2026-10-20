@@ -136,16 +136,23 @@ export interface DeclaredDestinationTable {
  * Declare `table`, `tables` or both; each table needs its own row class.
  * Repeating setup resumes the same resources, so adding a table to `tables` in
  * a later release only creates the new one.
+ *
+ * A property or class may name an existing term to reuse as `subject` (an
+ * `https` URL, such as a shared ontology's), which `ensureSchema` binds to
+ * without editing or copying it, after checking it is a Property of the
+ * declared datatype or a Class.
  */
 export interface DeclaredDestination {
   schema: {
     properties: {
+      subject?: string;
       shortname: string;
       name: string;
       description: string;
       datatype: string;
     }[];
     classes: {
+      subject?: string;
       shortname: string;
       name: string;
       description: string;
@@ -982,6 +989,29 @@ function validateDestination(
     return value as string;
   };
 
+  // A term to reuse instead of minting one: absolute https, no credentials.
+  const subject = (value: unknown, what: string) => {
+    if (value === undefined) return {};
+    const url = text(value, `${what} subject`);
+    let parsed: URL | undefined;
+
+    try {
+      parsed = new URL(url);
+    } catch {
+      parsed = undefined;
+    }
+
+    if (
+      parsed?.protocol !== 'https:' ||
+      parsed.username ||
+      parsed.password ||
+      parsed.href !== url
+    )
+      fail(`${what} subject must be an https URL`);
+
+    return { subject: url };
+  };
+
   const shortnames = (value: unknown, what: string) => {
     if (value === undefined) return [];
     if (!Array.isArray(value)) fail(`${what} must be a list`);
@@ -1000,6 +1030,7 @@ function validateDestination(
     fail('schema needs properties and classes lists');
   const properties = (schema.properties as unknown[]).map(raw => {
     const property = object(raw, [
+      'subject',
       'shortname',
       'name',
       'description',
@@ -1012,6 +1043,7 @@ function validateDestination(
       fail(`unsupported datatype ${datatype}`);
 
     return {
+      ...subject(property.subject, 'property'),
       shortname,
       name: text(property.name, 'property name'),
       description: text(property.description, 'property description'),
@@ -1023,6 +1055,7 @@ function validateDestination(
     fail('property shortnames must be unique, at most 64');
   const classes = (schema.classes as unknown[]).map(raw => {
     const klass = object(raw, [
+      'subject',
       'shortname',
       'name',
       'description',
@@ -1037,6 +1070,7 @@ function validateDestination(
       fail(`class ${shortname} names an undeclared property`);
 
     return {
+      ...subject(klass.subject, 'class'),
       shortname,
       name: text(klass.name, 'class name'),
       description: text(klass.description, 'class description'),

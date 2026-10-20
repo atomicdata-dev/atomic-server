@@ -743,6 +743,65 @@
     }
   },
   {
+    "name": "v2 destination reusing shared terms by subject",
+    "file": "v2-destination-shared-terms.json",
+    "serialized": {
+      "schemaVersion": 2,
+      "name": "money",
+      "namespace": "example",
+      "version": "0.1.0",
+      "secrets": [],
+      "operations": [],
+      "destination": {
+        "schema": {
+          "properties": [
+            {
+              "subject": "https://vocab.example/ontology/properties/bank-amount",
+              "shortname": "bank-amount",
+              "name": "Amount",
+              "description": "Exact decimal string.",
+              "datatype": "https://atomicdata.dev/datatypes/string"
+            },
+            {
+              "shortname": "bank-source-id",
+              "name": "Source identity",
+              "description": "The importer's own identity for a row.",
+              "datatype": "https://atomicdata.dev/datatypes/string"
+            }
+          ],
+          "classes": [
+            {
+              "subject": "https://vocab.example/ontology/classes/bank-transaction-v1",
+              "shortname": "bank-transaction",
+              "name": "Bank transaction",
+              "description": "One booked entry, of a shared class.",
+              "requires": [
+                "bank-amount"
+              ]
+            }
+          ]
+        },
+        "table": {
+          "name": "Bank transactions",
+          "rowClass": "bank-transaction",
+          "columns": [
+            "bank-amount"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "v2 destination property subject that is not https",
+    "file": "v2-destination-subject-not-https.json",
+    "error": "destination: property subject must be an https URL"
+  },
+  {
+    "name": "v2 destination class subject that is not a URL",
+    "file": "v2-destination-class-subject-relative.json",
+    "error": "destination: class subject must be an https URL"
+  },
+  {
     "name": "v2 destination without any table",
     "file": "v2-destination-no-table.json",
     "error": "destination: declare `table` or `tables`"

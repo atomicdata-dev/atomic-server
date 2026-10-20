@@ -79,6 +79,35 @@ describe('provisionDestination', () => {
     );
   });
 
+  it('binds a table to a shared class reused by subject, without writing it', async () => {
+    const { store, resources, childrenOf } = setup();
+    const shared = 'https://vocab.example/ontology/classes/bank-transaction-v1';
+    const amount = 'https://vocab.example/ontology/properties/bank-amount';
+    resources.set(shared, { [core.properties.isA]: [core.classes.class] });
+    resources.set(amount, {
+      [core.properties.isA]: [core.classes.property],
+      [core.properties.datatype]: 'https://atomicdata.dev/datatypes/string',
+    });
+    const before = JSON.stringify([resources.get(shared), resources.get(amount)]);
+
+    const config = await provisionDestination(
+      store,
+      'drive',
+      'plugin',
+      destinationOf('v2-destination-shared-terms.json'),
+      'money',
+    );
+
+    expect(config.rowClass).toBe(shared);
+    expect(config.properties['bank-amount']).toBe(amount);
+    expect(config.properties['bank-source-id']).toMatch(/^local:minted-/);
+    const [[, table]] = childrenOf('plugin');
+    expect(table[core.properties.classtype]).toBe(shared);
+    expect(JSON.stringify([resources.get(shared), resources.get(amount)])).toBe(
+      before,
+    );
+  });
+
   it('sets up every table of a multi-class destination', async () => {
     const { store, resources, childrenOf, stored } = setup();
     const destination = destinationOf('v2-destination-tables.json');
