@@ -171,6 +171,12 @@ and whether it was fixed (commit) or not.
   know it yet flips from dark to light once the warm page boots (once only:
   it is saved).
 
+- 2026-10-20 (performance round): after the app was killed (force-stop,
+  `install -r`, an ANR), its store would not open three times: a redb
+  assertion (`raw_file_len >= header.layout().len()`) panics in `open_db`
+  and the app stays black. See "Store lost after a kill" in
+  `flutter-performance.md`.
+
 ## On a real device
 
 - HoldFan: a long press that stays as a menu, and the drag-to-pick, under a
