@@ -85,7 +85,7 @@ function appHistory() {
 }
 
 function reloadedStore(json: string, local: Uint8Array) {
-  const store = new Store({ serverUrl: 'https://example.com' });
+  const store = new Store({ serverUrl: 'https://example.com', connect: false });
   store.setDrive(DRIVE);
   store.finishDriveSync(DRIVE, 1, Date.now());
   store.setClientDb({

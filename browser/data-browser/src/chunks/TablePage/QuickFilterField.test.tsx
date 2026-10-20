@@ -73,7 +73,7 @@ interface Fixture {
 }
 
 async function fixture(): Promise<Fixture> {
-  const store = new Store({ serverUrl: 'https://example.com' });
+  const store = new Store({ serverUrl: 'https://example.com', connect: false });
 
   const make = async (subject: string, values: Record<string, unknown>) => {
     const resource = await store.newResource({ subject, noParent: true });
