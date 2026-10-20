@@ -31,10 +31,11 @@ const _listDrives = 4;
 ///
 /// The button of the page on top is shown as the current one (in the main
 /// colour) and does nothing; a page of the bar is never opened twice (see
-/// [ShellController.open]). A tap on New lists what to make: an AI chat (always
-/// a fresh one), a voice chat, a document or anything else the web app makes;
-/// holding it opens the same list and the finger drags to a choice
-/// ([HoldFan]). Search has the drives on touch and hold.
+/// [ShellController.open]). New lists what to make as soon as the finger is
+/// down: an AI chat (always a fresh one), a voice chat, a document or anything
+/// else the web app makes. Lifted at once, the list waits for a tap; moved,
+/// the finger drags to a choice and lets go on it ([HoldFan.opensOnDown]).
+/// Search has the drives on touch and hold.
 ///
 /// On a tablet ([ShellLayout.split]) the bar spans the window under both
 /// panes, its buttons in a group in the middle. Home and Search then show what
@@ -150,7 +151,8 @@ class AppBottomBar extends StatelessWidget {
                             tooltip: 'New',
                             selected: newCurrent,
                             tapOpensMenu: true,
-                            holdDuration: newHold,
+                            // The list at once; a drag from + picks.
+                            opensOnDown: true,
                             items: newItems,
                             onSelected: (choice) => _new(context, choice),
                             child: _barIcon(context, Icons.add, newCurrent),
@@ -326,8 +328,10 @@ class ShellActions {
 /// The class of a chat room (a conversation), as the web app names it.
 const chatRoomClass = 'https://atomicdata.dev/classes/ChatRoom';
 
-/// How long a hold on New takes before the list opens for the drag.
-const newHold = Duration(milliseconds: 250);
+/// How long a hold on a New outside the bar (the home's Recents) takes
+/// before the list opens for the drag; the bar's opens as the finger goes
+/// down.
+const newHold = Duration(milliseconds: 150);
 
 /// What New offers.
 const newItems = [

@@ -259,6 +259,23 @@ void main() {
       expect(chat.voiceMode, isFalse);
     });
 
+    testWidgets('the list is there as the finger goes down; a drag picks',
+        (tester) async {
+      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpAndSettle();
+      final gesture = await tester.startGesture(tester.getCenter(
+          find.byWidgetPredicate((w) => w is HoldFan && w.tooltip == 'New')));
+      // No wait for a hold: the same frame.
+      await tester.pump();
+      expect(find.text('AI voice'), findsOneWidget);
+      await gesture.moveTo(tester.getCenter(find.text('AI voice')));
+      await tester.pump();
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(
+          tester.widget<ChatScreen>(find.byType(ChatScreen)).voiceMode, isTrue);
+    });
+
     testWidgets('AI chat from inside a chat with messages is a fresh chat',
         (tester) async {
       final api = _BarApi(

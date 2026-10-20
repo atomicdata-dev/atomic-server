@@ -60,6 +60,14 @@ class HoldFan<T> extends StatefulWidget {
   /// rows each an icon and a label, and a hold opens that same card.
   final bool tapOpensMenu;
 
+  /// With [tapOpensMenu]: the card opens as the finger goes down, with no
+  /// wait for a hold. Moving the finger more than [holdFanDragSlop] drags
+  /// through the rows (the one under it marked) and letting go picks one,
+  /// or, off the rows, closes the card; letting go without moving leaves it
+  /// open for a tap. For a button that is not in anything that scrolls (the
+  /// bottom bar): a scroll that starts on it would open the card.
+  final bool opensOnDown;
+
   final List<HoldFanItem<T>> items;
   final ValueChanged<T> onSelected;
 
@@ -104,10 +112,11 @@ class HoldFan<T> extends StatefulWidget {
     required this.onSelected,
     this.onTap,
     this.tapOpensMenu = false,
+    this.opensOnDown = false,
     this.defaultIndex = 0,
     this.tooltip,
     this.layout = HoldFanLayout.list,
-    this.holdDuration = const Duration(milliseconds: 180),
+    this.holdDuration = const Duration(milliseconds: 150),
     this.onOpen,
     this.menuLabel = 'More options',
     this.selected = false,
@@ -201,6 +210,10 @@ const _rowIcon = 24.0;
 const _rowGap = 14.0;
 const _rowMinWidth = 176.0;
 
+/// How far a finger that went down on an [HoldFan.opensOnDown] button moves
+/// before it is a drag through the rows rather than a tap.
+const holdFanDragSlop = 8.0;
+
 /// The list that is open now, if any (there is one at a time).
 _HoldFanState<dynamic>? _openList;
 
@@ -257,6 +270,15 @@ class _HoldFanState<T> extends State<HoldFan<T>>
       _show(finger: details.globalPosition, sticky: false);
 
   void _tapOpen() => _show(finger: null, sticky: true);
+
+  bool get _onDown =>
+      widget.opensOnDown && widget.tapOpensMenu && widget.items.isNotEmpty;
+
+  /// [HoldFan.opensOnDown]: the card at once, following the finger.
+  void _down(PointerDownEvent event) {
+    if (_open) return;
+    _show(finger: event.position, sticky: false);
+  }
 
   void _show({required Offset? finger, required bool sticky}) {
     widget.onOpen?.call();
@@ -383,7 +405,8 @@ class _HoldFanState<T> extends State<HoldFan<T>>
   void _move(PointerMoveEvent event) {
     final box = _overlayBox;
     if (!_open || box == null) return;
-    if ((event.position - _downAt).distance > kTouchSlop) _wandered = true;
+    final slop = _onDown ? holdFanDragSlop : kTouchSlop;
+    if ((event.position - _downAt).distance > slop) _wandered = true;
     final local = box.globalToLocal(event.position);
     final hit = holdFanHit(_rects, local, slop: _slop);
     if (hit != _hover.value) {
@@ -581,9 +604,13 @@ class _HoldFanState<T> extends State<HoldFan<T>>
   @override
   Widget build(BuildContext context) {
     final hold = widget.items.isNotEmpty;
-    final onTap = widget.tapOpensMenu && widget.items.isNotEmpty
-        ? _tapOpen
-        : widget.onTap;
+    final onDown = _onDown;
+    // Opened on the way down: no tap, no hold to wait for.
+    final onTap = onDown
+        ? null
+        : widget.tapOpensMenu && widget.items.isNotEmpty
+            ? _tapOpen
+            : widget.onTap;
     final rounded = widget.borderRadius;
     Widget target = rounded != null
         // A label: the wash hugs it, rounded, and no ripple spreads from the
@@ -618,7 +645,19 @@ class _HoldFanState<T> extends State<HoldFan<T>>
         child: target,
       );
     }
-    if (hold) {
+    if (onDown) {
+      // A raw pointer: nothing in the gesture arena to wait for.
+      target = Listener(
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: _down,
+        onPointerMove: _move,
+        onPointerUp: _up,
+        onPointerCancel: (_) {
+          if (!_sticky) _close();
+        },
+        child: target,
+      );
+    } else if (hold) {
       target = Listener(
         onPointerMove: _move,
         onPointerUp: _up,
@@ -644,6 +683,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
       button: true,
       selected: widget.selected,
       label: widget.tooltip,
+      onTap: onDown ? _tapOpen : null,
       onLongPress: hold ? _openMenu : null,
       onLongPressHint: hold ? widget.menuLabel : null,
       customSemanticsActions: hold

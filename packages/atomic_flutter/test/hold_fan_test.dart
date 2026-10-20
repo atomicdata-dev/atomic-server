@@ -350,6 +350,76 @@ void main() {
     expect(tapped, 1);
   });
 
+  group('opensOnDown', () {
+    Widget plus(List<String> picked) => MaterialApp(
+          theme: ThemeData(extensions: const [AppColors.light]),
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.bottomCenter,
+              child: HoldFan<String>(
+                tooltip: 'New',
+                tapOpensMenu: true,
+                opensOnDown: true,
+                items: const [
+                  HoldFanItem('AI chat', 'chat', icon: Icons.chat),
+                  HoldFanItem('Document', 'doc', icon: Icons.description),
+                ],
+                onSelected: picked.add,
+                child: const Icon(Icons.add),
+              ),
+            ),
+          ),
+        );
+
+    testWidgets('a drag right after the finger went down picks the row',
+        (tester) async {
+      final picked = <String>[];
+      await tester.pumpWidget(plus(picked));
+      final g =
+          await tester.startGesture(tester.getCenter(find.byIcon(Icons.add)));
+      await tester.pump();
+      expect(find.text('Document'), findsOneWidget);
+      await g.moveTo(tester.getCenter(find.text('Document')));
+      await tester.pump();
+      await g.up();
+      await tester.pumpAndSettle();
+      expect(picked, ['doc']);
+      expect(find.text('Document'), findsNothing);
+    });
+
+    testWidgets('a tap leaves the list open for a tap; outside closes it',
+        (tester) async {
+      final picked = <String>[];
+      await tester.pumpWidget(plus(picked));
+      await tester.tap(find.byIcon(Icons.add));
+      await tester.pumpAndSettle();
+      expect(find.text('AI chat'), findsOneWidget);
+      await tester.tapAt(const Offset(3, 3));
+      await tester.pumpAndSettle();
+      expect(find.text('AI chat'), findsNothing);
+      expect(picked, isEmpty);
+      await tester.tap(find.byIcon(Icons.add));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('AI chat'));
+      await tester.pumpAndSettle();
+      expect(picked, ['chat']);
+    });
+
+    testWidgets('a drag that ends off the rows picks nothing', (tester) async {
+      final picked = <String>[];
+      await tester.pumpWidget(plus(picked));
+      final g =
+          await tester.startGesture(tester.getCenter(find.byIcon(Icons.add)));
+      await tester.pump();
+      await g.moveBy(const Offset(-150, 0));
+      await tester.pump();
+      await g.up();
+      await tester.pumpAndSettle();
+      expect(picked, isEmpty);
+      expect(find.text('AI chat'), findsNothing);
+    });
+  });
+
   test('the only layout is a list: no fan, no side list', () {
     expect(HoldFanLayout.values.map((l) => l.name), ['list']);
   });
