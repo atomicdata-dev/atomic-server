@@ -9,9 +9,10 @@ Menu item "Move..." (`actions/resourceActions.tsx`, `MoveResourceDialog.tsx`, `h
 - [ ] Screenshots + e2e (only if the smoke tier needs it)
 
 ## Other drive
-Done: `copyResourceTree` + `replaceWithRedirect` (`helpers/moveResource.ts`), the dialog's other-drive
-warning and "Leave a redirect at the old location" checkbox (off = original to Trash), and
-`routes/ShowRoute.tsx` following a stored `Redirect` to its `destination`.
+Done: `copyResourceTree` + `replaceWithRedirect` (`helpers/moveResource.ts`, the tree walk), the
+single-resource copy shared with forks (`copyResource` in `@tomic/lib` `copy.ts`), the dialog's
+other-drive warning and "Leave a redirect at the old location" checkbox (off = original to Trash), and
+`views/ResourcePage.tsx` following a stored `Redirect` (one with a `parent`; the invite answer has none).
 
 How it works: copy = fresh genesis ids, children via `parent`, references inside the copied set
 rewritten, rights not carried over (they follow the new parent). Files are copied by value; blobs
