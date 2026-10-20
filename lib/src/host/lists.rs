@@ -3,6 +3,8 @@
 //! per row.
 
 use super::{
+    own_profile::own_profile,
+    profiles::{same_agent, short_agent, AgentProfiles},
     recents::{ActivityKind, RecentsIndex},
     rows::{emoji_of, first_class, name_of, resource_row, row_resource, with_emoji, DriveCache},
 };
@@ -51,44 +53,134 @@ pub struct ActivityRow {
     pub kind: ActivityKind,
     /// Unix ms.
     pub at: i64,
-    /// Display name of the agent that did it; `None` when the store does not
-    /// know who, or does not have that agent's resource.
-    pub actor: Option<String>,
+    /// Subject of the agent that did it (never this device's own agent).
+    pub actor_subject: String,
+    /// Display name of that agent: its name when the store or the server's
+    /// profile has one, else the start of its key (`a3f9…`).
+    pub actor: String,
     pub name: String,
     pub class_name: String,
 }
 
-/// What changed lately in every drive, newest first, by whom. Read from the
-/// recents index, which the store's change events keep.
-pub async fn list_activity(store: &Db, recents: &RecentsIndex, limit: usize) -> Vec<ActivityRow> {
-    let mut names: HashMap<String, Option<String>> = Default::default();
-    let mut out = Vec::new();
-    for a in recents.activity(limit) {
-        let actor = match &a.actor {
-            None => None,
-            Some(agent) => match names.get(agent) {
-                Some(name) => name.clone(),
-                None => {
-                    let name = row_resource(store, &Subject::from(agent.as_str()))
-                        .await
-                        .map(|r| name_of(&r))
-                        .filter(|n| !n.is_empty());
-                    names.insert(agent.clone(), name.clone());
-                    name
-                }
-            },
-        };
-        out.push(ActivityRow {
-            subject: a.subject,
-            drive: a.drive,
-            kind: a.kind,
-            at: a.at,
-            actor,
-            name: a.name,
-            class_name: a.class_name,
-        });
+/// How long [`list_activity`] waits for the server's profiles of agents it
+/// cannot name from the store. The lookups go on after it; the next read has
+/// the names.
+const PROFILE_WAIT: std::time::Duration = std::time::Duration::from_millis(250);
+
+/// The name of `agent` as far as this device knows it without waiting: the
+/// own agent's from its profile ([`own_profile`]), another agent's from its
+/// resource in the store, else from the server's profile cache (starting a
+/// lookup when it is not cached). `None` when nothing names it yet.
+pub async fn agent_name(store: &Db, profiles: &AgentProfiles, agent: &str) -> Option<String> {
+    let own = store.get_default_agent().ok();
+    if own
+        .as_ref()
+        .is_some_and(|own| same_agent(&own.subject.to_string(), agent))
+    {
+        if let Some(name) = own.as_ref().and_then(|own| own.name.clone()) {
+            if !name.trim().is_empty() {
+                return Some(name);
+            }
+        }
+        return own_profile(store, profiles)
+            .await
+            .ok()
+            .and_then(|p| p["name"].as_str().map(str::to_string))
+            .filter(|n| !n.trim().is_empty());
     }
-    out
+    if let Some(name) = row_resource(store, &Subject::from(agent))
+        .await
+        .map(|r| name_of(&r))
+        .filter(|n| !n.trim().is_empty())
+    {
+        return Some(name);
+    }
+    profiles
+        .name_or_prefetch(agent)
+        .filter(|n| !n.trim().is_empty())
+}
+
+/// What other agents changed lately in the person's drives, newest first, by
+/// whom; `drive` keeps one drive's. This device's own agent's changes are
+/// left out (they are in Recents), in any spelling of its subject, and so are
+/// changes nobody can be named for (see [`super::recents`]). Read from the
+/// recents index, which the store's change events keep.
+pub async fn list_activity(
+    store: &Db,
+    recents: &RecentsIndex,
+    profiles: &AgentProfiles,
+    drive: Option<&str>,
+    limit: usize,
+) -> Vec<ActivityRow> {
+    let own = store
+        .get_default_agent()
+        .ok()
+        .map(|a| a.subject.to_string());
+    let drive = drive.map(drive_key);
+    let entries: Vec<_> = recents
+        .activity(usize::MAX)
+        .into_iter()
+        .filter(|a| {
+            let Some(actor) = a.actor.as_deref() else {
+                return false;
+            };
+            if own.as_deref().is_some_and(|own| same_agent(own, actor)) {
+                return false;
+            }
+            drive.as_ref().is_none_or(|d| drive_key(&a.drive) == *d)
+        })
+        .take(limit)
+        .collect();
+
+    let mut names: HashMap<String, Option<String>> = Default::default();
+    for a in &entries {
+        let agent = a.actor.clone().unwrap_or_default();
+        if let std::collections::hash_map::Entry::Vacant(slot) = names.entry(agent.clone()) {
+            slot.insert(agent_name(store, profiles, &agent).await);
+        }
+    }
+    // Give the server's profiles a moment; the lookups started above.
+    let unnamed: Vec<String> = names
+        .iter()
+        .filter(|(_, n)| n.is_none())
+        .map(|(a, _)| a.clone())
+        .collect();
+    if !unnamed.is_empty() {
+        let lookups = futures::future::join_all(unnamed.iter().map(|a| profiles.get(a)));
+        let _ = tokio::time::timeout(PROFILE_WAIT, lookups).await;
+        for agent in unnamed {
+            let name = profiles.name_or_prefetch(&agent);
+            names.insert(agent, name);
+        }
+    }
+
+    entries
+        .into_iter()
+        .map(|a| {
+            let actor_subject = a.actor.unwrap_or_default();
+            let actor = names
+                .get(&actor_subject)
+                .cloned()
+                .flatten()
+                .unwrap_or_else(|| short_agent(&actor_subject));
+            ActivityRow {
+                subject: a.subject,
+                drive: a.drive,
+                kind: a.kind,
+                at: a.at,
+                actor_subject,
+                actor,
+                name: a.name,
+                class_name: a.class_name,
+            }
+        })
+        .collect()
+}
+
+/// A drive's subject in one spelling (`did:ad:` / `atomic:`, without a
+/// query), for comparing drives.
+fn drive_key(drive: &str) -> String {
+    crate::identifiers::canonicalize_scheme(&Subject::from(drive).pure_id())
 }
 
 /// The `limit` resources of `drive` this device opened last, newest first, as
@@ -186,7 +278,11 @@ pub fn search(
 ) -> AtomicResult<Vec<Json>> {
     let scoped = drive.is_some_and(|d| !d.is_empty());
     // Room to move the person's things forward past schema hits.
-    let fetch = if scoped { limit } else { limit.saturating_mul(4) };
+    let fetch = if scoped {
+        limit
+    } else {
+        limit.saturating_mul(4)
+    };
     let opts = crate::client::search::SearchOpts {
         limit: Some(fetch as u32),
         parents: drive.filter(|d| !d.is_empty()).map(|d| vec![d.to_string()]),
@@ -583,9 +679,30 @@ mod tests {
         assert_eq!(icons[&with], "🦊");
     }
 
+    /// Answers one profile for every agent.
+    struct Named(&'static str);
+
+    #[async_trait::async_trait]
+    impl crate::host::AgentProfileFetcher for Named {
+        async fn fetch_agent_resource(&self, _agent: &str) -> Option<String> {
+            Some(json!({ urls::NAME: self.0 }).to_string())
+        }
+    }
+
+    /// `agent` renames `subject` with a commit applied here (as a commit frame
+    /// would).
+    async fn edit_as(d: &Device, agent: &crate::agents::Agent, subject: &str, name: &str) {
+        let mut r = d.store.get_resource(&subject.into()).await.unwrap();
+        r.set_string(urls::NAME.into(), name, &d.store)
+            .await
+            .unwrap();
+        r.save_as(agent, &d.store).await.unwrap();
+    }
+
     #[tokio::test]
-    async fn activity_follows_creates_and_deletes_and_skips_chats() {
+    async fn activity_is_what_other_agents_did() {
         let d = Device::new().await;
+        let none = AgentProfiles::none();
         let mut rx = d.store.subscribe_events();
         let folder = d
             .store
@@ -594,32 +711,97 @@ mod tests {
             .unwrap();
         let chat = d.new_chat("Activity chat").await;
         d.pump(&mut rx).await;
+        // The index saw the own creation, signed by this device's agent...
+        let raw = d.recents.activity(500);
+        let own = raw.iter().find(|a| a.subject == folder).unwrap();
+        assert_eq!(own.kind, ActivityKind::Created);
+        assert!(own.actor.is_some());
+        // ...but that is the person's own work, not activity.
+        assert!(list_activity(&d.store, &d.recents, &none, None, 500)
+            .await
+            .is_empty());
 
-        let list = list_activity(&d.store, &d.recents, 500).await;
-        let entry = list.iter().find(|a| a.subject == folder).unwrap();
-        assert_eq!(entry.kind, ActivityKind::Created);
-        assert_eq!(entry.name, "Activity folder");
-        assert!(entry.at > 0);
+        // Another member edits it, a few times in a row: one entry.
+        let bob = crate::agents::Agent::new(Some("Bob")).unwrap();
+        for name in ["By Bob", "By Bob again", "By Bob, final"] {
+            edit_as(&d, &bob, &folder, name).await;
+        }
+        d.pump(&mut rx).await;
+        let list = list_activity(&d.store, &d.recents, &none, None, 500).await;
+        assert_eq!(list.len(), 1, "{list:?}");
+        let entry = &list[0];
+        assert_eq!(entry.subject, folder);
+        assert_eq!(entry.kind, ActivityKind::Changed);
+        assert_eq!(entry.name, "By Bob, final");
+        assert_eq!(entry.drive, d.drive);
+        assert!(same_agent(&entry.actor_subject, &bob.subject.to_string()));
+        // Nobody can name Bob here: the start of his key, never "someone".
+        assert_eq!(entry.actor, short_agent(&bob.subject.to_string()));
+        assert!(entry.actor.ends_with('…'));
         assert!(list.iter().all(|a| a.subject != chat));
-        // The signer comes from the stored commit, and is named.
-        let raw = d
-            .recents
-            .activity(500)
-            .into_iter()
-            .find(|a| a.subject == folder)
-            .unwrap();
-        assert!(raw.actor.is_some());
-        assert_eq!(entry.actor.as_deref(), Some("Test device"));
 
-        d.store
-            .remove_resource(&folder.as_str().into())
+        // A second member is a row of their own; the person's own edit after
+        // them adds nothing and takes nothing away.
+        let carol = crate::agents::Agent::new(Some("Carol")).unwrap();
+        edit_as(&d, &carol, &folder, "By Carol").await;
+        d.pump(&mut rx).await;
+        let mut own_edit = d.store.get_resource(&folder.as_str().into()).await.unwrap();
+        own_edit
+            .set_string(urls::NAME.into(), "By me", &d.store)
             .await
             .unwrap();
+        d.node.save_locally(&mut own_edit).await.unwrap();
         d.pump(&mut rx).await;
-        let list = list_activity(&d.store, &d.recents, 500).await;
-        let entry = list.iter().find(|a| a.subject == folder).unwrap();
-        assert_eq!(entry.kind, ActivityKind::Deleted);
-        assert_eq!(entry.name, "Activity folder");
+        let named = AgentProfiles::new(std::sync::Arc::new(Named("Carol")));
+        let list = list_activity(&d.store, &d.recents, &named, None, 500).await;
+        let actors: Vec<&str> = list.iter().map(|a| a.actor.as_str()).collect();
+        assert_eq!(list.len(), 2, "{actors:?}");
+        // Newest first; the server's profile names Carol (and here Bob too).
+        assert!(same_agent(
+            &list[0].actor_subject,
+            &carol.subject.to_string()
+        ));
+        assert_eq!(list[0].actor, "Carol");
+        assert!(same_agent(&list[1].actor_subject, &bob.subject.to_string()));
+
+        // The drive filter.
+        assert_eq!(
+            list_activity(&d.store, &d.recents, &none, Some(&d.drive), 500)
+                .await
+                .len(),
+            2
+        );
+        assert!(
+            list_activity(&d.store, &d.recents, &none, Some("did:ad:elsewhere"), 500)
+                .await
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn agents_are_named_from_the_own_profile_the_store_or_the_server() {
+        let d = Device::new().await;
+        let none = AgentProfiles::none();
+        let own = d.store.get_default_agent().unwrap().subject.to_string();
+        // The own agent, also when spelled `atomic:`.
+        assert_eq!(
+            agent_name(&d.store, &none, &own).await.as_deref(),
+            Some("Test device")
+        );
+        let atomic = crate::identifiers::canonicalize_scheme(&own);
+        assert_eq!(
+            agent_name(&d.store, &none, &atomic).await.as_deref(),
+            Some("Test device")
+        );
+        // Another agent the store does not hold: the server's profile.
+        let bob = crate::agents::Agent::new(None).unwrap().subject.to_string();
+        assert_eq!(agent_name(&d.store, &none, &bob).await, None);
+        let named = AgentProfiles::new(std::sync::Arc::new(Named("Bob")));
+        named.get(&bob).await;
+        assert_eq!(
+            agent_name(&d.store, &named, &bob).await.as_deref(),
+            Some("Bob")
+        );
     }
 
     /// Times the home lists over 3 drives x 20 resources (run with
@@ -675,7 +857,9 @@ mod tests {
             store.get_resource_shallow_call_count(),
         );
         let t = std::time::Instant::now();
-        let activity = list_activity(store, &d.recents, 30).await.len();
+        let activity = list_activity(store, &d.recents, &AgentProfiles::none(), None, 30)
+            .await
+            .len();
         let activity_ms = t.elapsed().as_secs_f64() * 1000.0;
         println!(
             "[timing] recents {rows} rows over {} drives: {recents_ms:.1} ms (full reads {full}, shallow {shallow}); activity {activity} rows: {activity_ms:.1} ms",

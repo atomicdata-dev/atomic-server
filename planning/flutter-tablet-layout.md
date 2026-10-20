@@ -24,7 +24,8 @@ next to a 290 dp list, and rotating a tablet keeps one structure.
 
 - **Rail** (`AppNavRail`, 80 dp, `barSurface`): Home, Search, New, Profile,
   Settings, each with its name under it, the current one in the main colour.
-  Search and New keep their hold menus; on the rail they open to the right
+  Search keeps its hold menu and New lists its kinds on a tap (and on a
+  hold, to drag through); on the rail both open to the right
   of the button (`HoldFanLayout.side` in `atomic_flutter`). In the split
   layout Home and Search show what the list pane holds, the others what the
   detail pane shows (two can be current: the home list next to Settings).
@@ -67,14 +68,15 @@ next to a 290 dp list, and rotating a tablet keeps one structure.
 - [x] `HoldFanLayout.side` for the rail.
 - [x] Search in the list pane takes the focus even when the web page next
   to it had it (`autofocus` alone did not).
-- [x] New (+) always gives a new chat: a chat stops being "new" as soon as
-  something is sent (with a slow host the + did nothing from inside a chat
-  with messages); on an empty new chat the + focuses its field; on a voice
-  chat it opens a typed one (`ShellController.onReselect`).
+- [x] New (+): a tap lists AI chat, AI voice, Document, Other…; AI chat is
+  always a fresh chat (a chat stops being "new" as soon as something is
+  sent; on an empty new chat it focuses its field; on a voice chat it opens
+  a typed one, `ShellController.onReselect`). Hold opens the same list to
+  drag through. (Before: a tap on + was a new chat.)
 - [x] Tests: `tablet_layout_test.dart` (phone 393x851, tablet 800x1280 and
   1280x800, phone sideways 851x393, 640 wide rail-only, resizes between
   them keeping the same State objects and typed text, search moving, back,
-  rail at font 1.3 with 48 dp targets, the 720 cap), the rail fans in
+  rail at font 1.3 with 48 dp targets, the 720 cap), the rail lists in
   `bottom_bar_test.dart`, `hold_fan_test.dart`. Phone tests run at phone
   size by default (`test/flutter_test_config.dart`; the test default of
   800x600 is a tablet now).

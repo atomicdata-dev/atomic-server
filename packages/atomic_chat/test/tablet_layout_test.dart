@@ -204,6 +204,34 @@ void main() {
     await _done(tester);
   });
 
+  testWidgets('a tap on the rail\'s New lists the kinds right of it, on screen',
+      (tester) async {
+    _size(tester, _landscape);
+    await tester.pumpWidget(_shell(_api()));
+    await _settle(tester);
+    final button = tester.getRect(find.descendant(
+        of: find.byType(AppNavRail), matching: find.byTooltip('New')));
+    await tester.tap(find.byTooltip('New'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    final screen = _landscape;
+    var lastTop = -1.0;
+    for (final t in ['AI chat', 'AI voice', 'Document', 'Other…']) {
+      final r = tester.getRect(find.text(t));
+      expect(r.left, greaterThan(button.right), reason: t);
+      expect(r.right, lessThanOrEqualTo(screen.width), reason: t);
+      expect(r.bottom, lessThanOrEqualTo(screen.height), reason: t);
+      expect(r.top, greaterThan(lastTop), reason: t);
+      lastTop = r.top;
+    }
+    // A fresh chat from the list opens in the detail pane.
+    await tester.tap(find.text('AI chat'));
+    await _settle(tester);
+    expect(find.byType(ChatScreen), findsOneWidget);
+    expect(find.text('AI voice'), findsNothing);
+    await _done(tester);
+  });
+
   testWidgets('the rail opens Settings, Profile and a new chat in the detail',
       (tester) async {
     _size(tester, _portrait);
@@ -393,9 +421,10 @@ void main() {
           reason: tip);
     }
     for (final tip in ['Search', 'New']) {
-      final fan =
+      final button =
           find.byWidgetPredicate((w) => w is HoldFan && w.tooltip == tip);
-      expect(tester.getSize(fan).height, greaterThanOrEqualTo(48), reason: tip);
+      expect(tester.getSize(button).height, greaterThanOrEqualTo(48),
+          reason: tip);
     }
     await _done(tester);
   });

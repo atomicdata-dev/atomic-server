@@ -10,7 +10,7 @@
 mod tests;
 
 use super::simple::state::{connected_server, db, err, node};
-use crate::host::{chat_rooms, conversations, pusher, recents, to_json};
+use crate::host::{chat_rooms, conversations, profiles, pusher, recents, to_json};
 use atomic_lib::host::{chats, lists, notifications};
 use flutter_rust_bridge::frb;
 
@@ -75,7 +75,9 @@ pub struct ActivityEntry {
 /// What changed lately in every drive, newest first, by whom. Read from the
 /// recents index, which the store's change events keep.
 pub async fn list_activity(limit: u32) -> Result<Vec<ActivityEntry>, String> {
-    let rows = lists::list_activity(db()?, recents(), limit as usize).await;
+    // Other agents' changes only (the person's own are Recents), each named:
+    // by the store, the server's profile, or the start of its key.
+    let rows = lists::list_activity(db()?, recents(), &profiles(), None, limit as usize).await;
     Ok(rows
         .into_iter()
         .map(|a| ActivityEntry {
@@ -83,7 +85,7 @@ pub async fn list_activity(limit: u32) -> Result<Vec<ActivityEntry>, String> {
             drive: a.drive,
             kind: a.kind.as_str().to_string(),
             at: a.at,
-            actor: a.actor,
+            actor: Some(a.actor),
             name: a.name,
             class_name: a.class_name,
         })

@@ -158,7 +158,7 @@ async fn favorites_come_from_the_private_drive_newest_first() {
 }
 
 #[tokio::test]
-async fn activity_follows_creates_and_deletes() {
+async fn activity_lists_other_agents_changes_not_the_own() {
     let drive = shared_drive().await.to_string();
     let store = db().unwrap();
     let mut rx = store.subscribe_events();
@@ -167,20 +167,24 @@ async fn activity_follows_creates_and_deletes() {
         .await
         .unwrap();
     pump(&mut rx).await;
-
+    // Made here, by the person: Recents, not Activity.
     let list = list_activity(500).await.unwrap();
-    let entry = list.iter().find(|a| a.subject == folder).unwrap();
-    assert_eq!(entry.kind, "created");
-    assert_eq!(entry.name, "Activity folder");
+    assert!(list.iter().all(|a| a.subject != folder));
 
-    store
-        .remove_resource(&folder.as_str().into())
+    // Another member renames it.
+    let bob = Agent::new(Some("Bob")).unwrap();
+    let mut r = store.get_resource(&folder.as_str().into()).await.unwrap();
+    r.set_string(urls::NAME.into(), "Renamed by Bob", store.as_ref())
         .await
         .unwrap();
+    r.save_as(&bob, store.as_ref()).await.unwrap();
     pump(&mut rx).await;
     let list = list_activity(500).await.unwrap();
     let entry = list.iter().find(|a| a.subject == folder).unwrap();
-    assert_eq!(entry.kind, "deleted");
+    assert_eq!(entry.kind, "changed");
+    assert_eq!(entry.name, "Renamed by Bob");
+    let actor = entry.actor.as_deref().unwrap();
+    assert!(!actor.is_empty() && actor != "Someone", "{actor}");
 }
 
 #[tokio::test]

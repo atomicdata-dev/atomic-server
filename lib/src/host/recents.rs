@@ -8,13 +8,15 @@
 //! in every drive. Now a listener on the store's change events keeps a small
 //! index: the newest entry time of each AI chat (chats belong to the person,
 //! so across all drives), per drive the resources this device opened
-//! recently, and an activity log. It lives in `recents.json` in a directory
-//! the host names ([`RecentsIndex::load`]), is local to the device (opening a
-//! resource commits nothing), and is rebuilt from the store when it is
-//! missing or the listener fell behind.
+//! recently, and an activity log (every agent's changes, this device's own
+//! included; [`super::lists::list_activity`] leaves those out). It lives in
+//! `recents.json` in a directory the host names ([`RecentsIndex::load`]), is
+//! local to the device (opening a resource commits nothing), and is rebuilt
+//! from the store when it is missing or the listener fell behind.
 
 use super::{
     chats::chat_entries,
+    profiles::same_agent,
     rows::{class_name_of, name_of, row_resource, AI_CHAT},
 };
 use crate::{db::DbEvent, errors::AtomicResult, urls, Db, Resource, Storelike, Subject};
@@ -137,13 +139,46 @@ fn is_ai_chat(resource: &Resource) -> bool {
         .is_some_and(|classes| classes.iter().any(|c| c == AI_CHAT))
 }
 
-/// Put `new` in the log: one entry per subject, newest first, bounded.
+/// Whether two actors of the log are the same agent (both unknown counts as
+/// the same).
+fn same_actor(a: Option<&str>, b: Option<&str>) -> bool {
+    match (a, b) {
+        (Some(a), Some(b)) => same_agent(a, b),
+        (None, None) => true,
+        _ => false,
+    }
+}
+
+/// Put `new` in the log: one entry per subject and agent, newest first,
+/// bounded. Two agents editing one resource are two entries; one agent
+/// editing it many times is one, with the latest time.
 ///
 /// Changes to a subject within [`BURST_MS`] of its entry update that entry; a
-/// resource created a moment ago is still reported as created.
+/// resource created a moment ago is still reported as created. A change whose
+/// signer is not known joins the subject's entry of that burst. A deletion
+/// replaces every entry of the subject: the resource is gone.
 fn record_activity(recents: &mut Recents, mut new: Activity) {
     let log = &mut recents.activity;
-    if let Some(i) = log.iter().position(|a| a.subject == new.subject) {
+    if new.kind == ActivityKind::Deleted {
+        let mut i = 0;
+        while i < log.len() {
+            if log[i].subject == new.subject {
+                let old = log.remove(i);
+                if new.name.is_empty() {
+                    new.name = old.name;
+                }
+                if new.class_name.is_empty() {
+                    new.class_name = old.class_name;
+                }
+            } else {
+                i += 1;
+            }
+        }
+    } else if let Some(i) = log.iter().position(|a| {
+        a.subject == new.subject
+            && (same_actor(a.actor.as_deref(), new.actor.as_deref())
+                || (new.actor.is_none() && (new.at - a.at).abs() < BURST_MS))
+    }) {
         let old = log.remove(i);
         let burst = new.kind == ActivityKind::Changed
             && old.kind != ActivityKind::Deleted
@@ -154,12 +189,22 @@ fn record_activity(recents: &mut Recents, mut new: Activity) {
         if new.actor.is_none() && burst {
             new.actor = old.actor;
         }
+        // An entry written before the agent was known keeps its place.
+        new.at = new.at.max(old.at);
         if new.name.is_empty() {
             new.name = old.name;
         }
         if new.class_name.is_empty() {
             new.class_name = old.class_name;
         }
+        // A deletion that is followed by a change: the resource is back, and
+        // other agents' entries of it may no longer hold.
+        if old.kind == ActivityKind::Deleted {
+            log.retain(|a| a.subject != new.subject);
+        }
+    } else {
+        // A resource that was deleted and is back.
+        log.retain(|a| !(a.subject == new.subject && a.kind == ActivityKind::Deleted));
     }
     let at = log.partition_point(|a| a.at > new.at);
     log.insert(at, new);
@@ -198,6 +243,65 @@ fn latest_signer(store: &Db, subject: &str) -> Option<(String, i64)> {
     let json: serde_json::Value = serde_json::from_str(&envelope.json).ok()?;
     let signer = json.get(urls::SIGNER)?.as_str()?.to_string();
     Some((signer, envelope.created_at))
+}
+
+/// How old the newest kept commit may be and still be taken for the signer
+/// of a change that arrived as plain state (ms).
+const FRESH_ENVELOPE_MS: i64 = 2 * 60_000;
+
+/// Who made a change, when, and whether it made the resource.
+///
+/// - A change a commit made here (this device's own edit, or a commit frame)
+///   is that commit's: its envelope is the newest one kept.
+/// - A resource first seen as plain state (the server's `UPDATE` frames carry
+///   no signer) and made a moment ago names its creator in its genesis
+///   change (`createdBy`).
+/// - Any other change that arrived as plain state is only attributed when a
+///   commit envelope came with it (a sync push carries them), i.e. the
+///   newest kept envelope is fresh. An older envelope describes an earlier
+///   change, often this device's own, and would put the wrong name on it;
+///   such a change stays unattributed.
+///
+/// The store is read when the event is handled, so a commit that lands
+/// before the listener gets to the previous one's event lends it its signer;
+/// the listener runs as the events come, so in practice that is a burst of
+/// one agent's own edits.
+fn attribute(
+    store: &Db,
+    subject: &str,
+    resource: &Resource,
+    is_new: bool,
+    from_commit: bool,
+    first_seen: bool,
+) -> (Option<String>, i64, bool) {
+    let now = crate::utils::now();
+    let latest = latest_signer(store, subject);
+    if from_commit {
+        return match latest {
+            Some((actor, at)) => (Some(actor), at, is_new),
+            None => (None, now, is_new),
+        };
+    }
+    let created_at = resource
+        .get(urls::CREATED_AT)
+        .ok()
+        .and_then(|v| v.to_int().ok());
+    let just_made =
+        is_new || (first_seen && created_at.is_some_and(|at| (now - at).abs() < FRESH_ENVELOPE_MS));
+    if just_made {
+        let creator = resource
+            .get(urls::CREATED_BY)
+            .ok()
+            .map(|v| v.to_string())
+            .filter(|s| !s.is_empty());
+        if creator.is_some() {
+            return (creator, created_at.unwrap_or(now), true);
+        }
+    }
+    match latest {
+        Some((actor, at)) if now - at < FRESH_ENVELOPE_MS => (Some(actor), at, is_new),
+        _ => (None, now, is_new),
+    }
 }
 
 impl RecentsIndex {
@@ -243,7 +347,14 @@ impl RecentsIndex {
         });
     }
 
-    async fn note_changed(&self, store: &Db, subject: &Subject, resource: &Resource, is_new: bool) {
+    async fn note_changed(
+        &self,
+        store: &Db,
+        subject: &Subject,
+        resource: &Resource,
+        is_new: bool,
+        from_commit: bool,
+    ) {
         let id = subject.to_string();
         if is_activity_noise(&id, resource) {
             return;
@@ -252,14 +363,12 @@ impl RecentsIndex {
             Ok(drive) => drive.to_string(),
             Err(_) => return,
         };
-        let (actor, at) = match latest_signer(store, &id) {
-            Some((actor, at)) => (Some(actor), at),
-            None => (None, crate::utils::now()),
-        };
+        let first_seen = self.with(|s| s.recents.activity.iter().all(|a| a.subject != id));
+        let (actor, at, created) = attribute(store, &id, resource, is_new, from_commit, first_seen);
         let new = Activity {
             subject: id,
             drive,
-            kind: if is_new {
+            kind: if created {
                 ActivityKind::Created
             } else {
                 ActivityKind::Changed
@@ -297,7 +406,10 @@ impl RecentsIndex {
     pub async fn handle_event(&self, store: &Db, event: DbEvent) {
         match event {
             DbEvent::Changed {
-                subject, is_new, ..
+                subject,
+                is_new,
+                from_commit,
+                ..
             } => {
                 let Ok(resource) = store.get_resource(&subject).await else {
                     return;
@@ -320,7 +432,8 @@ impl RecentsIndex {
                         self.bump_chat(&parent, page_last_activity(&resource));
                     }
                 } else {
-                    self.note_changed(store, &subject, &resource, is_new).await;
+                    self.note_changed(store, &subject, &resource, is_new, from_commit)
+                        .await;
                 }
             }
             DbEvent::Destroyed {
@@ -537,6 +650,134 @@ mod tests {
     }
 
     #[test]
+    fn two_agents_on_one_resource_are_two_entries() {
+        let mut r = Recents::default();
+        record_activity(&mut r, entry("a", ActivityKind::Changed, 1_000));
+        let mut other = entry("a", ActivityKind::Changed, 2_000);
+        other.actor = Some("did:ad:agent:b".into());
+        record_activity(&mut r, other.clone());
+        // The first agent again, in the other spelling: still its own entry.
+        let mut again = entry("a", ActivityKind::Changed, 3_000);
+        again.actor = Some("atomic:agent:a".into());
+        record_activity(&mut r, again);
+        assert_eq!(
+            log(&r),
+            vec![
+                ("a", ActivityKind::Changed, 3_000),
+                ("a", ActivityKind::Changed, 2_000)
+            ]
+        );
+        // A deletion ends them all.
+        let mut gone = entry("a", ActivityKind::Deleted, 4_000);
+        gone.name = String::new();
+        record_activity(&mut r, gone);
+        assert_eq!(log(&r), vec![("a", ActivityKind::Deleted, 4_000)]);
+        assert_eq!(r.activity[0].name, "name of a");
+    }
+
+    #[tokio::test]
+    async fn own_changes_are_left_out_in_any_spelling() {
+        let d = Device::new().await;
+        let own = d.store.get_default_agent().unwrap().subject.to_string();
+        // The other spelling of the own agent than the store uses.
+        let as_atomic = match own.strip_prefix("atomic:") {
+            Some(rest) => format!("did:ad:{rest}"),
+            None => crate::identifiers::canonicalize_scheme(&own),
+        };
+        assert_ne!(own, as_atomic);
+        let other = crate::agents::Agent::new(None).unwrap().subject.to_string();
+        d.recents.with(|s| {
+            for (subject, actor, at) in [
+                ("did:ad:mine", own.as_str(), 1_000),
+                ("did:ad:mine-too", as_atomic.as_str(), 2_000),
+                ("did:ad:theirs", other.as_str(), 3_000),
+            ] {
+                let mut e = entry(subject, ActivityKind::Changed, at);
+                e.actor = Some(actor.into());
+                e.drive = d.drive.clone();
+                record_activity(&mut s.recents, e);
+            }
+            let mut unknown = entry("did:ad:nobody-knows", ActivityKind::Changed, 4_000);
+            unknown.actor = None;
+            record_activity(&mut s.recents, unknown);
+        });
+        let profiles = crate::host::profiles::AgentProfiles::none();
+        let list = lists::list_activity(&d.store, &d.recents, &profiles, None, 500).await;
+        let subjects: Vec<&str> = list.iter().map(|a| a.subject.as_str()).collect();
+        assert_eq!(subjects, ["did:ad:theirs"]);
+        assert_ne!(list[0].actor, "Someone");
+        // The drive filter reads both spellings of the drive.
+        let drive_atomic = crate::identifiers::canonicalize_scheme(&d.drive);
+        assert_eq!(
+            lists::list_activity(&d.store, &d.recents, &profiles, Some(&drive_atomic), 500)
+                .await
+                .len(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn a_resource_that_arrived_as_plain_state_is_its_creators() {
+        let d = Device::new().await;
+        let mut rx = d.store.subscribe_events();
+        // Bob makes a folder in the drive on his own device.
+        let elsewhere = Db::init_redb(None).await.unwrap();
+        let bob = crate::agents::Agent::new(Some("Bob")).unwrap();
+        let mut builder = crate::commit::CommitBuilder::new("placeholder".into());
+        builder.set(
+            urls::IS_A.into(),
+            crate::Value::ResourceArray(vec![urls::FOLDER.into()]),
+        );
+        builder.set(
+            urls::NAME.into(),
+            crate::Value::String("Bob's folder".into()),
+        );
+        builder.set(
+            urls::PARENT.into(),
+            crate::Value::AtomicUrl(d.drive.as_str().into()),
+        );
+        builder.set(
+            urls::DRIVE_PROP.into(),
+            crate::Value::AtomicUrl(d.drive.as_str().into()),
+        );
+        let commit = crate::Commit::create_did(builder, &bob, &elsewhere)
+            .await
+            .unwrap();
+        let subject = commit.subject.to_string();
+        elsewhere
+            .apply_commit(
+                commit,
+                &crate::commit::CommitOpts::no_validations_no_index(),
+            )
+            .await
+            .unwrap();
+        let state = elsewhere.get_loro_snapshot_bytes(&subject).unwrap();
+        // It reaches this device as the server sends it: state, no commit.
+        crate::sync::ws_apply::apply_state_update(&d.store, &subject, &state)
+            .await
+            .unwrap();
+        // And a resource that names nobody.
+        let anonymous = d
+            .synced("did:ad:anonymous-note", &d.drive, "Anonymous", None, None)
+            .await;
+        d.pump(&mut rx).await;
+
+        let raw = d.recents.activity(500);
+        let bobs = raw.iter().find(|a| a.subject == subject).unwrap();
+        assert!(same_agent(
+            bobs.actor.as_deref().unwrap(),
+            &bob.subject.to_string()
+        ));
+        assert_eq!(bobs.kind, ActivityKind::Created);
+        let profiles = crate::host::profiles::AgentProfiles::none();
+        let list = lists::list_activity(&d.store, &d.recents, &profiles, None, 500).await;
+        assert!(list
+            .iter()
+            .any(|a| a.subject == subject && a.name == "Bob's folder"));
+        assert!(list.iter().all(|a| a.subject != anonymous));
+    }
+
+    #[test]
     fn a_deletion_keeps_the_last_known_name_and_ends_the_burst() {
         let mut r = Recents::default();
         record_activity(&mut r, entry("a", ActivityKind::Changed, 1_000));
@@ -682,7 +923,8 @@ mod tests {
             "{chats:?}"
         );
         // Also when an older index already holds it.
-        d.recents.with(|s| s.recents.chats.insert(meeting.clone(), 7_000_000));
+        d.recents
+            .with(|s| s.recents.chats.insert(meeting.clone(), 7_000_000));
         let chats = d.recents.recent_chats(&d.store, 500).await.unwrap();
         assert!(chats.iter().all(|(subject, _, _)| subject != &meeting));
     }

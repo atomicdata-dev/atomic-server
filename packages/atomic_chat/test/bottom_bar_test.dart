@@ -59,7 +59,7 @@ class _SlowChatApi extends _BarApi {
 ShellController _controller(WidgetTester tester) =>
     tester.widget<ShellScope>(find.byType(ShellScope)).controller;
 
-/// Touch and hold the bar button with [tooltip]; the fan is open after.
+/// Touch and hold the bar button with [tooltip]; the list is open after.
 Future<TestGesture> _hold(WidgetTester tester, String tooltip) async {
   final gesture = await tester.startGesture(tester.getCenter(
       find.byWidgetPredicate((w) => w is HoldFan && w.tooltip == tooltip)));
@@ -155,7 +155,7 @@ void main() {
       expect(anchor!.center.dx, greaterThan(700));
     });
 
-    testWidgets('the + and Search fans open next to their own buttons',
+    testWidgets('the + and Search lists open next to their own buttons',
         (tester) async {
       wide(tester);
       await tester.pumpWidget(_shell(_BarApi()));
@@ -353,7 +353,7 @@ void main() {
   });
 
   group('Search hold', () {
-    testWidgets('a drive from the fan scopes the search, and x clears it',
+    testWidgets('a drive from the list scopes the search, and x clears it',
         (tester) async {
       final api = _BarApi();
       await tester.pumpWidget(_shell(api));
@@ -492,7 +492,7 @@ void main() {
       await tester.tap(find.byTooltip('Settings'));
       await tester.pumpAndSettle();
       expect(find.byType(ResourceView), findsOneWidget);
-      // Choosing AI chat from the fan while a new chat is on top: the same.
+      // Choosing AI chat from the list while a new chat is on top: the same.
       await tapNewChat(tester);
       await tester.pumpAndSettle();
       await _pick(tester, await _hold(tester, 'New'), 'AI chat');

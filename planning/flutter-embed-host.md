@@ -69,7 +69,7 @@ Each step ships on its own and has a test that fails without it.
   with the code (`packages/atomic_chat/test`, on fakes); CI runs both packages
   (`atomic-flutter.yml`).
 - [x] **0c. More from the bottom bar.** A reusable `HoldFan` (tap = default,
-  touch-and-hold-drag = a fan of choices, after the canvas fans;
+  touch-and-hold-drag = a vertical list of choices;
   `packages/atomic_flutter`) on New (AI chat, AI voice, Document, Other) and
   Search (all drives, the four drives used last, More…). New document is
   native: `NewDocumentSheet` → `AssistantApi.createResource` →
@@ -82,8 +82,9 @@ Each step ships on its own and has a test that fails without it.
   The bar shows the current page and never opens one twice (`ShellPage`
   route names, `ShellController.open`). Tests: `hold_fan_test.dart`,
   `bottom_bar_test.dart`, `host::create`, the bridge's
-  `a_document_created_here_…`. Not yet seen on a phone (haptics, fan
-  geometry under a real thumb, TTS completion before listening again).
+  `a_document_created_here_…`. Since changed: a tap on New lists the
+  choices (`tapOpensMenu`), a hold drags to one, and there is no fan layout
+  any more. Not yet seen on a phone (haptics, the list under a real thumb, TTS completion before listening again).
 - [x] **1. Commit transport and flush.** Store option `commitTransport`,
   `canCommit` for write-side checks, `atomicEmbed.flush()` and the Dart handshake
   before leaving a page. A keystroke now travels: loro-prosemirror commits the
@@ -260,6 +261,30 @@ Still open: a resource opened by navigating inside the page (a folder's
 child, the drive's quick-create) is not noted as opened, so it is missing
 from Recents; the page's Data view (`DataRoute.fetchAs`) still signs an HTTP
 request (refused, harmless).
+
+## Recents and Activity on Home (2026-10-20)
+
+- **Recents** is what this device opened (`RecentsIndex::opened`), newest
+  first: the person's own work.
+- **Activity** is what *other* members changed in the person's drives
+  (`host::lists::list_activity`). The index logs every change; the list drops
+  the own agent's (compared by key, so `atomic:agent:K`, `did:ad:agent:K`,
+  legacy `/agents/K` and URL-safe base64 are one agent: `profiles::same_agent`)
+  and every change it cannot name a signer for. One row per resource and
+  agent; one agent's burst is one row with the latest time; two agents are
+  two rows; a deletion replaces them. Names: store resource, else the
+  server's profile (`AgentProfiles`, 250 ms wait, then cached for the next
+  read), else the start of the key (`a3f9…`); never "Someone".
+- Why Joep saw "Someone changed" for his own edits: Activity listed every
+  change, own included, and named the signer only from an agent resource in
+  the local store, which a phone signed in with a secret does not have.
+- Attribution: a commit applied here is its envelope's signer. The server's
+  WS `UPDATE` frames are plain state without a signer, so the newest kept
+  envelope is stale for them; such a change is only attributed when it made
+  the resource (`createdBy`, first seen within two minutes of `createdAt`) or
+  a fresh envelope came with it. Others' *edits* that arrive over WS are
+  therefore not listed yet. Follow-up: carry the frame's commit id to the
+  index and resolve its signer from the server.
 
 ## Not planned
 
