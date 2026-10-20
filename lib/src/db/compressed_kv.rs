@@ -37,6 +37,10 @@ const CODEC_RAW: u8 = 0;
 const CODEC_DEFLATE: u8 = 1;
 /// A snapshot as the deflated updates after the genesis commit.
 const CODEC_SNAPSHOT_DELTA: u8 = 2;
+/// Like [`CODEC_SNAPSHOT_DELTA`] for a resource whose id is not its commit's
+/// signature: the payload opens with the length and the signature of the
+/// genesis commit row the delta is against.
+const CODEC_SNAPSHOT_DELTA_OF: u8 = 3;
 /// miniz_oxide level 6, the usual speed/size trade.
 const LEVEL: u8 = 6;
 /// Below this a value is not worth the extra step.
@@ -78,9 +82,11 @@ fn decode(value: Vec<u8>) -> AtomicResult<Vec<u8>> {
         Some(&CODEC_RAW) => Ok(value[2..].to_vec()),
         Some(&CODEC_DEFLATE) => miniz_oxide::inflate::decompress_to_vec(&value[2..])
             .map_err(|e| format!("Could not decompress a stored value: {e:?}").into()),
-        Some(&CODEC_SNAPSHOT_DELTA) => Err("A snapshot delta can only be read with its key"
-            .to_string()
-            .into()),
+        Some(&CODEC_SNAPSHOT_DELTA | &CODEC_SNAPSHOT_DELTA_OF) => {
+            Err("A snapshot delta can only be read with its key"
+                .to_string()
+                .into())
+        }
         other => Err(format!("Unknown storage codec {other:?}").into()),
     }
 }
@@ -104,6 +110,23 @@ fn base_from_row(row: &[u8]) -> Option<Vec<u8>> {
         .remove(crate::urls::LORO_UPDATE)?
     {
         crate::Value::LoroDoc(bytes) if !bytes.is_empty() => Some(bytes),
+        _ => None,
+    }
+}
+
+/// The `loroUpdate` of `row` when it is the genesis commit of `subject`.
+fn genesis_base_of(row: &[u8], subject: &[u8]) -> Option<Vec<u8>> {
+    let mut propvals = super::encoding::decode_propvals(&decode(row.to_vec()).ok()?).ok()?;
+    let named = propvals.remove(crate::urls::SUBJECT)?.to_string();
+    match (
+        propvals.remove(crate::urls::LORO_UPDATE)?,
+        propvals.get(crate::urls::IS_GENESIS),
+    ) {
+        (crate::Value::LoroDoc(bytes), Some(crate::Value::Boolean(true)))
+            if named.as_bytes() == subject && !bytes.is_empty() =>
+        {
+            Some(bytes)
+        }
         _ => None,
     }
 }
@@ -144,12 +167,32 @@ fn encode_snapshot_delta(base: &[u8], snapshot: &[u8]) -> Option<Vec<u8>> {
 }
 
 fn decode_snapshot(inner: &dyn KvStore, key: &[u8], value: Vec<u8>) -> AtomicResult<Vec<u8>> {
-    if value.get(..2) != Some(&[MARKER, CODEC_SNAPSHOT_DELTA][..]) {
+    let of_commit = value.get(..2) == Some(&[MARKER, CODEC_SNAPSHOT_DELTA_OF][..]);
+    if !of_commit && value.get(..2) != Some(&[MARKER, CODEC_SNAPSHOT_DELTA][..]) {
         return decode(value);
     }
-    let delta = miniz_oxide::inflate::decompress_to_vec(&value[2..])
+    let (commit_key, payload) = if of_commit {
+        let len = *value.get(2).ok_or("A stored snapshot is cut short")? as usize;
+        let signature = value
+            .get(3..3 + len)
+            .ok_or("A stored snapshot is cut short")?;
+        (
+            Some(
+                crate::identifiers::commit_subject(&String::from_utf8_lossy(signature))
+                    .into_bytes(),
+            ),
+            &value[3 + len..],
+        )
+    } else {
+        (genesis_commit_key(key), &value[2..])
+    };
+    let delta = miniz_oxide::inflate::decompress_to_vec(payload)
         .map_err(|e| format!("Could not decompress a stored snapshot: {e:?}"))?;
-    let base = base_from_store(inner, key).ok_or_else(|| {
+    let base = commit_key.and_then(|commit_key| {
+        let row = inner.get(Tree::Resources, &commit_key).ok()??;
+        base_from_row(&row)
+    });
+    let base = base.ok_or_else(|| {
         format!(
             "The genesis commit a snapshot is stored against is missing for {}",
             String::from_utf8_lossy(key)
@@ -219,6 +262,36 @@ impl CompressedKv {
             });
             if let Some(delta) = base.and_then(|base| encode_snapshot_delta(&base, val)) {
                 return delta;
+            }
+            // A resource named by a genesis certificate: the genesis commit
+            // is the one queued in this batch, and the row says which.
+            {
+                let found = pending.iter().rev().find_map(|op| {
+                    // Cheap checks first: decoding a row is the costly part and
+                    // a bulk batch asks this once per snapshot.
+                    if op.tree != Tree::Resources || !matches!(op.method, Method::Insert) {
+                        return None;
+                    }
+                    let signature = op
+                        .key
+                        .strip_prefix(crate::identifiers::ATOMIC_COMMIT_PREFIX.as_bytes())?;
+                    let row = op.val.as_deref()?;
+                    // The row names the snapshot's subject; skip the decode
+                    // for every other commit in the batch.
+                    if !row.windows(key.len()).any(|w| w == key) {
+                        return None;
+                    }
+                    let base = genesis_base_of(row, key)?;
+                    Some((signature, base))
+                });
+                if let Some((signature, base)) = found {
+                    if let Some(delta) = encode_snapshot_delta(&base, val) {
+                        let mut out = vec![MARKER, CODEC_SNAPSHOT_DELTA_OF, signature.len() as u8];
+                        out.extend_from_slice(signature);
+                        out.extend_from_slice(&delta[2..]);
+                        return out;
+                    }
+                }
             }
         }
         encode(val)

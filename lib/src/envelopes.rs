@@ -124,9 +124,13 @@ enum Decoded {
     Unreadable,
 }
 
-fn decode(key: &[u8], value: Vec<u8>) -> Option<Decoded> {
+fn decode(store: &Db, key: &[u8], value: Vec<u8>) -> Option<Decoded> {
     let (subject, created_at, signature) = parse_key(key)?;
     let json = match value.first() {
+        Some(&GENESIS_ROW) => match envelope_from_commit_row(store, &subject, &signature) {
+            Some(envelope) => envelope.json,
+            None => return Some(Decoded::Unreadable),
+        },
         Some(&COMPACT_V1) => match rebuild_json(&subject, created_at, &signature, &value) {
             Some(json) => json,
             None => return Some(Decoded::Unreadable),
@@ -151,6 +155,9 @@ fn decode(key: &[u8], value: Vec<u8>) -> Option<Decoded> {
 // legacy row is the commit JSON and starts with `{`, so the tag byte tells
 // them apart.
 const COMPACT_V1: u8 = 1;
+/// A genesis envelope whose commit is the `Tree::Resources` row of the same
+/// signature: the row is only this tag, the JSON comes from the commit row.
+const GENESIS_ROW: u8 = 2;
 const AGENT_PREFIX: &str = "atomic:agent:";
 
 /// `value` as raw bytes when it is `prefix` plus the unpadded base64url form
@@ -406,7 +413,9 @@ pub fn record_ops(
             let (old_key, old_val) = existing?;
             // A newest row that cannot be read is not the one to supersede:
             // it stays until someone can say what it was.
-            if old_key != new_key && matches!(decode(&old_key, old_val), Some(Decoded::Row(_))) {
+            if old_key != new_key
+                && matches!(decode(store, &old_key, old_val), Some(Decoded::Row(_)))
+            {
                 transaction.push(Operation {
                     tree: Tree::Envelopes,
                     method: Method::Delete,
@@ -417,7 +426,18 @@ pub fn record_ops(
         }
     }
 
-    let val = value_for(subject, response.commit.created_at, signature, json);
+    // A creation whose id is not its commit signature (a genesis
+    // certificate) keeps a tag row instead of a second copy of the signed
+    // bytes, when the commit row queued in this transaction rebuilds the
+    // same JSON.
+    let val = if response.auth_impact().genesis
+        && response.resource_new.is_some()
+        && commit_row_rebuilds(transaction, signature, &json)
+    {
+        vec![GENESIS_ROW]
+    } else {
+        value_for(subject, response.commit.created_at, signature, json)
+    };
     transaction.push(Operation {
         tree: Tree::Envelopes,
         method: Method::Insert,
@@ -452,7 +472,7 @@ pub fn envelopes_checked(store: &Db, subject: &str) -> Retained {
         .scan_prefix(Tree::Envelopes, &prefix(subject))
         .filter_map(|entry| entry.ok())
     {
-        match decode(&k, v) {
+        match decode(store, &k, v) {
             Some(Decoded::Row(row)) => {
                 out.rows.push(row);
                 out.newest_unreadable = false;
@@ -500,8 +520,31 @@ fn genesis_signature(subject: &str) -> Option<String> {
 /// from that row: the row is the commit resource the envelope was written
 /// from, so the JSON is the same.
 fn genesis_envelope_from_row(store: &Db, subject: &str) -> Option<StoredEnvelope> {
-    let signature = genesis_signature(subject)?;
-    let commit_id = crate::identifiers::commit_subject(&signature);
+    envelope_from_commit_row(store, subject, &genesis_signature(subject)?)
+}
+
+/// Whether the commit row queued in `transaction` for `signature` gives back
+/// exactly `json` when read, so a tag row can stand in for the envelope.
+fn commit_row_rebuilds(transaction: &Transaction, signature: &str, json: &str) -> bool {
+    let id = crate::identifiers::commit_subject(signature);
+    transaction
+        .iter()
+        .rev()
+        .find(|op| op.tree == Tree::Resources && op.key == id.as_bytes())
+        .and_then(|op| op.val.as_deref())
+        .and_then(|bin| crate::db::encoding::decode_propvals(bin).ok())
+        .and_then(|propvals| {
+            crate::Resource::from_propvals(propvals, crate::Subject::from_raw(&id, None))
+                .to_json_ad(None)
+                .ok()
+        })
+        .as_deref()
+        == Some(json)
+}
+
+/// The envelope of the commit stored as the row `signature` names.
+fn envelope_from_commit_row(store: &Db, subject: &str, signature: &str) -> Option<StoredEnvelope> {
+    let commit_id = crate::identifiers::commit_subject(signature);
     let propvals = store.get_propvals(&commit_id).ok()?;
     let row = crate::Resource::from_propvals(propvals, crate::Subject::from_raw(&commit_id, None));
     let created_at = row.get(crate::urls::CREATED_AT).ok()?.to_int().ok()?;
@@ -509,7 +552,7 @@ fn genesis_envelope_from_row(store: &Db, subject: &str) -> Option<StoredEnvelope
     Some(StoredEnvelope {
         subject: subject.to_string(),
         created_at,
-        signature,
+        signature: signature.to_string(),
         json,
     })
 }
@@ -1629,6 +1672,47 @@ mod tests {
         let kept = envelopes(&db, subject.as_str());
         assert_eq!(kept.len(), 1);
         assert_ne!(kept[0].json, written);
+    }
+
+    /// A creation named by a genesis certificate (its id is not the commit
+    /// signature) keeps a one-byte tag row, not a second copy of the commit.
+    #[tokio::test]
+    async fn certificate_genesis_envelope_is_a_tag_row_read_from_the_commit_row() {
+        let db = Db::init_temp("envelopes_cert_genesis_tag").await.unwrap();
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = child(&db, &drive).await;
+        let rows = raw_rows(&db, &subject);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].1, vec![GENESIS_ROW]);
+        let kept = envelopes(&db, subject.as_str());
+        assert_eq!(kept.len(), 1);
+        let commit_row = db
+            .get_resource(&kept[0].commit_id().as_str().into())
+            .await
+            .unwrap();
+        assert_eq!(kept[0].json, commit_row.to_json_ad(None).unwrap());
+        assert_eq!(
+            db.get_resource(&subject)
+                .await
+                .unwrap()
+                .get(urls::NAME)
+                .unwrap()
+                .to_string(),
+            "Doc"
+        );
+
+        signed_edit(&db, &subject, "edited").await;
+        let kept = envelopes(&db, subject.as_str());
+        assert_eq!(kept.len(), 1, "the edit replaces the tag row");
+        assert_eq!(
+            db.get_resource(&subject)
+                .await
+                .unwrap()
+                .get(urls::NAME)
+                .unwrap()
+                .to_string(),
+            "edited"
+        );
     }
 
     /// Under `all` the genesis envelope is history: the edit that follows

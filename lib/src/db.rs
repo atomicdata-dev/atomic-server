@@ -14,7 +14,7 @@ mod chat_migration_test;
 #[cfg(all(feature = "db", not(target_arch = "wasm32")))]
 pub mod compaction;
 mod compressed_kv;
-mod encoding;
+pub(crate) mod encoding;
 pub mod encrypted_backend;
 mod index_keys;
 pub mod kv_store;
