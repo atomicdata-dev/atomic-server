@@ -52,6 +52,9 @@ pub(crate) async fn agent_name(store: &Db, profiles: &AgentProfiles, agent: &str
         .unwrap_or_else(|| UNKNOWN_MEMBER.to_string())
 }
 
+/// How many opened messages [`Conversations`] keeps.
+const OPENED_CACHE_CAP: usize = 5_000;
+
 /// A sealed message after opening.
 #[derive(Clone)]
 struct OpenedMessage {
@@ -164,6 +167,12 @@ impl Conversations {
         // only successes are remembered.
         if opened.text.is_some() {
             if let Ok(mut cache) = self.opened.lock() {
+                // Bounded: a long conversation scrolled through end to end
+                // must not keep every message in memory. Dropping it all is
+                // crude but cheap; the window on screen is opened again.
+                if cache.len() >= OPENED_CACHE_CAP {
+                    cache.clear();
+                }
                 cache.insert(cache_key, opened.clone());
             }
         }
@@ -249,6 +258,148 @@ impl Conversations {
             }
         }
         messages.sort_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));
+        Ok(self.rows(store, &me, messages).await)
+    }
+
+    /// A window of a conversation, as JSON `{messages, older, newest}`:
+    /// `messages` the newest `limit` messages before the `before` cursor (the
+    /// newest of all when `None`), oldest first, as [`Self::read`] gives
+    /// them; `older` the cursor for the window before (null at the start),
+    /// `newest` the cursor of the last message (for [`Self::read_after`]).
+    /// Only the window's messages are decrypted; the messages are found
+    /// through the sorted index, read only as far as the window reaches.
+    pub async fn read_page(
+        &self,
+        store: &Db,
+        subject: &str,
+        before: Option<&str>,
+        limit: usize,
+    ) -> AtomicResult<Json> {
+        let limit = limit.max(1);
+        let before = before.map(decode_message_cursor).transpose()?;
+        let (me, keys) = self.reader(store, subject).await?;
+        let mut messages = Vec::new();
+        let mut more = false;
+        let mut offset = 0;
+        // Messages made in the cursor's millisecond come back again and are
+        // skipped by hand; the loop reads on past them.
+        'read: loop {
+            let batch = limit + 4;
+            let subjects = message_window(
+                store,
+                subject,
+                true,
+                before.as_ref().map(|b| b.0),
+                offset,
+                batch,
+            )
+            .await?;
+            for message in &subjects {
+                let Some(m) = self.open_message(store, &me, subject, &keys, message).await else {
+                    continue;
+                };
+                let id = message.to_string();
+                if let Some((at, cursor_id)) = &before {
+                    if (m.created_at, id.as_str()) >= (*at, cursor_id.as_str()) {
+                        continue;
+                    }
+                }
+                if messages.len() >= limit {
+                    more = true;
+                    break 'read;
+                }
+                messages.push((m.created_at, id, m));
+            }
+            if subjects.len() < batch {
+                break;
+            }
+            offset += batch;
+        }
+        messages.sort_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));
+        let older = more
+            .then(|| messages.first().map(|(at, id, _)| format!("{at}|{id}")))
+            .flatten();
+        let newest = messages.last().map(|(at, id, _)| format!("{at}|{id}"));
+        Ok(json!({
+            "messages": self.rows(store, &me, messages).await,
+            "older": older,
+            "newest": newest,
+        }))
+    }
+
+    /// The messages of a conversation after `after` (a `newest` cursor), as
+    /// JSON `{messages, newest, more}`: at most `limit`, oldest first.
+    pub async fn read_after(
+        &self,
+        store: &Db,
+        subject: &str,
+        after: &str,
+        limit: usize,
+    ) -> AtomicResult<Json> {
+        let limit = limit.max(1);
+        let (at, cursor_id) = decode_message_cursor(after)?;
+        let (me, keys) = self.reader(store, subject).await?;
+        let mut messages = Vec::new();
+        let mut more = false;
+        let mut offset = 0;
+        'read: loop {
+            let batch = limit + 4;
+            let subjects = message_window(store, subject, false, Some(at), offset, batch).await?;
+            for message in &subjects {
+                let Some(m) = self.open_message(store, &me, subject, &keys, message).await else {
+                    continue;
+                };
+                let id = message.to_string();
+                if (m.created_at, id.as_str()) <= (at, cursor_id.as_str()) {
+                    continue;
+                }
+                if messages.len() >= limit {
+                    more = true;
+                    break 'read;
+                }
+                messages.push((m.created_at, id, m));
+            }
+            if subjects.len() < batch {
+                break;
+            }
+            offset += batch;
+        }
+        messages.sort_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));
+        let newest = messages
+            .last()
+            .map(|(at, id, _)| format!("{at}|{id}"))
+            .unwrap_or_else(|| after.to_string());
+        Ok(json!({
+            "messages": self.rows(store, &me, messages).await,
+            "newest": newest,
+            "more": more,
+        }))
+    }
+
+    /// This agent and the epoch keys it can open in `subject`.
+    async fn reader(
+        &self,
+        store: &Db,
+        subject: &str,
+    ) -> AtomicResult<(String, Vec<ConversationKey>)> {
+        let agent = store.get_default_agent()?;
+        let me = agent.subject.to_string();
+        let proof = vault_proof(&agent)?;
+        let conversation = row_resource(store, &Subject::from(subject))
+            .await
+            .ok_or("This conversation is not on this device yet")?;
+        let keys = open_keyring(&keyring_of(&conversation), &me, &proof);
+        Ok((me, keys))
+    }
+
+    /// Opened messages (oldest first) as the JSON rows of [`Self::read`].
+    async fn rows(
+        &self,
+        store: &Db,
+        me: &str,
+        messages: Vec<(i64, String, OpenedMessage)>,
+    ) -> Vec<Json> {
+        let me = me.to_string();
         let mut names: HashMap<String, String> = Default::default();
         let mut out = Vec::new();
         for (_, id, m) in messages {
@@ -269,7 +420,7 @@ impl Conversations {
             }
             out.push(row);
         }
-        Ok(out)
+        out
     }
 }
 
@@ -401,11 +552,49 @@ async fn message_subjects(
     query.sort_by = Some(urls::CREATED_AT.to_string());
     query.sort_desc = limit.is_some();
     query.limit = limit;
-    let mut subjects = store.query(&query).await?.subjects;
+    let mut subjects = match limit {
+        Some(_) => store.query_page(&query).await?,
+        None => store.query(&query).await?.subjects,
+    };
     if limit.is_some() {
         subjects.reverse();
     }
     Ok(subjects)
+}
+
+/// `<createdAt>|<message subject>`, the cursor of a conversation window.
+fn decode_message_cursor(cursor: &str) -> AtomicResult<(i64, String)> {
+    let bad = || format!("Not a conversation cursor: {cursor}");
+    let (at, id) = cursor.split_once('|').ok_or_else(bad)?;
+    Ok((at.parse().map_err(|_| bad())?, id.to_string()))
+}
+
+/// Message subjects of a conversation by creation time from `bound`
+/// (inclusive; descending: at or before it, ascending: at or after it),
+/// `offset` and `limit` into that order. Reads the index only as far as the
+/// page reaches.
+async fn message_window(
+    store: &Db,
+    conversation: &str,
+    desc: bool,
+    bound: Option<i64>,
+    offset: usize,
+    limit: usize,
+) -> AtomicResult<Vec<Subject>> {
+    let mut query = Query::new_prop_val(urls::PARENT, conversation);
+    query.drive = Some(Subject::from(conversation));
+    query.sort_by = Some(urls::CREATED_AT.to_string());
+    query.sort_desc = desc;
+    query.offset = offset;
+    query.limit = Some(limit);
+    if let Some(at) = bound {
+        if desc {
+            query.end_val = Some(Value::Timestamp(at));
+        } else {
+            query.start_val = Some(Value::Timestamp(at));
+        }
+    }
+    store.query_page(&query).await
 }
 
 #[cfg(test)]
@@ -583,6 +772,74 @@ mod tests {
     /// Messages are ordered by their creation time in ms.
     async fn tick() {
         tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+
+    /// Windows walk a conversation without gaps or duplicates (many
+    /// messages share a millisecond here), decrypt only what they return,
+    /// and `read_after` picks up what was sent since.
+    #[tokio::test]
+    async fn conversation_windows_page_and_decrypt_only_the_window() {
+        let d = Device::new().await;
+        let talk = new_talk(&d, "Alice").await;
+        for i in 0..120 {
+            send_message(&d.node, &NoPush, &talk.conversation, &format!("m{i}"))
+                .await
+                .unwrap();
+        }
+        let all: Vec<Json> = conversations()
+            .read(&d.store, &talk.conversation)
+            .await
+            .unwrap();
+        let want: Vec<&str> = all.iter().map(|m| m["id"].as_str().unwrap()).collect();
+
+        let c = conversations();
+        let first = c
+            .read_page(&d.store, &talk.conversation, None, 25)
+            .await
+            .unwrap();
+        let opened = c.opened.lock().unwrap().len();
+        assert!(
+            opened <= 25 + 5,
+            "{opened} messages decrypted for a window of 25"
+        );
+        let newest = first["newest"].as_str().unwrap().to_string();
+        let mut ids: Vec<String> = Vec::new();
+        let mut window = first;
+        loop {
+            let mut page: Vec<String> = window["messages"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|m| m["id"].as_str().unwrap().to_string())
+                .collect();
+            assert!(page.len() <= 25);
+            page.extend(ids);
+            ids = page;
+            let Some(older) = window["older"].as_str() else {
+                break;
+            };
+            window = c
+                .read_page(&d.store, &talk.conversation, Some(older), 25)
+                .await
+                .unwrap();
+        }
+        assert_eq!(ids, want);
+
+        tick().await;
+        send_message(&d.node, &NoPush, &talk.conversation, "later")
+            .await
+            .unwrap();
+        let after = c
+            .read_after(&d.store, &talk.conversation, &newest, 50)
+            .await
+            .unwrap();
+        let texts: Vec<&str> = after["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|m| m["text"].as_str().unwrap())
+            .collect();
+        assert_eq!(texts, ["later"]);
     }
 
     #[tokio::test]
