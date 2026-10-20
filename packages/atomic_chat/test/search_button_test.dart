@@ -185,4 +185,48 @@ void main() {
     expect(find.byKey(const Key('search-scope')), findsNothing,
         reason: 'an empty field: the drive goes too');
   });
+
+  testWidgets(
+      'tablet: a drive result opens and closes the card; its icon '
+      'scopes the card', (tester) async {
+    tester.view.devicePixelRatio = 2;
+    tester.view.physicalSize = _landscape * 2;
+    addTearDown(tester.view.reset);
+    final serverFactory = ResourceView.serverFactory;
+    ResourceView.serverFactory = () async => throw 'no server in a test';
+    addTearDown(() => ResourceView.serverFactory = serverFactory);
+    final api = FakeApi(driveList: const [
+      (subject: 'did:ad:drive', name: 'Home', emoji: null),
+      (subject: 'did:ad:work', name: 'Work', emoji: null),
+    ], hits: const [
+      (
+        subject: 'did:ad:work',
+        title: 'Work drive',
+        className: 'Drive',
+        drive: 'did:ad:drive',
+        score: 1.0,
+        emoji: null
+      ),
+    ]);
+    await tester.pumpWidget(_shell(api));
+    await tester.pumpAndSettle();
+    await tester.tap(_button());
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'wor');
+    await tester.pump(const Duration(milliseconds: 100));
+
+    await tester.tap(find.byTooltip('Search in Work drive'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('search-scope')), findsOneWidget);
+    expect(find.byType(SearchPalette), findsOneWidget, reason: 'stays open');
+
+    await tester.tap(find.byTooltip('Search all drives'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'wor');
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Work drive'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('search-scope')), findsNothing);
+    expect(find.byType(SearchPalette), findsNothing, reason: 'card closed');
+  });
 }

@@ -273,8 +273,7 @@ void main() {
       expect(chat.voiceMode, isFalse);
     });
 
-    testWidgets('a swipe opens the list at once; a drag picks',
-        (tester) async {
+    testWidgets('a swipe opens the list at once; a drag picks', (tester) async {
       await tester.pumpWidget(_shell(_BarApi()));
       await tester.pumpAndSettle();
       final gesture = await tester.startGesture(tester.getCenter(
@@ -429,7 +428,36 @@ void main() {
       expect(api.searched.last, ('plan', null));
     });
 
-    testWidgets('picking a drive in the results filters the search to it',
+    testWidgets('tapping a drive in the results opens it, no scope',
+        (tester) async {
+      final api = _BarApi()
+        ..searchHits = const [
+          (
+            subject: 'did:ad:work',
+            title: 'Work drive',
+            className: 'Drive',
+            drive: 'did:ad:home',
+            score: 1.0,
+            emoji: null
+          ),
+        ];
+      await tester.pumpWidget(_shell(api));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Search'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'wor');
+      await tester.pump(const Duration(milliseconds: 200));
+      final searches = api.searched.length;
+      await tester.tap(find.text('Work drive'));
+      await tester.pumpAndSettle();
+      expect(find.text('In: Work'), findsNothing);
+      expect(api.searched.length, searches, reason: 'not searched again');
+      expect(find.byKey(const Key('search-scope')), findsNothing);
+      expect(find.byType(SearchScreen), findsNothing,
+          reason: 'the drive page is on top of the search');
+    });
+
+    testWidgets('the search-in icon of a drive result scopes the search',
         (tester) async {
       final api = _BarApi()
         ..searchHits = const [
@@ -449,7 +477,7 @@ void main() {
       expect(find.byKey(const Key('search-scope')), findsNothing);
       await tester.enterText(find.byType(TextField), 'wor');
       await tester.pump(const Duration(milliseconds: 200));
-      await tester.tap(find.text('Work drive'));
+      await tester.tap(find.byTooltip('Search in Work drive'));
       await tester.pump(const Duration(milliseconds: 200));
       expect(find.byType(SearchScreen), findsOneWidget);
       expect(find.text('In: Work'), findsOneWidget);

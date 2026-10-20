@@ -389,17 +389,16 @@ class _SearchScreenState extends State<SearchScreen> {
     if (_model.query.isNotEmpty && !_searching) unawaited(_search());
   }
 
-  /// A drive in the results is a filter, not a page: the search goes on
-  /// inside it. True when [subject] was taken as such. Not when drives are
-  /// what is looked for: then a drive opens.
-  bool _scopeToDrive(String subject, String className) {
-    if (_model.kind == SearchKind.drives) return false;
-    final isDrive = className.split(RegExp(r'[/#]')).last == 'Drive' ||
-        _model.drives.any((d) => _id(d.subject) == _id(subject));
-    if (!isDrive || subject.isEmpty) return false;
-    if (_model.scope != null && _id(_model.scope!) == _id(subject)) {
-      return true;
-    }
+  bool _isDrive(String subject, String className) =>
+      subject.isNotEmpty &&
+      (className.split(RegExp(r'[/#]')).last == 'Drive' ||
+          _model.drives.any((d) => _id(d.subject) == _id(subject)));
+
+  /// The explicit "search in this drive" of a drive in the results: the
+  /// search goes on inside [subject]. Tapping the drive itself opens it.
+  void _searchInDrive(String subject) {
+    if (subject.isEmpty) return;
+    if (_model.scope != null && _id(_model.scope!) == _id(subject)) return;
     _model.scope = subject;
     _remember();
     final route = ModalRoute.of(context);
@@ -412,7 +411,6 @@ class _SearchScreenState extends State<SearchScreen> {
     _model.changed();
     _loadRecent(_model.drives);
     if (query.isNotEmpty) _changed(query);
-    return true;
   }
 
   /// One drives call for both the names and the recents; it paints the cached
@@ -542,7 +540,6 @@ class _SearchScreenState extends State<SearchScreen> {
   /// Opens a resource, notes it as opened, and refreshes the list after.
   Future<void> _open(
       String drive, String subject, String title, String className) async {
-    if (_scopeToDrive(subject, className)) return;
     final opened = openFromList<void>(
       context,
       (_) => openResourceView(
@@ -940,6 +937,15 @@ class _SearchScreenState extends State<SearchScreen> {
       title: i.title.isEmpty ? i.subject : i.title,
       detail: _detail(i.className, i.shown),
       onTap: () => _open(i.drive, i.subject, i.title, i.className),
+      trailing: _isDrive(i.subject, i.className)
+          ? IconButton(
+              key: Key('search-in-drive-${i.subject}'),
+              icon: const Icon(Icons.manage_search),
+              tooltip: 'Search in ${i.title.isEmpty ? 'this drive' : i.title}',
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              onPressed: () => _searchInDrive(i.subject),
+            )
+          : null,
     );
     if (widget.palette) {
       // Every row at the same inset; the one Enter opens is filled, not
