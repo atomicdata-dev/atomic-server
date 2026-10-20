@@ -7,22 +7,33 @@ import 'package:atomic_chat/atomic_chat.dart'
     show AppShell, AppThemeMode, ChatsScreen, defaultAttachmentPicker;
 import 'assistant/atomic_assistant_api.dart';
 import 'assistant/file_attachment_picker.dart';
+import 'perf_seed.dart';
 import 'screens/login_screen.dart';
 import 'screens/pair_screen.dart';
 import 'screens/sync_screen.dart';
+import 'package:atomic_flutter/atomic_flutter.dart' show Perf;
 import 'theme.dart';
 import 'atomic/atomic_client.dart';
 import 'atomic/session.dart';
 
 void main() async {
+  Perf.start();
   WidgetsFlutterBinding.ensureInitialized();
+  Perf.watchFrames();
   await RustLib.init();
+  Perf.mark('rust init');
   final dir = await getApplicationDocumentsDirectory();
+  Perf.mark('documents dir');
   await AtomicClient.openDb(dir.path);
+  Perf.mark('db open');
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   await AppThemeMode.load();
   defaultAttachmentPicker = const FileSelectorAttachmentPicker();
+  Perf.mark('runApp');
   runApp(const AtomicApp());
+  WidgetsBinding.instance
+      .waitUntilFirstFrameRasterized
+      .then((_) => Perf.mark('first frame'));
 }
 
 class AtomicApp extends StatefulWidget {
@@ -138,7 +149,9 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
   }
 
   void _onLoggedIn() {
+    Perf.once('session restored');
     setState(() => _loggedIn = true);
+    unawaited(perfSeedIfAsked());
     _startEventListener();
     _startBackgroundSync();
   }

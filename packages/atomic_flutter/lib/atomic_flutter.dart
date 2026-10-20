@@ -10,3 +10,5 @@ export 'src/account/link_dialog.dart';
 export 'src/theme.dart';
 
 export 'src/hold_fan.dart';
+
+export 'src/perf.dart';

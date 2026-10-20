@@ -3,11 +3,12 @@ import 'dart:convert';
 import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/foundation.dart';
 
-/// A pretend AI for trying the chat without an account: debug builds only,
-/// and only when built with `--dart-define=FAKE_AI=1`. Never in a release
-/// build ([kDebugMode] is a constant there, so this is compiled out).
+/// A pretend AI for trying the chat without an account: debug and profile
+/// builds only (profile, so the chat's frame times can be measured), and only
+/// when built with `--dart-define=FAKE_AI=1`. Never in a release build
+/// ([kReleaseMode] is a constant there, so this is compiled out).
 const bool fakeAiEnabled =
-    kDebugMode && (_fakeAi == '1' || _fakeAi == 'true');
+    !kReleaseMode && (_fakeAi == '1' || _fakeAi == 'true');
 const _fakeAi = String.fromEnvironment('FAKE_AI');
 
 /// The pretend AI: it searches the drives with the real tool (the first

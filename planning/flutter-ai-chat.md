@@ -45,8 +45,8 @@ use, matching the web app's chat (`browser/data-browser/src/chunks/AI/`).
   web `file` parts. `AttachmentPicker` interface; the app implements it with
   `file_selector` (offline in the pub cache). Text files are sent as text;
   images only to an AI with `acceptsImages` (not the included AI).
-- [x] Debug-only pretend AI: `--dart-define=FAKE_AI=1` (compiled out of
-  release). Seen on the Phone_A35 emulator: streaming Markdown, tool step,
+- [x] Debug/profile-only pretend AI: `--dart-define=FAKE_AI=1` (compiled out
+  of release; on in profile so `scripts/perf_android.sh` can time the chat). Seen on the Phone_A35 emulator: streaming Markdown, tool step,
   photo picker, drive picker, reopened chat history, font scale 1.3, tablet
   split layout.
 

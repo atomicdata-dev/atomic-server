@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColors, AppColorsExt;
+    show AppColors, AppColorsExt, Perf;
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'app_top_bar.dart';
 
@@ -282,9 +283,11 @@ class _SearchScreenState extends State<SearchScreen> {
     // Typing flips the list from recents to hits once; the debounce then only
     // swaps the hits.
     _model.changed();
+    final typed = Stopwatch()..start();
     _debounce = Timer(const Duration(milliseconds: 120), () async {
       try {
         final scope = _model.scope;
+        final asked = typed.elapsedMilliseconds;
         final hits = await widget.api.search(query, drive: scope);
         if (scope != _model.scope) return;
         if (mounted && query == _model.query) {
@@ -292,6 +295,11 @@ class _SearchScreenState extends State<SearchScreen> {
           _model.hitsFor = query;
           _model.error = null;
           _model.changed();
+          if (!kReleaseMode) {
+            Perf.span('search query', typed.elapsedMilliseconds - asked);
+            WidgetsBinding.instance.addPostFrameCallback((_) => Perf.span(
+                'search keystroke to results', typed.elapsedMilliseconds));
+          }
         }
       } catch (e) {
         if (mounted && query == _model.query) {

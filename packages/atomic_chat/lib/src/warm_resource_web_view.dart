@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
 
+import 'package:atomic_flutter/atomic_flutter.dart' show Perf;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -104,8 +105,9 @@ class WebViewEmbedPage implements WarmPage {
     page = WebViewEmbedPage._(controller)
       .._onMessage = onMessage
       .._onLoaded = onLoaded;
-    // Debug builds can be inspected from chrome://inspect.
-    if (kDebugMode && controller.platform is AndroidWebViewController) {
+    // Debug and profile builds can be inspected from chrome://inspect (the
+    // perf script drives and times the page through it).
+    if (!kReleaseMode && controller.platform is AndroidWebViewController) {
       await AndroidWebViewController.enableDebugging(true);
     }
     unawaited(controller.loadRequest(url));
@@ -253,6 +255,7 @@ class WarmResourceWebView with WidgetsBindingObserver {
         _starting = false;
         await page.whenReady;
         debugPrint('[warm] spare ready after ${clock.elapsedMilliseconds} ms');
+        Perf.once('warm ready');
       } catch (e) {
         failures++;
         debugPrint('[warm] spare failed: $e');

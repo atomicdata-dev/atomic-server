@@ -1,5 +1,5 @@
 import 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColors, AppColorsExt, HoldFan, HoldFanItem, HoldFanLayout;
+    show AppColors, AppColorsExt, HoldFan, HoldFanItem, HoldFanLayout, Perf;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'app_top_bar.dart';
@@ -86,12 +86,13 @@ class _ChatsScreenState extends State<ChatsScreen> {
   Future<List<NotificationItem>> _loadNotifications() async =>
       widget.api.notifications();
 
-  /// How long a home list took, in debug builds (`[home]` in logcat).
+  /// How long a home list took, in debug and profile builds (`[perf] home
+  /// LIST` in logcat).
   Future<T> _timed<T>(String what, Future<T> future) {
-    if (!kDebugMode) return future;
+    if (kReleaseMode) return future;
     final watch = Stopwatch()..start();
-    return future.whenComplete(
-        () => debugPrint('[home] $what ${watch.elapsedMilliseconds} ms'));
+    return future
+        .whenComplete(() => Perf.span('home $what', watch.elapsedMilliseconds));
   }
 
   /// The emojis of the activity's resources, filled in after the list shows.
@@ -109,8 +110,26 @@ class _ChatsScreenState extends State<ChatsScreen> {
   @override
   void initState() {
     super.initState();
+    if (!kReleaseMode) _markLoaded();
     HomeLayout.load().then((layout) {
       if (mounted) setState(() => _layout = layout);
+    });
+  }
+
+  /// `[perf] home data` once every list of the first load is in, and `home
+  /// painted` after the frame that shows them.
+  void _markLoaded() {
+    Perf.once('home start');
+    Future.wait<Object?>([
+      for (final f in <Future<Object?>>[
+        _drives, _chats, _recents, _favorites, _conversations, _activity,
+        _notifications,
+      ])
+        f.then((_) => null, onError: (Object _) => null),
+    ]).then((_) {
+      Perf.once('home data');
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => Perf.once('home painted'));
     });
   }
 

@@ -1,3 +1,4 @@
+import 'package:atomic_flutter/atomic_flutter.dart' show Perf;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:atomic_chat/atomic_chat.dart' show AtomicWordmark;
@@ -101,6 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _tryAutoLogin() async {
     try {
       final session = await AtomicSession.load();
+      Perf.once('session loaded');
       if (session == null || session.secret.isEmpty) {
         setState(() => _step = _Step.welcome);
         return;

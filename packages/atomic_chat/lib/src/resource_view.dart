@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt;
+import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt, Perf;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -174,6 +174,7 @@ class _ResourceViewState extends State<ResourceView>
   }
 
   bool _warm = false;
+  int _traced = 0;
 
   void _pageLoaded() {
     debugPrint('[embed] page loaded after ${_clock.elapsedMilliseconds} ms');
@@ -310,6 +311,11 @@ class _ResourceViewState extends State<ResourceView>
       if (done != null && !done.isCompleted) done.complete();
       return;
     }
+    if (request['method'] == 'painted') {
+      Perf.span('resource painted ${_warm ? 'warm' : 'cold'}',
+          _clock.elapsedMilliseconds);
+      return;
+    }
     final id = request['id'] as int;
     final method = request['method'] as String;
     if (method == 'openNative') {
@@ -328,6 +334,7 @@ class _ResourceViewState extends State<ResourceView>
       return;
     }
     final started = _clock.elapsedMilliseconds;
+    var firstContent = false;
     String reply;
     // Writes show up in logcat, so what the page persists can be followed.
     if (kDebugMode && !_readMethods.contains(method)) {
@@ -344,14 +351,31 @@ class _ResourceViewState extends State<ResourceView>
         debugPrint(_warm
             ? '[warm] open ${_clock.elapsedMilliseconds} ms first content'
             : '[warm] cold open ${_clock.elapsedMilliseconds} ms first content');
+        firstContent = true;
       }
     } catch (e) {
       reply = 'false,${jsonEncode('$e')}';
     }
     // Answered after this screen is gone too: a page that is closing still
     // waits on the store (signing, applying its last commit).
+    final answered = _clock.elapsedMilliseconds;
     try {
       await _page?.runJavaScript('window.__atomicReply($id,$reply)');
+      if (!kReleaseMode && _traced++ < 12) {
+        // The first calls of a page, to see where an open spends its time.
+        debugPrint('[perf] embed $method in at $started, answered at '
+            '$answered, delivered at ${_clock.elapsedMilliseconds} ms '
+            '(${reply.length} chars)');
+      }
+      if (firstContent && !kReleaseMode) {
+        // The page has the resource; two animation frames later it has
+        // rendered it (`[perf] resource painted`).
+        Perf.span('resource data ${_warm ? 'warm' : 'cold'}',
+            _clock.elapsedMilliseconds);
+        unawaited(_page?.runJavaScript('requestAnimationFrame(function(){'
+            'requestAnimationFrame(function(){AtomicFlutter.postMessage('
+            '\'{"method":"painted"}\')})})'));
+      }
     } catch (e) {
       debugPrint('[embed] reply to $method not delivered: $e');
     }
