@@ -11136,13 +11136,10 @@ msgid "Could not read storage use."
 msgstr "Could not read storage use."
 
 #. 0: formatBytes(result.bytes_reclaimed)
-#. 0: formatBytes(result.bytes_reclaimed)
-#: src/components/Vault/VaultStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 msgid "Freed {0}."
 msgstr "Freed {0}."
 
-#: src/components/Vault/VaultStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 #: src/components/Vault/VaultStorage.tsx
 msgid "Nothing to free."
@@ -13223,3 +13220,7 @@ msgstr "Latest changes from each of {0} browsers and apps"
 #: src/components/Vault/VaultStorage.tsx
 msgid "The next backup from that browser or app adds them"
 msgstr "The next backup from that browser or app adds them"
+
+#: src/components/ConnectDrivePicker.tsx
+msgid "All drives"
+msgstr "All drives"

@@ -15,7 +15,7 @@ mod chat_migration_test;
 pub mod compaction;
 mod compressed_kv;
 pub mod drive_events;
-mod encoding;
+pub(crate) mod encoding;
 pub mod encrypted_backend;
 mod index_keys;
 pub mod kv_store;
