@@ -67,14 +67,37 @@ pub(crate) async fn open_native_store(
     Ok((store, recovered))
 }
 
-/// `Db::init_redb_file` with any panic inside it turned into a "damaged"
-/// error: a panic must not escape to the app, which then never draws.
+/// redb's read cache on a phone. Its default (1 GiB) keeps whatever was read,
+/// up to the size of the store, in memory (870 MB of RSS after a full walk of
+/// a 1 GB store); the lists and the search read little and repeatedly. The
+/// same 48 MiB as the Flutter bridge.
+pub(crate) const REDB_CACHE_BYTES: usize = 48 * 1024 * 1024;
+
+/// `Db::init_redb_file_with_cache` with any panic inside it turned into a
+/// "damaged" error: a panic must not escape to the app, which then never
+/// draws. The startup compaction check runs at most once a week
+/// ([`crate::compaction_check`]).
 async fn open_store_catching(base_path: &Path) -> Result<atomic_lib::Db, String> {
     use futures::FutureExt;
     let uploads_path = base_path.join("uploads");
-    let opening = atomic_lib::Db::init_redb_file(base_path, None, &uploads_path);
+    let now = crate::state::now_ms();
+    let policy = crate::compaction_check::startup_policy(base_path, now);
+    let checks = policy.enabled;
+    let opening = atomic_lib::Db::init_redb_file_with_cache(
+        base_path,
+        None,
+        &uploads_path,
+        &policy,
+        Some(REDB_CACHE_BYTES),
+    );
     match std::panic::AssertUnwindSafe(opening).catch_unwind().await {
-        Ok(result) => result.map_err(|e| e.to_string()),
+        Ok(Ok(store)) => {
+            if checks {
+                crate::compaction_check::record_check(base_path, now);
+            }
+            Ok(store)
+        }
+        Ok(Err(e)) => Err(e.to_string()),
         Err(panic) => Err(format!(
             "The {}: panic while opening: {}",
             atomic_lib::db::recovery::DAMAGED_STORE,

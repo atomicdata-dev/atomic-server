@@ -59,7 +59,12 @@ impl RawRow {
 /// The agent's drives with their names and own icons.
 pub(crate) async fn drives(store: &Db) -> CoreResult<Vec<DriveRow>> {
     let mut out = Vec::new();
-    for info in store.list_drives().await? {
+    // The order every drive list shows: the active drive, then the most
+    // recently used, then by name.
+    let drives = lists::order_drives_by_use(store, crate::state::recents(), store.list_drives().await?, |d| {
+        (d.subject.as_str(), d.name.as_str())
+    });
+    for info in drives {
         let emoji = match row_resource(store, &info.subject.as_str().into()).await {
             Some(r) => Some(atomic_lib::host::rows::emoji_of(&r)).filter(|e| !e.is_empty()),
             None => None,
@@ -91,7 +96,18 @@ pub(crate) async fn ai_chats(
     index: &RecentsIndex,
     limit: usize,
 ) -> CoreResult<Vec<ResourceRow>> {
-    let rows = lists::list_ai_chats(store, index, limit).await?;
+    ai_chats_page(store, index, 0, limit).await
+}
+
+/// `limit` AI chats after the `offset` newest; a page shorter than `limit` is
+/// the last (the "All AI chats" list reads it page by page).
+pub(crate) async fn ai_chats_page(
+    store: &Db,
+    index: &RecentsIndex,
+    offset: usize,
+    limit: usize,
+) -> CoreResult<Vec<ResourceRow>> {
+    let rows = lists::list_ai_chats_page(store, index, offset, limit).await?;
     Ok(parse_rows(rows)
         .into_iter()
         .map(|mut r| {
@@ -116,11 +132,17 @@ pub(crate) async fn messages(
 }
 
 /// Full-text search across every drive (type-ahead on the last word).
-pub(crate) fn search(store: &Db, query: &str, limit: usize) -> CoreResult<Vec<SearchHit>> {
+pub(crate) fn search(
+    store: &Db,
+    query: &str,
+    limit: usize,
+    drive: Option<&str>,
+    classes: &[String],
+) -> CoreResult<Vec<SearchHit>> {
     if query.trim().is_empty() {
         return Ok(Vec::new());
     }
-    let rows = lists::search(store, None, query, limit)?;
+    let rows = lists::search_classes(store, drive, query, limit, classes)?;
     Ok(parse_rows(rows)
         .into_iter()
         .map(|r| SearchHit {

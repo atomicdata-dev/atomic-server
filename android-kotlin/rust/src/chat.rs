@@ -1,15 +1,13 @@
 //! Chats as typed rows for the native chat screens: AI chats, conversations
 //! (end-to-end encrypted DMs) and the chat of a meeting or chat room.
 //!
-//! Reading is in windows, like Flutter's long-chat paging
-//! (`claude/flutter-mobile-app-w8e9wz`: `read_chat_page` / `read_chat_after`):
-//! the newest `limit` messages, then the window before one (`before` cursor),
-//! then what came after a message (a poll). The `atomic_lib::host` of this
-//! branch has no windowed reads yet (they came with that branch, in
-//! `lib/src/host/chats.rs`), so each call reads the chat whole and cuts the
-//! window out of it. The cursors are message ids, which stay valid when
-//! messages are added anywhere, so swapping the cut for the library's windows
-//! changes no Kotlin.
+//! Reading is in windows, through the library's own: `read_chat_page` /
+//! `read_chat_after` of `atomic_lib::host::chats` (and `read_page` /
+//! `read_after` of chat rooms and conversations). The newest `limit` messages,
+//! then the window before one (`before` cursor), then what came after the
+//! newest (a poll). Each call reads only the pages its window covers, however
+//! long the chat; the cursors are opaque strings of the library's
+//! (`<page createdAt>|<page>#<key>`), stable when messages are added.
 
 use crate::{
     error::CoreResult,
@@ -72,57 +70,6 @@ pub struct ThreadPage {
     pub more: bool,
 }
 
-// ── Windows ────────────────────────────────────────────────────────────────
-
-/// The slice `[start, end)` of `ids` that is the newest `limit` before the
-/// message `before` (the newest of all for `None`; the end of the list when the
-/// id is not there).
-pub(crate) fn window_before(ids: &[String], before: Option<&str>, limit: usize) -> (usize, usize) {
-    let end = before
-        .and_then(|b| ids.iter().position(|i| i == b))
-        .unwrap_or(ids.len());
-    (end.saturating_sub(limit.max(1)), end)
-}
-
-/// The slice after the message `after` and whether `limit` cut it. An id that
-/// is not there yields nothing (the caller keeps its cursor).
-pub(crate) fn window_after(ids: &[String], after: &str, limit: usize) -> (usize, usize, bool) {
-    let Some(at) = ids.iter().position(|i| i == after) else {
-        return (ids.len(), ids.len(), false);
-    };
-    let start = at + 1;
-    let end = (start + limit.max(1)).min(ids.len());
-    (start, end, end < ids.len())
-}
-
-fn cut<T: Clone>(
-    all: &[T],
-    id: impl Fn(&T) -> &str,
-    cursor: Cursor<'_>,
-    limit: usize,
-) -> (Vec<T>, Option<String>, Option<String>, bool) {
-    let ids: Vec<String> = all.iter().map(|m| id(m).to_string()).collect();
-    match cursor {
-        Cursor::Before(before) => {
-            let (start, end) = window_before(&ids, before, limit);
-            let older = (start > 0).then(|| ids[start].clone());
-            let newest = (end > start).then(|| ids[end - 1].clone());
-            (all[start..end].to_vec(), older, newest, false)
-        }
-        Cursor::After(after) => {
-            let (start, end, more) = window_after(&ids, after, limit);
-            let newest = if end > start { ids[end - 1].clone() } else { after.to_string() };
-            (all[start..end].to_vec(), None, Some(newest), more)
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-enum Cursor<'a> {
-    Before(Option<&'a str>),
-    After(&'a str),
-}
-
 // ── AI chats ───────────────────────────────────────────────────────────────
 
 /// Text parts, tool calls and files of the entries a chat shows: user and
@@ -151,13 +98,20 @@ pub(crate) fn ai_entry(raw: &Json) -> Option<AiChatEntry> {
     })
 }
 
-async fn ai_entries(store: &atomic_lib::Db, chat: &str) -> CoreResult<Vec<AiChatEntry>> {
-    Ok(chats::read_chat(store, chat).await?.iter().filter_map(ai_entry).collect())
-}
-
-fn ai_page(all: &[AiChatEntry], cursor: Cursor<'_>, limit: usize) -> AiChatPage {
-    let (entries, older, newest, more) = cut(all, |e| &e.id, cursor, limit);
-    AiChatPage { entries, older, newest, more }
+/// The entries of a library window (`{entries, older?, newest, more?}`) as
+/// the chat shows them.
+fn ai_page(window: &Json) -> AiChatPage {
+    let cursor = |key: &str| window.get(key).and_then(Json::as_str).map(str::to_string);
+    AiChatPage {
+        entries: window
+            .get("entries")
+            .and_then(Json::as_array)
+            .map(|rows| rows.iter().filter_map(ai_entry).collect())
+            .unwrap_or_default(),
+        older: cursor("older"),
+        newest: cursor("newest"),
+        more: window.get("more").and_then(Json::as_bool).unwrap_or(false),
+    }
 }
 
 pub(crate) async fn ai_chat_page(
@@ -166,7 +120,7 @@ pub(crate) async fn ai_chat_page(
     before: Option<&str>,
     limit: usize,
 ) -> CoreResult<AiChatPage> {
-    Ok(ai_page(&ai_entries(store, chat).await?, Cursor::Before(before), limit))
+    Ok(ai_page(&chats::read_chat_page(store, chat, before, limit).await?))
 }
 
 pub(crate) async fn ai_chat_after(
@@ -175,7 +129,7 @@ pub(crate) async fn ai_chat_after(
     after: &str,
     limit: usize,
 ) -> CoreResult<AiChatPage> {
-    Ok(ai_page(&ai_entries(store, chat).await?, Cursor::After(after), limit))
+    Ok(ai_page(&chats::read_chat_after(store, chat, after, limit).await?))
 }
 
 /// The newest `limit` messages of an AI chat older than `before` (the newest
@@ -242,30 +196,31 @@ fn thread_message(raw: &Json) -> Option<ThreadMessage> {
     })
 }
 
-fn thread_page(rows: &[Json], cursor: Cursor<'_>, limit: usize) -> ThreadPage {
-    let all: Vec<ThreadMessage> = rows.iter().filter_map(thread_message).collect();
-    let (messages, older, newest, more) = cut(&all, |m| &m.id, cursor, limit);
-    ThreadPage { messages, older, newest, more }
-}
-
-pub(crate) async fn conversation_rows(store: &atomic_lib::Db, subject: &str) -> CoreResult<Vec<Json>> {
-    Ok(conversations().read(store, subject).await?)
-}
-
-pub(crate) async fn room_rows(store: &atomic_lib::Db, subject: &str) -> CoreResult<Vec<Json>> {
-    Ok(chat_rooms().read(store, subject).await?)
+/// A library window (`{messages, older?, newest, more?}`) as the thread shows it.
+fn thread_page(window: &Json) -> ThreadPage {
+    let cursor = |key: &str| window.get(key).and_then(Json::as_str).map(str::to_string);
+    ThreadPage {
+        messages: window
+            .get("messages")
+            .and_then(Json::as_array)
+            .map(|rows| rows.iter().filter_map(thread_message).collect())
+            .unwrap_or_default(),
+        older: cursor("older"),
+        newest: cursor("newest"),
+        more: window.get("more").and_then(Json::as_bool).unwrap_or(false),
+    }
 }
 
 /// A window of a conversation: only decrypted messages are text; one this
 /// agent cannot open has no text.
 #[uniffi::export(async_runtime = "tokio")]
 pub async fn read_conversation_page(subject: String, before: Option<String>, limit: u32) -> CoreResult<ThreadPage> {
-    Ok(thread_page(&conversation_rows(db()?, &subject).await?, Cursor::Before(before.as_deref()), limit as usize))
+    Ok(thread_page(&conversations().read_page(db()?, &subject, before.as_deref(), limit as usize).await?))
 }
 
 #[uniffi::export(async_runtime = "tokio")]
 pub async fn read_conversation_after(subject: String, after: String, limit: u32) -> CoreResult<ThreadPage> {
-    Ok(thread_page(&conversation_rows(db()?, &subject).await?, Cursor::After(&after), limit as usize))
+    Ok(thread_page(&conversations().read_after(db()?, &subject, &after, limit as usize).await?))
 }
 
 /// Post `text` in a conversation as this device's agent: sealed with the
@@ -287,12 +242,12 @@ pub async fn follow_conversation(subject: String) -> CoreResult<()> {
 
 #[uniffi::export(async_runtime = "tokio")]
 pub async fn read_room_page(subject: String, before: Option<String>, limit: u32) -> CoreResult<ThreadPage> {
-    Ok(thread_page(&room_rows(db()?, &subject).await?, Cursor::Before(before.as_deref()), limit as usize))
+    Ok(thread_page(&chat_rooms().read_page(db()?, &subject, before.as_deref(), limit as usize).await?))
 }
 
 #[uniffi::export(async_runtime = "tokio")]
 pub async fn read_room_after(subject: String, after: String, limit: u32) -> CoreResult<ThreadPage> {
-    Ok(thread_page(&room_rows(db()?, &subject).await?, Cursor::After(&after), limit as usize))
+    Ok(thread_page(&chat_rooms().read_after(db()?, &subject, &after, limit as usize).await?))
 }
 
 /// Post `text` in a meeting or chat room as this device's agent, as the web
@@ -307,6 +262,31 @@ pub async fn send_room_message(subject: String, text: String, reply_to: Option<S
         reply_to.as_deref(),
     )
     .await?)
+}
+
+/// Import a whole AI chat at once (one commit per 256 messages): a chat named
+/// `name` in the private drive with every message of `entries_json`, an array
+/// of `{role, parts, c}` oldest first. Returns the chat's subject.
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn import_ai_chat(name: String, entries_json: String) -> CoreResult<String> {
+    let node = node()?;
+    let author = node.db().get_default_agent()?.subject.to_string();
+    let raw: Vec<Json> = serde_json::from_str(&entries_json).map_err(|e| e.to_string())?;
+    let now = state::now_ms();
+    let entries: Vec<Entry> = raw
+        .iter()
+        .map(|e| {
+            let mut entry = Entry::new(author.clone(), "", e["c"].as_i64().unwrap_or(now));
+            let parts = match &e["parts"] {
+                Json::String(s) => s.clone(),
+                other => other.to_string(),
+            };
+            entry.extra.insert("role".into(), e["role"].as_str().unwrap_or("user").into());
+            entry.extra.insert("parts".into(), parts.as_str().into());
+            entry
+        })
+        .collect();
+    Ok(chats::import_ai_chat(&node, state::pusher().as_ref(), &name, &entries).await?)
 }
 
 // ── Around the chats ───────────────────────────────────────────────────────
@@ -345,30 +325,6 @@ mod tests {
     use super::*;
     use atomic_lib::host::{profiles::AgentProfiles, NoProfiles, NoPush};
     use serde_json::json;
-
-    fn ids(n: usize) -> Vec<String> {
-        (0..n).map(|i| format!("m{i}")).collect()
-    }
-
-    #[test]
-    fn the_newest_window_ends_at_the_end_and_the_next_one_ends_where_it_starts() {
-        let all = ids(10);
-        assert_eq!(window_before(&all, None, 4), (6, 10));
-        assert_eq!(window_before(&all, Some("m6"), 4), (2, 6));
-        assert_eq!(window_before(&all, Some("m2"), 4), (0, 2));
-        // A short chat is one window; a cursor that is gone reads the newest.
-        assert_eq!(window_before(&ids(3), None, 50), (0, 3));
-        assert_eq!(window_before(&all, Some("gone"), 4), (6, 10));
-    }
-
-    #[test]
-    fn what_came_after_a_cursor_is_cut_by_the_limit() {
-        let all = ids(10);
-        assert_eq!(window_after(&all, "m6", 2), (7, 9, true));
-        assert_eq!(window_after(&all, "m6", 10), (7, 10, false));
-        assert_eq!(window_after(&all, "m9", 10), (10, 10, false));
-        assert_eq!(window_after(&all, "gone", 10), (10, 10, false));
-    }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn a_long_ai_chat_is_read_window_by_window_and_polled() {
@@ -432,8 +388,7 @@ mod tests {
         atomic_lib::host::chat_rooms::send_message(&d.node, &NoPush, &room, "Hi again", Some(&first)).await.unwrap();
 
         let rooms = atomic_lib::host::chat_rooms::ChatRooms::new(AgentProfiles::new(std::sync::Arc::new(NoProfiles)));
-        let rows = rooms.read(&d.db, &room).await.unwrap();
-        let page = thread_page(&rows, Cursor::Before(None), 50);
+        let page = thread_page(&rooms.read_page(&d.db, &room, None, 50).await.unwrap());
         assert_eq!(page.messages.len(), 2);
         assert_eq!(page.messages[0].text.as_deref(), Some("Morning"));
         assert!(page.messages[0].mine);
@@ -445,12 +400,12 @@ mod tests {
 
     #[test]
     fn a_message_that_cannot_be_opened_has_no_text_and_an_event_is_marked() {
-        let rows = vec![
+        let rows = json!({ "messages": [
             json!({"id": "a", "author": "x", "author_name": "Anna", "mine": false, "text": null, "c": 5}),
             json!({"id": "b", "author": "y", "author_name": "Bo", "mine": true, "text": "Viewing [Plan](did:ad:p)", "c": 6,
                    "kind": "event", "about": "did:ad:p", "about_title": "Plan"}),
-        ];
-        let page = thread_page(&rows, Cursor::Before(None), 10);
+        ] });
+        let page = thread_page(&rows);
         assert_eq!(page.messages[0].text, None);
         assert_eq!(page.messages[0].author_name, "Anna");
         assert!(page.messages[1].is_event);

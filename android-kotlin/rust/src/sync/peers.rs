@@ -157,10 +157,14 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
         }
     }
 
-    // pkarr discover when still not live to any peer. The record also names
-    // replicas that are gone (an uninstalled app, an old laptop), so several
-    // are dialled at once and the first that answers wins.
-    if atomic_lib::sync::peer::live_peer_count() == 0 {
+    // pkarr discover, also when some peer is live already: a live server
+    // used to stop this lookup, and then the account's other devices were
+    // never dialled. The record also names replicas that are gone (an
+    // uninstalled app, an old laptop), so several are dialled at once and
+    // the first that answers wins; live ones are skipped
+    // (`sync_drive_with_peer_if_needed`). As in the Flutter bridge, the
+    // active and the private drive are both looked up.
+    {
         match tokio::time::timeout(PKARR_RESOLVE_TIMEOUT, async {
             let my_node_id = atomic_lib::sync::peer::get_node_id()
                 .ok_or("Peer not started")?
@@ -168,7 +172,21 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
             // Only other devices: a drive on this device alone names none,
             // which is nothing to report (it toasted "No peer on network:
             // Found 1 NodeID(s) but all are ours (…)" on every start).
-            atomic_lib::discovery::resolve_other_node_ids(&drive, Some(&my_node_id)).await
+            let mut drives = vec![drive.clone()];
+            if let Ok(private) = store.private_drive_subject() {
+                if !drives.contains(&private) {
+                    drives.push(private);
+                }
+            }
+            let mut others = Vec::new();
+            for search in drives {
+                for id in atomic_lib::discovery::resolve_other_node_ids(&search, Some(&my_node_id)).await? {
+                    if !others.contains(&id) {
+                        others.push(id);
+                    }
+                }
+            }
+            Ok::<_, atomic_lib::AtomicError>(others)
         })
         .await
         {
@@ -196,8 +214,8 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
                     )),
                 }
             }
-            Ok(Err(e)) => errors.push(format!("No peer on network: {e}")),
-            Err(_) => errors.push("Peer lookup timed out (pkarr)".into()),
+            Ok(Err(e)) => errors.push(format!("Could not look for devices: {e}")),
+            Err(_) => errors.push("Could not look for devices: the directory (pkarr) timed out".into()),
         }
     }
 
@@ -237,7 +255,7 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
     } else if imported > 0 {
         "Synced data but no live connection — try again".to_string()
     } else if errors.is_empty() {
-        "No peers online. Open the other device or pair with QR.".to_string()
+        "No other device found yet. Open the app on another device signed in with this account, or pair with QR.".to_string()
     } else {
         errors.join(" · ")
     };

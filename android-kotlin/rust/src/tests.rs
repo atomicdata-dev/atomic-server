@@ -91,10 +91,10 @@ async fn search_finds_a_document_by_a_word_prefix() {
     // Indexing may be deferred; drain it like the app does after a write.
     while atomic_lib::search::index_pending(&d.db, 500).await.unwrap_or(0) > 0 {}
 
-    let hits = home::search(&d.db, "migra", 10).unwrap();
+    let hits = home::search(&d.db, "migra", 10, None, &[]).unwrap();
     let hit = hits.iter().find(|h| h.subject == doc).unwrap_or_else(|| panic!("{doc} not in {hits:?}"));
     assert_eq!(hit.title, "Pelican migration notes");
-    assert!(home::search(&d.db, "   ", 10).unwrap().is_empty(), "an empty query finds nothing");
+    assert!(home::search(&d.db, "   ", 10, None, &[]).unwrap().is_empty(), "an empty query finds nothing");
 }
 
 #[test]
@@ -359,4 +359,42 @@ async fn resuming_without_a_drive_hint_uses_the_private_drive() {
     db.set_active_drive("did:ad:something-else").unwrap();
     assert!(crate::session::resume(&db, &agent.build_secret().unwrap(), None).await.unwrap());
     assert_eq!(db.get_active_drive().as_deref(), Some(drive.as_str()));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn ai_chats_come_in_pages_by_offset() {
+    let d = Device::new("chat-pages").await;
+    for i in 0..5 {
+        atomic_lib::host::chats::create_ai_chat(&d.node, &NoPush, &format!("Chat {i}")).await.unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(3)).await;
+    }
+    let first = home::ai_chats_page(&d.db, &d.index, 0, 3).await.unwrap();
+    let rest = home::ai_chats_page(&d.db, &d.index, 3, 3).await.unwrap();
+    assert_eq!(first.len(), 3);
+    assert_eq!(rest.len(), 2, "a short page is the last");
+    assert!(first.iter().all(|a| rest.iter().all(|b| a.subject != b.subject)));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn search_filters_by_class_before_the_limit() {
+    let d = Device::new("search-class").await;
+    let chat = atomic_lib::host::chats::create_ai_chat(&d.node, &NoPush, "Pelican chat").await.unwrap();
+    for i in 0..3 {
+        d.make(urls::DOCUMENT_V2, &format!("Pelican doc {i}")).await;
+    }
+    while atomic_lib::search::index_pending(&d.db, 500).await.unwrap_or(0) > 0 {}
+    let chats = home::search(&d.db, "pelican", 1, None, &["aichat".to_string()]).unwrap();
+    assert_eq!(chats.iter().map(|h| h.subject.as_str()).collect::<Vec<_>>(), [chat.as_str()]);
+    let in_drive = home::search(&d.db, "pelican doc", 10, Some(&d.drive), &[]).unwrap();
+    assert!(in_drive.len() >= 3);
+    assert!(home::search(&d.db, "pelican", 5, None, &["nonsense".to_string()]).is_err());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn drives_are_listed_the_active_one_first_then_by_use() {
+    let d = Device::new("drive-order").await;
+    let other = d.db.create_drive("Zed").await.unwrap();
+    d.db.set_active_drive(&other).unwrap();
+    let rows = home::drives(&d.db).await.unwrap();
+    assert_eq!(rows[0].subject, other, "the active drive leads");
 }

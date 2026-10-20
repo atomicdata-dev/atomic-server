@@ -12,6 +12,7 @@ uniffi::setup_scaffolding!();
 
 mod api;
 mod chat;
+mod compaction_check;
 mod embed;
 mod error;
 mod home;

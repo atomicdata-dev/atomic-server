@@ -40,6 +40,19 @@ pub struct ResourceRow {
     pub detail: String,
 }
 
+/// One line of the activity feed: `actor` changed (`kind`) the resource
+/// `name` of class `class_name` in `drive` at `at` (unix ms).
+#[derive(Clone, Debug, PartialEq, Eq, uniffi::Record)]
+pub struct ActivityRow {
+    pub subject: String,
+    pub drive: String,
+    pub kind: String,
+    pub at: i64,
+    pub actor: String,
+    pub name: String,
+    pub class_name: String,
+}
+
 /// The home lists a screen can ask for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, uniffi::Enum)]
 pub enum HomeList {

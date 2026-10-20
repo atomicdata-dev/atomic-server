@@ -118,15 +118,68 @@ pub async fn home_list(which: HomeList, limit: u32) -> CoreResult<Vec<ResourceRo
     home::list(db()?, recents(), conversations(), which, limit as usize).await
 }
 
-/// Full-text search across every drive, best first. Cheap enough to call on
-/// every keystroke; an empty query returns nothing.
+/// `limit` AI chats after the `offset` newest, newest activity first (the
+/// "All AI chats" list). A page shorter than `limit` is the last.
 #[uniffi::export(async_runtime = "tokio")]
-pub async fn search(query: String, limit: u32) -> CoreResult<Vec<SearchHit>> {
+pub async fn ai_chats_page(limit: u32, offset: u32) -> CoreResult<Vec<ResourceRow>> {
+    home::ai_chats_page(db()?, recents(), offset as usize, limit as usize).await
+}
+
+/// Full-text search, best first, across every drive or only in `drive`.
+/// `classes` (`drive`, `aichat`, `conversation`, `chatroom`; empty: any) keep
+/// only those kinds, filtered in the index before the limit. Cheap enough to
+/// call on every keystroke; an empty query returns nothing.
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn search(query: String, limit: u32, drive: Option<String>, classes: Vec<String>) -> CoreResult<Vec<SearchHit>> {
     let store = db()?.clone();
     // The index read is blocking work; keep it off the async workers.
-    tokio::task::spawn_blocking(move || home::search(&store, &query, limit as usize))
+    tokio::task::spawn_blocking(move || home::search(&store, &query, limit as usize, drive.as_deref(), &classes))
         .await
         .map_err(|e| format!("search task failed: {e}"))?
+}
+
+/// Read the search index once so the first keystroke is not cold. Call after
+/// the first frame; runs on a blocking thread and never fails.
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn warm_search() {
+    if let Ok(store) = db() {
+        let store = store.clone();
+        let _ = tokio::task::spawn_blocking(move || atomic_lib::host::lists::warm_search(&store)).await;
+    }
+}
+
+/// What changed lately in every drive, newest first, by whom. `include_own`
+/// adds the person's own changes (the feed's "Show mine"), by `You`.
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn list_activity(limit: u32, include_own: bool) -> CoreResult<Vec<ActivityRow>> {
+    let rows = atomic_lib::host::lists::list_activity_with(
+        db()?,
+        recents(),
+        &state::profiles(),
+        None,
+        limit as usize,
+        include_own,
+    )
+    .await;
+    Ok(rows
+        .into_iter()
+        .map(|a| ActivityRow {
+            subject: a.subject,
+            drive: a.drive,
+            kind: a.kind.as_str().to_string(),
+            at: a.at,
+            actor: a.actor,
+            name: a.name,
+            class_name: a.class_name,
+        })
+        .collect())
+}
+
+/// The bytes of a File resource (a profile picture) when this device holds
+/// them; `None` when the File or its bytes are not here (yet) or too large.
+#[uniffi::export(async_runtime = "tokio")]
+pub async fn read_file_bytes(file: String) -> CoreResult<Option<Vec<u8>>> {
+    Ok(atomic_lib::host::own_profile::file_bytes(db()?, &file).await?)
 }
 
 /// Record that this device opened `subject` in `drive` (local only).
