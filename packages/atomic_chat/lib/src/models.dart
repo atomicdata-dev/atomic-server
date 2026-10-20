@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart' show listEquals;
 
 import 'chat_parts.dart';
 import 'chat_window.dart';
@@ -351,17 +354,35 @@ class ProfileIdentity {
 
   /// The picture's download URL.
   final String? imageUrl;
+
+  /// The picture's bytes, when this device holds the profile's picture file.
+  final Uint8List? imageBytes;
   final String? emoji;
 
-  const ProfileIdentity({this.name, this.imageUrl, this.emoji});
+  /// The profile has a picture this device could not show yet (the file or
+  /// its bytes have not arrived): worth loading again soon.
+  final bool pendingImage;
+
+  const ProfileIdentity(
+      {this.name,
+      this.imageUrl,
+      this.imageBytes,
+      this.emoji,
+      this.pendingImage = false});
 
   @override
   bool operator ==(Object other) =>
       other is ProfileIdentity &&
       other.name == name &&
       other.imageUrl == imageUrl &&
+      other.pendingImage == pendingImage &&
+      (identical(other.imageBytes, imageBytes) ||
+          (other.imageBytes != null &&
+              imageBytes != null &&
+              listEquals(other.imageBytes, imageBytes))) &&
       other.emoji == emoji;
 
   @override
-  int get hashCode => Object.hash(name, imageUrl, emoji);
+  int get hashCode =>
+      Object.hash(name, imageUrl, imageBytes?.length, emoji, pendingImage);
 }

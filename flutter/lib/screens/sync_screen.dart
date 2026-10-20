@@ -7,7 +7,13 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart' show WebViewCookie;
 
 import 'package:atomic_chat/atomic_chat.dart'
-    show AppTopBar, ReadableWidth, ResourceWebView, openResourceView, timeAgo;
+    show
+        AppTopBar,
+        ProfileAvatar,
+        ReadableWidth,
+        ResourceWebView,
+        openResourceView,
+        timeAgo;
 
 import '../assistant/atomic_assistant_api.dart';
 import '../atomic/account_store.dart';
@@ -17,63 +23,14 @@ import '../theme.dart';
 import 'account_link_dialog.dart';
 import 'edit_profile_screen.dart';
 
-/// The person's picture in a circle when they have one, else their emoji icon,
-/// else their initial: the way into the agent and sync screen.
-class AgentAvatar extends StatelessWidget {
-  final String? name;
-  final double radius;
-
-  /// The agent's picture (its `icon` File's download URL).
-  final String? imageUrl;
-
-  /// The agent's emoji icon.
-  final String? emoji;
-
-  const AgentAvatar(
-      {super.key, this.name, this.radius = 16, this.imageUrl, this.emoji});
-
-  /// The same circle for an identity.
-  factory AgentAvatar.of(shared.AtomicIdentity? agent, {double radius = 16}) =>
-      AgentAvatar(
-          name: agent?.name,
-          imageUrl: agent?.imageUrl,
-          emoji: agent?.emoji,
-          radius: radius);
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.appColors;
-    final trimmed = name?.trim() ?? '';
-    final icon = emoji?.trim() ?? '';
-    final Widget fallback = icon.isNotEmpty
-        ? Text(icon, style: TextStyle(fontSize: radius))
-        : trimmed.isEmpty
-            ? Icon(Icons.person, size: radius * 1.1, color: c.mainSelectedFg)
-            : Text(trimmed.characters.first.toUpperCase(),
-                style: TextStyle(
-                    color: c.mainSelectedFg,
-                    fontWeight: FontWeight.w600,
-                    fontSize: radius * 0.9));
-    final url = imageUrl?.trim() ?? '';
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: c.mainSelectedBg,
-      child: url.isEmpty
-          ? fallback
-          : ClipOval(
-              child: Image.network(
-                url,
-                width: radius * 2,
-                height: radius * 2,
-                fit: BoxFit.cover,
-                // Offline, or a picture this device may not read: the
-                // initial instead.
-                errorBuilder: (_, __, ___) => Center(child: fallback),
-              ),
-            ),
-    );
-  }
-}
+/// The circle for an identity: its picture, else emoji, else initial.
+Widget agentAvatar(shared.AtomicIdentity? agent, {double radius = 16}) =>
+    ProfileAvatar(
+        name: agent?.name,
+        imageUrl: agent?.imageUrl,
+        imageBytes: agent?.imageBytes,
+        emoji: agent?.emoji,
+        radius: radius);
 
 /// Hides the portal's own top bar: the app already has its own.
 const portalChromeCss = 'nav.topbar{display:none!important}';
@@ -622,7 +579,7 @@ class _SyncScreenState extends State<SyncScreen> {
           onTap: agent == null ? null : _openProfile,
           borderRadius: BorderRadius.circular(12),
           child: Row(children: [
-            AgentAvatar.of(agent, radius: 28),
+            agentAvatar(agent, radius: 28),
             const SizedBox(width: 16),
             Expanded(
               child: Column(

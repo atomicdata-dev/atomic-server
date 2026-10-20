@@ -78,8 +78,13 @@ class AtomicClient {
   static Future<AgentInfo?> getActiveAgent() => ffi.getActiveAgent();
 
   /// The active agent's profile as JSON `{subject, name, description, emoji?,
-  /// imageUrl?}`.
+  /// imageUrl?, iconFile?}`.
   static Future<String> getOwnProfile() => ffi.getOwnProfile();
+
+  /// The bytes of a File resource (a profile picture) this device holds, else
+  /// null (the File or its bytes have not arrived).
+  static Future<Uint8List?> readFileBytes(String file) =>
+      ffi.readFileBytes(file: file);
 
   /// Save the active agent's name and description (a commit by the agent).
   static Future<void> setAgentProfile(String name, String description) =>
@@ -263,8 +268,7 @@ class AtomicClient {
 
   /// The messages of an AI chat after the cursor [after].
   static Future<ChatPage<ChatEntry>> readChatEntriesAfter(
-          String subject, String after,
-          {int limit = 100}) async =>
+          String subject, String after, {int limit = 100}) async =>
       AssistantJson.parsePage(
           await assistant.readChatAfter(
               subject: subject, after: after, limit: limit),
@@ -282,8 +286,7 @@ class AtomicClient {
 
   /// The lines of a meeting or chat room after the cursor [after].
   static Future<ChatPage<ChatRoomMessage>> readChatRoomAfter(
-          String subject, String after,
-          {int limit = 100}) async =>
+          String subject, String after, {int limit = 100}) async =>
       AssistantJson.parsePage(
           await assistant.readChatRoomAfter(
               subject: subject, after: after, limit: limit),
@@ -303,8 +306,7 @@ class AtomicClient {
 
   /// The messages of a conversation after the cursor [after].
   static Future<ChatPage<ConversationMessage>> readConversationAfter(
-          String subject, String after,
-          {int limit = 100}) async =>
+          String subject, String after, {int limit = 100}) async =>
       AssistantJson.parsePage(
           await assistant.readConversationAfter(
               subject: subject, after: after, limit: limit),

@@ -1,8 +1,8 @@
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
 import 'atomic_client.dart';
+import 'own_profile.dart';
 import 'atomic_auth.dart';
 import 'server_info.dart';
 import 'session.dart';
@@ -16,21 +16,17 @@ class AppSettingsBackend extends shared.AtomicSettingsBackend {
     final agent = await AtomicClient.getActiveAgent();
     if (agent == null) return null;
     try {
-      final p = jsonDecode(await AtomicClient.getOwnProfile())
-          as Map<String, dynamic>;
-      String? text(String key) {
-        final v = (p[key] as String?)?.trim();
-        return v == null || v.isEmpty ? null : v;
-      }
-
+      final p = await OwnProfile.load();
       return shared.AtomicIdentity(
         subject: agent.subject,
-        name: text('name') ?? agent.name,
-        description: text('description'),
-        imageUrl: text('imageUrl'),
-        emoji: text('emoji'),
+        name: p.name ?? agent.name,
+        description: p.description,
+        imageUrl: p.imageUrl,
+        imageBytes: p.imageBytes,
+        emoji: p.emoji,
       );
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Own profile not read: $e');
       return shared.AtomicIdentity(subject: agent.subject, name: agent.name);
     }
   }

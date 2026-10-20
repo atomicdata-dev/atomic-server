@@ -248,18 +248,53 @@ class ShellController extends ChangeNotifier {
 
   int _identityLoads = 0;
 
+  /// How long to wait before loading the identity again when its picture has
+  /// not arrived yet (one entry per retry; the sync may still be fetching
+  /// the file).
+  List<Duration> identityRetries = const [
+    Duration(seconds: 5),
+    Duration(seconds: 20),
+    Duration(seconds: 60),
+  ];
+  int _identityRetry = 0;
+  Timer? _identityTimer;
+
   /// Loads the identity again (after the profile was edited, on resume).
   Future<void> refreshIdentity() async {
     final load = identityLoader;
     if (load == null) return;
     final n = ++_identityLoads;
     try {
-      final who = await load();
+      var who = await load();
       // The latest request wins.
       if (_disposed || n != _identityLoads) return;
-      if (who != null) identity.value = who;
-    } catch (_) {
+      if (who == null) return;
+      final before = identity.value;
+      // A load that could not read the picture does not take away the one
+      // already shown.
+      if (who.pendingImage &&
+          before != null &&
+          (before.imageBytes != null || before.imageUrl != null) &&
+          who.imageBytes == null &&
+          who.imageUrl == null) {
+        who = ProfileIdentity(
+            name: who.name,
+            imageUrl: before.imageUrl,
+            imageBytes: before.imageBytes,
+            emoji: who.emoji,
+            pendingImage: true);
+      }
+      identity.value = who;
+      _identityTimer?.cancel();
+      if (!who.pendingImage) {
+        _identityRetry = 0;
+      } else if (_identityRetry < identityRetries.length) {
+        _identityTimer =
+            Timer(identityRetries[_identityRetry++], refreshIdentity);
+      }
+    } catch (e) {
       // The last one stays.
+      debugPrint('Profile identity not loaded: $e');
     }
   }
 
@@ -390,7 +425,8 @@ class ShellController extends ChangeNotifier {
   }
 
   /// [open] with the page sliding in from the right.
-  Future<T?> openPage<T>(String kind, WidgetBuilder builder) => open<T>(kind,
+  Future<T?> openPage<T>(String kind, WidgetBuilder builder) => open<T>(
+      kind,
       (settings) => SlideBackRoute<T>(
           builder: builder, settings: settings, instant: split));
 
@@ -478,6 +514,7 @@ class ShellController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _settling?.cancel();
+    _identityTimer?.cancel();
     drive.dispose();
     identity.dispose();
     list.dispose();
@@ -836,8 +873,8 @@ const listOvershootLimit = 48.0;
 
 /// The spring that brings the list pane back to its bound: a little under
 /// critical damping (a hair of overshoot), settled in about 300 ms.
-final listSpring = SpringDescription.withDampingRatio(
-    mass: 1, stiffness: 260, ratio: 0.85);
+final listSpring =
+    SpringDescription.withDampingRatio(mass: 1, stiffness: 260, ratio: 0.85);
 
 double _tanh(double x) {
   final e = math.exp(2 * x.clamp(-20.0, 20.0));
@@ -1071,7 +1108,8 @@ class _SplitPanesState extends State<_SplitPanes>
       return ValueListenableBuilder<double?>(
         valueListenable: shell.listWidth,
         builder: (context, dragged, _) {
-          final full = snapPaneWidth(listPaneWidth(room, dragged: dragged), dpr);
+          final full =
+              snapPaneWidth(listPaneWidth(room, dragged: dragged), dpr);
           return AnimatedBuilder(
             animation: _open,
             builder: (context, _) {
@@ -1079,8 +1117,7 @@ class _SplitPanesState extends State<_SplitPanes>
               final listFull = dragging == null
                   ? full
                   : math.max(_minList, math.min(dragging, room - _minDetail));
-              final shown =
-                  snapPaneWidth(dragging ?? full * _open.value, dpr);
+              final shown = snapPaneWidth(dragging ?? full * _open.value, dpr);
               final gone = shown <= 0.5;
               return Stack(children: [
                 Positioned.fill(

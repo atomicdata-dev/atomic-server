@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'server_info.dart';
 
@@ -8,6 +10,7 @@ class AtomicIdentity {
     this.name,
     this.description,
     this.imageUrl,
+    this.imageBytes,
     this.emoji,
   });
   final String subject;
@@ -16,6 +19,9 @@ class AtomicIdentity {
 
   /// The agent's picture (the download URL of its `icon` File), if any.
   final String? imageUrl;
+
+  /// The picture's bytes, when this device holds the picture's file.
+  final Uint8List? imageBytes;
 
   /// The agent's emoji icon, if it has one and no picture.
   final String? emoji;
