@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:atomic_chat/atomic_chat.dart';
 
 import '../atomic/account_store.dart';
@@ -59,6 +61,27 @@ class AtomicAssistantApi extends AssistantApi {
   @override
   Future<String?> agentName() async =>
       (await AtomicClient.getActiveAgent())?.name;
+
+  @override
+  Future<ProfileIdentity?> ownIdentity() async {
+    final agent = await AtomicClient.getActiveAgent();
+    if (agent == null) return null;
+    try {
+      final p = jsonDecode(await AtomicClient.getOwnProfile())
+          as Map<String, dynamic>;
+      String? text(String key) {
+        final v = (p[key] as String?)?.trim();
+        return v == null || v.isEmpty ? null : v;
+      }
+
+      return ProfileIdentity(
+          name: text('name') ?? agent.name,
+          imageUrl: text('imageUrl'),
+          emoji: text('emoji'));
+    } catch (_) {
+      return ProfileIdentity(name: agent.name);
+    }
+  }
 
   /// The linked account's AI. With no session saved, the active agent signs
   /// the account in first (as the web app does).

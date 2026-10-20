@@ -64,6 +64,10 @@ abstract class AssistantApi {
   /// The name of this device's agent, if known.
   Future<String?> agentName();
 
+  /// The name, picture and emoji of this device's agent for the bar's profile
+  /// button; null when unknown (the button then shows a person icon).
+  Future<ProfileIdentity?> ownIdentity() async => null;
+
   /// The AI of the linked account; null when none is linked.
   Future<HostedAi?> hostedAi();
 

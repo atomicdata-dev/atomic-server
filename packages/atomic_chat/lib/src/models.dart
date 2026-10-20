@@ -331,3 +331,25 @@ abstract final class AssistantJson {
         {'type': 'text', 'text': text}
       ]);
 }
+
+/// Who the person is, for the bar's profile button: the name, picture and
+/// emoji of this device's agent. Every part is optional.
+class ProfileIdentity {
+  final String? name;
+
+  /// The picture's download URL.
+  final String? imageUrl;
+  final String? emoji;
+
+  const ProfileIdentity({this.name, this.imageUrl, this.emoji});
+
+  @override
+  bool operator ==(Object other) =>
+      other is ProfileIdentity &&
+      other.name == name &&
+      other.imageUrl == imageUrl &&
+      other.emoji == emoji;
+
+  @override
+  int get hashCode => Object.hash(name, imageUrl, emoji);
+}

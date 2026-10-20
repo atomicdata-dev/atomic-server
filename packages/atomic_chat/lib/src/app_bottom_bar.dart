@@ -7,6 +7,7 @@ import 'assistant_api.dart';
 import 'chat_screen.dart';
 import 'models.dart';
 import 'native_views.dart';
+import 'profile_avatar.dart';
 import 'new_document_sheet.dart';
 import 'resource_view.dart';
 import 'search_screen.dart';
@@ -162,10 +163,11 @@ class AppBottomBar extends StatelessWidget {
                         _Current(
                           current: top == ShellPage.profile,
                           label: 'Profile',
-                          child: IconButton(
-                            tooltip: 'Profile',
-                            onPressed: top == ShellPage.profile ? null : onUser,
-                            icon: const Icon(Icons.person_outline),
+                          child: _ProfileButton(
+                            shell: shell,
+                            current: top == ShellPage.profile,
+                            wide: split,
+                            onPressed: onUser,
                           ),
                         ),
                         if (split) ...[
@@ -387,6 +389,97 @@ class _Current extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The widest the name next to the avatar gets.
+const _profileNameWidth = 96.0;
+
+/// The profile button: the person's avatar (ringed in the main colour when
+/// their page is on top) and, on a wide bar, their name; a person icon until
+/// the identity is loaded. The name is the tooltip and the semantics label.
+class _ProfileButton extends StatelessWidget {
+  final ShellController shell;
+  final bool current;
+  final bool wide;
+  final VoidCallback? onPressed;
+
+  const _ProfileButton({
+    required this.shell,
+    required this.current,
+    required this.wide,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final main = context.appColors.main;
+    return ValueListenableBuilder<ProfileIdentity?>(
+      valueListenable: shell.identity,
+      builder: (context, who, _) {
+        if (who == null) {
+          return IconButton(
+            tooltip: 'Profile',
+            onPressed: current ? null : onPressed,
+            icon: const Icon(Icons.person_outline),
+          );
+        }
+        final name = who.name?.trim() ?? '';
+        final label = name.isEmpty ? 'Profile' : name;
+        final showName = wide && name.isNotEmpty;
+        final avatar = Container(
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+                color: current ? main : Colors.transparent, width: 2),
+          ),
+          child: ProfileAvatar.of(who, radius: 12),
+        );
+        return Tooltip(
+          message: label,
+          child: Semantics(
+            button: true,
+            label: label,
+            excludeSemantics: true,
+            onTap: current ? null : onPressed,
+            child: InkResponse(
+              onTap: current ? null : onPressed,
+              radius: 28,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                child: Center(
+                  child: showName
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            avatar,
+                            const SizedBox(width: 6),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                  maxWidth: _profileNameWidth),
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: current
+                                        ? main
+                                        : Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant),
+                              ),
+                            ),
+                          ]),
+                        )
+                      : avatar,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -16,6 +16,7 @@ export 'src/ai_tools.dart';
 // The shell: pages above a bottom bar that never moves.
 export 'src/app_shell.dart';
 export 'src/app_bottom_bar.dart';
+export 'src/profile_avatar.dart';
 export 'src/app_top_bar.dart';
 export 'src/app_theme.dart';
 export 'src/slide_back_route.dart';

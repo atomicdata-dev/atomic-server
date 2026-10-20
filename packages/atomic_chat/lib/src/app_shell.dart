@@ -177,6 +177,31 @@ class ShellController extends ChangeNotifier {
   /// [WarmResourceWebView]); null where there is none.
   WarmResourceWebView? warm;
 
+  /// Who the person is, for the bar's profile button; null until loaded (the
+  /// button then shows a person icon). Kept once loaded: a failed refresh
+  /// leaves the last one.
+  final ValueNotifier<ProfileIdentity?> identity = ValueNotifier(null);
+
+  /// Reads the identity ([AppShell] sets it to the api's [AssistantApi.ownIdentity]).
+  Future<ProfileIdentity?> Function()? identityLoader;
+
+  int _identityLoads = 0;
+
+  /// Loads the identity again (after the profile was edited, on resume).
+  Future<void> refreshIdentity() async {
+    final load = identityLoader;
+    if (load == null) return;
+    final n = ++_identityLoads;
+    try {
+      final who = await load();
+      // The latest request wins.
+      if (_disposed || n != _identityLoads) return;
+      if (who != null) identity.value = who;
+    } catch (_) {
+      // The last one stays.
+    }
+  }
+
   ShellController({String drive = '', this.profile})
       : drive = ValueNotifier(drive);
 
@@ -342,7 +367,13 @@ class ShellController extends ChangeNotifier {
 
   void _setTop(Route<dynamic>? route) {
     if (identical(route, _top)) return;
+    final before = topKind;
     _top = route;
+    // Coming back from (or into) the profile pages: the profile may have been
+    // edited there.
+    if (before == ShellPage.profile || topKind == ShellPage.profile) {
+      refreshIdentity();
+    }
     _changed();
   }
 
@@ -380,6 +411,7 @@ class ShellController extends ChangeNotifier {
     _disposed = true;
     _settling?.cancel();
     drive.dispose();
+    identity.dispose();
     list.dispose();
     listCollapsed.dispose();
     listWidth.dispose();
@@ -499,7 +531,7 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   late final ShellController _shell =
       ShellController(drive: widget.drive, profile: widget.profile);
   late final _TopObserver _observer = _TopObserver(_shell);
@@ -557,6 +589,14 @@ class _AppShellState extends State<AppShell> {
           ?..showAhead = _likelyNext
           ..warmUp();
     _shell.loadListPrefs();
+    _shell.identityLoader = widget.api.ownIdentity;
+    _shell.refreshIdentity();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _shell.refreshIdentity();
   }
 
   @override
@@ -580,6 +620,7 @@ class _AppShellState extends State<AppShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _shell.warm?.dispose();
     _shell.dispose();
     _barHeight.dispose();
