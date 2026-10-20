@@ -768,10 +768,11 @@ class _SearchScreenState extends State<SearchScreen> {
     child: SafeArea(
       top: false,
       child: Padding(
-        // The palette: the same 12 dp above and below, 16 at the sides.
+        // The palette: the same 12 dp above and below. Both: the field, the
+        // chip and the result rows share one 16 dp gutter at both sides.
         padding: widget.palette
             ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
-            : const EdgeInsets.fromLTRB(16, 4, 12, 12),
+            : const EdgeInsets.fromLTRB(16, 4, 16, 12),
         child: Row(
           children: [
             Expanded(
@@ -836,7 +837,7 @@ class _SearchScreenState extends State<SearchScreen> {
         if (n == items.length || n < 0) {
           return Padding(
             padding:
-                EdgeInsets.fromLTRB(palette ? 24 : 16, palette ? 4 : 12, 16, 4),
+                EdgeInsets.fromLTRB(palette ? 32 : 16, palette ? 4 : 12, 16, 4),
             child: Text(_model.kind.heading,
                 style: TextStyle(
                     color: c.textSecondary,
@@ -952,7 +953,7 @@ class _SearchScreenState extends State<SearchScreen> {
       // outlined (an outline moved its content).
       return Padding(
         key: top ? const Key('search-top-hit') : null,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
         child: Material(
           color: top ? c.mainSelectedBg : Colors.transparent,
           borderRadius: BorderRadius.circular(9),
@@ -965,7 +966,7 @@ class _SearchScreenState extends State<SearchScreen> {
     // The one Enter opens.
     return Container(
       key: const Key('search-top-hit'),
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       decoration: BoxDecoration(
         border: Border.all(color: c.main, width: 1.5),
         borderRadius: BorderRadius.circular(9),
