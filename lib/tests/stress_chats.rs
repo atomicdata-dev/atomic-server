@@ -669,6 +669,38 @@ async fn stress_measure() {
          after search {rss_after_search:.0} MB, end {rss_end:.0} MB"
     );
 
+    if std::env::var("STRESS_TREES").is_ok() {
+        use atomic_lib::db::trees::Tree;
+        println!("\n| tree | entries | keys MB | values MB (uncompressed) |\n|---|---:|---:|---:|");
+        for tree in [
+            Tree::Resources,
+            Tree::LoroSnapshots,
+            Tree::Envelopes,
+            Tree::Outbox,
+            Tree::PropValSub,
+            Tree::ValPropSub,
+            Tree::QueryMembers,
+            Tree::SearchPostings,
+            Tree::SearchDocs,
+            Tree::SearchTrigrams,
+            Tree::DidMapping,
+            Tree::PluginMeta,
+        ] {
+            let (mut n, mut keys, mut values) = (0usize, 0usize, 0usize);
+            for pair in store.kv.iter_tree(tree) {
+                let (k, v) = pair.unwrap();
+                n += 1;
+                keys += k.len();
+                values += v.len();
+            }
+            println!(
+                "| {tree:?} | {n} | {:.1} | {:.1} |",
+                keys as f64 / 1e6,
+                values as f64 / 1e6
+            );
+        }
+    }
+
     if std::env::var("STRESS_REBUILD").is_ok() {
         let t = Instant::now();
         atomic_lib::search::rebuild_search_index(&store).unwrap();
