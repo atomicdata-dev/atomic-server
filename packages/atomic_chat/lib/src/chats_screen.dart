@@ -196,6 +196,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
       shell?.addListener(_onShellChanged);
     }
     _shell = shell;
+    _publishActivity();
     // The profile button of the shell signs out through the home.
     if (_profile != null) _shell?.onUser = _settings;
   }
@@ -233,6 +234,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   @override
   void dispose() {
     _shell?.removeListener(_onShellChanged);
+    _shell?.activity.value = null;
     if (_shell?.onUser == _settings) _shell?.onUser = null;
     super.dispose();
   }
@@ -282,9 +284,27 @@ class _ChatsScreenState extends State<ChatsScreen> {
               if (drives.contains(driveKey(a.drive))) a
           ];
     widget.api.resourceIcons([for (final a in list) a.subject]).then((icons) {
-      if (mounted && !_sameIcons(icons)) setState(() => _icons = icons);
+      if (mounted && !_sameIcons(icons)) {
+        setState(() => _icons = icons);
+        _publishActivity();
+      }
     }).catchError((Object _) {});
     return list;
+  }
+
+  /// Hands the activity feed to the shell, for the detail pane while nothing
+  /// is open next to the home (the split layout shows it there, big, instead
+  /// of as a section). The rows are the home's own.
+  void _publishActivity() {
+    final shell = _shell;
+    if (shell == null) return;
+    final future = _activity;
+    future
+        .then((list) => list, onError: (Object _) => <ActivityEntry>[])
+        .then((list) {
+      if (!mounted || !identical(future, _activity)) return;
+      shell.activity.value = (entries: list, row: _activityRow);
+    });
   }
 
   bool _sameIcons(Map<String, String> icons) =>
@@ -309,6 +329,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         _activity = _loadActivity();
         _notifications = _loadNotifications();
       });
+      _publishActivity();
     });
     // A frame must run for the callback to fire.
     WidgetsBinding.instance.scheduleFrame();
@@ -693,6 +714,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
+    final split = ShellScope.layoutOf(context) == ShellLayout.split;
     return FutureBuilder<List<DriveInfo>>(
       future: _drives,
       builder: (context, snapshot) {
@@ -727,7 +749,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
               child: ListView(
                 physics: const ClampingScrollPhysics(),
                 children: [
-                  for (final id in _layout.visible) _sectionFor(id, c),
+                  // Next to the pages the activity is the detail pane's.
+                  for (final id in _layout.visible)
+                    if (!(split && id == HomeSection.activity))
+                      _sectionFor(id, c),
                   if (_layout.visible.isEmpty) _showSectionsButton(),
                 ],
               ),

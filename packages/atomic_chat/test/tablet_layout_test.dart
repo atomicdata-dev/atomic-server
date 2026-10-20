@@ -752,7 +752,7 @@ void main() {
         expect(tester.getRect(all).right, closeTo(list.right - 4, 1));
         expect(
             tester
-                .getRect(find.byKey(const ValueKey('section-search-activity')))
+                .getRect(find.byKey(const ValueKey('section-new-chats')))
                 .right,
             closeTo(list.right - 4, 1));
         await _done(tester);
@@ -939,6 +939,73 @@ void main() {
       final main =
           tester.element(find.byType(AppBottomBar)).appColors.mainSelectedBg;
       expect(avatar.backgroundColor, isNot(main));
+      await _done(tester);
+    });
+  });
+
+  group('the home page next to the sidebar is the activity feed', () {
+    FakeApi withActivity({bool none = false}) => FakeApi(
+          recent: [_r('did:ad:plans', 'Plans')],
+          driveList: const [],
+          activityList: none
+              ? const []
+              : [
+                  ActivityEntry(
+                      subject: 'did:ad:budget',
+                      drive: 'did:ad:drive',
+                      kind: 'changed',
+                      at: DateTime.now().millisecondsSinceEpoch,
+                      actor: 'Polle',
+                      name: 'Budget',
+                      className: 'document-v2'),
+                ],
+        );
+
+    testWidgets('nothing open: the feed, big; a row opens next to it',
+        (tester) async {
+      _size(tester, _landscape);
+      await tester.pumpWidget(_shell(withActivity()));
+      await _settle(tester);
+      final feed = find.byKey(const Key('home-activity'));
+      expect(feed, findsOneWidget);
+      expect(find.descendant(of: feed, matching: find.text('Activity')),
+          findsOneWidget);
+      final row = find.descendant(of: feed, matching: find.text('Budget'));
+      expect(row, findsOneWidget);
+      // At most 720 wide, in the detail pane.
+      expect(tester.getSize(feed).width, lessThanOrEqualTo(720));
+      final list = tester.getRect(find.byType(ChatsScreen));
+      expect(tester.getRect(feed).left, greaterThan(list.right));
+      // Not a section of the sidebar as well.
+      expect(
+          find.byKey(const ValueKey('section-heading-activity')), findsNothing);
+      await tester.tap(row);
+      await _settle(tester);
+      expect(find.byType(ResourceView), findsOneWidget);
+      expect(feed, findsNothing);
+      // Back: the feed again.
+      await tester.binding.handlePopRoute();
+      await _settle(tester);
+      expect(feed, findsOneWidget);
+      await _done(tester);
+    });
+
+    testWidgets('an empty feed says so', (tester) async {
+      _size(tester, _portrait);
+      await tester.pumpWidget(_shell(withActivity(none: true)));
+      await _settle(tester);
+      expect(find.textContaining('Nothing yet'), findsOneWidget);
+      await _done(tester);
+    });
+
+    testWidgets('a phone keeps Activity as a section of the home',
+        (tester) async {
+      _size(tester, _phone);
+      await tester.pumpWidget(_shell(withActivity()));
+      await _settle(tester);
+      expect(find.byKey(const Key('home-activity')), findsNothing);
+      expect(find.byKey(const ValueKey('section-heading-activity')),
+          findsOneWidget);
       await _done(tester);
     });
   });

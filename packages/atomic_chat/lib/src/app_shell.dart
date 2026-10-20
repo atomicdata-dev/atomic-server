@@ -79,6 +79,13 @@ enum ShellLayout {
 /// the Samsung tablet start on an empty page with nothing to go back to).
 const listWidthKey = 'shell_list_width';
 
+/// The home's activity feed as the home read it, with the home's own row
+/// for an entry (its icon, what a tap opens).
+typedef HomeFeed = ({
+  List<ActivityEntry> entries,
+  Widget Function(ActivityEntry) row,
+});
+
 /// Opens a page's menu; [anchor] is the bar button that asked, in global
 /// coordinates, so the menu opens at that button.
 typedef ShellMenu = void Function(Rect anchor);
@@ -102,6 +109,10 @@ class ShellController extends ChangeNotifier {
   /// ([ShellPage.home]) or a search ([ShellPage.search],
   /// [ShellPage.searchIn]).
   final ValueNotifier<String> list = ValueNotifier(ShellPage.home);
+
+  /// The home's activity feed, which the detail pane shows while nothing is
+  /// open (split layout); the home publishes it, null until it has read it.
+  final ValueNotifier<HomeFeed?> activity = ValueNotifier(null);
 
   /// The subject of the resource the detail pane shows (what was opened
   /// from a list), for the list to mark its row; null when none.
@@ -413,6 +424,7 @@ class ShellController extends ChangeNotifier {
     drive.dispose();
     identity.dispose();
     list.dispose();
+    activity.dispose();
     listCollapsed.dispose();
     listWidth.dispose();
     selected.dispose();
@@ -1123,9 +1135,15 @@ class _HomeSlot extends StatelessWidget {
           : home;
 }
 
-/// The detail pane before anything is opened.
+/// The detail pane before anything is opened: the home's activity feed,
+/// big, in a readable column.
 class _NothingOpen extends StatelessWidget {
   const _NothingOpen();
+
+  /// The widest the feed's column gets.
+  static const maxWidth = 720.0;
+
+  static final _noFeed = ValueNotifier<HomeFeed?>(null);
 
   @override
   Widget build(BuildContext context) {
@@ -1134,29 +1152,48 @@ class _NothingOpen extends StatelessWidget {
     return Scaffold(
       key: const Key('nothing-open'),
       backgroundColor: c.bgBody,
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.article_outlined, size: 40, color: c.textSecondary),
-            const SizedBox(height: 12),
-            Text('Open something from the list',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: c.textSecondary)),
-            if (shell != null)
-              ValueListenableBuilder<bool>(
-                valueListenable: shell.listCollapsed,
-                builder: (context, collapsed, _) => collapsed
-                    ? Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: TextButton(
-                          onPressed: () => shell.setListCollapsed(false),
-                          child: const Text('Show list'),
-                        ),
-                      )
-                    : const SizedBox.shrink(),
+      body: SafeArea(
+        bottom: false,
+        child: ValueListenableBuilder<HomeFeed?>(
+          valueListenable: shell?.activity ?? _noFeed,
+          builder: (context, feed, _) => Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: maxWidth),
+              child: ListView(
+                key: const Key('home-activity'),
+                padding: EdgeInsets.fromLTRB(
+                    8, 24, 8, 24 + MediaQuery.paddingOf(context).bottom),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: Text('Activity',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineSmall
+                            ?.copyWith(
+                                color: c.textPrimary,
+                                fontWeight: FontWeight.w600)),
+                  ),
+                  if (feed == null)
+                    const Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (feed.entries.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: Text(
+                          'Nothing yet: create or open something, and what '
+                          'others change in your drives shows up here.',
+                          style: TextStyle(color: c.textSecondary)),
+                    )
+                  else
+                    for (final a in feed.entries) feed.row(a),
+                ],
               ),
-          ]),
+            ),
+          ),
         ),
       ),
     );
