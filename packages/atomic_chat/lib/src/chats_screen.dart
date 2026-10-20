@@ -2,6 +2,7 @@ import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt, HoldFan, HoldFanItem, HoldFanLayout, Perf;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'app_bottom_bar.dart';
 import 'app_top_bar.dart';
 import 'home_sections.dart';
@@ -135,6 +136,32 @@ class _ChatsScreenState extends State<ChatsScreen> {
     HomeLayout.load().then((layout) {
       if (mounted) setState(() => _layout = layout);
     });
+    _loadMine();
+  }
+
+  /// SharedPreferences key: the activity feed's "Show mine" (per device).
+  static const showMineKey = 'activity_show_mine';
+
+  /// The activity feed shows the person's own changes too.
+  bool _mine = false;
+
+  Future<void> _loadMine() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      if (mounted && (p.getBool(showMineKey) ?? false)) _setMine(true);
+    } catch (_) {}
+  }
+
+  void _setMine(bool mine) {
+    if (mine == _mine) return;
+    setState(() {
+      _mine = mine;
+      _activity = _loadActivity();
+    });
+    _publishActivity();
+    SharedPreferences.getInstance()
+        .then((p) => p.setBool(showMineKey, mine))
+        .catchError((Object _) => false);
   }
 
   /// `[perf] home data` once every list of the first load is in, and `home
@@ -275,7 +302,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
   /// rows do not carry the resources' own icons, so those are looked up after
   /// the list is out (never blocking it).
   Future<List<ActivityEntry>> _loadActivity() async {
-    final all = await widget.api.activity(_maxActivity);
+    final all = _mine
+        ? await widget.api.activityWithMine(_maxActivity)
+        : await widget.api.activity(_maxActivity);
     final drives = await _drives.then(
         (ds) => {for (final d in ds) driveKey(d.subject)},
         onError: (Object _) => <String>{});
@@ -305,7 +334,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
         .then((list) => list, onError: (Object _) => <ActivityEntry>[])
         .then((list) {
       if (!mounted || !identical(future, _activity)) return;
-      shell.activity.value = (entries: list, row: _activityRow);
+      shell.activity.value =
+          (entries: list, row: _activityRow, mine: _mine, onMine: _setMine);
     });
   }
 
@@ -413,8 +443,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
     Navigator.of(context).push(SlideBackRoute<void>(builder: page));
   }
 
-  /// A section's "new": what it lists, made fresh. Null where that makes no
-  /// sense (activity, notifications, favorites) or there is no shell.
+  /// A section's "new": what it lists, made fresh; for the activity its
+  /// "Show mine". Null where that makes no sense (notifications, favorites)
+  /// or there is no shell.
   Widget? _plusFor(HomeSection id) {
     final actions = _actions;
     if (actions == null) return null;
@@ -424,6 +455,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
         icon: Icons.add,
         onPressed: onPressed);
     return switch (id) {
+      // Not a "new": the feed's own switch.
+      HomeSection.activity => ShowMineChip(value: _mine, onChanged: _setMine),
       HomeSection.drives => button('New drive', actions.newDrive),
       HomeSection.chats => button('New AI chat', actions.newChat),
       HomeSection.messages => button('New chat room', actions.newConversation),
@@ -438,10 +471,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
           child:
               Icon(Icons.add, size: 24, color: context.appColors.textSecondary),
         ),
-      HomeSection.activity ||
-      HomeSection.notifications ||
-      HomeSection.favorites =>
-        null,
+      HomeSection.notifications || HomeSection.favorites => null,
     };
   }
 
@@ -688,7 +718,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
           title: id.title,
           fold: fold,
           future: _activity,
-          empty: 'No activity from others yet',
+          empty: _mine ? 'Nothing changed yet' : 'No activity from others yet',
           rows: (list) => [for (final a in list) _activityRow(a)],
           onShowAll: (list) {
             final shown = list.take(_maxActivity).toList();

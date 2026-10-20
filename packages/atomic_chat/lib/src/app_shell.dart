@@ -85,7 +85,27 @@ const listWidthKey = 'shell_list_width';
 typedef HomeFeed = ({
   List<ActivityEntry> entries,
   Widget Function(ActivityEntry) row,
+  // "Show mine": the person's own changes too.
+  bool mine,
+  ValueChanged<bool> onMine,
 });
+
+/// The activity feed's "Show mine": also the person's own changes.
+class ShowMineChip extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const ShowMineChip({super.key, required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) => FilterChip(
+        key: const Key('show-mine'),
+        label: const Text('Show mine'),
+        selected: value,
+        onSelected: onChanged,
+        visualDensity: VisualDensity.compact,
+      );
+}
 
 /// Opens a page's menu; [anchor] is the bar button that asked, in global
 /// coordinates, so the menu opens at that button.
@@ -1186,13 +1206,19 @@ class _NothingOpen extends StatelessWidget {
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                    child: Text('Activity',
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineSmall
-                            ?.copyWith(
-                                color: c.textPrimary,
-                                fontWeight: FontWeight.w600)),
+                    child: Row(children: [
+                      Expanded(
+                        child: Text('Activity',
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(
+                                    color: c.textPrimary,
+                                    fontWeight: FontWeight.w600)),
+                      ),
+                      if (feed != null)
+                        ShowMineChip(value: feed.mine, onChanged: feed.onMine),
+                    ]),
                   ),
                   if (feed == null)
                     const Padding(
@@ -1203,8 +1229,12 @@ class _NothingOpen extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                       child: Text(
-                          'Nothing yet: create or open something, and what '
-                          'others change in your drives shows up here.',
+                          feed.mine
+                              ? 'Nothing yet: what you and others change in '
+                                  'your drives shows up here.'
+                              : 'Nothing yet: what others change in your '
+                                  'drives shows up here. "Show mine" adds '
+                                  'your own changes.',
                           style: TextStyle(color: c.textSecondary)),
                     )
                   else

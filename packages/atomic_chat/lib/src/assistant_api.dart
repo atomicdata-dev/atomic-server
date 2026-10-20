@@ -77,8 +77,13 @@ abstract class AssistantApi {
   /// Sends [text] in a meeting or chat room as this device's agent.
   Future<void> sendChatRoomMessage(String subject, String text);
 
-  /// What changed lately in every drive, newest first, by whom.
+  /// What changed lately in every drive, newest first, by whom: what other
+  /// members did.
   Future<List<ActivityEntry>> activity(int limit);
+
+  /// [activity] with the person's own changes too (the feed's "Show mine"),
+  /// whose actor is `You`.
+  Future<List<ActivityEntry>> activityWithMine(int limit) => activity(limit);
 
   /// The emojis (`{subject: emoji}`) of those of [subjects] that have one.
   Future<Map<String, String>> resourceIcons(List<String> subjects);

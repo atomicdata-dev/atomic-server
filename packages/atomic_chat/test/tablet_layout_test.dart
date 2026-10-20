@@ -1119,6 +1119,39 @@ void main() {
       await _done(tester);
     });
   });
+
+  group('Show mine', () {
+    for (final (name, size) in [
+      ('a tablet', _landscape),
+      ('a phone', _phone)
+    ]) {
+      testWidgets('$name: off at first; on adds own changes, by You, and stays',
+          (tester) async {
+        _size(tester, size);
+        await tester.pumpWidget(_shell(_MineApi()));
+        await _settle(tester);
+        final chip = find.byKey(const Key('show-mine'));
+        expect(chip, findsOneWidget);
+        expect(tester.widget<FilterChip>(chip).selected, isFalse);
+        expect(find.text('Budget'), findsOneWidget);
+        expect(find.text('My notes'), findsNothing);
+        await tester.tap(chip);
+        await _settle(tester);
+        expect(tester.widget<FilterChip>(chip).selected, isTrue);
+        expect(find.text('My notes'), findsOneWidget);
+        expect(find.textContaining('You '), findsOneWidget);
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getBool('activity_show_mine'), isTrue);
+        // A fresh start keeps it.
+        await _done(tester);
+        await tester.pumpWidget(_shell(_MineApi()));
+        await _settle(tester);
+        expect(tester.widget<FilterChip>(chip).selected, isTrue);
+        expect(find.text('My notes'), findsOneWidget);
+        await _done(tester);
+      });
+    }
+  });
 }
 
 class _IdentityApi extends FakeApi {
@@ -1165,4 +1198,27 @@ class _VisitApi extends FakeApi {
       emoji: null
     ));
   }
+}
+
+/// Activity by others, and the person's own with "Show mine".
+class _MineApi extends FakeApi {
+  static ActivityEntry _a(String subject, String name, String actor) =>
+      ActivityEntry(
+          subject: subject,
+          drive: 'did:ad:drive',
+          kind: 'changed',
+          at: DateTime.now().millisecondsSinceEpoch,
+          actor: actor,
+          name: name,
+          className: 'document-v2');
+
+  _MineApi()
+      : super(
+          driveList: const [],
+          activityList: [_a('did:ad:budget', 'Budget', 'Polle')],
+        );
+
+  @override
+  Future<List<ActivityEntry>> activityWithMine(int limit) async =>
+      [_a('did:ad:mine', 'My notes', 'You'), ...await activity(limit)];
 }
