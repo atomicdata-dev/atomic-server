@@ -49,18 +49,24 @@ void main() {
       ('light', ToastPalette.light, AppColors.light),
       ('dark', ToastPalette.dark, AppColors.dark),
     ]) {
-      test('$name: text, accents and card edge are legible', () {
+      test('$name: text, icons and card edge are legible', () {
         expect(ToastPalette.of(colors), same(pal));
         expect(ratio(pal.text, pal.card), greaterThanOrEqualTo(4.5));
         for (final s in ToastSeverity.values) {
-          // Retry label / icon on the card.
+          // Icon (and action label) on the card.
           expect(ratio(pal.accent(s), pal.card), greaterThanOrEqualTo(4.5),
               reason: '$name ${s.name}');
         }
-        // Card against the page it floats over, plus border and shadow.
-        expect(ratio(pal.card, colors.bgBody), greaterThanOrEqualTo(3));
-        expect(ratio(pal.card, colors.bg1), greaterThanOrEqualTo(3));
-        expect(pal.border.a, greaterThan(0));
+        // Calm card: set apart by hairline border and shadow, not colour.
+        expect(pal.border.a, inInclusiveRange(0.12, 0.2));
+        expect(pal.shadow.a, greaterThanOrEqualTo(0.1));
+        // Never a red-filled card.
+        expect(pal.card.r - pal.card.b, closeTo(0, 0.05));
+        // The border edge itself is visible against the page.
+        for (final page in [colors.bgBody, colors.bg1]) {
+          final edge = Color.alphaBlend(pal.border, page);
+          expect(ratio(edge, page), greaterThan(1.1), reason: '$name edge');
+        }
       });
     }
   });
@@ -98,16 +104,16 @@ void main() {
       final card =
           tester.getRect(find.byKey(const ValueKey('toast-sync:error')));
       expect(card.right, 1200 - ToastHost.margin);
-      expect(card.width, ToastHost.maxWidth);
+      expect(card.width, 320);
       expect(card.top, lessThan(80));
       expect(find.text('Retry'), findsOneWidget);
 
       // Outside the toast, touches reach the content below.
-      await tester.pump(const Duration(seconds: 7));
+      await tester.pump(const Duration(seconds: 5));
       expect(find.text('Sync timed out'), findsNothing);
     });
 
-    testWidgets('card has border, shadow, radius, accent and 48dp action',
+    testWidgets('card has border, shadow, radius, icon and 48dp action',
         (tester) async {
       final c = ToastController();
       await tester.pumpWidget(app(c, const Size(800, 600)));
@@ -122,12 +128,13 @@ void main() {
       final d = box.decoration! as BoxDecoration;
       expect(d.color, ToastPalette.light.card);
       expect(d.border, isNotNull);
-      expect(d.boxShadow, isNotEmpty);
+      expect(d.boxShadow!.single.blurRadius, 16);
       expect(d.borderRadius, BorderRadius.circular(12));
-      expect(find.byKey(const Key('toast-accent')), findsOneWidget);
+      expect(find.byKey(const Key('toast-accent')), findsNothing);
+      expect(tester.getSize(find.byKey(const Key('toast-icon'))), const Size(20, 20));
       expect(tester.getSize(find.byType(TextButton)).height,
           greaterThanOrEqualTo(48));
-      await tester.pump(const Duration(seconds: 7));
+      await tester.pump(const Duration(seconds: 5));
     });
 
     testWidgets('two identical notices give one toast', (tester) async {
@@ -137,7 +144,7 @@ void main() {
       c.show('k', 'Same');
       await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('Same'), findsOneWidget);
-      await tester.pump(const Duration(seconds: 7));
+      await tester.pump(const Duration(seconds: 5));
     });
 
     testWidgets('swiping right dismisses', (tester) async {
@@ -165,12 +172,12 @@ void main() {
       final c = ToastController();
       await tester.pumpWidget(app(c, const Size(800, 600)));
       c.show('k', 'Again');
-      await tester.pump(const Duration(seconds: 4));
+      await tester.pump(const Duration(seconds: 3));
       c.show('k', 'Again');
       await tester.pump();
-      await tester.pump(const Duration(seconds: 4));
-      expect(find.text('Again'), findsOneWidget);
       await tester.pump(const Duration(seconds: 3));
+      expect(find.text('Again'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 2));
       await tester.pump();
       expect(find.text('Again'), findsNothing);
     });

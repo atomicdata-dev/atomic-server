@@ -6,14 +6,17 @@ import 'package:flutter/material.dart';
 /// How serious a notice is; picks the accent colour and default icon.
 enum ToastSeverity { info, success, warning, error }
 
-/// Colours of a toast card: an inverse surface (dark card in light themes,
-/// light card in dark themes) so it never blends with the page.
+/// Colours of a toast card: a calm elevated surface in the app's own look
+/// (white in light themes, a lifted dark grey in dark ones). It stands apart
+/// from the page by a hairline border and a soft shadow, not by colour; the
+/// severity shows only in the small icon.
 @immutable
 class ToastPalette {
   const ToastPalette({
     required this.card,
     required this.text,
     required this.border,
+    required this.shadow,
     required this.info,
     required this.success,
     required this.warning,
@@ -23,29 +26,32 @@ class ToastPalette {
   final Color card;
   final Color text;
   final Color border;
+  final Color shadow;
   final Color info;
   final Color success;
   final Color warning;
   final Color error;
 
   static const light = ToastPalette(
-    card: Color(0xFF1F2430),
-    text: Color(0xFFF3F5F9),
-    border: Color(0x33000000), // black 20%
-    info: Color(0xFF9DB4FF),
-    success: Color(0xFF5FD38A),
-    warning: Color(0xFFFFC107),
-    error: Color(0xFFFF8A80),
+    card: Color(0xFFFFFFFF),
+    text: Color(0xFF1F2430),
+    border: Color(0x24000000), // black 14%
+    shadow: Color(0x1A000000), // black 10%
+    info: Color(0xFF4C6CC4),
+    success: Color(0xFF2E7D4F),
+    warning: Color(0xFF9A6200),
+    error: Color(0xFFB85C45), // soft terracotta, only ever an icon
   );
 
   static const dark = ToastPalette(
-    card: Color(0xFFE8EAF0),
-    text: Color(0xFF111418),
-    border: Color(0x33FFFFFF), // white 20%
-    info: Color(0xFF1B50D8),
-    success: Color(0xFF1B6B3A),
-    warning: Color(0xFF8A5A00),
-    error: Color(0xFFB3261E),
+    card: Color(0xFF262626),
+    text: Color(0xFFE8E8E8),
+    border: Color(0x24FFFFFF), // white 14%
+    shadow: Color(0x66000000), // black 40%: dark pages need more to show
+    info: Color(0xFF8FA9F5),
+    success: Color(0xFF6BCB93),
+    warning: Color(0xFFD9A94A),
+    error: Color(0xFFE3917B),
   );
 
   /// Follows the app's own tokens (not the platform brightness).
@@ -77,7 +83,7 @@ class ToastEntry {
     IconData? icon,
     this.actionLabel,
     this.onAction,
-    this.duration = const Duration(seconds: 6),
+    this.duration = const Duration(seconds: 4),
   }) : icon = icon ?? _defaultIcon(severity);
 
   final String key;
@@ -119,7 +125,7 @@ class ToastController extends ChangeNotifier {
     IconData? icon,
     String? actionLabel,
     VoidCallback? onAction,
-    Duration duration = const Duration(seconds: 6),
+    Duration duration = const Duration(seconds: 4),
   }) {
     final existing = _toasts.where((t) => t.key == key).firstOrNull;
     if (existing != null) {
@@ -187,7 +193,7 @@ class ToastScope extends InheritedNotifier<ToastController> {
 }
 
 /// Draws the controller's toasts over [child] without taking space or touches
-/// from it: top-right on wide windows (max 360 dp), full width minus 16 dp
+/// from it: top-right on wide windows (max 320 dp), full width minus 16 dp
 /// margins on phones. Put it in `MaterialApp.builder`.
 class ToastHost extends StatelessWidget {
   const ToastHost({super.key, required this.controller, required this.child});
@@ -195,7 +201,7 @@ class ToastHost extends StatelessWidget {
   final ToastController controller;
   final Widget child;
 
-  static const double maxWidth = 360;
+  static const double maxWidth = 320;
   static const double margin = 16;
 
   @override
@@ -306,68 +312,45 @@ class _ToastCardState extends State<_ToastCard> {
         color: pal.card,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: pal.border, width: 1),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x40000000), // black 25%
-            blurRadius: 20,
-            offset: Offset(0, 4),
-          ),
+        boxShadow: [
+          BoxShadow(color: pal.shadow, blurRadius: 16, offset: const Offset(0, 2)),
         ],
       ),
-      clipBehavior: Clip.antiAlias,
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(key: const Key('toast-accent'), width: 4, color: accent),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: accent.withValues(alpha: 0.2),
-                      ),
-                      child: Icon(e.icon, size: 18, color: accent),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        e.message,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: pal.text,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    if (e.actionLabel != null)
-                      TextButton(
-                        style: TextButton.styleFrom(
-                          foregroundColor: accent,
-                          minimumSize: const Size(48, 48),
-                          tapTargetSize: MaterialTapTargetSize.padded,
-                          textStyle: const TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w600),
-                        ),
-                        onPressed: () {
-                          widget.onDismiss();
-                          e.onAction?.call();
-                        },
-                        child: Text(e.actionLabel!),
-                      ),
-                  ],
-                ),
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          Icon(e.icon, key: const Key('toast-icon'), size: 20, color: accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              e.message,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: pal.text,
+                fontSize: 13.5,
+                height: 1.3,
+                fontWeight: FontWeight.w400,
               ),
             ),
-          ],
-        ),
+          ),
+          if (e.actionLabel != null)
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: accent,
+                minimumSize: const Size(48, 48),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                tapTargetSize: MaterialTapTargetSize.padded,
+                textStyle:
+                    const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500),
+              ),
+              onPressed: () {
+                widget.onDismiss();
+                e.onAction?.call();
+              },
+              child: Text(e.actionLabel!),
+            ),
+        ],
       ),
     );
 
@@ -392,12 +375,12 @@ class _ToastCardState extends State<_ToastCard> {
             onDismissed: (_) => widget.onDismiss(),
             child: TweenAnimationBuilder<double>(
               tween: Tween(begin: 0, end: 1),
-              duration: const Duration(milliseconds: 220),
+              duration: const Duration(milliseconds: 160),
               curve: Curves.easeOutCubic,
               builder: (context, v, child) => Opacity(
                 opacity: v,
                 child: Transform.translate(
-                  offset: Offset(0, -12 * (1 - v)),
+                  offset: Offset(0, -8 * (1 - v)),
                   child: child,
                 ),
               ),
