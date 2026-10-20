@@ -748,23 +748,59 @@ void main() {
       await _done(tester);
     });
 
-    testWidgets('narrower than the least it resists too, and springs back',
+    testWidgets('narrower than the least it follows the finger down to 0',
         (tester) async {
       final g = await grab(tester);
       final start = listWidth(tester);
-      // To 250 dp wanted: past 304, not yet the fold (182).
-      await g.moveBy(Offset(250 - start, 0));
+      for (var target = 400.0; target >= 0; target -= 50) {
+        await g.moveBy(Offset(target - listWidth(tester), 0));
+        await tester.pump();
+        expect(listWidth(tester), closeTo(target, 0.6), reason: '$target');
+      }
+      expect(start, greaterThan(0));
+      expect(listWidth(tester), closeTo(0, 0.6));
+      await g.up();
+      await _settle(tester);
+      expect(_controller(tester).listCollapsed.value, isTrue);
+      await _done(tester);
+    });
+
+    testWidgets('released below the fold threshold it folds', (tester) async {
+      final g = await grab(tester);
+      await g.moveBy(Offset(100 - listWidth(tester), 0));
       await tester.pump();
-      final w = listWidth(tester);
-      expect(w, lessThan(304));
-      expect(w, greaterThanOrEqualTo(304 - 48));
-      expect(w, greaterThan(250));
+      expect(listWidth(tester), closeTo(100, 0.6));
+      await g.up();
+      await _settle(tester);
+      expect(_controller(tester).listCollapsed.value, isTrue);
+      expect(find.byKey(const Key('list-toggle')), findsOneWidget);
+      await _done(tester);
+    });
+
+    testWidgets('released at 250 it springs back to the least, not folded',
+        (tester) async {
+      final g = await grab(tester);
+      await g.moveBy(Offset(250 - listWidth(tester), 0));
+      await tester.pump();
+      expect(listWidth(tester), closeTo(250, 0.6));
       await g.up();
       await _settle(tester);
       expect(listWidth(tester), closeTo(304, 0.01));
       expect(_controller(tester).listCollapsed.value, isFalse);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getDouble(listWidthKey), closeTo(304, 0.01));
+      await _done(tester);
+    });
+
+    testWidgets('a left fling from the least folds', (tester) async {
+      SharedPreferences.setMockInitialValues({listWidthKey: 304.0});
+      _size(tester, _landscape);
+      await tester.pumpWidget(_shell(_api()));
+      await _settle(tester);
+      await tester.fling(
+          find.byKey(const Key('list-toggle')), const Offset(-60, 0), 1500);
+      await _settle(tester);
+      expect(_controller(tester).listCollapsed.value, isTrue);
       await _done(tester);
     });
 
@@ -778,6 +814,8 @@ void main() {
         expect(listRubberBandInverse(w, 304, 520), closeTo(raw, 0.5));
       }
       expect(listRubberBand(0, 304, 520), greaterThanOrEqualTo(304 - 48));
+      // Closing is never resisted: the divider uses 0 as its lower bound.
+      expect(listRubberBand(100, 0, 520), 100);
     });
   });
 

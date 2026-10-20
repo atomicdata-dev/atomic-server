@@ -844,7 +844,8 @@ double _tanh(double x) {
 }
 
 /// The width shown for a finger at [raw]: the same inside [lo]..[hi], and
-/// outside it never more than [listOvershootLimit] past the bound.
+/// outside it never more than [listOvershootLimit] past the bound (the
+/// divider uses 0 for [lo]: closing is never resisted).
 double listRubberBand(double raw, double lo, double hi) {
   const l = listOvershootLimit;
   if (raw > hi) return hi + l * _tanh((raw - hi) / l);
@@ -959,7 +960,9 @@ class _SplitPanesState extends State<_SplitPanes>
   double _hi(double room) =>
       math.max(_minList, math.min(_maxDragged, room - _minDetail));
 
-  double _lo() => widget.shell.listCollapsed.value ? 0 : _minList;
+  /// Narrower than the minimum there is no resistance: the pane follows the
+  /// finger all the way to nothing, so it can be swiped fully closed.
+  double _lo() => 0;
 
   void _dragStart(double full, double room) {
     final collapsed = widget.shell.listCollapsed.value;
