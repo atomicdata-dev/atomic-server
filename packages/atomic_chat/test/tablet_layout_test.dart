@@ -616,8 +616,8 @@ void main() {
       _size(tester, _landscape);
       await tester.pumpWidget(_shell(_api()));
       await _settle(tester);
-      final g = await tester.startGesture(
-          tester.getCenter(find.byKey(const Key('list-toggle'))));
+      final g = await tester
+          .startGesture(tester.getCenter(find.byKey(const Key('list-toggle'))));
       // The first move only gets past the touch slop.
       await g.moveBy(const Offset(30, 0));
       await tester.pump();
