@@ -13,6 +13,9 @@ scripts/perf_android.sh -a build/app/outputs/flutter-apk/app-profile.apk [-s SER
 scripts/perf_android.sh --seed 30 --only size     # once per install: test data
 ```
 
+- `FAKE_AI=1` (the chat step's canned AI) only on the emulator or a test
+  phone: every reply says "FAKE AI, test build". An APK for someone's own
+  phone is built without it.
 - Always a **profile** build. Debug is several times slower; release prints
   no marks. Cargokit builds the Rust library `--release` for profile and
   release (`rust_builder/cargokit/build_tool/lib/src/builder.dart`).
@@ -152,6 +155,64 @@ To re-measure on the Xiaomi (phone and Pad):
 - [ ] `[perf] tap ? to frame` over a few minutes of use: anything > 50 ms.
 - [ ] Whether the 150 ms slide feels right on the phone, and the instant
       swap on the Pad.
+
+## Round 3: the warm web view stays attached (2026-10-20)
+
+Changes (commits `Embed: no loader for the first second…`, `Open: keep the
+warm web view attached under the pages…`):
+
+- The ready spare is in the widget tree: `WarmPageSlot` under the shell's
+  navigator (phone pages / tablet detail pane), same box and insets as a
+  resource page, `Opacity(0)` + `IgnorePointer` + `ExcludeSemantics`. On
+  Android the web view is a texture layer (TLHC): it is created by layout,
+  so its Android view is attached and laid out before the tap and keeps
+  drawing into its texture; opacity 0 only leaves the layer out.
+- `ResourceView` takes the page and moves the same `GlobalKey`ed subtree in
+  one frame later (the slot lets go after the take's frame; same frame would
+  be a duplicate key): the platform view is not made again and not resized
+  (widget tests check both, plus rotation phone ↔ tablet with the spare and
+  with an open page, release after close, memory pressure).
+- Until the page's `main[about=subject]` holds more than a loading state
+  (posted as `revealed`, two frames later), a native `ResourceSkeleton`
+  covers it: the page colour and a 36 px header with the row's title. Caps:
+  2 s warm, 8 s cold. Then a 90 ms fade. No spinner in Flutter.
+- The page: a centered `Spinner` in the embed waits 1 s (empty status until
+  then); `?scheme=dark|light` sets the host scheme before the first render;
+  the pool tells a ready spare the app's scheme.
+
+Emulator (Phone_A35, profile, host load 5-7, interleaved with the round 2
+APK). Screen recordings (only frames that change, analysed per frame from
+the push frame: the bar's Home icon turning to an outline, which Flutter
+logs 8-14 ms after the tap):
+
+| Open from Recents, warm | Before | After |
+| --- | --- | --- |
+| Push frame → screen frozen (nothing moves) | 550-980 ms in 3 of 10 opens, else none | none in 11 opens |
+| Push frame → page's title as it ends up, top row (rendered ahead) | 314-1016 ms (median 340, n=9) | 279-380 ms (median 330, n=6) |
+| Push frame → title, second row | 366-447 ms (median 430, n=5) | 318-401 ms (median 380, n=5) |
+| First thing on the page | a black page sliding in | the page colour with the row's title sliding in |
+
+Logged (`perf_android.sh --only open`, 4 interleaved runs of 3-4 opens): tap
+→ painted (title in `main`, after the message reaches Dart) did not move
+beyond the noise: doc 1139-1585 vs 173-1310 ms medians per run, 80 kB
+doc 1406-2251 vs 307-2169 ms. One quiet run gave 173 / 307 ms; the rest
+are dominated by replies to the page waiting 300-1500 ms for the main
+thread (the emulator's GL, see below), which the video does not show:
+the title is on screen at ~330 ms while the log says 1.2 s. Renderer PSS
+with the spare 143 vs 149 MB, after opens 335 vs 357 MB, app 226 vs
+231 MB: no memory cost for keeping it attached.
+
+To check on the Xiaomi (phone and Pad):
+
+- [ ] Screen recording of opens from Recents: first changed frame after the
+      tap (should be the next frame) and the title.
+- [ ] `--only open,memory`: `tap to revealed` vs `tap to painted`, renderer
+      PSS with the spare attached, and after 10 opens.
+- [ ] Battery/CPU with the spare attached and idle (it should draw nothing).
+- [ ] Rotation and split-screen with only the spare loaded, and with a page
+      open; a TalkBack pass (the hidden spare must not be announced).
+- [ ] The skeleton's header against the page's breadcrumb (a small jump:
+      the page also shows the drive).
 
 ## Where the time goes now (and what is emulator-only)
 

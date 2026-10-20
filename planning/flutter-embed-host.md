@@ -121,7 +121,13 @@ Each step ships on its own and has a test that fails without it.
   the blank first history entry so back leaves the resource; falls back to
   `show`), and the pool starts the next spare after 600 ms (so the open is not
   competing with a 13 MB load). Not ready, failed, `path` pages (settings) or no
-  pool: the cold path, as before. A taken (or cold) page is released 3 s after the
+  pool: the cold path, as before. Once ready the spare is in the widget tree
+  (`WarmPageSlot` under the shell's navigator, opacity 0, same box as a
+  resource page), so its Android view is attached and laid out before the
+  tap; the taking `ResourceView` moves the same `GlobalKey`ed subtree in and
+  covers it with a native `ResourceSkeleton` (page colour, the row's title in
+  a 36 px header) until the page's `main` shows the subject (`revealed`).
+  A taken (or cold) page is released 3 s after the
   view closes. The spare is dropped after 5 min in the background or on memory
   pressure, and warmed again on resume. Logs: `[warm] taken ready=...`,
   `[warm] open N ms first content`, `[warm] cold open N ms first content`.

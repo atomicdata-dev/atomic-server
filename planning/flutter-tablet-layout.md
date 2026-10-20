@@ -107,8 +107,9 @@ image); Tablet_A35 has the same screen.
 - Freeform / split-screen windows and drag-resizing (the emulator only had
   `wm size`); the widget tests cover the transitions.
 - Stylus and keyboard/mouse: no hover states or keyboard shortcuts yet.
-- The warm web view is sized for the detail pane only once it is attached:
-  measure first paint there.
+- The warm web view is attached and laid out under the detail pane before
+  it is taken (`WarmPageSlot`): check on the Pad that a taken page shows at
+  once and that rotating with only the spare loaded keeps it.
 - A resource reached by navigating inside the page is not marked in the list
   (the mark follows what was opened from the list).
 - Once seen: the search pane showed a hit still marked after Settings took
