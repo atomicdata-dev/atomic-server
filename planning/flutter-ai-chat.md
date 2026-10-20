@@ -50,7 +50,37 @@ use, matching the web app's chat (`browser/data-browser/src/chunks/AI/`).
   photo picker, drive picker, reopened chat history, font scale 1.3, tablet
   split layout.
 
+- [x] Long chats (`chat_window.dart`, see `flutter-performance.md`, "Very
+  long chats"): the AI chat, chat room and conversation screens hold a
+  window of the chat, not all of it. They open with the newest 50
+  (`chatEntriesPage` / `chatRoomMessagesPage` / `conversationMessagesPage`,
+  bridge `read_*_page`), read the page before when scrolled within 15 rows
+  of the top (a reversed `ListView.builder` with keyed rows and
+  `findChildIndexCallback`, so a prepended page and a trimmed end do not
+  move what is on screen), keep at most ~500 messages (the far end is
+  dropped and read again on the way back), poll with `read_*_after` every
+  3 s (rooms and conversations; the AI chat is only written here), and show
+  new messages at once only at the bottom; scrolled up they wait behind a
+  "Jump to latest" button with their count. Day separators ('Today',
+  'Yesterday', the date) per window. Finished messages' Markdown parses are
+  shared through a 256-entry cache, so a row scrolled back in is not parsed
+  again. The model gets the window (its newest messages), which
+  `HostedAi._recent` cuts further to its budget. `ChatWindow.openAt(cursor)`
+  is the start of "jump to a message" (a search hit); nothing calls it yet.
+- [x] Following a streaming answer (Joep: stop once the screen is full):
+  after sending, room is made below the answer so the question sits at the
+  top of the list and the answer grows under it; the list follows the
+  answer at the bottom while its top is in view, then holds its top at the
+  top of the list (`_settle`, after each frame while streaming). A drag by
+  the person ends following, and from then on (and while the top is held)
+  the growing answer does not move what is on screen. A chat whose last
+  answer is taller than the list opens at that answer's start. Tests:
+  `test/answer_follow_test.dart`.
+
 ## Open
+
+- [ ] Search inside a long chat, and opening a hit at its place
+  (`ChatWindow.openAt`): chat text is not in the search index yet.
 
 - [ ] Camera: no camera / image_picker plugin in the pub cache. Implement
   `AttachmentPicker.takePhoto` once one is added.

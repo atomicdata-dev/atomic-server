@@ -535,3 +535,121 @@ Waits for a go-ahead (emulator builds conflict with other agents and disk).
 - Search kind chips (Drives, AI chats, Messages) pass their classes to the
   host's `search(.., classes)`: the filter runs in the index before the limit.
   The chats chip lists every chat before typing (pages of 200).
+
+## Very long chats (2026-10-20)
+
+Joep: "But what if a chat is VERY long, like a Discord channel?" The 1000-chat
+run had 20-60 messages per chat. Here: one chat of each kind with 200 000
+messages (a conversation with 20 000), and every chat screen made to read
+it in windows.
+
+### Method (Mac)
+
+`stress_long_chat` in `lib/tests/stress_chats.rs` (ignored; seeds on the
+first run, then measures in a fresh open, same e2e profile and
+debug-assertions-off flags as above):
+
+```
+STRESS_DIR=<scratch>/long cargo test -p atomic_lib --features db-redb --profile e2e \
+  --test stress_chats -- --ignored --nocapture stress_long_chat
+```
+
+Data: an AI chat and a chat room of 200 000 messages each (avg ~120 chars,
+one in twenty 300-1000; 23.6 MB of text each), written with the bulk
+import (`import_ai_chat` / `import_entries`, one commit per 256-entry page,
+~9 s each), and an end-to-end encrypted conversation of 20 000 messages sent
+one by one (`send_message`, 2 ms each). Store 1078 MB (deleted after).
+`STRESS_LONG`, `STRESS_LONG_CONV` scale it; `STRESS_LONG_FULL=0` skips the
+whole-chat reads.
+
+### Results (Mac, ms: first / median)
+
+| What | Before (`c126f5b9c`, whole reads) | After (windows) |
+| --- | --- | --- |
+| Open AI chat | `read_chat`: 897 / 872, 74.9 MB JSON, +762 MB RSS | `read_chat_page(50)`: 9.8 / 1.25, 15 KB, +4 MB RSS |
+| Scroll up AI chat (next 50) | (all in memory) | 2.1 / 0.69 |
+| Poll AI chat for new entries | (read all again) | `read_chat_after`: 0.38 / 0.25 |
+| Open chat room | `ChatRooms::read`: 1273 / 1282, 76.5 MB, +311 MB | `read_page(50)`: 16 / 1.35, 18 KB, +2 MB |
+| Scroll up room (next 50) | | 2.1 / 0.60 |
+| Open conversation (20 000) | `Conversations::read`: 1198 / 497 (decrypts all), 7 MB, +511 MB | `read_page(50)`: 101 (index build) / 2.6, 17 KB |
+| Scroll up conversation (next 50, decrypts 50) | | 18.6 / 12.4 |
+| Conversations list (newest message) | 15.2 / 14.8 | 1.75 / 1.43 |
+| Append one message (AI chat / room) | 480 / 467, 395: 791 full page reads | 4.4 / 3.9: one page decode |
+| Recents rescan per chat (`chat_last_activity`) | 601 / 612 | 1.1 / 1.0 |
+| Send a conversation message | 2.8 / 1.9 | 5.5 / 4.5 (noise or the extra watched indexes; unexplained) |
+| Search "b" | 3.1 / 0.41 | 2.6 / 0.30 (chat text is not indexed) |
+
+The whole-chat reads are still there (`read_chat`, `ChatRooms::read`,
+`Conversations::read`; the web-compatible full read, the AI tools) and cost
+the same; the app no longer calls them from its chat screens.
+
+### Design
+
+- **Pages through the sorted index.** A chat's `ChatLog` pages are found with
+  `parent = chat AND isA = ChatLog` sorted by `createdAt`, scoped to the
+  chat's drive (`chats::drive_scope`). `Db::query_page` reads the query
+  index only as far as the page reaches (`query_sorted_indexed_page`); the
+  normal `query` walks every member to count them. The first call for a
+  chat builds its index the usual way (the cold numbers above).
+- **Cursor** (opaque to the app): `<page createdAt>|<page subject>#<entry
+  key>`. Older: entries of the cursor's page with a smaller key, then pages
+  before it (`end_val = createdAt`, pages at the same millisecond skipped by
+  `(createdAt, subject)`). Newer (`read_*_after`): larger keys on the
+  cursor's page, then the pages after it. Keys and pages never move, so a
+  cursor stays valid while the chat grows. Within a page entries come in
+  key order (time), across pages in page order.
+- **Append** opens the newest page only (one index read + one decode);
+  `chat_last_activity` reads the newest page only.
+- **Rooms** merge old `Message` / `FollowEvent` resources by time: those in
+  the time span of the window's log entries, through per-class sorted
+  indexes (`parent = room AND isA = Message`), not the room's children
+  (imported pages carry today's `createdAt`, so a time range over the
+  children hit all 782 pages: 140 ms per window until fixed). Once the log
+  is exhausted, old messages come `limit` at a time. The room cursor is a
+  small JSON of the log cursor and the old messages' bound.
+- **Conversations** page `SealedMessage`s by `createdAt` through the same
+  early-stopping index read and decrypt only the window; the cache of
+  opened messages is bounded (5000, cleared when full).
+- **App**: `ChatWindow` (`packages/atomic_chat/lib/src/chat_window.dart`)
+  holds pages of 50, at most ~500 messages; see `flutter-ai-chat.md`.
+
+### Phase 2: the emulator
+
+Phone_A35 AVD (Android 15 arm64, M5 Pro host), profile build with
+`FAKE_AI=1`, a throwaway identity, `perf_android.sh --seed-long 100000` (one
+AI chat of 100 000 messages, 11.8 MB of text, 92 s through `import_ai_chat`;
+the store was 269 MB with two such chats), then `--only longchat,memory`
+(median of 3, min-max):
+
+| What | First run | After bounding the AI chat's window |
+| --- | --- | --- |
+| Open the chat: data / painted (ms) | 34 / 43 (14-96 / 25-125) | 5 / 21 (3-41 / 20-77) |
+| 30 fast flings up: janky frames | 13 % (8-36) | 1.2 % (0-18) |
+| ... build p90 / p99 (ms) | 5.6 / 16.2 | 3.9 / 5.7 |
+| ... raster p90 / p99 (ms) | 17.7 / 33.8 | 5.2 / 16.7 |
+| Older pages read while flinging | 13 | 53 (28-97) |
+| Older page read: median / slowest (ms) | 9 / 23 | 2 / 9 |
+| Messages held after flinging | 700 (not bounded: the AI chat had no `readAfter`) | 550 |
+| App PSS: after start / after flinging | 222 / 248 MB | |
+
+The whole-chat read would have been several seconds and hundreds of MB on
+the phone (870 ms and +762 MB for 200 000 on the Mac). Sending in the long
+chat (checked by hand with screenshots): the question moves to the top,
+the fake answer grows below it, and once it fills the screen its start
+stays put (see `flutter-ai-chat.md`). The script's send step timed out
+waiting for its `[chat] stream done` line (to look at; the send itself
+worked by hand). Not run on the owner's phones.
+
+### Open
+
+- [ ] Server-side paging for synced rooms: a device that does not hold a
+      room's pages yet syncs all of them (the drive sync), not the newest.
+- [ ] Search inside a long chat (chat text is not indexed, see above) and
+      opening a hit at its place (`ChatWindow.openAt`).
+- [ ] `read_*_after` does not look at older pages: an entry another device
+      adds to a page that is no longer the newest here (it was still
+      filling it) shows on the next open, not live.
+- [ ] Rooms: old `Message` resources are not polled (only older clients
+      write them).
+- [ ] An unread count per chat (the log length is not stored; counting
+      walks every page).
