@@ -1035,7 +1035,13 @@ async fn a_fresh_device_finds_the_other_through_the_peer_search() {
         db: &pair.db_b,
     };
     let outcome = search
-        .search_once(&me, std::slice::from_ref(&pair.drive), &directory, &dialer, false)
+        .search_once(
+            &me,
+            std::slice::from_ref(&pair.drive),
+            &directory,
+            &dialer,
+            false,
+        )
         .await;
 
     assert_eq!(outcome.dialled, vec![pair.node_id_a.to_lowercase()]);

@@ -114,7 +114,10 @@ mod tests {
         assert!(drives[1]["resources"].as_u64().unwrap() >= 2);
         assert!(drives.iter().all(|r| r["bytes"].as_u64().unwrap() > 0));
         assert!(drives[0]["bytes"].as_u64() >= drives[1]["bytes"].as_u64());
-        let sum: u64 = drives.iter().map(|r| r["resources"].as_u64().unwrap()).sum();
+        let sum: u64 = drives
+            .iter()
+            .map(|r| r["resources"].as_u64().unwrap())
+            .sum();
         assert_eq!(stats["resources"].as_u64().unwrap(), sum);
         assert_eq!(stats["disk_bytes"], json!(1234));
         std::fs::remove_dir_all(&dir).ok();

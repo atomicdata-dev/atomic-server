@@ -54,8 +54,8 @@ pub mod own_profile;
 pub mod peer_search;
 pub mod profiles;
 pub mod recents;
-pub mod store_stats;
 pub mod rows;
+pub mod store_stats;
 
 #[cfg(test)]
 pub(crate) mod test_support;
