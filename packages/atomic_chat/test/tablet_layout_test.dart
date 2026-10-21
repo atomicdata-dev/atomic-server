@@ -1368,7 +1368,7 @@ void main() {
 
       expect(await switcher(), ['a', 'b']);
       // Picking Beta makes it the active drive and the first in the list.
-      await tester.tap(find.byKey(const ValueKey('drive-switcher-row-did:ad:b')));
+      await tester.tap(find.byKey(const ValueKey('drive-switcher-switch-did:ad:b')));
       await _settle(tester);
       expect(api.activeSet, ['did:ad:b']);
       expect(find.byKey(const Key('drive-switcher')), findsNothing);

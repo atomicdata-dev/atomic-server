@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColorsExt, ErrorText, SectionHeaderStyle;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'assistant_api.dart';
@@ -91,12 +92,17 @@ class CurrentDriveHeader extends StatelessWidget {
   }
 }
 
-/// The drive switcher: a search field, every listed drive (the current one
-/// checked) and "Manage drives…" and "New drive" at the bottom.
+/// The drive switcher: a search field, every listed drive as a full-width
+/// row (the left part opens the drive's page, a "Switch" button on the right
+/// makes it the current drive, the current one shows a "Current" chip) and
+/// "Manage drives…" and "New drive" at the bottom.
 class DriveSwitcherContent extends StatefulWidget {
   final List<DriveInfo> drives;
   final String current;
   final ValueChanged<DriveInfo> onSelect;
+
+  /// The row's left part: open the drive's page, the active drive unchanged.
+  final ValueChanged<DriveInfo> onOpen;
   final VoidCallback? onManage;
   final VoidCallback? onNew;
 
@@ -105,6 +111,7 @@ class DriveSwitcherContent extends StatefulWidget {
     required this.drives,
     required this.current,
     required this.onSelect,
+    required this.onOpen,
     this.onManage,
     this.onNew,
   });
@@ -197,26 +204,12 @@ class _DriveSwitcherContentState extends State<DriveSwitcherContent> {
                   itemBuilder: (context, i) {
                     final d = shown[i];
                     final current = driveKeyOf(d.subject) == currentKey;
-                    return KeyedSubtree(
+                    return _DriveSwitcherRow(
                       key: ValueKey('drive-switcher-row-${d.subject}'),
-                      child: ListTile(
-                        mouseCursor: WidgetStateMouseCursor.clickable,
-                        leading: DriveAvatar(drive: d, size: 32),
-                        title: Text(driveTitle(d),
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
-                        titleTextStyle: TextStyle(
-                            color: c.textPrimary,
-                            fontSize: 15,
-                            fontWeight:
-                                current ? FontWeight.w600 : FontWeight.w400),
-                        trailing: current
-                            ? Icon(Icons.check,
-                                key: const Key('drive-switcher-current'),
-                                size: 20,
-                                color: c.main)
-                            : null,
-                        onTap: () => widget.onSelect(d),
-                      ),
+                      drive: d,
+                      current: current,
+                      onOpen: () => widget.onOpen(d),
+                      onSwitch: () => widget.onSelect(d),
                     );
                   },
                 ),
@@ -233,18 +226,164 @@ class _DriveSwitcherContentState extends State<DriveSwitcherContent> {
   }
 }
 
+/// One drive in the switcher, edge to edge: the left part (avatar and name)
+/// opens the drive's page, the right a compact "Switch" button, or for the
+/// current drive a "Current" chip. Ctrl/Cmd+Enter on the row switches.
+class _DriveSwitcherRow extends StatefulWidget {
+  final DriveInfo drive;
+  final bool current;
+  final VoidCallback onOpen;
+  final VoidCallback onSwitch;
+
+  const _DriveSwitcherRow({
+    super.key,
+    required this.drive,
+    required this.current,
+    required this.onOpen,
+    required this.onSwitch,
+  });
+
+  @override
+  State<_DriveSwitcherRow> createState() => _DriveSwitcherRowState();
+}
+
+class _DriveSwitcherRowState extends State<_DriveSwitcherRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    final d = widget.drive;
+    final name = driveTitle(d);
+    final switchable = !widget.current;
+    Widget trailing;
+    if (switchable) {
+      trailing = Semantics(
+        button: true,
+        label: 'Switch to $name',
+        excludeSemantics: true,
+        onTap: widget.onSwitch,
+        child: SizedBox(
+          height: 34,
+          child: FilledButton.tonal(
+            key: ValueKey('drive-switcher-switch-${d.subject}'),
+            onPressed: widget.onSwitch,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 34),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              backgroundColor: c.mainSelectedBg,
+              foregroundColor: c.mainSelectedFg,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(17)),
+              textStyle:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+            child: const Text('Switch'),
+          ),
+        ),
+      );
+    } else {
+      trailing = Container(
+        key: const Key('drive-switcher-current'),
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: c.bg1,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.check, size: 16, color: c.textSecondary),
+          const SizedBox(width: 4),
+          Text('Current',
+              key: const Key('drive-switcher-current-label'),
+              style: TextStyle(
+                  color: c.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600)),
+        ]),
+      );
+    }
+    return CallbackShortcuts(
+      bindings: {
+        if (switchable) ...{
+          const SingleActivator(LogicalKeyboardKey.enter, control: true):
+              widget.onSwitch,
+          const SingleActivator(LogicalKeyboardKey.enter, meta: true):
+              widget.onSwitch,
+        },
+      },
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: _hovered ? c.rowHighlight : Colors.transparent,
+            border: Border(bottom: BorderSide(color: c.sectionDivider)),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Row(children: [
+              Expanded(
+                child: Semantics(
+                  button: true,
+                  label: 'Open $name',
+                  excludeSemantics: true,
+                  onTap: widget.onOpen,
+                  child: InkWell(
+                    key: ValueKey('drive-switcher-open-${d.subject}'),
+                    mouseCursor: WidgetStateMouseCursor.clickable,
+                    onTap: widget.onOpen,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 56),
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 16, right: 8),
+                        child: Row(children: [
+                          DriveAvatar(drive: d, size: 32),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Text(name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: c.textPrimary,
+                                    fontSize: 15,
+                                    fontWeight: widget.current
+                                        ? FontWeight.w600
+                                        : FontWeight.w400)),
+                          ),
+                        ]),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: trailing,
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// The identifier without its scheme (`did:ad:X` and `atomic:X` are one).
 String driveKeyOf(String subject) =>
     subject.replaceFirst(RegExp(r'^(did:ad:|atomic:)'), '').split('?').first;
 
 /// Opens the drive switcher from the header whose [context] is given: a
 /// popover under it from [driveSwitcherPopoverWidth] on, else a bottom sheet.
-/// Picking a drive closes it first, then calls [onSelect].
+/// Both close it first: the "Switch" button then calls [onSelect], the row's
+/// left part [onOpen] (the drive's page; the active drive stays).
 Future<void> showDriveSwitcher(
   BuildContext context, {
   required List<DriveInfo> drives,
   required String current,
   required ValueChanged<DriveInfo> onSelect,
+  required ValueChanged<DriveInfo> onOpen,
   VoidCallback? onManage,
   VoidCallback? onNew,
 }) {
@@ -256,6 +395,10 @@ Future<void> showDriveSwitcher(
         onSelect: (d) {
           Navigator.of(inner).pop();
           onSelect(d);
+        },
+        onOpen: (d) {
+          Navigator.of(inner).pop();
+          onOpen(d);
         },
         onManage: onManage == null
             ? null

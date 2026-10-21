@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -199,7 +200,7 @@ void main() {
       await tester.tap(find.byKey(const Key('current-drive-header')));
       await tester.pumpAndSettle();
       await tester
-          .tap(find.byKey(const ValueKey('drive-switcher-row-did:ad:b')));
+          .tap(find.byKey(const ValueKey('drive-switcher-switch-did:ad:b')));
       await tester.pumpAndSettle();
       // Closed, set in the store, the header and the tree are the other's.
       expect(find.byKey(const Key('drive-switcher')), findsNothing);
@@ -212,16 +213,141 @@ void main() {
       expect(api.childrenAsked, contains('did:ad:b'));
     });
 
-    testWidgets('the current drive is not set again', (tester) async {
+    testWidgets('the current drive has a chip and no Switch button',
+        (tester) async {
+      await _home(tester, _api());
+      await tester.tap(find.byKey(const Key('current-drive-header')));
+      await tester.pumpAndSettle();
+      expect(
+          find.descendant(
+              of: find.byKey(const ValueKey('drive-switcher-row-did:ad:a')),
+              matching: find.text('Current')),
+          findsOneWidget);
+      expect(find.byIcon(Icons.check), findsOneWidget);
+      expect(find.byKey(const ValueKey('drive-switcher-switch-did:ad:a')),
+          findsNothing);
+      expect(find.byKey(const ValueKey('drive-switcher-switch-did:ad:b')),
+          findsOneWidget);
+      expect(find.text('Switch'), findsNWidgets(2));
+    });
+
+    testWidgets("the left part opens the drive's page, the drive stays",
+        (tester) async {
+      _size(tester, const Size(393, 851));
+      final api = _api();
+      await _home(tester, api);
+      await tester.tap(find.byKey(const Key('current-drive-header')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Beta'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('drive-switcher')), findsNothing);
+      expect(api.activeSet, isEmpty);
+      final page = tester.widget<ResourceView>(find.byType(ResourceView));
+      expect(page.path ?? page.subject, anyOf(isNull, contains('did:ad:b')));
+      // The home underneath still has the current drive.
+      expect(
+          tester
+              .widget<Text>(find.byKey(const Key('current-drive-name'),
+                  skipOffstage: false))
+              .data,
+          'Alpha');
+    });
+
+    testWidgets('the current drive row opens its page too', (tester) async {
       final api = _api();
       await _home(tester, api);
       await tester.tap(find.byKey(const Key('current-drive-header')));
       await tester.pumpAndSettle();
       await tester
-          .tap(find.byKey(const ValueKey('drive-switcher-row-did:ad:a')));
+          .tap(find.byKey(const ValueKey('drive-switcher-open-did:ad:a')));
       await tester.pumpAndSettle();
+      expect(find.byKey(const Key('drive-switcher')), findsNothing);
       expect(api.activeSet, isEmpty);
+      expect(find.byType(ResourceView), findsOneWidget);
     });
+
+    for (final width in [393.0, 1000.0]) {
+      testWidgets(
+          'rows span the full width and the button sits 12 from the '
+          'edge at $width', (tester) async {
+        _size(tester, Size(width, 851));
+        await _home(tester, _api());
+        await tester.tap(find.byKey(const Key('current-drive-header')));
+        await tester.pumpAndSettle();
+        final box = tester.getRect(find.byKey(
+            Key(width < 600 ? 'drive-switcher' : 'drive-switcher-popover')));
+        for (final d in [_alpha, _beta, _gamma]) {
+          final row = tester
+              .getRect(find.byKey(ValueKey('drive-switcher-row-${d.subject}')));
+          expect(row.width, box.width);
+          expect(row.left, box.left);
+          expect(row.height, greaterThanOrEqualTo(56));
+        }
+        final manage =
+            tester.getRect(find.byKey(const Key('drive-switcher-manage')));
+        expect(manage.width, box.width);
+        final button = tester.getRect(
+            find.byKey(const ValueKey('drive-switcher-switch-did:ad:b')));
+        final row = tester
+            .getRect(find.byKey(const ValueKey('drive-switcher-row-did:ad:b')));
+        expect(row.right - button.right, 12);
+        expect(button.height, inInclusiveRange(32, 36));
+        // The left part takes what the button leaves.
+        final open = tester.getRect(
+            find.byKey(const ValueKey('drive-switcher-open-did:ad:b')));
+        expect(open.left, row.left);
+        expect(open.right, lessThanOrEqualTo(button.left));
+      });
+    }
+
+    testWidgets('keyboard and semantics', (tester) async {
+      final handle = tester.ensureSemantics();
+      await _home(tester, _api());
+      await tester.tap(find.byKey(const Key('current-drive-header')));
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsLabel('Open Beta'), findsOneWidget);
+      expect(find.bySemanticsLabel('Switch to Beta'), findsOneWidget);
+      expect(find.bySemanticsLabel('Switch to Alpha'), findsNothing);
+      handle.dispose();
+    });
+
+    testWidgets('Ctrl+Enter on a focused row switches', (tester) async {
+      final api = _api();
+      await _home(tester, api);
+      await tester.tap(find.byKey(const Key('current-drive-header')));
+      await tester.pumpAndSettle();
+      final focus = Focus.of(tester.element(find.descendant(
+          of: find.byKey(const ValueKey('drive-switcher-open-did:ad:b')),
+          matching: find.text('Beta'))));
+      focus.requestFocus();
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pumpAndSettle();
+      expect(api.activeSet, ['did:ad:b']);
+    });
+
+    for (final brightness in [Brightness.light, Brightness.dark]) {
+      testWidgets('the button label and the chip are legible in $brightness',
+          (tester) async {
+        await _home(tester, _api(), brightness: brightness);
+        await tester.tap(find.byKey(const Key('current-drive-header')));
+        await tester.pumpAndSettle();
+        final button = tester.widget<FilledButton>(
+            find.byKey(const ValueKey('drive-switcher-switch-did:ad:b')));
+        final bg = button.style!.backgroundColor!.resolve({})!;
+        final fg = button.style!.foregroundColor!.resolve({})!;
+        expect(_contrast(fg, bg), greaterThanOrEqualTo(4.5));
+        final chip = tester
+            .widget<Container>(find.byKey(const Key('drive-switcher-current')));
+        final chipBg = (chip.decoration as BoxDecoration).color!;
+        final label = tester.widget<Text>(
+            find.byKey(const Key('drive-switcher-current-label')));
+        expect(
+            _contrast(label.style!.color!, chipBg), greaterThanOrEqualTo(4.5));
+      });
+    }
 
     testWidgets('Manage drives… lists every drive on a page of its own',
         (tester) async {

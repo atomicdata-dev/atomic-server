@@ -436,9 +436,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
       drives = [(subject: widget.drive, name: '', emoji: null, picture: null)];
     }
     final want = _selected ?? widget.drive;
-    _drive = drives.any((d) => d.subject == want)
-        ? want
-        : drives.first.subject;
+    _drive = drives.any((d) => d.subject == want) ? want : drives.first.subject;
     if (mounted) _shell?.drive.value = _drive;
     // The most recently visited first.
     final sorted = await sortDrivesByRecent(widget.api, drives);
@@ -640,6 +638,13 @@ class _ChatsScreenState extends State<ChatsScreen> {
         drive: drive,
         subject: r.subject);
   }
+
+  /// The drive's own page, without making it the current drive.
+  void _openDrivePage(DriveInfo d) => _push(
+      openResourceView(
+          api: widget.api, drive: d.subject, subject: d.subject, title: d.name),
+      subject: d.subject,
+      onLeave: () => noteDriveVisited(d.subject));
 
   Widget _driveRow(DriveInfo d) => ResourceRow(
         subject: d.subject,
@@ -1051,6 +1056,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
       drives: _driveList,
       current: _drive,
       onSelect: _selectDrive,
+      onOpen: _openDrivePage,
       onManage: () => _openSectionPage(HomeSection.drives),
       onNew: shell == null ? null : ShellActions(widget.api, shell).newDrive,
     );
@@ -1114,7 +1120,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
                     padding: EdgeInsets.only(
                         bottom: MediaQuery.paddingOf(context).bottom),
                     child: Column(
-                        mainAxisSize: MainAxisSize.min, children: _shownSections(split)),
+                        mainAxisSize: MainAxisSize.min,
+                        children: _shownSections(split)),
                   ),
                 ]);
               }),
@@ -1477,7 +1484,7 @@ class _ShowAllRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
-    mouseCursor: WidgetStateMouseCursor.clickable,
+        mouseCursor: WidgetStateMouseCursor.clickable,
         onTap: onTap,
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 48),
