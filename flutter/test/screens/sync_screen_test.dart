@@ -157,6 +157,11 @@ Widget _app(Widget home) => MaterialApp(
 
 void main() {
   testWidgets('lists unpaired connected devices, display only', (tester) async {
+    // The This device card has grown (storage, background activity): give the
+    // page room so the Devices section is built.
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(_app(SyncScreen(
       backend: _Backend()
         ..unsaved = [
@@ -178,6 +183,9 @@ void main() {
 
   testWidgets('hides Connected now when nobody unpaired is connected',
       (tester) async {
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(_app(SyncScreen(
       backend: _Backend(),
       loadAccount: (_) async => null,
