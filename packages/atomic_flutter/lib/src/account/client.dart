@@ -213,7 +213,7 @@ class AtomicAccountClient {
     final me = await account();
     final response = await _request('GET', 'recovery-secret');
     if (response.statusCode == 404 || response.statusCode == 204) {
-      throw StateError('Finish setting up your workspace in the browser first');
+      throw const AtomicNoAssistedRecovery('This account has no backup yet.');
     }
     final data = _object(response);
     if (data['owner_email'] != me['email']) {
@@ -221,7 +221,8 @@ class AtomicAccountClient {
     }
     if (data['format_version'] != 2 ||
         data['encryption_algorithm'] != 'AES-GCM') {
-      throw StateError('This backup needs manual recovery in the browser');
+      throw const AtomicNoAssistedRecovery(
+          'This account has an older backup the app cannot open.');
     }
     final wrappers = (data['wrappers'] as List?) ?? [];
     final wrapper = wrappers
@@ -238,6 +239,11 @@ class AtomicAccountClient {
     });
     if (keyResponse.statusCode == 403) {
       throw StateError('Sign in again in the browser to unlock this device');
+    }
+    // 410: the backup was made with a service key that has since been retired.
+    if (keyResponse.statusCode == 410) {
+      throw const AtomicNoAssistedRecovery(
+          "This account's backup was made with a key that is no longer in use.");
     }
     final key = _object(keyResponse);
     final secret =
@@ -499,16 +505,20 @@ class AtomicVoiceError implements Exception {
 
 enum AtomicLinkProgress { pending, approved, expired }
 
-/// The account's backup has no server-assisted wrapper, so only its recovery
-/// code or passkey opens it, in the browser. The app can't, and asks for the
-/// secret instead.
+/// The account's identity can't be recovered by the app: there is no backup,
+/// or it has no usable server-assisted wrapper, so only its recovery code or
+/// passkey opens it, in the browser. Restoring there once adds the wrapper.
+/// The app asks for the secret instead.
 class AtomicNoAssistedRecovery implements Exception {
-  const AtomicNoAssistedRecovery();
+  final String reason;
+
+  const AtomicNoAssistedRecovery(
+      [this.reason =
+          "This account's backup only opens with its recovery code or passkey."]);
 
   @override
-  String toString() =>
-      "This account's backup only opens with its recovery code or passkey. "
-      'Paste your Atomic secret instead.';
+  String toString() => '$reason Paste your Atomic secret, or restore once in '
+      'the web app with your passkey or recovery code and try again.';
 }
 
 class AtomicDeviceLink {

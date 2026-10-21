@@ -105,7 +105,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Sign in with atomic.place'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Paste your Atomic secret instead'),
+    expect(find.textContaining('Paste your Atomic secret'),
         findsOneWidget);
     expect(find.byType(TextField), findsWidgets);
     expect(find.text('Get Started'), findsNothing);

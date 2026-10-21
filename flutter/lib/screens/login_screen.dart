@@ -317,7 +317,14 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
       if (linked != true) return null;
-      return await client.recoverIdentity();
+      try {
+        return await client.recoverIdentity();
+      } catch (_) {
+        // Without the identity the account session is of no use here, and
+        // keeping it made a failed sign-in look half done.
+        await AccountStore.clear();
+        rethrow;
+      }
     } finally {
       client.close();
     }
