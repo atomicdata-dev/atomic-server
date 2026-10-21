@@ -110,15 +110,12 @@ pub fn validate_actions(manifest: &Manifest) -> Result<(), String> {
         if !manifest.operations.iter().any(|o| o.id == a.operation) {
             return Err("action references an undeclared operation".into());
         }
-        let s = &a.input_schema;
-        if s.r#type != "object"
-            || s.additional_properties
-            || s.properties.len() > 32
-            || s.required.iter().any(|p| !s.properties.contains_key(p))
-            || s.properties.values().any(|p| {
-                p.property.is_some()
-                    || !matches!(p.r#type.as_str(), "string" | "integer" | "boolean")
-            })
+        // Actions take a flat object of scalars; `property` is for exports.
+        if !super::manifest::flat_object(&a.input_schema, false)
+            || a.input_schema
+                .properties
+                .values()
+                .any(|p| p.property.is_some())
         {
             return Err("unsupported action input schema".into());
         }

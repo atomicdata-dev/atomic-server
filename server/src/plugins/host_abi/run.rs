@@ -17,13 +17,13 @@ use std::{
 
 use atomic_lib::{agents::ForAgent, sync::protocol::CallBudgetWire, Db};
 use wasmtime::{
-    component::{Linker, ResourceTable},
-    Store, StoreLimits,
+    component::{Component, Linker, ResourceTable},
+    Engine, Store, StoreLimits,
 };
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 
 use super::{
-    bindings::SandboxedApp,
+    bindings::{SandboxedApp, SandboxedAppPre},
     code, error,
     forward::Forward,
     registry::{HostAbiRegistry, LoadedApp, MAX_CALL_DEPTH},
@@ -47,7 +47,7 @@ pub(super) struct AbiHost {
     /// draft), which declares nothing.
     pub drive: String,
     pub installation: String,
-    pub manifest: Option<Manifest>,
+    pub manifest: Option<Arc<Manifest>>,
     /// Reads, fetches and secrets, under the caller and the Installation's
     /// agent. The caller is the agent the entry call came from, at every hop;
     /// a calling app's own rights are never passed on.
@@ -319,12 +319,28 @@ impl WasiView for AbiState {
     }
 }
 
+/// Links the host ABI once per loaded app, so a call only instantiates.
+pub(super) fn instance_pre(
+    engine: &Engine,
+    component: &Component,
+) -> Result<SandboxedAppPre<AbiState>, String> {
+    let mut linker: Linker<AbiState> = Linker::new(engine);
+    wasmtime_wasi::p2::add_to_linker_async(&mut linker)
+        .map_err(|e| format!("could not link WASI: {e}"))?;
+    SandboxedApp::add_to_linker::<_, wasmtime::component::HasSelf<_>>(&mut linker, |s| s)
+        .map_err(|e| format!("could not link the host ABI: {e}"))?;
+    let pre = linker
+        .instantiate_pre(component)
+        .map_err(|e| format!("the app does not fit the host ABI: {e}"))?;
+    SandboxedAppPre::new(pre).map_err(|e| format!("the app does not fit the host ABI: {e}"))
+}
+
 /// Builds the host for one invocation, with the Installation resolved now:
 /// a paused or revoked app fails here, on its next call.
 pub(super) async fn build_host(
     registry: &Arc<HostAbiRegistry>,
     db: &Arc<Db>,
-    (drive, installation, manifest): (&str, &str, Option<Manifest>),
+    (drive, installation, manifest): (&str, &str, Option<Arc<Manifest>>),
     caller: ForAgent,
     depth: usize,
     budget: Arc<CallBudget>,
@@ -369,6 +385,17 @@ pub fn call_export<'a>(
 ) -> Call<'a> {
     Box::pin(async move {
         budget.take_call()?;
+        let forward = || Forward {
+            registry,
+            db,
+            drive,
+            interface,
+            function,
+            args,
+            caller: &caller,
+            depth,
+            budget: &budget,
+        };
         if depth >= MAX_CALL_DEPTH {
             return Err(error(
                 code::DEPTH_EXCEEDED,
@@ -377,18 +404,7 @@ pub fn call_export<'a>(
         }
         let Some(app) = registry.provider_of(drive, interface, function) else {
             // No app here: a node that syncs this drive may have it.
-            let to_peer = Forward {
-                registry,
-                db,
-                drive,
-                interface,
-                function,
-                args,
-                caller: &caller,
-                depth,
-                budget: &budget,
-            };
-            if let Some(outcome) = to_peer.send().await {
+            if let Some(outcome) = forward().send().await {
                 return outcome;
             }
             return Err(error(
@@ -412,18 +428,7 @@ pub fn call_export<'a>(
         // every secret it declares: a peer that has them runs it instead. With
         // no peer that does, it runs here and fails where it needs the secret.
         if !super::forward::holds_secrets(db, &app) {
-            let to_peer = Forward {
-                registry,
-                db,
-                drive,
-                interface,
-                function,
-                args,
-                caller: &caller,
-                depth,
-                budget: &budget,
-            };
-            match to_peer.send().await {
+            match forward().send().await {
                 // A peer without the app says nothing about this one.
                 Some(Err(e)) if e.code == code::NOT_FOUND => {}
                 Some(outcome) => return outcome,
@@ -509,32 +514,6 @@ pub fn call_export<'a>(
     })
 }
 
-/// An entry call: loads the drive's apps that are not loaded yet, then calls as
-/// `caller`, whose rights are bounded by the provider's own agent.
-pub async fn call_as(
-    registry: &Arc<HostAbiRegistry>,
-    db: &Arc<Db>,
-    drive: &str,
-    interface: &str,
-    function: &str,
-    args: &str,
-    caller: ForAgent,
-) -> Result<String, HostError> {
-    registry.refresh(db, drive).await;
-    call_entry(
-        registry,
-        db,
-        drive,
-        interface,
-        function,
-        args,
-        caller,
-        Arc::new(CallBudget::default()),
-        ENTRY_TIMEOUT,
-    )
-    .await
-}
-
 /// The entry call of every outside caller (`/host/call`, MCP): the agent must
 /// be able to read the drive, the drive's apps are loaded, and the call runs
 /// under `budget` with [`ENTRY_TIMEOUT`]. Write on the drive, for exports that
@@ -590,29 +569,6 @@ pub(super) async fn call_for_agent_at(
     .await
 }
 
-/// An entry call into apps that are already loaded, under one budget and one
-/// deadline for the whole chain it causes.
-#[allow(clippy::too_many_arguments)]
-pub async fn call_entry(
-    registry: &Arc<HostAbiRegistry>,
-    db: &Arc<Db>,
-    drive: &str,
-    interface: &str,
-    function: &str,
-    args: &str,
-    caller: ForAgent,
-    budget: Arc<CallBudget>,
-    deadline: Duration,
-) -> Result<String, HostError> {
-    with_deadline(
-        deadline,
-        call_export(
-            registry, db, drive, interface, function, args, caller, 0, budget,
-        ),
-    )
-    .await
-}
-
 /// Runs `work`, giving up after `deadline`. The work is dropped, which stops
 /// an app at its next await or fuel yield.
 pub(super) async fn with_deadline<F>(deadline: Duration, work: F) -> Result<String, HostError>
@@ -653,16 +609,10 @@ async fn run_invoke(
         &host.db,
         &app.drive,
         &app.installation,
-        Some(&app.manifest),
+        Some(app.manifest.as_ref()),
     )
     .await;
     let limits = host_core::limits(Runtime::App, grants);
-
-    let mut linker: Linker<AbiState> = Linker::new(&app.engine);
-    wasmtime_wasi::p2::add_to_linker_async(&mut linker)
-        .map_err(|e| error(code::INTERNAL, format!("could not link WASI: {e}")))?;
-    SandboxedApp::add_to_linker::<_, wasmtime::component::HasSelf<_>>(&mut linker, |s| s)
-        .map_err(|e| error(code::INTERNAL, format!("could not link the host ABI: {e}")))?;
 
     let mut store = Store::new(&app.engine, AbiState::new(host, limits.store_limits()));
     store.limiter(|state| &mut state.limits);
@@ -676,7 +626,9 @@ async fn run_invoke(
         .map_err(|e| error(code::INTERNAL, format!("could not meter the app: {e}")))?;
 
     let outcome = async {
-        let instance = SandboxedApp::instantiate_async(&mut store, &app.component, &linker)
+        let instance = app
+            .pre
+            .instantiate_async(&mut store)
             .await
             .map_err(|e| error(code::TRAP, format!("could not start the app: {e}")))?;
 

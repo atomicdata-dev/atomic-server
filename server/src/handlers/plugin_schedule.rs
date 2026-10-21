@@ -148,17 +148,33 @@ pub async fn handle_set_auto_apply(
         return Ok(HttpResponse::Ok().json(read(&appstate, &key)?));
     }
 
-    let (reviewed, approved_source) = reviewed_run(&appstate, &body.drive, &body.plugin).await?;
+    schedule.auto_apply =
+        Some(build_auto_apply_grant(&appstate, &agent, &body.drive, &body.plugin).await?);
 
-    crate::plugins::js_runtime::describe_manifest(&approved_source).await?;
+    appstate.store.set_plugin_schedule(&key, &schedule)?;
 
-    let ForAgent::AgentSubject(subject) = &agent else {
+    Ok(HttpResponse::Ok().json(read(&appstate, &key)?))
+}
+
+/// The grant that lets a plugin write unattended as `agent`: the reviewed run
+/// it rests on and an immutable release of the approved source and schemas.
+/// Shared by schedules and triggers, which take the same precondition.
+pub(crate) async fn build_auto_apply_grant(
+    appstate: &AppState,
+    agent: &ForAgent,
+    drive: &str,
+    plugin: &str,
+) -> AtomicServerResult<AutoApplyGrant> {
+    let (reviewed, approved_source) = reviewed_run(appstate, drive, plugin).await?;
+    let manifest = crate::plugins::js_runtime::describe_manifest(&approved_source).await?;
+
+    let ForAgent::AgentSubject(subject) = agent else {
         return Err(AtomicServerError::bad_request(
             "Only a signed-in agent can allow a plugin to write unattended",
         ));
     };
 
-    schedule.auto_apply = Some(AutoApplyGrant {
+    Ok(AutoApplyGrant {
         agent: subject.to_string(),
         granted_at: atomic_lib::utils::now(),
         reviewed_run: Some(reviewed),
@@ -166,14 +182,12 @@ pub async fn handle_set_auto_apply(
             appstate.store.publish_plugin_release(
                 &atomic_lib::db::plugin_release::PluginRelease {
                     source: Some(approved_source.clone()),
-                    manifest: serde_json::json!(
-                        crate::plugins::js_runtime::describe_manifest(&approved_source).await?
-                    ),
+                    manifest: serde_json::json!(manifest),
                     runtime: atomic_lib::db::plugin_release::RUNTIME.into(),
                     schemas: crate::plugins::scheduler::plugin_schema_bindings(
                         &appstate.store,
-                        &body.drive,
-                        &body.plugin,
+                        drive,
+                        plugin,
                     )
                     .await?,
                     ..Default::default()
@@ -181,11 +195,7 @@ pub async fn handle_set_auto_apply(
             )?,
         ),
         source: Some(approved_source),
-    });
-
-    appstate.store.set_plugin_schedule(&key, &schedule)?;
-
-    Ok(HttpResponse::Ok().json(read(&appstate, &key)?))
+    })
 }
 
 /// Refuses to arm a plugin whose secrets need a person present.
