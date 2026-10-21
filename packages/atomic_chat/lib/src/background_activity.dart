@@ -22,11 +22,16 @@ class BackgroundState {
   /// When a task last succeeded (ms since the epoch).
   final int? lastOkMs;
 
+  /// Requests this device made to the public device directory in the last
+  /// hour; null when the host does not count them.
+  final int? directoryLookups;
+
   const BackgroundState({
     this.total = 0,
     this.byKind = const {},
     this.lastError,
     this.lastOkMs,
+    this.directoryLookups,
   });
 
   static const idle = BackgroundState();
@@ -58,9 +63,16 @@ class BackgroundState {
 
   /// The line of the Sync page's "Background activity" row.
   String get summary {
-    if (busy) return '$caption · $total ${total == 1 ? 'task' : 'tasks'}';
+    final lookups = directoryLookups;
+    final suffix = lookups == null
+        ? ''
+        : ' · $lookups directory ${lookups == 1 ? 'lookup' : 'lookups'} '
+            'in the last hour';
+    if (busy) {
+      return '$caption · $total ${total == 1 ? 'task' : 'tasks'}$suffix';
+    }
     if (problem) return lastError!;
-    return 'Idle';
+    return 'Idle$suffix';
   }
 
   BackgroundState plus(Map<String, int> dart) {
@@ -76,6 +88,7 @@ class BackgroundState {
       byKind: merged,
       lastError: lastError,
       lastOkMs: lastOkMs,
+      directoryLookups: directoryLookups,
     );
   }
 
@@ -85,10 +98,11 @@ class BackgroundState {
       other.total == total &&
       other.lastError == lastError &&
       other.lastOkMs == lastOkMs &&
+      other.directoryLookups == directoryLookups &&
       mapEquals(other.byKind, byKind);
 
   @override
-  int get hashCode => Object.hash(total, lastError, lastOkMs, byKind.length);
+  int get hashCode => Object.hash(total, lastError, lastOkMs, byKind.length, directoryLookups);
 }
 
 /// Holds one Dart-side task in the count until [end] (safe to call twice).

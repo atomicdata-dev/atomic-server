@@ -250,7 +250,8 @@ Future<String> startPeer() => RustLib.instance.api.crateApiSimpleStartPeer();
 /// What the search for this account's other devices is doing, as JSON:
 /// `{"state": "starting" | "searching" | "no_peers_yet" | "connected" |
 /// "failed", "message": "…", "detail": "…" | null, "retry_in_secs"?,
-/// "devices"?, "reason"?, "last_checked_ms": …, "attempts": …}`.
+/// "devices"?, "reason"?, "last_checked_ms": …, "attempts": …,
+/// "directory_lookups_last_hour": …, "paused": …}`.
 String peerSearchStatus() =>
     RustLib.instance.api.crateApiSimplePeerSearchStatus();
 
@@ -258,6 +259,14 @@ String peerSearchStatus() =>
 /// change, the app coming back), dialling the ones that did not answer
 /// recently too.
 void peerSearchAgain() => RustLib.instance.api.crateApiSimplePeerSearchAgain();
+
+/// Tell the bridge whether the app is in the foreground. In the background
+/// the device search and the periodic announce stop (no directory requests;
+/// live connections stay); coming back looks for devices at once. Call it
+/// from the app lifecycle: resumed → true; paused, hidden, detached → false;
+/// inactive (a window that merely lost focus) is not a reason to stop.
+void setAppForeground({required bool foreground}) =>
+    RustLib.instance.api.crateApiSimpleSetAppForeground(foreground: foreground);
 
 /// Get this device's Iroh NodeID (if peer is running).
 String? getPeerId() => RustLib.instance.api.crateApiSimpleGetPeerId();

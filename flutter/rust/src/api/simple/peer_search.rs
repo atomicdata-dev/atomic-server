@@ -2,6 +2,7 @@
 //! directory, Iroh the dialer, the global store the drives.
 
 use atomic_lib::host::peer_search::{PeerDialer, PeerDirectory, PeerSearch, PeerSearchSchedule};
+use super::directory;
 use async_trait::async_trait;
 use std::sync::{Arc, LazyLock};
 use std::time::Duration;
@@ -21,17 +22,15 @@ impl PeerDirectory for PkarrDirectory {
     async fn announced(&self, drive: &str) -> Result<Vec<String>, String> {
         tokio::time::timeout(
             super::PKARR_RESOLVE_TIMEOUT,
-            atomic_lib::discovery::resolve_other_node_ids(drive, None),
+            directory::resolve_record(drive, directory::SEARCH_TTL, false),
         )
         .await
         .map_err(|_| "device directory (pkarr) timed out".to_string())?
-        .map_err(|e| e.to_string())
+        .map(|record| record.node_ids)
     }
 
     async fn announce(&self, drive: &str, me: &str) -> Result<(), String> {
-        atomic_lib::discovery::publish_node_id(drive, me)
-            .await
-            .map_err(|e| e.to_string())
+        directory::announce(drive, me).await
     }
 }
 
@@ -78,6 +77,22 @@ pub(crate) fn search_drives(store: &atomic_lib::Db) -> Vec<String> {
     drives
 }
 
+/// Look for devices now, for something the user did or a change that matters
+/// (a device went away, the app came back): the directory is asked again
+/// rather than answered from what it said a moment ago.
+pub(crate) fn search_again_now() {
+    directory::invalidate_all();
+    PEER_SEARCH.search_again();
+}
+
+/// The app went to the background (`false`) or came back (`true`).
+pub(crate) fn set_foreground(foreground: bool) {
+    PEER_SEARCH.set_paused(!foreground);
+    if foreground {
+        search_again_now();
+    }
+}
+
 /// Start the search loop (once) for the endpoint that just started, and wake
 /// it whenever the last live peer goes away.
 pub(crate) fn spawn(store: atomic_lib::Db, me: String) {
@@ -100,7 +115,7 @@ pub(crate) fn spawn(store: atomic_lib::Db, me: String) {
             let now = atomic_lib::sync::peer::wait_for_peer_count_change(count).await;
             if now < count {
                 tracing::info!("[peer_search] live peers {count} → {now}, searching again");
-                PEER_SEARCH.search_again();
+                search_again_now();
             }
             count = now;
         }

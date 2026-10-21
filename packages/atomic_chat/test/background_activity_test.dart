@@ -156,5 +156,15 @@ void main() {
   test('summary: idle, error', () {
     expect(BackgroundState.idle.summary, 'Idle');
     expect(const BackgroundState(lastError: 'Offline').summary, 'Offline');
+    // The directory lookups of the last hour, when the host counts them.
+    expect(const BackgroundState(directoryLookups: 12).summary,
+        'Idle · 12 directory lookups in the last hour');
+    expect(const BackgroundState(directoryLookups: 1).summary,
+        'Idle · 1 directory lookup in the last hour');
+    expect(
+        const BackgroundState(
+                total: 2, byKind: {'drives': 2}, directoryLookups: 0)
+            .summary,
+        'Syncing drives · 2 tasks · 0 directory lookups in the last hour');
   });
 }

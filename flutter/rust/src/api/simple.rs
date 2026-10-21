@@ -7,6 +7,7 @@ mod compaction_check;
 mod dial_tests;
 #[cfg(test)]
 mod peer_tests;
+mod directory;
 mod peer_search;
 pub(crate) mod state;
 #[cfg(test)]
@@ -1070,7 +1071,9 @@ enum PkarrOutcome {
 /// ones are skipped (`sync_drive_with_peer_if_needed`). The search loop keeps
 /// looking after this; it is woken, too.
 async fn pkarr_peers(store: &atomic_lib::Db, drive: &str) -> PkarrOutcome {
-    peer_search::PEER_SEARCH.search_again();
+    // The user is waiting on this (the needs-sync screen, pairing): no kept
+    // answer.
+    peer_search::search_again_now();
     let lookup = tokio::time::timeout(PKARR_RESOLVE_TIMEOUT, async {
         let my_node_id = atomic_lib::sync::peer::get_node_id()
             .ok_or("Peer not started")?
@@ -1079,15 +1082,14 @@ async fn pkarr_peers(store: &atomic_lib::Db, drive: &str) -> PkarrOutcome {
         // which is nothing to report.
         let mut others = Vec::new();
         for search in peer_search::search_drives(store) {
-            for id in
-                atomic_lib::discovery::resolve_other_node_ids(&search, Some(&my_node_id)).await?
-            {
+            let record = directory::resolve_record(&search, directory::DEFAULT_TTL, true).await?;
+            for id in directory::others(&record, Some(&my_node_id)) {
                 if !others.contains(&id) {
                     others.push(id);
                 }
             }
         }
-        Ok::<_, atomic_lib::AtomicError>(others)
+        Ok::<_, String>(others)
     })
     .await;
     let node_ids = match lookup {
@@ -1138,11 +1140,10 @@ async fn pkarr_peers(store: &atomic_lib::Db, drive: &str) -> PkarrOutcome {
 pub async fn resolve_drive_origins(drive: String) -> Result<Vec<String>, String> {
     let record = tokio::time::timeout(
         PKARR_RESOLVE_TIMEOUT,
-        atomic_lib::discovery::resolve_drive_record(&drive),
+        directory::resolve_record(&drive, directory::DEFAULT_TTL, false),
     )
     .await
-    .map_err(|_| "Server lookup timed out (pkarr)".to_string())?
-    .map_err(err)?;
+    .map_err(|_| "Server lookup timed out (pkarr)".to_string())??;
     tracing::info!(
         "[home] {drive} names {} origins {:?}",
         record.http_origins.len(),
@@ -1243,7 +1244,11 @@ async fn follow_listed_drives(home: String) {
     // A few at a time: each one is a round trip or a dial.
     for chunk in wanted.chunks(OTHER_DRIVES_PARALLEL) {
         let mut tasks = tokio::task::JoinSet::new();
-        for drive in chunk {
+        for (i, drive) in chunk.iter().enumerate() {
+            if i > 0 {
+                // Not a burst of relay requests: one every so often.
+                tokio::time::sleep(OTHER_DRIVES_STAGGER).await;
+            }
             tasks.spawn(fetch_other_drive(drive.clone(), dead_peers.clone()));
         }
         while let Some(done) = tasks.join_next().await {
@@ -1306,6 +1311,8 @@ fn same_drive(a: &str, b: &str) -> bool {
 }
 
 const OTHER_DRIVES_PARALLEL: usize = 4;
+/// Between the starts of the drives of one batch.
+const OTHER_DRIVES_STAGGER: std::time::Duration = std::time::Duration::from_millis(150);
 
 /// One drive of the person that this device lacks, tried where it is most
 /// likely to be: the server the session is connected to, then the paired
@@ -1328,12 +1335,18 @@ async fn fetch_other_drive(
     // 2. Paired devices, then 3. pkarr's nodes for this drive.
     let mut candidates = peer_ids_to_try(&dead_peers.lock().map(|d| d.clone()).unwrap_or_default());
     let own = atomic_lib::sync::peer::get_node_id().map(|n| n.to_string());
-    match tokio::time::timeout(
-        PKARR_RESOLVE_TIMEOUT,
-        atomic_lib::discovery::resolve_drive_record(&drive),
-    )
-    .await
-    {
+    // In the background nothing asks the directory (the connected server and
+    // the paired devices above still work).
+    let lookup = if peer_search::PEER_SEARCH.is_paused() {
+        Ok(Err("the app is in the background".to_string()))
+    } else {
+        tokio::time::timeout(
+            PKARR_RESOLVE_TIMEOUT,
+            directory::resolve_record(&drive, directory::DEFAULT_TTL, false),
+        )
+        .await
+    };
+    match lookup {
         Ok(Ok(record)) => {
             for node in record.node_ids {
                 if own.as_deref() != Some(node.as_str()) && !candidates.contains(&node) {
@@ -1464,7 +1477,18 @@ pub async fn start_peer() -> Result<String, String> {
 /// "devices"?, "reason"?, "last_checked_ms": …, "attempts": …}`.
 #[frb(sync)]
 pub fn peer_search_status() -> String {
-    serde_json::to_string(&peer_search::PEER_SEARCH.status()).unwrap_or_else(|_| "{}".into())
+    let mut status =
+        serde_json::to_value(peer_search::PEER_SEARCH.status()).unwrap_or(serde_json::json!({}));
+    if let Some(map) = status.as_object_mut() {
+        // For the Sync page's "N directory lookups in the last hour", and
+        // whether the search is paused (the app in the background).
+        map.insert(
+            "directory_lookups_last_hour".into(),
+            directory::lookups_last_hour().into(),
+        );
+        map.insert("paused".into(), peer_search::PEER_SEARCH.is_paused().into());
+    }
+    status.to_string()
 }
 
 /// Look for the other devices now (a "Search again" button, a network
@@ -1472,7 +1496,17 @@ pub fn peer_search_status() -> String {
 /// recently too.
 #[frb(sync)]
 pub fn peer_search_again() {
-    peer_search::PEER_SEARCH.search_again();
+    peer_search::search_again_now();
+}
+
+/// Tell the bridge whether the app is in the foreground. In the background
+/// the device search and the periodic announce stop (no directory requests;
+/// live connections stay); coming back looks for devices at once. Call it
+/// from the app lifecycle: resumed → true; paused, hidden, detached → false;
+/// inactive (a window that merely lost focus) is not a reason to stop.
+#[frb(sync)]
+pub fn set_app_foreground(foreground: bool) {
+    peer_search::set_foreground(foreground);
 }
 
 /// Get this device's Iroh NodeID (if peer is running).

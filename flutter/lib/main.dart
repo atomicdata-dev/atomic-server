@@ -190,6 +190,16 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
           (Object e) => debugPrint('Flushing the store failed: $e'));
     }
     _inForeground = state == AppLifecycleState.resumed;
+    // No requests to the device directory in the background. `inactive` is a
+    // window that lost focus (desktop) or a passing interruption: not a
+    // reason to stop looking for devices.
+    if (state == AppLifecycleState.resumed) {
+      AtomicClient.setAppForeground(true);
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      AtomicClient.setAppForeground(false);
+    }
     if (state == AppLifecycleState.resumed && _loggedIn) {
       _resumeFromSession();
       _startBackgroundSync();
@@ -294,7 +304,9 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
     final seconds =
         (20 * (1 << (_syncFailures - 1).clamp(0, 4))).clamp(20, 300);
     _syncRetry = Timer(Duration(seconds: seconds), () {
-      if (mounted && _loggedIn) _startBackgroundSync();
+      // In the background nothing asks the device directory; coming back
+      // starts a sync (see didChangeAppLifecycleState).
+      if (mounted && _loggedIn && _inForeground) _startBackgroundSync();
     });
   }
 

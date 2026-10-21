@@ -66,6 +66,8 @@ class AtomicClient {
       byKind: Map<String, int>.of(a.byKind),
       lastError: a.lastError,
       lastOkMs: a.lastOkMs?.toInt(),
+      directoryLookups:
+          peerSearchStatus()['directory_lookups_last_hour'] as int?,
     );
   }
 
@@ -447,6 +449,17 @@ class AtomicClient {
       ffi.peerSearchAgain();
     } catch (e) {
       debugPrint('peerSearchAgain: $e');
+    }
+  }
+
+  /// The app is in the foreground (true) or the background (false). In the
+  /// background the search for other devices and the announcing stop (no
+  /// requests to the device directory); coming back looks again at once.
+  static void setAppForeground(bool foreground) {
+    try {
+      ffi.setAppForeground(foreground: foreground);
+    } catch (e) {
+      debugPrint('setAppForeground: $e');
     }
   }
 

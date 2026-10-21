@@ -37,7 +37,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1310265938;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1524034831;
 
 // Section: executor
 
@@ -2918,6 +2918,38 @@ fn wire__crate__api__simple__set_agent_profile_impl(
         },
     )
 }
+fn wire__crate__api__simple__set_app_foreground_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "set_app_foreground",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_foreground = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Result::<_, ()>::Ok({
+                    crate::api::simple::set_app_foreground(api_foreground);
+                })?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
 fn wire__crate__api__simple__set_device_name_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -3931,32 +3963,32 @@ fn pde_ffi_dispatcher_primary_impl(
         ),
         79 => wire__crate__api__simple__set_active_drive_impl(port, ptr, rust_vec_len, data_len),
         80 => wire__crate__api__simple__set_agent_profile_impl(port, ptr, rust_vec_len, data_len),
-        83 => wire__crate__api__simple__set_property_impl(port, ptr, rust_vec_len, data_len),
-        84 => wire__crate__api__simple__setup_impl(port, ptr, rust_vec_len, data_len),
-        85 => wire__crate__api__simple__start_peer_impl(port, ptr, rust_vec_len, data_len),
-        87 => wire__crate__api__simple__store_stats_impl(port, ptr, rust_vec_len, data_len),
-        88 => {
+        84 => wire__crate__api__simple__set_property_impl(port, ptr, rust_vec_len, data_len),
+        85 => wire__crate__api__simple__setup_impl(port, ptr, rust_vec_len, data_len),
+        86 => wire__crate__api__simple__start_peer_impl(port, ptr, rust_vec_len, data_len),
+        88 => wire__crate__api__simple__store_stats_impl(port, ptr, rust_vec_len, data_len),
+        89 => {
             wire__crate__api__simple__sync_connectivity_now_impl(port, ptr, rust_vec_len, data_len)
         }
-        89 => {
+        90 => {
             wire__crate__api__simple__sync_drive_to_server_impl(port, ptr, rust_vec_len, data_len)
         }
-        90 => {
+        91 => {
             wire__crate__api__simple__upload_agent_picture_impl(port, ptr, rust_vec_len, data_len)
         }
-        91 => wire__crate__api__simple__wait_for_peer_count_change_impl(
+        92 => wire__crate__api__simple__wait_for_peer_count_change_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        92 => wire__crate__api__simple__wait_for_sync_event_impl(port, ptr, rust_vec_len, data_len),
-        93 => {
+        93 => wire__crate__api__simple__wait_for_sync_event_impl(port, ptr, rust_vec_len, data_len),
+        94 => {
             wire__crate__api__simple__warm_resource_history_impl(port, ptr, rust_vec_len, data_len)
         }
-        94 => wire__crate__api__assistant__warm_search_impl(port, ptr, rust_vec_len, data_len),
-        95 => wire__crate__api__simple__watch_children_impl(port, ptr, rust_vec_len, data_len),
-        96 => wire__crate__api__simple__watch_resource_impl(port, ptr, rust_vec_len, data_len),
+        95 => wire__crate__api__assistant__warm_search_impl(port, ptr, rust_vec_len, data_len),
+        96 => wire__crate__api__simple__watch_children_impl(port, ptr, rust_vec_len, data_len),
+        97 => wire__crate__api__simple__watch_resource_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -3989,9 +4021,10 @@ fn pde_ffi_dispatcher_sync_impl(
         54 => wire__crate__api__simple__peer_search_status_impl(ptr, rust_vec_len, data_len),
         70 => wire__crate__api__simple__remove_known_peer_impl(ptr, rust_vec_len, data_len),
         73 => wire__crate__api__assistant__resource_web_url_impl(ptr, rust_vec_len, data_len),
-        81 => wire__crate__api__simple__set_device_name_impl(ptr, rust_vec_len, data_len),
-        82 => wire__crate__api__simple__set_drive_impl(ptr, rust_vec_len, data_len),
-        86 => wire__crate__api__simple__store_recovery_impl(ptr, rust_vec_len, data_len),
+        81 => wire__crate__api__simple__set_app_foreground_impl(ptr, rust_vec_len, data_len),
+        82 => wire__crate__api__simple__set_device_name_impl(ptr, rust_vec_len, data_len),
+        83 => wire__crate__api__simple__set_drive_impl(ptr, rust_vec_len, data_len),
+        87 => wire__crate__api__simple__store_recovery_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
