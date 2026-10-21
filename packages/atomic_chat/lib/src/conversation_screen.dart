@@ -204,9 +204,7 @@ class _ConversationScreenState extends State<ConversationScreen>
                 ),
               ),
               body: ListAndField(
-                  fullWidthField: true,
-                  list: _list(c),
-                  field: _composer(c)),
+                  fullWidthField: true, list: _list(c), field: _composer(c)),
             )));
   }
 
@@ -268,8 +266,9 @@ class _ConversationScreenState extends State<ConversationScreen>
               physics: chatScrollPhysics,
               scrollCacheExtent: const ScrollCacheExtent.viewport(1.5),
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(
-                  ChatTextStyles.gutter, 8, ChatTextStyles.gutter, 8),
+              padding: readableHorizontalPadding(box.maxWidth,
+                      gutter: ChatTextStyles.gutter)
+                  .copyWith(top: 8, bottom: 8),
               itemCount: shown.length + (_window.hasOlder ? 1 : 0),
               findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
               itemBuilder: (context, i) {
@@ -301,7 +300,10 @@ class _ConversationScreenState extends State<ConversationScreen>
                   avatarOf: m.mine ? null : m.authorName,
                   time: last ? clockTime(m.createdAt) : null,
                   sending: m.id.startsWith('pending-'),
-                  listWidth: box.maxWidth - 2 * ChatTextStyles.gutter,
+                  listWidth: box.maxWidth -
+                      2 *
+                          (ChatTextStyles.gutter +
+                              readableSideInset(box.maxWidth)),
                   content: _text(c, m),
                 );
                 return KeyedSubtree(

@@ -25,25 +25,30 @@ class ListAndField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!fullWidthField) {
-      return ReadableWidth(
-        child: LayoutBuilder(
-          builder: (context, box) => box.maxHeight < minHeight
-              ? SingleChildScrollView(reverse: true, child: field)
-              : Column(children: [Expanded(child: list), field]),
-        ),
-      );
-    }
+    final Widget bottom = fullWidthField ? field : ReadableWidth(child: field);
     return LayoutBuilder(
       builder: (context, box) => box.maxHeight < minHeight
-          ? SingleChildScrollView(reverse: true, child: field)
-          : Column(children: [
-              Expanded(child: ReadableWidth(child: list)),
-              field,
-            ]),
+          ? SingleChildScrollView(reverse: true, child: bottom)
+          // The list runs the whole width, so its scrollbar and overscroll
+          // sit at the pane's edge; it centres its own content with
+          // [readableHorizontalPadding].
+          : Column(children: [Expanded(child: list), bottom]),
     );
   }
 }
+
+/// The horizontal padding that centres a scrollable's content in a column of
+/// at most [ReadableWidth.maxWidth] while the scrollable itself (and its
+/// scrollbar) spans [paneWidth]. [gutter] is added on each side, as inside
+/// the column. Narrower than the column it is just [gutter].
+EdgeInsets readableHorizontalPadding(double paneWidth, {double gutter = 0}) =>
+    EdgeInsets.symmetric(horizontal: gutter + readableSideInset(paneWidth));
+
+/// The empty margin each side of the readable column in a [paneWidth] pane.
+double readableSideInset(double paneWidth) =>
+    paneWidth <= ReadableWidth.maxWidth
+        ? 0
+        : (paneWidth - ReadableWidth.maxWidth) / 2;
 
 /// Text-heavy pages (a chat, settings, sync) in a wide pane: at most
 /// [maxWidth] wide, centred. Narrower than that (a phone) the child gets the

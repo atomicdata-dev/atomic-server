@@ -1003,8 +1003,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _results(BuildContext context) {
     final c = context.appColors;
     if (_model.error != null) {
-      return Center(
-          child: ErrorText('${_model.error}', color: c.alert));
+      return Center(child: ErrorText('${_model.error}', color: c.alert));
     }
     final items = _items;
     if (items.isEmpty &&
@@ -1014,28 +1013,32 @@ class _SearchScreenState extends State<SearchScreen> {
     }
     final heading = _model.showsRecent && items.isNotEmpty;
     final palette = widget.palette;
-    return ListView.builder(
-      // Best first, drawn from the bottom up: nearest the thumb. The palette
-      // lists from its field on top down.
-      reverse: !palette,
-      padding: palette ? const EdgeInsets.symmetric(vertical: 8) : null,
-      itemCount: items.length + (heading ? 1 : 0),
-      itemBuilder: (context, i) {
-        final n = palette ? (heading ? i - 1 : i) : i;
-        if (n == items.length || n < 0) {
-          return Padding(
-            padding:
-                EdgeInsets.fromLTRB(palette ? 32 : 16, palette ? 4 : 12, 16, 4),
-            child: Text(_model.kind.heading,
-                style: TextStyle(
-                    color: c.textSecondary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600)),
-          );
-        }
-        return _row(c, items[n], top: n == 0);
-      },
-    );
+    return LayoutBuilder(builder: (context, box) {
+      final side = readableSideInset(box.maxWidth);
+      return ListView.builder(
+        // Best first, drawn from the bottom up: nearest the thumb. The palette
+        // lists from its field on top down.
+        reverse: !palette,
+        padding:
+            EdgeInsets.symmetric(vertical: palette ? 8 : 0, horizontal: side),
+        itemCount: items.length + (heading ? 1 : 0),
+        itemBuilder: (context, i) {
+          final n = palette ? (heading ? i - 1 : i) : i;
+          if (n == items.length || n < 0) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                  palette ? 32 : 16, palette ? 4 : 12, 16, 4),
+              child: Text(_model.kind.heading,
+                  style: TextStyle(
+                      color: c.textSecondary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600)),
+            );
+          }
+          return _row(c, items[n], top: n == 0);
+        },
+      );
+    });
   }
 
   /// A query without hits: said where the first hit would be, just above

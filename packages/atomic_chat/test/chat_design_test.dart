@@ -57,6 +57,15 @@ Future<void> _open(WidgetTester tester, List<ConversationMessage> log,
   await tester.pumpAndSettle();
 }
 
+/// The list's readable column: the list spans the pane (its scrollbar at the
+/// edge), its content is centred at most 720 wide.
+Rect _column(WidgetTester tester) {
+  final full = tester.getRect(find.byType(ListView));
+  final side = readableSideInset(full.width);
+  return Rect.fromLTRB(
+      full.left + side, full.top, full.right - side, full.bottom);
+}
+
 Finder _sel(String t) =>
     find.byWidgetPredicate((w) => w is SelectableText && w.data == t);
 
@@ -81,7 +90,7 @@ void main() {
       testWidgets('own right in the accent, others left with avatar ($label)',
           (tester) async {
         await _open(tester, dm, colors: colors, width: width);
-        final list = tester.getRect(find.byType(ListView));
+        final list = _column(tester);
         final own = tester.getRect(_bubbleOf('three'));
         expect(own.right, closeTo(list.right - 12, 0.5));
         final other = tester.getRect(_bubbleOf('one'));
@@ -134,7 +143,7 @@ void main() {
         expect(ys.any((y) => (y - one.bottom).abs() < 0.5), isFalse);
         expect(first.width, 32);
         // No avatar beside own messages: the avatars are left of the list.
-        final list = tester.getRect(find.byType(ListView));
+        final list = _column(tester);
         for (final e in avatars.evaluate()) {
           expect(tester.getRect(find.byWidget(e.widget)).left,
               closeTo(list.left + 12, 0.5));

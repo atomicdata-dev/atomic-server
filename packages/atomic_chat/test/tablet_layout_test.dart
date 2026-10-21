@@ -484,13 +484,8 @@ void main() {
     await _settle(tester);
     await tapNewChat(tester);
     await _settle(tester);
-    // The row keeps the readable width; its strip and hairline run edge to
-    // edge (see full_bleed_lines_test).
-    final composer = tester.getRect(find
-        .descendant(
-            of: find.byType(ReadableWidth), matching: find.byType(SizedBox))
-        .first);
-    expect(composer.width, ReadableWidth.maxWidth);
+    // The list runs the whole pane, so its scrollbar sits at the edge; its
+    // content is centred at most 720 wide (readable_scrollbar_test).
     final strip = tester.getRect(find.byType(ListAndField));
     expect(strip.width, greaterThan(ReadableWidth.maxWidth));
     await _done(tester);
@@ -900,9 +895,11 @@ void main() {
         _size(tester, size);
         await tester.pumpWidget(_shell(_manyApi()));
         await _settle(tester);
-        await tester.ensureVisible(find.byKey(const ValueKey('section-show-all-favorites')));
+        await tester.ensureVisible(
+            find.byKey(const ValueKey('section-show-all-favorites')));
         await tester.pump();
-        await tester.tap(find.byKey(const ValueKey('section-show-all-favorites')));
+        await tester
+            .tap(find.byKey(const ValueKey('section-show-all-favorites')));
         await _settle(tester);
         final list = tester.getRect(find.byType(ChatsScreen));
         // A page in the detail pane, titled, next to the home.
@@ -930,9 +927,11 @@ void main() {
       _size(tester, _phone);
       await tester.pumpWidget(_shell(_manyApi()));
       await _settle(tester);
-      await tester.ensureVisible(find.byKey(const ValueKey('section-show-all-favorites')));
+      await tester.ensureVisible(
+          find.byKey(const ValueKey('section-show-all-favorites')));
       await tester.pump();
-      await tester.tap(find.byKey(const ValueKey('section-show-all-favorites')));
+      await tester
+          .tap(find.byKey(const ValueKey('section-show-all-favorites')));
       await _settle(tester);
       expect(
           find.descendant(
@@ -1189,13 +1188,17 @@ void main() {
           findsOneWidget);
       final row = find.descendant(of: feed, matching: find.text('Budget'));
       expect(row, findsOneWidget);
-      // At most 720 wide, in the detail pane.
-      expect(tester.getSize(feed).width, lessThanOrEqualTo(720));
+      // The scroll view spans the detail pane (scrollbar at its edge); the
+      // content is at most 720 wide, centred.
       final list = tester.getRect(find.byType(ChatsScreen));
       expect(tester.getRect(feed).left, greaterThan(list.right));
+      final feedRect = tester.getRect(feed);
+      final title = tester
+          .getRect(find.descendant(of: feed, matching: find.text('Activity')));
+      expect(title.left - feedRect.left,
+          greaterThanOrEqualTo((feedRect.width - 720) / 2));
       // Not a section of the sidebar as well.
-      expect(
-          find.byKey(const ValueKey('home-panel-activity')), findsNothing);
+      expect(find.byKey(const ValueKey('home-panel-activity')), findsNothing);
       await tester.tap(row);
       await _settle(tester);
       expect(find.byType(ResourceView), findsOneWidget);
@@ -1221,8 +1224,7 @@ void main() {
       await tester.pumpWidget(_shell(withActivity()));
       await _settle(tester);
       expect(find.byKey(const Key('home-activity')), findsNothing);
-      expect(find.byKey(const ValueKey('home-panel-activity')),
-          findsOneWidget);
+      expect(find.byKey(const ValueKey('home-panel-activity')), findsOneWidget);
       await _done(tester);
     });
   });
@@ -1341,7 +1343,8 @@ void main() {
   group('lists move when a page is left, not when it opens', () {
     setUp(resetDriveVisits);
 
-    testWidgets('drives: the last visited first in the switcher, also after a restart',
+    testWidgets(
+        'drives: the last visited first in the switcher, also after a restart',
         (tester) async {
       _size(tester, _landscape);
       final api = _VisitApi();
@@ -1368,7 +1371,8 @@ void main() {
 
       expect(await switcher(), ['a', 'b']);
       // Picking Beta makes it the active drive and the first in the list.
-      await tester.tap(find.byKey(const ValueKey('drive-switcher-switch-did:ad:b')));
+      await tester
+          .tap(find.byKey(const ValueKey('drive-switcher-switch-did:ad:b')));
       await _settle(tester);
       expect(api.activeSet, ['did:ad:b']);
       expect(find.byKey(const Key('drive-switcher')), findsNothing);
@@ -1434,8 +1438,7 @@ void main() {
       await tester.pumpWidget(_shell(_MineApi()));
       await _settle(tester);
       // The Home section has no chip and shows others' changes only.
-      expect(find.byKey(const ValueKey('home-panel-activity')),
-          findsOneWidget);
+      expect(find.byKey(const ValueKey('home-panel-activity')), findsOneWidget);
       expect(chip, findsNothing);
       expect(find.widgetWithText(FilterChip, 'Show mine'), findsNothing);
       expect(find.text('Budget'), findsOneWidget);

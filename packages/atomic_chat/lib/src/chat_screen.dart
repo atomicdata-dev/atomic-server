@@ -1294,9 +1294,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ),
               ),
               body: ListAndField(
-                  fullWidthField: true,
-                  list: _list(c),
-                  field: _composer(c)),
+                  fullWidthField: true, list: _list(c), field: _composer(c)),
             )));
   }
 
@@ -1327,8 +1325,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           physics: chatScrollPhysics,
           scrollCacheExtent: const ScrollCacheExtent.viewport(1.5),
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: EdgeInsets.fromLTRB(
-              ChatTextStyles.gutter, 8, ChatTextStyles.gutter, 8 + _spacer),
+          padding: readableHorizontalPadding(box.maxWidth,
+                  gutter: ChatTextStyles.gutter)
+              .copyWith(top: 8, bottom: 8 + _spacer),
           itemCount: shown.length + (_window.hasOlder ? 1 : 0),
           findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
           itemBuilder: (context, i) {
@@ -1363,7 +1362,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 constraints: BoxConstraints(
                   // An answer may hold code and tables: a little wider.
                   maxWidth: ChatTextStyles.bubbleMaxWidth(
-                      box.maxWidth - 2 * ChatTextStyles.gutter,
+                      box.maxWidth -
+                          2 *
+                              (ChatTextStyles.gutter +
+                                  readableSideInset(box.maxWidth)),
                       answer: !mine),
                 ),
                 decoration: ChatTextStyles.bubbleDecoration(c,

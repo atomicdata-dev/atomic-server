@@ -10,7 +10,7 @@ import 'package:atomic_chat/atomic_chat.dart'
     show
         AppTopBar,
         ProfileAvatar,
-        ReadableWidth,
+        readableHorizontalPadding,
         openFromList,
         ResourceView,
         ResourceWebView,
@@ -461,38 +461,43 @@ class _SyncScreenState extends State<SyncScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           // A tablet's detail pane: a readable column, centred.
-          : ReadableWidth(
-              child: ListView(
-              padding: const EdgeInsets.fromLTRB(
-                  shared.SyncGap.l, shared.SyncGap.xs, shared.SyncGap.l, 32),
-              children: [
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: shared.SyncGap.m),
-                    child: shared.SyncNote(_error!,
-                        tone: shared.SyncTone.error, icon: Icons.error_outline),
-                  ),
-                _identity(c),
-                _workspaceSwitcher(c),
-                if (_account != null || _accountError != null) _account_(c),
-                if (_account == null && _portal != null) _linkRow(c, _portal!),
-                ThisDeviceCard(
-                  backend: _backend,
-                  deviceName: _deviceName,
-                  peerId: _peerId,
-                  identity: _agent?.subject,
-                  driveNames: _drives,
-                  onRename: _rename,
-                  onOpenStorage: _openStorage,
-                ),
-                // Servers, paired devices and the pairing code: the browser's
-                // Devices list.
-                shared.ServerSettingsSection(
-                  backend: _backend,
-                  onServerChanged: _load,
-                ),
-              ],
-            )),
+          : LayoutBuilder(
+              builder: (context, box) => ListView(
+                    padding: readableHorizontalPadding(box.maxWidth,
+                            gutter: shared.SyncGap.l)
+                        .copyWith(top: shared.SyncGap.xs, bottom: 32),
+                    children: [
+                      if (_error != null)
+                        Padding(
+                          padding:
+                              const EdgeInsets.only(bottom: shared.SyncGap.m),
+                          child: shared.SyncNote(_error!,
+                              tone: shared.SyncTone.error,
+                              icon: Icons.error_outline),
+                        ),
+                      _identity(c),
+                      _workspaceSwitcher(c),
+                      if (_account != null || _accountError != null)
+                        _account_(c),
+                      if (_account == null && _portal != null)
+                        _linkRow(c, _portal!),
+                      ThisDeviceCard(
+                        backend: _backend,
+                        deviceName: _deviceName,
+                        peerId: _peerId,
+                        identity: _agent?.subject,
+                        driveNames: _drives,
+                        onRename: _rename,
+                        onOpenStorage: _openStorage,
+                      ),
+                      // Servers, paired devices and the pairing code: the browser's
+                      // Devices list.
+                      shared.ServerSettingsSection(
+                        backend: _backend,
+                        onServerChanged: _load,
+                      ),
+                    ],
+                  )),
     );
   }
 

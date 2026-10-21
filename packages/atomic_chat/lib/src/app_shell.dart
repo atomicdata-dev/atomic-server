@@ -26,6 +26,7 @@ import 'native_views.dart';
 import 'warm_resource_web_view.dart';
 import 'slide_back_route.dart';
 import 'home_sections.dart' show HomeSection, HomeSectionEntry;
+import 'list_and_field.dart' show readableHorizontalPadding;
 
 /// The route names of the pages the bottom bar opens: a page's kind. The bar
 /// shows which of its pages is on top and never stacks a second one of a
@@ -1575,9 +1576,6 @@ class _HomeSlot extends StatelessWidget {
 class _NothingOpen extends StatelessWidget {
   const _NothingOpen();
 
-  /// The widest the feed's column gets.
-  static const maxWidth = 720.0;
-
   static final _noFeed = ValueNotifier<HomeFeed?>(null);
 
   @override
@@ -1591,52 +1589,52 @@ class _NothingOpen extends StatelessWidget {
         bottom: false,
         child: ValueListenableBuilder<HomeFeed?>(
           valueListenable: shell?.activity ?? _noFeed,
-          builder: (context, feed, _) => Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: maxWidth),
-              child: ListView(
-                key: const Key('home-activity'),
-                padding: EdgeInsets.fromLTRB(
-                    8, 24, 8, 24 + MediaQuery.paddingOf(context).bottom),
-                children: [
+          // The list spans the pane (its scrollbar at the edge); it centres
+          // its own content.
+          builder: (context, feed, _) => LayoutBuilder(
+            builder: (context, box) => ListView(
+              key: const Key('home-activity'),
+              padding: readableHorizontalPadding(box.maxWidth, gutter: 8)
+                  .copyWith(
+                      top: 24,
+                      bottom: 24 + MediaQuery.paddingOf(context).bottom),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Row(children: [
+                    Expanded(
+                      child: Text('Activity',
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(
+                                  color: c.textPrimary,
+                                  fontWeight: FontWeight.w600)),
+                    ),
+                    if (feed != null)
+                      ShowMineChip(value: feed.mine, onChanged: feed.onMine),
+                  ]),
+                ),
+                if (feed == null)
+                  const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (feed.entries.isEmpty)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                    child: Row(children: [
-                      Expanded(
-                        child: Text('Activity',
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineSmall
-                                ?.copyWith(
-                                    color: c.textPrimary,
-                                    fontWeight: FontWeight.w600)),
-                      ),
-                      if (feed != null)
-                        ShowMineChip(value: feed.mine, onChanged: feed.onMine),
-                    ]),
-                  ),
-                  if (feed == null)
-                    const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  else if (feed.entries.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                      child: Text(
-                          feed.mine
-                              ? 'Nothing yet: what you and others change in '
-                                  'your drives shows up here.'
-                              : 'Nothing yet: what others change in your '
-                                  'drives shows up here. "Show mine" adds '
-                                  'your own changes.',
-                          style: TextStyle(color: c.textSecondary)),
-                    )
-                  else
-                    for (final a in feed.entries) feed.row(a),
-                ],
-              ),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: Text(
+                        feed.mine
+                            ? 'Nothing yet: what you and others change in '
+                                'your drives shows up here.'
+                            : 'Nothing yet: what others change in your '
+                                'drives shows up here. "Show mine" adds '
+                                'your own changes.',
+                        style: TextStyle(color: c.textSecondary)),
+                  )
+                else
+                  for (final a in feed.entries) feed.row(a),
+              ],
             ),
           ),
         ),
