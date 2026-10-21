@@ -135,6 +135,10 @@ void main() {
         find.byKey(const ValueKey('needsSync-details-panel')), findsOneWidget);
     expect(find.textContaining('PanicException', findRichText: true),
         findsOneWidget);
+    expect(
+        find.byWidgetPredicate((w) =>
+            w is SelectableText && (w.data ?? '').contains('PanicException')),
+        findsOneWidget);
 
     String? copied;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

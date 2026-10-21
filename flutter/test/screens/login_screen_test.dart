@@ -100,6 +100,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Finish setting up your workspace in the browser first'),
         findsOneWidget);
+    // The error is selectable and copyable, not plain text.
+    expect(
+        find.widgetWithText(SelectableText,
+            'Finish setting up your workspace in the browser first'),
+        findsOneWidget);
+    expect(find.byTooltip('Copy'), findsOneWidget);
   });
 
   testWidgets('a backup the app cannot open leads to the secret field',

@@ -507,8 +507,9 @@ class SyncNote extends StatelessWidget {
           const SizedBox(width: SyncGap.m),
         ],
         Expanded(
-          child:
-              Text(text, style: plain ? SyncText.caption(c) : SyncText.body(c)),
+          // Errors and notes can be selected and copied.
+          child: SelectableText(text,
+              style: plain ? SyncText.caption(c) : SyncText.body(c)),
         ),
         if (action != null) action!,
       ]),

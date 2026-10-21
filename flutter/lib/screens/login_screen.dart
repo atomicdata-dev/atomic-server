@@ -877,11 +877,10 @@ class _LoginScreenState extends State<LoginScreen> {
               Colors.red.shade50,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Text(_error!,
-            style: TextStyle(
-                color: Theme.of(context).extension<AppColors>()?.alert ??
-                    Colors.red,
-                fontSize: 13)),
+        child: shared.ErrorText(_error!,
+            color: Theme.of(context).extension<AppColors>()?.alert ??
+                Colors.red,
+            fontSize: 13),
       ),
     );
   }

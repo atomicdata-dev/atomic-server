@@ -13,6 +13,8 @@ export 'src/app_scroll_physics.dart';
 
 export 'src/hold_fan.dart';
 
+export 'src/copyable_error.dart';
+export 'src/error_snack.dart';
 export 'src/perf.dart';
 
 export 'src/device_stats.dart';

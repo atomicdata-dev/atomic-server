@@ -243,8 +243,8 @@ class _SyncScreenState extends State<SyncScreen> {
         .showSnackBar(SnackBar(content: Text('$what copied')));
   }
 
-  void _fail(String what, Object e) => ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text('$what: $e')));
+  void _fail(String what, Object e) =>
+      shared.showErrorSnack(context, '$what: $e');
 
   Future<String?> _ask(String title, String hint, {String initial = ''}) {
     final controller = TextEditingController(text: initial);
@@ -659,10 +659,16 @@ class _SyncScreenState extends State<SyncScreen> {
           icon: Icons.error_outline,
           iconColor: c.alert,
           title: 'Could not read your account',
-          subtitle: _accountError ?? '',
+          subtitle: '',
           trailing:
               shared.SyncTextAction(label: 'Retry', onPressed: _loadAccount),
         ),
+        if (_accountError != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+                shared.SyncGap.l, 0, shared.SyncGap.l, shared.SyncGap.m),
+            child: shared.ErrorText(_accountError!, color: c.alert),
+          ),
       ]);
     }
     final vault = account.vault;

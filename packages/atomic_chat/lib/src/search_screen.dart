@@ -1,3 +1,4 @@
+import 'package:atomic_flutter/atomic_flutter.dart' show ErrorText;
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -1003,7 +1004,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final c = context.appColors;
     if (_model.error != null) {
       return Center(
-          child: Text('${_model.error}', style: TextStyle(color: c.alert)));
+          child: ErrorText('${_model.error}', color: c.alert));
     }
     final items = _items;
     if (items.isEmpty &&

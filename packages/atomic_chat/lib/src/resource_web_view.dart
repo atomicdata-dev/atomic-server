@@ -1,3 +1,4 @@
+import 'package:atomic_flutter/atomic_flutter.dart' show ErrorText;
 import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt;
 import 'package:flutter/material.dart';
 import 'app_top_bar.dart';
@@ -118,7 +119,7 @@ class _ResourceWebViewState extends State<ResourceWebView> {
           title: widget.title.isEmpty ? widget.subject : widget.title),
       body: _error != null
           ? Center(
-              child: Text('$_error', style: TextStyle(color: c.alert)),
+              child: ErrorText('$_error', color: c.alert),
             )
           : _controller == null
               ? const Center(child: CircularProgressIndicator())

@@ -1,3 +1,4 @@
+import 'package:atomic_flutter/atomic_flutter.dart' show ErrorText;
 import 'dart:async';
 import 'dart:convert';
 
@@ -641,7 +642,7 @@ class _ResourceViewState extends State<ResourceView>
             bottom: false,
             child: _error != null
                 ? Center(
-                    child: Text('$_error', style: TextStyle(color: c.alert)))
+                    child: ErrorText('$_error', color: c.alert))
                 : Stack(children: [
                     if (page != null && _inTree) page.build(),
                     if (!_skeletonGone)

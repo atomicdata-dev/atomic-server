@@ -1,3 +1,4 @@
+import 'package:atomic_flutter/atomic_flutter.dart' show ErrorText;
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt, Perf;
 import 'package:flutter/material.dart';
@@ -1299,7 +1300,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Widget _list(AppColors c) {
     if (_loadError != null) {
       return Center(
-        child: Text('$_loadError', style: TextStyle(color: c.alert)),
+        child: ErrorText('$_loadError', color: c.alert),
       );
     }
     if (!_loaded) return const Center(child: CircularProgressIndicator());
@@ -1769,9 +1770,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 child: const Text('Turn on AI'),
               ),
               if (_error != null)
-                Text(_error!,
-                    style: TextStyle(
-                        color: c.alert, fontSize: ChatTextStyles.metaSize)),
+                ErrorText(_error!,
+                    color: c.alert, fontSize: ChatTextStyles.metaSize),
             ],
           ),
         ),

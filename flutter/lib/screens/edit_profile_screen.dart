@@ -186,7 +186,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ),
           if (_error != null) ...[
             const SizedBox(height: 12),
-            Text(_error!, style: TextStyle(color: c.alert)),
+            shared.ErrorText(_error!, color: c.alert),
           ],
           const SizedBox(height: 16),
           OutlinedButton(

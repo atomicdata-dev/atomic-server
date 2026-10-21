@@ -1,3 +1,4 @@
+import 'package:atomic_flutter/atomic_flutter.dart' show ErrorText;
 import 'dart:async';
 
 import 'package:atomic_flutter/atomic_flutter.dart'
@@ -296,8 +297,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text('$loadError',
-              textAlign: TextAlign.center, style: TextStyle(color: c.alert)),
+          child: ErrorText('$loadError',
+              textAlign: TextAlign.center, color: c.alert),
         ),
       );
     }
@@ -459,9 +460,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
-                child: Text(_error!,
-                    style: TextStyle(
-                        color: c.alert, fontSize: ChatTextStyles.metaSize)),
+                child: ErrorText(_error!,
+                    color: c.alert, fontSize: ChatTextStyles.metaSize),
               ),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,

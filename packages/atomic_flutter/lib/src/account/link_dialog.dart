@@ -1,3 +1,4 @@
+import '../copyable_error.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'client.dart';
@@ -174,9 +175,7 @@ class _LinkState extends State<AtomicAccountLinkDialog> {
                 ],
                 if (_error != null) ...[
                   const SizedBox(height: 12),
-                  Text(_error!,
-                      style: TextStyle(
-                          color: Theme.of(context).colorScheme.error)),
+                  ErrorText(_error!),
                   TextButton(onPressed: _start, child: const Text('Try again')),
                 ],
               ],

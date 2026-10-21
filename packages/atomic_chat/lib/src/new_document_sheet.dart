@@ -1,3 +1,4 @@
+import 'package:atomic_flutter/atomic_flutter.dart' show ErrorText;
 import 'dart:convert';
 
 import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt;
@@ -282,9 +283,9 @@ class _NewDocumentSheetState extends State<NewDocumentSheet> {
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
-                  child: Text(_error!,
+                  child: ErrorText(_error!,
                       key: const Key('new-document-error'),
-                      style: TextStyle(color: c.alert, fontSize: 13)),
+                      color: c.alert, fontSize: 13),
                 ),
               const SizedBox(height: 12),
               Align(

@@ -32,6 +32,10 @@ void main() {
     await tester.tap(find.text('Details'));
     await tester.pumpAndSettle();
     expect(find.textContaining('redb panicked'), findsOneWidget);
+    expect(
+        find.byWidgetPredicate((w) =>
+            w is SelectableText && (w.data ?? '').contains('redb panicked')),
+        findsOneWidget);
 
     await tester.tap(find.text('Start fresh'));
     expect(continued, isTrue);

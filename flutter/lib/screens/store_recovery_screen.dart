@@ -1,3 +1,4 @@
+import 'package:atomic_flutter/atomic_flutter.dart' show showErrorSnack;
 import 'package:flutter/material.dart';
 
 /// What happened to a local store that could not be opened, as the bridge's
@@ -48,9 +49,7 @@ class _StoreRecoveryScreenState extends State<StoreRecoveryScreen> {
       await widget.onShare(widget.notice.keptPath);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not share the file: $e')),
-        );
+        showErrorSnack(context, 'Could not share the file: $e');
       }
     } finally {
       if (mounted) setState(() => _sharing = false);

@@ -1,3 +1,4 @@
+import 'package:atomic_flutter/atomic_flutter.dart' show ErrorText;
 import 'dart:async';
 
 import 'package:atomic_flutter/atomic_flutter.dart'
@@ -1262,7 +1263,7 @@ class _SectionState<T> extends State<_Section<T>>
         if (error != null)
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Text('$error', style: TextStyle(color: c.alert)),
+            child: ErrorText('$error', color: c.alert),
           )
         else if (list == null)
           const Padding(

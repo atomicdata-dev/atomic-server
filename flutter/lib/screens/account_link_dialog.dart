@@ -172,7 +172,7 @@ class _AccountLinkDialogState extends State<AccountLinkDialog> {
               ],
               if (_error != null) ...[
                 const SizedBox(height: 12),
-                Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+                shared.ErrorText(_error!),
                 TextButton(onPressed: _start, child: const Text('Try again')),
               ],
             ],

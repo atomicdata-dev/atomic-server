@@ -1,3 +1,4 @@
+import 'copyable_error.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'settings_backend.dart';
@@ -185,8 +186,7 @@ class _AgentSettingsDialogState extends State<AgentSettingsDialog> {
                     // page. A server is one of those devices (an always-on
                     // one), not a category of its own.
                     if (_error != null) ...[
-                      Text(_error!,
-                          style: TextStyle(color: theme.colorScheme.error)),
+                      ErrorText(_error!),
                       TextButton(
                           onPressed: _loadData, child: const Text('Retry')),
                     ],
