@@ -1,6 +1,5 @@
 use crate::{
-    appstate::AppState, context::RequestContext, errors::AtomicServerResult,
-    helpers::get_client_agent,
+    appstate::AppState, errors::AtomicServerResult, helpers::get_client_agent_for_signed_url,
 };
 use actix_web::{web, HttpRequest, HttpResponse};
 use atomic_lib::agents::ForAgent;
@@ -89,12 +88,8 @@ pub async fn handle_forget_peer(
     req: HttpRequest,
 ) -> AtomicServerResult<HttpResponse> {
     let store = &appstate.store;
-    let origin = RequestContext::new(&req, &appstate).origin;
 
-    // The client signs the full request URL (path + query); rebuild it exactly
-    // so the signature check matches what it signed.
-    let full_url = format!("{}{}", origin, req.uri());
-    let for_agent = get_client_agent(req.headers(), &appstate, &full_url).await?;
+    let for_agent = get_client_agent_for_signed_url(&req, &appstate).await?;
     crate::helpers::enforce_write_rate_limit(&appstate, &req, &for_agent)?;
 
     let node = params.node.clone();
