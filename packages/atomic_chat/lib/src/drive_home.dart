@@ -596,7 +596,6 @@ class DriveTreeState extends State<DriveTree> {
   }
 
   Widget _row(_ChildItem item) {
-    final c = context.appColors;
     final child = item.child;
     final lead = leadingOf(child.picture, child.emoji, child.className);
     final open = _open.contains(child.subject);

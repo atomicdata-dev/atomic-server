@@ -407,7 +407,6 @@ class _Current extends StatelessWidget {
   final Widget child;
 
   const _Current({
-    super.key,
     required this.current,
     required this.label,
     required this.child,

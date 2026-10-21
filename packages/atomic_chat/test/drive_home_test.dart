@@ -216,10 +216,10 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('drive-switcher')), findsNothing);
+      expect(find.byKey(const Key('drive-tree-row-did:ad:z')), findsOneWidget);
     });
 
     testWidgets('searching filters as you type', (tester) async {
-      expect(find.byKey(const Key('drive-tree-row-did:ad:z')), findsOneWidget);
       await _home(tester, _api());
       await tester.tap(find.byKey(const Key('current-drive-header')));
       await tester.pumpAndSettle();
@@ -852,7 +852,6 @@ void main() {
       });
     }
   });
-}
   group('alignment', () {
     tearDown(() => SidebarMetrics.debugOverride = null);
 
@@ -956,3 +955,4 @@ void main() {
       });
     }
   });
+}
