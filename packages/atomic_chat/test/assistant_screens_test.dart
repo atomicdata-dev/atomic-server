@@ -124,7 +124,7 @@ class FakeApi extends UnimplementedApi {
                 kind: n.kind,
                 occurredAt: n.occurredAt,
                 read: true,
-        actor: null
+                actor: null
               )
             : n,
     ];
@@ -326,12 +326,18 @@ void main() {
             title: 'Doc $s',
             className: 'Document',
             openedAt: now - 60 * 60 * 1000,
-            emoji: null, picture: null
+            emoji: null,
+            picture: null
           );
       final api = FakeApi(
         driveList: [
           for (var i = 0; i < 6; i++)
-            (subject: 'did:ad:drive$i', name: 'Drive $i', emoji: '📁', picture: null),
+            (
+              subject: 'did:ad:drive$i',
+              name: 'Drive $i',
+              emoji: '📁',
+              picture: null
+            ),
         ],
         favoriteList: [for (var i = 0; i < 6; i++) res('f$i')],
         conversationList: [for (var i = 0; i < 6; i++) res('c$i')],
@@ -350,7 +356,7 @@ void main() {
               kind: 'chat',
               occurredAt: now,
               read: false,
-        actor: null
+              actor: null
             ),
         ],
       );
@@ -437,7 +443,7 @@ void main() {
             kind: 'chat',
             occurredAt: now - 5 * 60 * 1000,
             read: false,
-        actor: null
+            actor: null
           ),
           (
             subject: 'n2',
@@ -447,7 +453,7 @@ void main() {
             kind: 'chat',
             occurredAt: now - 3 * 3600 * 1000,
             read: true,
-        actor: null
+            actor: null
           ),
         ],
       );
@@ -506,41 +512,66 @@ void main() {
       expect(find.text('No notifications'), findsNothing);
     });
 
-    testWidgets('flicking down at the top does not stretch or bounce the home',
+    testWidgets('pulling or flicking down at the top gives a mild rubber band',
         (tester) async {
+      // The binding checks this variable before tearDowns run, so reset it
+      // in a finally: a failing assertion must not cascade into later tests.
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      final api = FakeApi(
-        chatList: [
-          for (var i = 0; i < 6; i++)
-            (subject: 'c$i', name: 'Chat $i', lastActivity: 0),
-        ],
-      );
-      await tester
-          .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
-      await tester.pumpAndSettle();
-      final list = find.byType(ListView);
-      double offset() => tester
-          .state<ScrollableState>(
-              find.descendant(of: list, matching: find.byType(Scrollable)))
-          .position
-          .pixels;
-      expect(offset(), 0);
-      expect(find.byType(StretchingOverscrollIndicator), findsNothing);
-      await tester.fling(list, const Offset(0, 600), 3000);
-      await tester.pump(const Duration(milliseconds: 100));
-      expect(offset(), 0);
-      await tester.pumpAndSettle();
-      expect(offset(), 0);
-      // And a flick up to the bottom ends there, not back above it.
-      await tester.fling(list, const Offset(0, -2000), 3000);
-      await tester.pumpAndSettle();
-      final max = tester
-          .state<ScrollableState>(
-              find.descendant(of: list, matching: find.byType(Scrollable)))
-          .position
-          .maxScrollExtent;
-      expect(offset(), max);
-      debugDefaultTargetPlatformOverride = null;
+      try {
+        final api = FakeApi(
+          chatList: [
+            for (var i = 0; i < 6; i++)
+              (subject: 'c$i', name: 'Chat $i', lastActivity: 0),
+          ],
+        );
+        await tester
+            .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
+        await tester.pumpAndSettle();
+        final list = find.byType(ListView);
+        ScrollPosition position() => tester
+            .state<ScrollableState>(
+                find.descendant(of: list, matching: find.byType(Scrollable)))
+            .position;
+        double offset() => position().pixels;
+        final view = position().viewportDimension;
+        expect(offset(), 0);
+        expect(find.byType(StretchingOverscrollIndicator), findsNothing);
+
+        // A long drag down overscrolls a little, then settles without
+        // swinging past the edge.
+        final g = await tester.startGesture(tester.getCenter(list));
+        for (var i = 0; i < 30; i++) {
+          await g.moveBy(const Offset(0, 10));
+        }
+        await tester.pump();
+        expect(offset(), lessThan(0));
+        expect(-offset(), lessThanOrEqualTo(0.3 * view));
+        await g.up();
+        for (var i = 0; i < 150; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(offset(), lessThanOrEqualTo(0.01));
+        }
+        await tester.pumpAndSettle();
+        expect(offset(), 0);
+
+        // A flick travels further, still mild, and also comes to rest at 0.
+        await tester.fling(list, const Offset(0, 600), 3000);
+        await tester.pump(const Duration(milliseconds: 100));
+        expect(offset(), lessThanOrEqualTo(0));
+        expect(-offset(), lessThanOrEqualTo(0.4 * view));
+        for (var i = 0; i < 150; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(offset(), lessThanOrEqualTo(0.01));
+        }
+        await tester.pumpAndSettle();
+        expect(offset(), 0);
+        // And a flick up to the bottom ends there, not back above it.
+        await tester.fling(list, const Offset(0, -2000), 3000);
+        await tester.pumpAndSettle();
+        expect(offset(), position().maxScrollExtent);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     });
 
     testWidgets('a tap on a heading folds its section', (tester) async {
@@ -572,7 +603,8 @@ void main() {
               title: 'A star',
               className: 'Document',
               openedAt: 1,
-              emoji: null, picture: null
+              emoji: null,
+              picture: null
             ),
           ],
         );
@@ -793,7 +825,8 @@ void main() {
             title: 'A doc',
             className: 'Document',
             openedAt: 1,
-            emoji: null, picture: null
+            emoji: null,
+            picture: null
           ),
         ],
       );
@@ -831,7 +864,8 @@ void main() {
             title: 'Starred',
             className: 'Folder',
             openedAt: 0,
-            emoji: null, picture: null
+            emoji: null,
+            picture: null
           ),
         ],
         conversationList: [
@@ -840,7 +874,8 @@ void main() {
             title: 'Alice, Bob',
             className: '',
             openedAt: 0,
-            emoji: null, picture: null
+            emoji: null,
+            picture: null
           ),
         ],
       );
@@ -870,7 +905,8 @@ void main() {
             title: 'Alice, Bob',
             className: 'conversation',
             openedAt: 0,
-            emoji: null, picture: null
+            emoji: null,
+            picture: null
           ),
         ],
         lastMessages: {'m1': 'See you\n  tomorrow'},
@@ -894,7 +930,8 @@ void main() {
             title: 'Fav $i',
             className: '',
             openedAt: 0,
-            emoji: null, picture: null
+            emoji: null,
+            picture: null
           ),
       ]);
       await tester
@@ -936,7 +973,8 @@ void main() {
             title: 'A doc',
             className: 'Document',
             openedAt: 1,
-            emoji: null, picture: null
+            emoji: null,
+            picture: null
           ),
         ],
         activityList: [_activity('a1', 'Plan')],
@@ -1033,7 +1071,9 @@ void main() {
 
     testWidgets('a drive opens as a resource page', (tester) async {
       final api = _PerDrive(
-        driveList: [(subject: 'did:ad:a', name: 'Alpha', emoji: null, picture: null)],
+        driveList: [
+          (subject: 'did:ad:a', name: 'Alpha', emoji: null, picture: null)
+        ],
         byDrive: {
           'did:ad:a': [
             for (var i = 0; i < 6; i++)
@@ -1042,7 +1082,8 @@ void main() {
                 title: 'Doc $i',
                 className: '',
                 openedAt: i,
-                emoji: null, picture: null
+                emoji: null,
+                picture: null
               ),
           ],
         },
@@ -1129,14 +1170,16 @@ void main() {
           title: 'Fox doc',
           className: 'Document',
           openedAt: 2,
-          emoji: '🦊', picture: null
+          emoji: '🦊',
+          picture: null
         ),
         (
           subject: 'r2',
           title: 'Plain table',
           className: 'Table',
           openedAt: 1,
-          emoji: null, picture: null
+          emoji: null,
+          picture: null
         ),
       ], driveList: const [
         (subject: 'did:ad:drive', name: 'Home', emoji: '🏔', picture: null),
@@ -1166,7 +1209,8 @@ void main() {
           className: 'Document',
           drive: '',
           score: 2.0,
-          emoji: '🦊', picture: null
+          emoji: '🦊',
+          picture: null
         ),
         (
           subject: 'did:ad:2',
@@ -1174,7 +1218,8 @@ void main() {
           className: 'Canvas',
           drive: '',
           score: 1.0,
-          emoji: null, picture: null
+          emoji: null,
+          picture: null
         ),
       ]);
       await tester
@@ -1200,7 +1245,8 @@ void main() {
               title: 'Fox doc',
               className: 'Document',
               openedAt: 2,
-              emoji: '🦊', picture: null
+              emoji: '🦊',
+              picture: null
             ),
           ]);
       await tester.pumpWidget(app(ChatScreen(api: api)));
@@ -1230,7 +1276,8 @@ void main() {
           className: 'Folder',
           drive: '',
           score: 1.5,
-          emoji: null, picture: null
+          emoji: null,
+          picture: null
         ),
       ]);
       await tester
@@ -1264,7 +1311,8 @@ void main() {
             title: 'Opened doc',
             className: 'Document',
             openedAt: 1,
-            emoji: null, picture: null
+            emoji: null,
+            picture: null
           ),
         ],
         hits: [
@@ -1274,7 +1322,8 @@ void main() {
             className: 'Folder',
             drive: '',
             score: 1.5,
-            emoji: null, picture: null
+            emoji: null,
+            picture: null
           ),
         ],
       );
@@ -1342,7 +1391,8 @@ void main() {
           className: 'Drive',
           drive: 'did:ad:drive',
           score: 2,
-          emoji: null, picture: null
+          emoji: null,
+          picture: null
         ),
       ]);
       await tester.pumpWidget(app(SearchScreen(
@@ -1366,7 +1416,8 @@ void main() {
             title: 'Opened doc',
             className: 'Document',
             openedAt: 1,
-            emoji: null, picture: null
+            emoji: null,
+            picture: null
           ),
         ],
         hits: [
@@ -1376,7 +1427,8 @@ void main() {
             className: 'Folder',
             drive: '',
             score: 1.0,
-            emoji: null, picture: null
+            emoji: null,
+            picture: null
           ),
         ],
       );
@@ -1416,7 +1468,8 @@ void main() {
           className: 'Folder',
           drive: '',
           score: 1.5,
-          emoji: null, picture: null
+          emoji: null,
+          picture: null
         ),
       ]);
       await tester
@@ -1441,7 +1494,8 @@ void main() {
           className: 'Folder',
           drive: '',
           score: score,
-          emoji: null, picture: null
+          emoji: null,
+          picture: null
         );
 
     Future<void> type(WidgetTester tester, String text) async {
@@ -1529,14 +1583,16 @@ void main() {
           title: 'Newer',
           className: 'Document',
           openedAt: 2,
-          emoji: null, picture: null
+          emoji: null,
+          picture: null
         ),
         (
           subject: 'r1',
           title: 'Older',
           className: 'Document',
           openedAt: 1,
-          emoji: null, picture: null
+          emoji: null,
+          picture: null
         ),
       ]);
       await tester
@@ -1570,7 +1626,8 @@ void main() {
             className: 'Folder',
             drive: 'did:ad:drive',
             score: 2.0,
-            emoji: null, picture: null
+            emoji: null,
+            picture: null
           ),
           (
             subject: 'did:ad:b',
@@ -1578,7 +1635,8 @@ void main() {
             className: 'Document',
             drive: 'did:ad:work',
             score: 1.0,
-            emoji: null, picture: null
+            emoji: null,
+            picture: null
           ),
         ],
       );
@@ -2117,14 +2175,16 @@ void main() {
           title: 'Trip plan',
           className: 'Document',
           openedAt: 5,
-          emoji: null, picture: null
+          emoji: null,
+          picture: null
         ),
         (
           subject: 'r2',
           title: 'Budget',
           className: 'Table',
           openedAt: 9,
-          emoji: null, picture: null
+          emoji: null,
+          picture: null
         ),
       ];
 
@@ -2209,7 +2269,8 @@ void main() {
               title: 'Res $i',
               className: 'Document',
               openedAt: i,
-              emoji: null, picture: null
+              emoji: null,
+              picture: null
             ),
         ];
         await tester
@@ -2414,7 +2475,8 @@ void main() {
       title: 'A doc',
       className: 'Document',
       openedAt: 1,
-      emoji: null, picture: null
+      emoji: null,
+      picture: null
     );
 
     Future<void> pumpHome(WidgetTester tester) async {
@@ -2702,7 +2764,8 @@ void main() {
           '[{"subject":"did:ad:A","name":"Home","emoji":"🏠"},'
           '{"subject":"atomic:A","name":"Home"},'
           '{"subject":"did:ad:B","name":""}]');
-      expect(drives, [(subject: 'did:ad:A', name: 'Home', emoji: '🏠', picture: null)]);
+      expect(drives,
+          [(subject: 'did:ad:A', name: 'Home', emoji: '🏠', picture: null)]);
       final rows = AssistantJson.parseConversations(
           '[{"subject":"did:ad:c","title":"Ann","class_name":"conversation",'
           '"opened_at":3,"last_message":"hi"},{"subject":"did:ad:d"}]');
@@ -2852,7 +2915,8 @@ void main() {
           title: 'Opened doc',
           className: 'Document',
           openedAt: 1,
-          emoji: null, picture: null
+          emoji: null,
+          picture: null
         ),
       ]);
       await tester
