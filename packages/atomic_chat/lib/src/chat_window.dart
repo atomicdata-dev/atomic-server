@@ -440,7 +440,7 @@ class ChatScrollKeeper {
 
   ChatScrollKeeper(this.window, {this.edge = 15, ScrollController? controller})
       : controller = controller ?? ScrollController() {
-    controller.addListener(_scrolled);
+    this.controller.addListener(_scrolled);
   }
 
   /// Within this many pixels of the bottom counts as at the bottom.
