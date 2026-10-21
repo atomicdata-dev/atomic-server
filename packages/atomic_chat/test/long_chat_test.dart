@@ -242,6 +242,52 @@ void main() {
       expect(w.items.toSet().length, w.items.length);
     });
 
+    test(
+        'an item that reaches the device late, older than the cursor, shows up',
+        () async {
+      // Items are their time; the cursor is the newest time read, strictly.
+      final all = [10, 20, 30];
+      final w = ChatWindow<int>(
+        readPage: (before, limit) async {
+          final sorted = [...all]..sort();
+          final upTo = before == null
+              ? sorted
+              : sorted.where((t) => t < int.parse(before)).toList();
+          final win =
+              upTo.length > limit ? upTo.sublist(upTo.length - limit) : upTo;
+          return ChatPage<int>(win,
+              older: upTo.length > limit ? '${win.first}' : null,
+              newest: win.isEmpty ? null : '${win.last}');
+        },
+        readAfter: (after, limit) async {
+          final newer = ([...all]..sort())
+              .where((t) => t > int.parse(after))
+              .take(limit)
+              .toList();
+          return ChatPage<int>(newer,
+              newest: newer.isEmpty ? null : '${newer.last}');
+        },
+        idOf: (i) => '$i',
+      );
+      await w.open();
+      expect(w.items, [10, 20, 30]);
+      // Another device was offline: its message of time 25 arrives only now.
+      all.add(25);
+      await w.poll(atBottom: true);
+      expect(w.items.toSet(), {10, 20, 25, 30});
+      expect(w.items.length, 4);
+      // And a normal new one still comes after, once.
+      all.add(40);
+      await w.poll(atBottom: true);
+      expect(w.items.last, 40);
+      expect(w.items.length, 5);
+      // Scrolled up, the late one waits like any other new item.
+      all.add(15);
+      await w.poll(atBottom: false);
+      expect(w.unseen, 1);
+      expect(w.items.length, 5);
+    });
+
     test('opens at a cursor (a search hit), detached from the newest',
         () async {
       final all = List.generate(1000, (i) => i);

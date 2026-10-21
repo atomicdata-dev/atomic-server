@@ -246,17 +246,29 @@ class ChatWindow<T> extends ChangeNotifier {
     try {
       var page = await readAfter!(after, pageSize);
       _latest = page.newest ?? after;
-      if (page.items.isEmpty) return;
       if (_detached) {
-        _detachedNews = true;
-        _changed();
+        if (page.items.isNotEmpty) {
+          _detachedNews = true;
+          _changed();
+        }
         return;
       }
-      final known = {for (final i in items) idOf(i)};
+      final known = {
+        for (final i in items) idOf(i),
+        for (final i in _waiting) idOf(i),
+      };
       final fresh = [
         for (final i in page.items)
           if (!known.contains(idOf(i))) i
       ];
+      // The cursor only sees what is newer than the newest item read. An item
+      // that was made earlier but reached this device later (another device
+      // was offline, or its clock is behind) is older than the cursor: the
+      // newest page shows it, so it is looked for there.
+      final late =
+          await _lateArrivals({...known, for (final i in fresh) idOf(i)});
+      if (page.items.isEmpty && late.isEmpty) return;
+      fresh.addAll(late);
       // A sent message read back replaces its local stand-in: the screen
       // drops those itself (see [settleLocal]); here they are just known.
       if (atBottom && _waiting.isEmpty) {
@@ -270,6 +282,22 @@ class ChatWindow<T> extends ChangeNotifier {
       _changed();
     } catch (_) {
       // A failed poll keeps what is shown.
+    }
+  }
+
+  /// How many of the newest items are looked at again by [poll] for items
+  /// that arrived late.
+  static const lateCheckSize = 20;
+
+  Future<List<T>> _lateArrivals(Set<String> known) async {
+    try {
+      final recent = await readPage(null, lateCheckSize);
+      return [
+        for (final i in recent.items)
+          if (!known.contains(idOf(i))) i
+      ];
+    } catch (_) {
+      return const [];
     }
   }
 

@@ -85,11 +85,13 @@ class _ConversationScreenState extends State<ConversationScreen>
     _window.addListener(_windowChanged);
     unawaited(_window.open());
     _timer = Timer.periodic(conversationRefresh, (_) => _tick());
+    widget.api.storeChanges?.addListener(_tick);
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    widget.api.storeChanges?.removeListener(_tick);
     _window.removeListener(_windowChanged);
     _window.dispose();
     _scroll.dispose();

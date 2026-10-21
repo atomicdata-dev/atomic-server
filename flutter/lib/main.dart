@@ -97,11 +97,19 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
   final _toasts = ToastController();
   int _syncFailures = 0;
   Timer? _syncRetry;
+  Timer? _storeTick;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Messages other people send arrive over the sync session at any time,
+    // with no screen change to read them on: the conversations list and an
+    // open conversation read the store again every so often (and when a
+    // background sync finishes).
+    _storeTick = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (_loggedIn) AtomicClient.notifyStoreChanged();
+    });
     // The theme chosen on the settings page (the embedded web page).
     AppThemeMode.mode.addListener(_themeChanged);
     SharedPreferences.getInstance().then((p) {
@@ -147,6 +155,7 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _storeTick?.cancel();
     _eventPoller?.cancel();
     _syncRetry?.cancel();
     _toasts.dispose();
@@ -282,6 +291,9 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
     Future(() async {
       try {
         final report = await AtomicClient.syncConnectivityNow();
+        // What it imported (and what the open sync session brought meanwhile)
+        // is in the store: lists and open conversations read it again.
+        AtomicClient.notifyStoreChanged();
         if (!mounted) return;
 
         // Only a failure is worth a notice; being connected is the normal case.

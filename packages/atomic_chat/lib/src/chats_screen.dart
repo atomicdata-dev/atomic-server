@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt, Perf;
 import 'package:flutter/foundation.dart';
@@ -118,6 +120,15 @@ class _ChatsScreenState extends State<ChatsScreen> {
       _publishSections();
     });
     _loadMine();
+    widget.api.storeChanges?.addListener(_storeChanged);
+  }
+
+  /// The store may have new conversations or messages: read that list again
+  /// (only while the home is what is looked at).
+  void _storeChanged() {
+    if (!mounted || _covered) return;
+    if (ModalRoute.of(context)?.isCurrent == false) return;
+    setState(() => _conversations = widget.api.conversations());
   }
 
   /// SharedPreferences key: the activity feed's "Show mine" (per device).
@@ -327,6 +338,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   @override
   void dispose() {
+    widget.api.storeChanges?.removeListener(_storeChanged);
     _shell?.removeListener(_onShellChanged);
     _shell?.sectionRequest.removeListener(_onSectionRequest);
     _shell?.homeSections.value = const [];

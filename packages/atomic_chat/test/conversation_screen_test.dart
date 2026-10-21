@@ -24,6 +24,10 @@ class _ConversationApi extends UnimplementedApi {
   final List<String> followed = [];
   int reads = 0;
   Object? sendError;
+  final ValueNotifier<int> changes = ValueNotifier(0);
+
+  @override
+  Listenable? get storeChanges => changes;
 
   _ConversationApi(this.log);
 
@@ -61,6 +65,20 @@ Future<void> _open(WidgetTester tester, _ConversationApi api,
 }
 
 void main() {
+  testWidgets('a finished sync shows what arrived without waiting for the poll',
+      (tester) async {
+    final api = _ConversationApi([_msg('1', 'alice', 'Hi there', _t0)]);
+    await _open(tester, api);
+    expect(find.text('Sent while away'), findsNothing);
+    api.log = [
+      ...api.log,
+      _msg('2', 'alice', 'Sent while away', _t0 + _minute)
+    ];
+    api.changes.value++;
+    await tester.pumpAndSettle();
+    expect(find.text('Sent while away'), findsOneWidget);
+  });
+
   testWidgets(
       'shows the other members in the title and the messages as '
       'bubbles, mine on the right', (tester) async {

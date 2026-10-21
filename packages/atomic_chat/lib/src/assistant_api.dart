@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show Listenable;
 import 'chat_parts.dart';
 import 'chat_window.dart';
 import 'hosted_ai.dart';
@@ -70,6 +71,12 @@ abstract class AssistantApi {
 
   /// Get the conversation onto this device and follow it; best effort.
   Future<void> followConversation(String subject);
+
+  /// Fires when the local store may have changed without this app doing it:
+  /// a background sync finished, so conversations and messages other people
+  /// sent can be there. The lists and open conversations read again. Null:
+  /// the host cannot tell (they poll).
+  Listenable? get storeChanges => null;
 
   /// The chat of a meeting or chat room, oldest first.
   Future<List<ChatRoomMessage>> chatRoomMessages(String subject);

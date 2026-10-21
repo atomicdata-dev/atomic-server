@@ -1,6 +1,6 @@
 
 import 'package:atomic_chat/atomic_chat.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show Listenable, debugPrint;
 
 import '../atomic/account_store.dart';
 import '../atomic/atomic_client.dart';
@@ -55,6 +55,8 @@ class AtomicAssistantApi extends AssistantApi {
   @override
   Future<void> followConversation(String subject) =>
       AtomicClient.followConversation(subject);
+  @override
+  Listenable? get storeChanges => AtomicClient.storeRevision;
   @override
   Future<List<ChatRoomMessage>> chatRoomMessages(String subject) =>
       AtomicClient.readChatRoom(subject);

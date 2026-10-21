@@ -705,6 +705,14 @@ class AtomicClient {
   /// Fired when Iroh live-peer count changes (`connected` / `disconnected` events).
   static final ValueNotifier<int> livePeersRevision = ValueNotifier(0);
 
+  /// Bumped when data may have arrived from elsewhere (a background sync
+  /// finished): lists and open conversations read the store again.
+  static final ValueNotifier<int> storeRevision = ValueNotifier(0);
+
+  static void notifyStoreChanged() {
+    storeRevision.value++;
+  }
+
   static void notifyLivePeersChanged() {
     livePeersRevision.value++;
   }
