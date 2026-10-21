@@ -17,7 +17,9 @@ void main() {
         order: ['chats', 'drives', 'recents', 'activity', 'favorites']);
     expect(layout.order.indexOf(HomeSection.notifications),
         layout.order.indexOf(HomeSection.drives) + 1);
-    expect(layout.order.indexOf(HomeSection.messages), layout.order.length - 1);
+    // Messages comes before Favorites and AI chats, as in the web sidebar.
+    expect(layout.order.indexOf(HomeSection.messages),
+        lessThan(layout.order.indexOf(HomeSection.favorites)));
   });
 
   test('move swaps with the visible neighbour and skips hidden sections', () {

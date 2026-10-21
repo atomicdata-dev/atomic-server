@@ -112,6 +112,9 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(_app(ChatsScreen(drive: 'did:ad:drive', api: api)));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('section-show-all-chats')));
+    await tester.ensureVisible(find.byKey(const ValueKey('section-show-all-chats')));
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('section-show-all-chats')));
     await tester.pumpAndSettle();
   }

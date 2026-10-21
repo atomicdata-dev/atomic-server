@@ -42,6 +42,7 @@ export 'src/chat_screen.dart';
 export 'src/conversation_screen.dart';
 export 'src/search_screen.dart';
 export 'src/new_document_sheet.dart';
+export 'src/drive_home.dart';
 
 // Resources: native views, else the embedded web renderer.
 export 'src/native_views.dart';

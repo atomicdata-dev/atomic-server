@@ -279,6 +279,7 @@ void main() {
     expect(find.text('web view 1'), findsOneWidget);
 
     // Opening again takes the attached one.
+    await tester.ensureVisible(find.text('Notes'));
     await tester.tap(find.text('Notes'));
     await tester.pump();
     expect(next.made, 1);

@@ -169,6 +169,7 @@ void main() {
       expect(bar.width, list.width);
 
       // A row opens in the detail pane, next to the list, and is marked.
+      await tester.ensureVisible(find.text('Plans'));
       await tester.tap(find.text('Plans'));
       await _settle(tester);
       final detail = tester.getRect(find.byType(ResourceView));
@@ -183,6 +184,7 @@ void main() {
       expect(tile('Notes').selected, isFalse);
 
       // Another row takes its place; nothing piles up.
+      await tester.ensureVisible(find.text('Notes'));
       await tester.tap(find.text('Notes'));
       await _settle(tester);
       expect(find.byType(ResourceView), findsOneWidget);
@@ -898,8 +900,9 @@ void main() {
         _size(tester, size);
         await tester.pumpWidget(_shell(_manyApi()));
         await _settle(tester);
-        await tester
-            .tap(find.byKey(const ValueKey('section-show-all-favorites')));
+        await tester.ensureVisible(find.byKey(const ValueKey('section-show-all-favorites')));
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('section-show-all-favorites')));
         await _settle(tester);
         final list = tester.getRect(find.byType(ChatsScreen));
         // A page in the detail pane, titled, next to the home.
@@ -927,8 +930,9 @@ void main() {
       _size(tester, _phone);
       await tester.pumpWidget(_shell(_manyApi()));
       await _settle(tester);
-      await tester
-          .tap(find.byKey(const ValueKey('section-show-all-favorites')));
+      await tester.ensureVisible(find.byKey(const ValueKey('section-show-all-favorites')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('section-show-all-favorites')));
       await _settle(tester);
       expect(
           find.descendant(
@@ -948,7 +952,11 @@ void main() {
           find.descendant(of: find.byType(ChatsScreen), matching: f);
       expect(inHome(find.byType(IconButton)), findsNothing);
       expect(inHome(find.byIcon(Icons.search)), findsNothing);
-      expect(inHome(find.byIcon(Icons.add)), findsNothing);
+      expect(
+          find.descendant(
+              of: find.byKey(const Key('home-panels')),
+              matching: find.byIcon(Icons.add)),
+          findsNothing);
       expect(inHome(find.byIcon(Icons.format_list_bulleted)), findsNothing);
       expect(find.textContaining('Show all'), findsNothing);
       await _done(tester);
@@ -968,7 +976,7 @@ void main() {
         await tester.pumpWidget(_shell(_api()));
         await _settle(tester);
         expect(tester.takeException(), isNull);
-        final heading = find.byKey(const ValueKey('section-heading-favorites'));
+        final heading = find.byKey(const ValueKey('home-panel-favorites'));
         expect(heading, findsOneWidget);
         expect(tester.getSize(heading).height, 48);
         await _done(tester);
@@ -980,7 +988,7 @@ void main() {
       _size(tester, _phone);
       await tester.pumpWidget(_shell(_api()));
       await _settle(tester);
-      final heading = find.byKey(const ValueKey('section-heading-favorites'));
+      final heading = find.byKey(const ValueKey('home-panel-favorites'));
       final ink = find.descendant(of: heading, matching: find.byType(InkWell));
       expect(tester.getSize(ink).width, _phone.width);
       // A tap still folds it.
@@ -1063,7 +1071,8 @@ void main() {
       samsung(tester);
       await tester.pumpWidget(_shell(named()));
       await _settle(tester);
-      expect(find.byKey(const Key('atomic-wordmark')), findsOneWidget);
+      expect(find.byKey(const Key('current-drive-header')), findsOneWidget);
+      expect(find.byKey(const Key('atomic-wordmark')), findsNothing);
       await tester.tap(find.byTooltip('Close sidebar'));
       await _settle(tester);
       expect(_controller(tester).listCollapsed.value, isTrue);
@@ -1186,7 +1195,7 @@ void main() {
       expect(tester.getRect(feed).left, greaterThan(list.right));
       // Not a section of the sidebar as well.
       expect(
-          find.byKey(const ValueKey('section-heading-activity')), findsNothing);
+          find.byKey(const ValueKey('home-panel-activity')), findsNothing);
       await tester.tap(row);
       await _settle(tester);
       expect(find.byType(ResourceView), findsOneWidget);
@@ -1212,7 +1221,7 @@ void main() {
       await tester.pumpWidget(_shell(withActivity()));
       await _settle(tester);
       expect(find.byKey(const Key('home-activity')), findsNothing);
-      expect(find.byKey(const ValueKey('section-heading-activity')),
+      expect(find.byKey(const ValueKey('home-panel-activity')),
           findsOneWidget);
       await _done(tester);
     });
@@ -1332,38 +1341,42 @@ void main() {
   group('lists move when a page is left, not when it opens', () {
     setUp(resetDriveVisits);
 
-    List<String> order(WidgetTester tester, List<String> titles) {
-      final tops = {
-        for (final t in titles)
-          t: tester
-              .getRect(find
-                  .descendant(
-                      of: find.byType(ChatsScreen), matching: find.text(t))
-                  .first)
-              .top
-      };
-      return titles.toList()..sort((a, b) => tops[a]!.compareTo(tops[b]!));
-    }
-
-    testWidgets('drives: the last visited first, also after a restart',
+    testWidgets('drives: the last visited first in the switcher, also after a restart',
         (tester) async {
       _size(tester, _landscape);
       final api = _VisitApi();
       await tester.pumpWidget(_shell(api));
       await _settle(tester);
-      expect(order(tester, ['Alpha', 'Beta']), ['Alpha', 'Beta']);
-      await tester.tap(find.text('Beta'));
+
+      Future<List<String>> switcher() async {
+        await tester.tap(find.byKey(const Key('current-drive-header')));
+        await _settle(tester);
+        final tops = {
+          for (final d in ['a', 'b'])
+            d: tester
+                .getTopLeft(
+                    find.byKey(ValueKey('drive-switcher-row-did:ad:$d')))
+                .dy
+        };
+        return tops.keys.toList()..sort((x, y) => tops[x]!.compareTo(tops[y]!));
+      }
+
+      Future<void> close() async {
+        await tester.binding.handlePopRoute();
+        await _settle(tester);
+      }
+
+      expect(await switcher(), ['a', 'b']);
+      // Picking Beta makes it the active drive and the first in the list.
+      await tester.tap(find.byKey(const ValueKey('drive-switcher-row-did:ad:b')));
       await _settle(tester);
-      // Not while it is open.
-      expect(order(tester, ['Alpha', 'Beta']), ['Alpha', 'Beta']);
-      await tester.binding.handlePopRoute();
-      await _settle(tester);
-      expect(order(tester, ['Alpha', 'Beta']), ['Beta', 'Alpha']);
-      await tester.tap(find.text('Alpha'));
-      await _settle(tester);
-      await tester.binding.handlePopRoute();
-      await _settle(tester);
-      expect(order(tester, ['Alpha', 'Beta']), ['Alpha', 'Beta']);
+      expect(api.activeSet, ['did:ad:b']);
+      expect(find.byKey(const Key('drive-switcher')), findsNothing);
+      expect(
+          tester.widget<Text>(find.byKey(const Key('current-drive-name'))).data,
+          'Beta');
+      expect(await switcher(), ['b', 'a']);
+      await close();
 
       // A fresh start reads the visits from the device.
       await _done(tester);
@@ -1371,7 +1384,8 @@ void main() {
       await warmDriveVisits();
       await tester.pumpWidget(_shell(_VisitApi()));
       await _settle(tester);
-      expect(order(tester, ['Alpha', 'Beta']), ['Alpha', 'Beta']);
+      expect(await switcher(), ['b', 'a']);
+      await close();
       await _done(tester);
     });
   });
@@ -1420,7 +1434,7 @@ void main() {
       await tester.pumpWidget(_shell(_MineApi()));
       await _settle(tester);
       // The Home section has no chip and shows others' changes only.
-      expect(find.byKey(const ValueKey('section-heading-activity')),
+      expect(find.byKey(const ValueKey('home-panel-activity')),
           findsOneWidget);
       expect(chip, findsNothing);
       expect(find.widgetWithText(FilterChip, 'Show mine'), findsNothing);

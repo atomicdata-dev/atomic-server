@@ -75,11 +75,11 @@ void main() {
 
       // The heading sits on the band, with the shared header style.
       final heading = find.descendant(
-          of: find.byKey(const ValueKey('section-heading-favorites')),
+          of: find.byKey(const ValueKey('home-panel-favorites')),
           matching: find.byType(Material));
       expect(tester.widget<Material>(heading.first).color, c.sectionBand);
       final title = tester.widget<Text>(find.descendant(
-          of: find.byKey(const ValueKey('section-heading-favorites')),
+          of: find.byKey(const ValueKey('home-panel-favorites')),
           matching: find.text('Favorites')));
       expect(title.style!.fontSize, 14);
       expect(title.style!.fontWeight, FontWeight.w700);

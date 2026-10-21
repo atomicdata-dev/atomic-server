@@ -20,13 +20,15 @@ Widget _shell(FakeApi api) => app(AppShell(
       home: ChatsScreen(drive: 'did:ad:home', api: api),
     ));
 
-Finder _heading(String name) => find.byKey(ValueKey('section-heading-$name'));
+Finder _heading(String name) => find.byKey(ValueKey('home-panel-$name'));
 
 /// The animated box around the favorites rows: the clip while folding, the
 /// rows' own boundary at rest (no clip, fade or opacity layer then).
 Finder get _box {
-  final clip =
-      find.ancestor(of: find.text('Fav 0'), matching: find.byType(ClipRect));
+  final clip = find.ancestor(
+      of: find.text('Fav 0'),
+      matching: find.byWidgetPredicate(
+          (w) => w is Align && w.heightFactor != null));
   if (clip.evaluate().isNotEmpty) return clip;
   return find.ancestor(
       of: find.text('Fav 0'),
@@ -46,14 +48,14 @@ void main() {
   setUp(() {
     ResourceView.serverFactory = () async => throw 'no server in a test';
     api = FakeApi(
-      favoriteList: [for (var i = 0; i < 7; i++) _r('did:ad:f$i', 'Fav $i')],
+      favoriteList: [for (var i = 0; i < 3; i++) _r('did:ad:f$i', 'Fav $i')],
     );
   });
 
   Future<void> boot(WidgetTester tester, Map<String, Object> prefs) async {
     SharedPreferences.setMockInitialValues(prefs);
     tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(400, 1600);
+    tester.view.physicalSize = const Size(400, 3200);
     addTearDown(tester.view.reset);
     await tester.pumpWidget(_shell(api));
     await tester.pumpAndSettle();

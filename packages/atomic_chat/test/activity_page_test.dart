@@ -44,6 +44,9 @@ void main() {
   Future<void> openAll(WidgetTester tester, PagedApi api) async {
     await tester.pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('section-show-all-activity')));
+    await tester.ensureVisible(find.byKey(const ValueKey('section-show-all-activity')));
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('section-show-all-activity')));
     await tester.pumpAndSettle();
   }

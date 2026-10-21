@@ -142,6 +142,29 @@ typedef DriveInfo = ({
   ResourcePicture? picture
 });
 
+/// One child of a drive or folder, as the web sidebar lists it. `expandable`
+/// is false for what shows its children in a page of its own (tables, chat
+/// rooms, meetings, AI chats, ontologies, forms).
+typedef DriveChild = ({
+  String subject,
+  String title,
+  String className,
+  bool expandable,
+  String? emoji,
+  ResourcePicture? picture
+});
+
+/// The children of a drive or folder in the web sidebar's order, and how many
+/// there are (more than listed when `total > children.length`).
+class DriveChildren {
+  final List<DriveChild> children;
+  final int total;
+  DriveChildren(this.children, [int? total]) : total = total ?? children.length;
+  const DriveChildren.empty()
+      : children = const [],
+        total = 0;
+}
+
 typedef RecentResource = ({
   String subject,
   String title,
@@ -457,6 +480,23 @@ abstract final class AssistantJson {
             emoji: null,
           ),
     ];
+  }
+
+  /// `{total, children: [{subject, title, class_name, expandable, ...}]}`.
+  static DriveChildren parseDriveChildren(String json) {
+    final m = jsonDecode(json) as Map;
+    final list = [
+      for (final e in (m['children'] as List? ?? const []))
+        (
+          subject: e['subject'] as String,
+          title: e['title'] as String? ?? '',
+          className: e['class_name'] as String? ?? '',
+          expandable: e['expandable'] != false,
+          emoji: _emoji(e),
+          picture: ResourcePicture.fromJson(e),
+        ),
+    ];
+    return DriveChildren(list, (m['total'] as num?)?.toInt() ?? list.length);
   }
 
   static List<RecentResource> parseRecentResources(String json) => [

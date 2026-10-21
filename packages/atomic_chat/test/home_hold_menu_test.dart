@@ -203,17 +203,17 @@ void main() {
 
   testWidgets('a folded section is unfolded by the pick', (tester) async {
     SharedPreferences.setMockInitialValues({
-      homeCollapsedKey: ['drives'],
+      homeCollapsedKey: ['favorites'],
     });
     await tester.pumpWidget(_shell(api));
     await tester.pumpAndSettle();
-    expect(find.text('Work'), findsNothing);
+    expect(find.text('Starred doc'), findsNothing);
     final gesture = await _holdHome(tester);
-    await gesture.moveTo(tester.getCenter(find.text('Drives').last));
+    await gesture.moveTo(tester.getCenter(find.text('Favorites').last));
     await tester.pump();
     await gesture.up();
     await tester.pumpAndSettle();
-    expect(_controller(tester).topKind, ShellPage.listOf('drives'));
+    expect(_controller(tester).topKind, ShellPage.listOf('favorites'));
     expect(
         (await SharedPreferences.getInstance()).getStringList(homeCollapsedKey),
         isEmpty);

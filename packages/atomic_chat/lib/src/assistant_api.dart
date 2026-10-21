@@ -206,6 +206,15 @@ abstract class AssistantApi {
   /// its arguments as JSON, answered as JSON (see `ResourceView`).
   Future<String> embedCall(String method, String argsJson);
 
+  /// The children of a drive or folder [parent] as the web sidebar lists them
+  /// (its order, without the folders it hides). Empty by default.
+  Future<DriveChildren> driveChildren(String parent) async =>
+      const DriveChildren.empty();
+
+  /// Makes [subject] the store's active drive, which the app opens on again
+  /// after a restart. Does nothing by default.
+  Future<void> setActiveDrive(String subject) async {}
+
   /// Gives [subject] a new name (a chat room shown natively, which has no web
   /// page to edit its title on).
   Future<void> renameResource(String subject, String name);

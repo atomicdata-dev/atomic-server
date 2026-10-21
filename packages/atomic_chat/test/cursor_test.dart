@@ -82,7 +82,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
         await cursorOver(
-            tester, find.byKey(const ValueKey('section-heading-favorites'))),
+            tester, find.byKey(const ValueKey('home-panel-favorites'))),
         SystemMouseCursors.click);
     expect(await cursorOver(tester, find.byIcon(Icons.search).first),
         SystemMouseCursors.click);

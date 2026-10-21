@@ -1,5 +1,6 @@
 import 'package:atomic_flutter/atomic_flutter.dart' show ErrorText;
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt, AppScrollPhysics, Perf, SectionHeaderStyle;
@@ -15,9 +16,11 @@ import 'home_sections_dialog.dart';
 
 import 'models.dart';
 import 'slide_back_route.dart';
+import 'app_bottom_bar.dart' show ShellActions;
 import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'chat_screen.dart';
+import 'drive_home.dart';
 import 'resource_row.dart';
 import 'row_leading.dart';
 import 'resource_view.dart';
@@ -114,11 +117,25 @@ class _ChatsScreenState extends State<ChatsScreen> {
   String _drive = '';
 
   /// Which sections show, in which order, and which are folded (per device).
-  HomeLayout _layout = const HomeLayout();
+  HomeLayout _layout = HomeLayout.fresh;
+
+  /// The drive the person picked in the switcher (the store's active drive
+  /// once set); [ChatsScreen.drive] until then.
+  String? _selected;
+
+  final _tree = GlobalKey<DriveTreeState>();
+
+  /// The drives as last listed, for the header.
+  List<DriveInfo> _driveList = const [];
+
+  /// The order panels were opened in (the last is the newest), to keep only
+  /// the newest open when the window gets compact.
+  final List<HomeSection> _openOrder = [];
 
   @override
   void initState() {
     super.initState();
+    _drive = widget.drive;
     RowPictures.loader = widget.api.fileBytes;
     if (!kReleaseMode) _markLoaded();
     // Once the home is drawn: read the search index so the first keystroke is
@@ -418,12 +435,18 @@ class _ChatsScreenState extends State<ChatsScreen> {
     if (drives.isEmpty) {
       drives = [(subject: widget.drive, name: '', emoji: null, picture: null)];
     }
-    _drive = drives.any((d) => d.subject == widget.drive)
-        ? widget.drive
+    final want = _selected ?? widget.drive;
+    _drive = drives.any((d) => d.subject == want)
+        ? want
         : drives.first.subject;
     if (mounted) _shell?.drive.value = _drive;
     // The most recently visited first.
-    return sortDrivesByRecent(widget.api, drives);
+    final sorted = await sortDrivesByRecent(widget.api, drives);
+    if (mounted) {
+      setState(() => _driveList = sorted);
+      _noteCount(HomeSection.drives, sorted.length);
+    }
+    return sorted;
   }
 
   /// The activity feed: what other members changed in the person's drives
@@ -493,6 +516,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
       });
       _feedChanged.notifyListeners();
       _publishActivity();
+      _tree.currentState?.reload();
     });
     // A frame must run for the callback to fire.
     WidgetsBinding.instance.scheduleFrame();
@@ -809,27 +833,21 @@ class _ChatsScreenState extends State<ChatsScreen> {
         );
       });
 
-  Widget _emptyHome() => Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(children: [
-          Text('All sections are off',
-              style: TextStyle(color: context.appColors.textSecondary)),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: _customize,
-            child: const Text('Customize'),
-          ),
-        ]),
-      );
-
-  /// One section of the home, with the layout's fold state and hold menu.
+  /// One panel of the home, with the layout's fold state and hold menu.
   Widget _sectionFor(HomeSection id, AppColors c, {bool divider = false}) {
     final fold = (
       collapsed: _layout.collapsed.contains(id),
       onToggle: () {
         final opening = _layout.collapsed.contains(id);
-        _setLayout(_layout.toggleCollapsed(id));
-        if (opening) _revealSection(id);
+        if (opening) {
+          _openOrder
+            ..remove(id)
+            ..add(id);
+        }
+        // On a compact window one panel is open at a time.
+        _setLayout(opening && _accordion
+            ? _layout.openOnly(id)
+            : _layout.toggleCollapsed(id));
       },
       onHold: _customize,
       section: id,
@@ -841,6 +859,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         return _Section<NotificationItem>(
           key: key,
           divider: divider,
+          bodyMax: _bodyMax,
           title: id.title,
           fold: fold,
           future: _notifications,
@@ -855,6 +874,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         return _Section<DriveInfo>(
           key: key,
           divider: divider,
+          bodyMax: _bodyMax,
           title: id.title,
           fold: fold,
           future: _drives,
@@ -867,6 +887,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         return _Section<ActivityEntry>(
           key: key,
           divider: divider,
+          bodyMax: _bodyMax,
           title: id.title,
           fold: fold,
           future: _activity,
@@ -879,6 +900,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         return _Section<ChatSummary>(
           key: key,
           divider: divider,
+          bodyMax: _bodyMax,
           title: id.title,
           fold: fold,
           future: _chats,
@@ -890,6 +912,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         return _Section<RecentResource>(
           key: key,
           divider: divider,
+          bodyMax: _bodyMax,
           title: id.title,
           fold: fold,
           future: _favorites,
@@ -903,6 +926,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         return _Section<ConversationRow>(
           key: key,
           divider: divider,
+          bodyMax: _bodyMax,
           title: id.title,
           fold: fold,
           future: _conversations,
@@ -916,16 +940,120 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   /// The sections the home lists, a hairline above each but the first.
+  List<HomeSection> _panelIds(bool split) => [
+        for (final id in _layout.visible)
+          if (id != HomeSection.drives &&
+              !(split && id == HomeSection.activity))
+            id
+      ];
+
   List<Widget> _shownSections(bool split) {
     final c = context.appColors;
-    final ids = [
-      for (final id in _layout.visible)
-        if (!(split && id == HomeSection.activity)) id
-    ];
+    final ids = _panelIds(split);
     return [
       for (var i = 0; i < ids.length; i++)
         _sectionFor(ids[i], c, divider: i > 0),
     ];
+  }
+
+  /// Whether the panels behave as an accordion: on a compact window (phone)
+  /// one is open at a time. Follows the window live.
+  bool get _accordion {
+    final forced = HomeLayout.accordionOverride;
+    if (forced != null) return forced;
+    final size = MediaQuery.sizeOf(context);
+    return size.width < 600 || size.height < 700;
+  }
+
+  /// How tall a panel's rows may get before they scroll inside it.
+  double _bodyMax = 200;
+
+  /// Compact window: of several open panels only the one opened last stays.
+  void _enforceAccordion() {
+    if (!_accordion) return;
+    final open = [
+      for (final s in homePanelSections)
+        if (!_layout.collapsed.contains(s)) s
+    ];
+    if (open.length < 2) return;
+    final keep = _openOrder.lastWhere(open.contains, orElse: () => open.last);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _accordion) _setLayout(_layout.openOnly(keep));
+    });
+  }
+
+  /// The current drive's own list: its tree of children and "New".
+  Widget _driveTree() => DriveTree(
+        key: _tree,
+        api: widget.api,
+        drive: _drive,
+        onNew: _newInDrive,
+        onOpen: (child) => _visit(
+            openResourceView(
+                api: widget.api,
+                drive: _drive,
+                subject: child.subject,
+                title: child.title,
+                className: child.className),
+            drive: _drive,
+            subject: child.subject),
+      );
+
+  /// The "New" row: the new-document sheet with the current drive selected;
+  /// what it makes opens.
+  Future<void> _newInDrive() async {
+    final created = await showNewDocumentSheet(context,
+        api: widget.api, fallbackDrive: _drive, preferredDrive: _drive);
+    if (created == null || !mounted) return;
+    widget.api.noteOpened(created.drive, created.subject);
+    await _visit(
+        openResourceView(
+            api: widget.api,
+            drive: created.drive,
+            subject: created.subject,
+            title: created.name),
+        drive: created.drive,
+        subject: created.subject);
+    if (mounted) _tree.currentState?.reload();
+  }
+
+  /// A drive picked in the switcher: it becomes the store's active drive and
+  /// everything that follows the drive (the tree, the search scope, where New
+  /// goes) moves to it.
+  Future<void> _selectDrive(DriveInfo d) async {
+    if (driveKey(d.subject) == driveKey(_drive)) return;
+    try {
+      await widget.api.setActiveDrive(d.subject);
+    } catch (e) {
+      debugPrint('Active drive not set: $e');
+    }
+    if (!mounted) return;
+    setState(() {
+      _selected = d.subject;
+      _drive = d.subject;
+    });
+    _shell?.drive.value = d.subject;
+    noteDriveVisited(d.subject);
+    _reload();
+  }
+
+  DriveInfo? get _currentDrive {
+    for (final d in _driveList) {
+      if (driveKey(d.subject) == driveKey(_drive)) return d;
+    }
+    return null;
+  }
+
+  void _openSwitcher(BuildContext headerContext) {
+    final shell = _shell;
+    showDriveSwitcher(
+      headerContext,
+      drives: _driveList,
+      current: _drive,
+      onSelect: _selectDrive,
+      onManage: () => _openSectionPage(HomeSection.drives),
+      onNew: shell == null ? null : ShellActions(widget.api, shell).newDrive,
+    );
   }
 
   @override
@@ -933,6 +1061,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     final c = context.appColors;
     final split = ShellScope.layoutOf(context) == ShellLayout.split;
     // "Show icons in the sidebar" off: the rows below are text only.
+    _enforceAccordion();
     return SidebarIconsScope(
         child: FutureBuilder<List<DriveInfo>>(
       future: _drives,
@@ -940,7 +1069,15 @@ class _ChatsScreenState extends State<ChatsScreen> {
         return Scaffold(
           backgroundColor: c.bgBody,
           appBar: AppTopBar(
-            titleWidget: const AtomicWordmark(),
+            titleWidget: Builder(
+              builder: (headerContext) => Align(
+                alignment: Alignment.centerLeft,
+                child: CurrentDriveHeader(
+                  drive: _currentDrive,
+                  onTap: () => _openSwitcher(headerContext),
+                ),
+              ),
+            ),
           ),
           // The app's overscroll stretch.
           body: ScrollConfiguration(
@@ -951,13 +1088,36 @@ class _ChatsScreenState extends State<ChatsScreen> {
             child: SafeArea(
               top: false,
               bottom: false,
-              child: ListView(
-                children: [
-                  // Next to the pages the activity is the detail pane's.
-                  ..._shownSections(split),
-                  if (_layout.visible.isEmpty) _emptyHome(),
-                ],
-              ),
+              child: LayoutBuilder(builder: (context, box) {
+                final shown = _panelIds(split);
+                final open = [
+                  for (final s in shown)
+                    if (!_layout.collapsed.contains(s)) s
+                ];
+                final room = box.maxHeight.isFinite ? box.maxHeight : 600.0;
+                final headers = 49.0 * shown.length;
+                final openCount = math.max(1, open.length);
+                // Half the column at most, but room for a couple of rows in
+                // every open panel (never more than 80%).
+                final cap = math.min(room * 0.8,
+                    math.max(room * 0.5, headers + 96.0 * open.length));
+                // The open panels share what is left of the cap and scroll
+                // their rows inside.
+                _bodyMax = math.max(0.0, (cap - headers) / openCount);
+                return Column(children: [
+                  // The tree takes what the panels leave; it scrolls itself.
+                  Expanded(child: _driveTree()),
+                  // Bottom-anchored panels, just above the bottom bar.
+                  Container(
+                    key: const Key('home-panels'),
+                    constraints: BoxConstraints(maxHeight: cap),
+                    padding: EdgeInsets.only(
+                        bottom: MediaQuery.paddingOf(context).bottom),
+                    child: Column(
+                        mainAxisSize: MainAxisSize.min, children: _shownSections(split)),
+                  ),
+                ]);
+              }),
             ),
           ),
         );
@@ -1018,6 +1178,9 @@ class _Section<T> extends StatefulWidget {
   /// it is still being read, and when the data cannot be read.
   final bool hideEmpty;
 
+  /// How tall the open rows get before they scroll inside the panel.
+  final double bodyMax;
+
   /// A count shown as a pill before the chevron (unread notifications);
   /// nothing at 0.
   final int Function(List<T>)? badge;
@@ -1032,6 +1195,7 @@ class _Section<T> extends StatefulWidget {
     required this.onShowAll,
     this.total,
     this.hideEmpty = false,
+    this.bodyMax = double.infinity,
     this.badge,
     this.divider = false,
   });
@@ -1149,7 +1313,7 @@ class _SectionState<T> extends State<_Section<T>>
       onLongPress: fold.onHold,
       child: ExcludeSemantics(
         child: SizedBox(
-          key: ValueKey('section-heading-${fold.section.name}'),
+          key: ValueKey('home-panel-${fold.section.name}'),
           height: 48,
           width: double.infinity,
           child: Material(
@@ -1267,7 +1431,7 @@ class _SectionState<T> extends State<_Section<T>>
   /// The rows below the heading (what folds).
   Widget _body(BuildContext context, List<T>? list, Object? error) {
     final c = context.appColors;
-    return Column(
+    final body = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (error != null)
@@ -1291,6 +1455,14 @@ class _SectionState<T> extends State<_Section<T>>
             onTap: () => widget.onShowAll(list),
           ),
       ],
+    );
+    if (!widget.bodyMax.isFinite) return body;
+    // A bottom panel: its rows scroll inside the room it has.
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: widget.bodyMax),
+      child: SingleChildScrollView(
+          key: ValueKey('home-panel-body-${widget.fold.section.name}'),
+          child: body),
     );
   }
 }

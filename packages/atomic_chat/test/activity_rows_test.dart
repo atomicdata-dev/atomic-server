@@ -136,6 +136,8 @@ void main() {
     final api = _Api(activityList: entries, driveList: drives);
     await tester.pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('section-show-all-activity')));
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('section-show-all-activity')));
     await tester.pumpAndSettle();
     await tester.pump(const Duration(milliseconds: 300));

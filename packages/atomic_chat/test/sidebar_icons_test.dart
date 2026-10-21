@@ -16,14 +16,25 @@ void main() {
   final api = FakeApi(driveList: [
     (subject: 'did:ad:current', name: 'Zebra', emoji: '🦓', picture: null),
     (subject: 'did:ad:used', name: 'Mango', emoji: null, picture: null),
-  ]);
+  ], childrenOf: {
+    'did:ad:current': [
+      (
+        subject: 'did:ad:doc',
+        title: 'Plan',
+        className: 'document-v2',
+        expandable: true,
+        emoji: '🦊',
+        picture: null
+      ),
+    ],
+  });
 
   testWidgets('a row has its leading by default', (tester) async {
     await tester
         .pumpWidget(app(ChatsScreen(drive: 'did:ad:current', api: api)));
     await tester.pumpAndSettle();
     expect(find.byType(RowLeading), findsWidgets);
-    expect(tester.getTopLeft(find.text('Zebra').first).dx, greaterThan(16));
+    expect(tester.getTopLeft(find.text('Plan').first).dx, greaterThan(16));
   });
 
   testWidgets('off: no RowLeading on Home and the text starts at 16 dp',
@@ -32,10 +43,10 @@ void main() {
     await tester
         .pumpWidget(app(ChatsScreen(drive: 'did:ad:current', api: api)));
     await tester.pumpAndSettle();
-    expect(find.text('Zebra'), findsOneWidget);
+    expect(find.text('Plan'), findsOneWidget);
     expect(find.byType(RowLeading), findsNothing);
-    expect(tester.getTopLeft(find.text('Zebra').first).dx, 16);
-    expect(tester.getSize(find.widgetWithText(ListTile, 'Zebra')).height,
+    expect(tester.getTopLeft(find.text('Plan').first).dx, 16);
+    expect(tester.getSize(find.widgetWithText(ListTile, 'Plan')).height,
         greaterThanOrEqualTo(44));
 
     // Switched on again: the leading comes back at once.

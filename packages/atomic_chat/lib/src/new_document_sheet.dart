@@ -111,11 +111,15 @@ Future<CreatedResource?> showNewDocumentSheet(
   BuildContext context, {
   required AssistantApi api,
   String fallbackDrive = '',
+  String preferredDrive = '',
 }) =>
     showModalBottomSheet<CreatedResource>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => NewDocumentSheet(api: api, fallbackDrive: fallbackDrive),
+      builder: (_) => NewDocumentSheet(
+          api: api,
+          fallbackDrive: fallbackDrive,
+          preferredDrive: preferredDrive),
     );
 
 /// A new document, natively: a name (empty is "Untitled"), the drive it goes
@@ -127,6 +131,9 @@ class NewDocumentSheet extends StatefulWidget {
   /// The drive used when the drives cannot be listed.
   final String fallbackDrive;
 
+  /// The drive that is preselected (the current one), over the last used.
+  final String preferredDrive;
+
   /// The class of what is made.
   final String classUrl;
 
@@ -134,6 +141,7 @@ class NewDocumentSheet extends StatefulWidget {
     super.key,
     required this.api,
     this.fallbackDrive = '',
+    this.preferredDrive = '',
     this.classUrl = documentClass,
   });
 
@@ -174,7 +182,14 @@ class _NewDocumentSheetState extends State<NewDocumentSheet> {
     if (!mounted) return;
     setState(() {
       _drives = drives;
+      final preferred = widget.preferredDrive;
       _drive = drives
+              .where((d) =>
+                  preferred.isNotEmpty &&
+                  driveKey(d.subject) == driveKey(preferred))
+              .map((d) => d.subject)
+              .firstOrNull ??
+          drives
               .where(
                   (d) => last != null && driveKey(d.subject) == driveKey(last))
               .map((d) => d.subject)

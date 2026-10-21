@@ -7,6 +7,8 @@ import 'package:flutter/foundation.dart' show Listenable, debugPrint;
 import '../atomic/account_store.dart';
 import '../atomic/atomic_client.dart';
 import '../atomic/own_profile.dart';
+import '../src/rust/api/assistant.dart' as ffi_assistant;
+import '../src/rust/api/simple.dart' as ffi_simple;
 import 'fake_ai.dart';
 
 /// The app's [AssistantApi]: the local node through [AtomicClient] (the Rust
@@ -16,6 +18,13 @@ class AtomicAssistantApi extends AssistantApi {
 
   @override
   Future<List<DriveInfo>> drives() => AtomicClient.listDrivesWithNames();
+  @override
+  Future<DriveChildren> driveChildren(String parent) async =>
+      AssistantJson.parseDriveChildren(
+          await ffi_assistant.listChildren(parent: parent, limit: 200));
+  @override
+  Future<void> setActiveDrive(String subject) =>
+      ffi_simple.setActiveDrive(subject: subject);
   @override
   Future<List<ChatSummary>> chats() =>
       AtomicClient.listAiChats(limit: AssistantApi.chatsPageSize);

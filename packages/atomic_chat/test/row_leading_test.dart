@@ -200,7 +200,7 @@ void main() {
       picture: const ResourcePicture(file: 'did:ad:docpic'),
     );
 
-    testWidgets('DMs show the other member, drives and favorites their own',
+    testWidgets('DMs show the other member, favorites their own, the drive header its picture',
         (tester) async {
       tester.view.physicalSize = const Size(400, 3000);
       tester.view.devicePixelRatio = 1;
@@ -256,14 +256,18 @@ void main() {
       expect(inRow('Fox doc', find.text('🦊')), findsOneWidget);
       expect(inRow('Pic doc', find.byKey(const Key('row-picture'))), findsOneWidget);
       expect(rowOf('Pic doc').shape, RowShape.square);
-      expect(inRow('Home', find.byKey(const Key('row-picture'))), findsOneWidget);
-      expect(inRow('Plain drive', find.byIcon(Icons.folder_outlined)), findsOneWidget);
+      // The current drive's picture is in the header.
+      expect(
+          find.descendant(
+              of: find.byKey(const Key('current-drive-header')),
+              matching: find.byKey(const Key('row-picture'))),
+          findsOneWidget);
       // The notification shows the actor's initial.
       expect(inRow('Dora wrote', find.text('D')), findsOneWidget);
 
       // Every kind of row: the same leading slot and the same text x.
       final xs = <double>{};
-      for (final t in ['Bob', 'Carol', 'Bob, Carol', 'Plain doc', 'Fox doc', 'Pic doc', 'Home', 'Plain drive', 'Dora wrote']) {
+      for (final t in ['Bob', 'Carol', 'Bob, Carol', 'Plain doc', 'Fox doc', 'Pic doc', 'Dora wrote']) {
         final lead = tester.getRect(inRow(t, find.byType(RowLeading)));
         expect(lead.size, const Size(32, 32), reason: t);
         expect(lead.left, 16, reason: t);

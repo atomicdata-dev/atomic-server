@@ -54,7 +54,7 @@ void main() {
     expect(find.text('Notifications'), findsOneWidget);
     expect(
         find.descendant(
-            of: find.byKey(const ValueKey('section-heading-notifications')),
+            of: find.byKey(const ValueKey('home-panel-notifications')),
             matching: find.text('2')),
         findsOneWidget);
     expect(find.text('Note 1'), findsOneWidget);
@@ -105,8 +105,9 @@ void main() {
     await tester.pumpWidget(_shell(api));
     await tester.pumpAndSettle();
     expect(find.text('Note 4'), findsNothing);
-    await tester
-        .tap(find.byKey(const ValueKey('section-show-all-notifications')));
+    await tester.ensureVisible(find.byKey(const ValueKey('section-show-all-notifications')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('section-show-all-notifications')));
     await tester.pumpAndSettle();
     expect(_controller(tester).topKind, ShellPage.listOf('notifications'));
     final list = tester.getRect(find.byType(ChatsScreen));

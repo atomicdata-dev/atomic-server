@@ -5,9 +5,9 @@ enum HomeSection {
   drives('Drives'),
   notifications('Notifications'),
   activity('Activity'),
-  chats('AI chats'),
+  messages('Messages'),
   favorites('Favorites'),
-  messages('Messages');
+  chats('AI chats');
 
   final String title;
   const HomeSection(this.title);
@@ -19,6 +19,16 @@ enum HomeSection {
     return null;
   }
 }
+
+/// The sections that are panels at the bottom of the home, in the web
+/// sidebar's order (the drives are not one: the current drive's tree is).
+const homePanelSections = [
+  HomeSection.notifications,
+  HomeSection.activity,
+  HomeSection.messages,
+  HomeSection.favorites,
+  HomeSection.chats,
+];
 
 /// A section as the Home button's menu lists it: whether the person hid it
 /// from the home, and how many rows it has (null until known).
@@ -91,6 +101,29 @@ class HomeLayout {
         collapsed: collapsed ?? this.collapsed,
       );
 
+  /// The layout of a fresh install: every panel closed.
+  static const closed = HomeLayout(collapsed: {
+    HomeSection.drives,
+    HomeSection.notifications,
+    HomeSection.activity,
+    HomeSection.messages,
+    HomeSection.favorites,
+    HomeSection.chats,
+  });
+
+  /// What a device with nothing saved starts with (tests start from another).
+  static HomeLayout fresh = closed;
+
+  /// Forces the compact (accordion) behaviour of the panels on or off; null
+  /// follows the window. For tests.
+  static bool? accordionOverride;
+
+  /// Only [s] open, every other section folded.
+  HomeLayout openOnly(HomeSection s) => _with(collapsed: {
+        for (final o in HomeSection.values)
+          if (o != s) o
+      });
+
   HomeLayout toggleCollapsed(HomeSection s) => _with(
         collapsed: collapsed.contains(s)
             ? (Set.of(collapsed)..remove(s))
@@ -141,10 +174,11 @@ class HomeLayout {
       return HomeLayout.fromNames(
         order: p.getStringList(homeOrderKey),
         hidden: p.getStringList(homeHiddenKey),
-        collapsed: p.getStringList(homeCollapsedKey),
+        collapsed: p.getStringList(homeCollapsedKey) ??
+            [for (final s in fresh.collapsed) s.name],
       );
     } catch (_) {
-      return const HomeLayout();
+      return fresh;
     }
   }
 
