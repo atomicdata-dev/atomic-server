@@ -337,7 +337,7 @@ jobs:
           mkdir -p dist-artifacts
           # Bundle layout differs per platform and per tauri version, so match on
           # extension rather than hardcoding paths. -print0/-d '' survives the
-          # spaces in "Atomic Server_0.41.0_x64.dmg".
+          # name "atomic.place_0.41.0_x64.dmg".
           find target -type d -name bundle -print0 | while IFS= read -r -d '' bundle; do
             find "$bundle" -type f \
               \( -name '*.dmg' -o -name '*.app.tar.gz' \
