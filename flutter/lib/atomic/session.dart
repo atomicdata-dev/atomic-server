@@ -1,7 +1,39 @@
 import 'package:atomic_flutter/atomic_flutter.dart'
     show normalizeServerUrl, sameOrigin;
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// The app's secure storage.
+///
+/// On macOS it uses the legacy file-based login keychain, not the data
+/// protection keychain: that one needs the `keychain-access-groups`
+/// entitlement, which needs a provisioning profile, so an ad-hoc or
+/// Developer-ID signed build without one fails every access with -34018
+/// (errSecMissingEntitlement). iOS and Android are unchanged.
+FlutterSecureStorage createSecureStorage() => const FlutterSecureStorage(
+      aOptions: AndroidOptions(encryptedSharedPreferences: true),
+      mOptions: MacOsOptions(
+        useDataProtectionKeyChain: false,
+        accessibility: KeychainAccessibility.unlocked,
+      ),
+    );
+
+/// A sentence for a failed Keychain / secure storage call, in place of the
+/// raw `PlatformException(...)` text.
+String keychainErrorMessage(Object error) {
+  if (error is PlatformException) {
+    final code = error.code;
+    final text = '${error.message}';
+    if (code == '-34018' || text.contains('-34018') ||
+        code.contains('34018')) {
+      return 'Couldn\u2019t access the Keychain';
+    }
+    return 'Couldn\u2019t access secure storage';
+  }
+  return 'Couldn\u2019t access secure storage';
+}
 
 /// Persists the atomic session across restarts.
 ///
@@ -15,29 +47,54 @@ class AtomicSession {
   static const _keySecret = 'atomic_agent_secret';
   static const _keyDrive = 'atomic_drive';
 
-  static const _secure = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-    // The data protection keychain needs a keychain-access-groups entitlement,
-    // which an ad-hoc signed build can't carry (-34018). The login keychain
-    // works without one.
-    mOptions: MacOsOptions(useDataProtectionKeyChain: false),
-  );
+  static FlutterSecureStorage _secure = createSecureStorage();
 
-  static Future<void> save({
+  @visibleForTesting
+  static set secureStorage(FlutterSecureStorage storage) => _secure = storage;
+
+  /// The secret of this run, when secure storage would not take it: signing
+  /// in still works for the session, it just is not remembered.
+  static String? _memorySecret;
+
+  /// Set when the last [save] could not store the secret; says why.
+  static String? lastSaveWarning;
+
+  @visibleForTesting
+  static void resetForTest() {
+    _memorySecret = null;
+    lastSaveWarning = null;
+    _early = null;
+  }
+
+  /// Saves the session. A secret that secure storage refuses (an unavailable
+  /// Keychain) is kept in memory for this run and reported through
+  /// [lastSaveWarning] and the return value (false), not thrown: the person
+  /// is signed in, and only has to sign in again next start.
+  static Future<bool> save({
     required String serverUrl,
     required String secret,
     String? drive,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyServerUrl, serverUrl);
-    await _secure.write(key: _keySecret, value: secret);
-    // Clear any legacy plaintext copy left in SharedPreferences.
-    await prefs.remove(_keySecret);
+    var stored = true;
+    lastSaveWarning = null;
+    _memorySecret = secret;
+    try {
+      await _secure.write(key: _keySecret, value: secret);
+      // Clear any legacy plaintext copy left in SharedPreferences.
+      await prefs.remove(_keySecret);
+    } catch (e) {
+      debugPrint('Saving the secret failed: $e');
+      stored = false;
+      lastSaveWarning = keychainErrorMessage(e);
+    }
     if (isResumableDrive(drive)) {
       await prefs.setString(_keyDrive, drive!);
     }
 
     await addKnownServer(serverUrl);
+    return stored;
   }
 
   /// Only a drive that can be found again from its own subject is worth
@@ -86,22 +143,39 @@ class AtomicSession {
   /// Read the secret from secure storage, migrating a pre-existing plaintext
   /// SharedPreferences secret into it on first run so nobody has to re-sign-in.
   static Future<String?> _loadSecret(SharedPreferences prefs) async {
-    final secure = await _secure.read(key: _keySecret);
+    String? secure;
+    try {
+      secure = await _secure.read(key: _keySecret);
+    } catch (e) {
+      // An unavailable Keychain must not lock the person out or crash the
+      // start: treat it as "nothing saved", and use this run's secret if any.
+      debugPrint('Reading the secret failed: $e');
+      return _memorySecret ?? prefs.getString(_keySecret);
+    }
     if (secure != null) return secure;
 
     final legacy = prefs.getString(_keySecret);
     if (legacy != null) {
-      await _secure.write(key: _keySecret, value: legacy);
-      await prefs.remove(_keySecret);
+      try {
+        await _secure.write(key: _keySecret, value: legacy);
+        await prefs.remove(_keySecret);
+      } catch (e) {
+        debugPrint('Migrating the secret failed: $e');
+      }
       return legacy;
     }
-    return null;
+    return _memorySecret;
   }
 
   static Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyServerUrl);
-    await _secure.delete(key: _keySecret);
+    _memorySecret = null;
+    try {
+      await _secure.delete(key: _keySecret);
+    } catch (e) {
+      debugPrint('Deleting the secret failed: $e');
+    }
     await prefs.remove(_keySecret); // legacy, if any
     await prefs.remove(_keyDrive);
   }

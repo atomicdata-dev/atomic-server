@@ -1,8 +1,10 @@
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'atomic_auth.dart';
 import 'atomic_client.dart';
+import 'session.dart' show createSecureStorage;
 
 /// What the person's managed account says about one workspace: the address it
 /// belongs to, and whether Cloud Vault (encrypted backup) and Cloud Server
@@ -30,22 +32,41 @@ class AccountSummary {
 /// lives in platform secure storage like the agent secret, never in prefs.
 class AccountStore {
   static const _key = 'atomic_account_session';
-  static const _secure = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-    // The data protection keychain needs a keychain-access-groups entitlement,
-    // which an ad-hoc signed build can't carry (-34018). The login keychain
-    // works without one.
-    mOptions: MacOsOptions(useDataProtectionKeyChain: false),
-  );
+  static final FlutterSecureStorage _secure = createSecureStorage();
 
-  static Future<void> save(String session) =>
-      _secure.write(key: _key, value: session);
+  /// This run's session, for when the Keychain will not keep it.
+  static String? _memory;
 
-  static Future<void> clear() => _secure.delete(key: _key);
+  /// Saving never throws: an unavailable Keychain only means the link is not
+  /// remembered after this run.
+  static Future<void> save(String session) async {
+    _memory = session;
+    try {
+      await _secure.write(key: _key, value: session);
+    } catch (e) {
+      debugPrint('Saving the account session failed: $e');
+    }
+  }
+
+  static Future<void> clear() async {
+    _memory = null;
+    try {
+      await _secure.delete(key: _key);
+    } catch (e) {
+      debugPrint('Deleting the account session failed: $e');
+    }
+  }
 
   /// The saved session, for a client to restore; null when no account is
-  /// linked.
-  static Future<String?> read() => _secure.read(key: _key);
+  /// linked (or the Keychain is unavailable and nothing is held in memory).
+  static Future<String?> read() async {
+    try {
+      return await _secure.read(key: _key) ?? _memory;
+    } catch (e) {
+      debugPrint('Reading the account session failed: $e');
+      return _memory;
+    }
+  }
 
   /// The portal agents sign in to when no portal is linked yet.
   static const defaultPortal = 'https://atomic.place';

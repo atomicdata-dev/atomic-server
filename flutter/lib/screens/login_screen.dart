@@ -326,11 +326,19 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
-      await AtomicSession.save(
+      final stored = await AtomicSession.save(
         serverUrl: _serverOrigin,
         secret: secret,
         drive: drive,
       );
+      if (!stored && mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text('Couldn\u2019t save your sign-in on this device; '
+                'you\u2019ll need to sign in again next time'),
+          ),
+        );
+      }
 
       final status = await AtomicClient.resumeSession(
         serverUrl: _serverOrigin,
@@ -903,6 +911,7 @@ class _LoginScreenState extends State<LoginScreen> {
 /// can act on, not the decoder's "Not valid Base64. Invalid last symbol 116,
 /// offset 9."; anything else as it came.
 String signInError(Object error) {
+  if (error is PlatformException) return keychainErrorMessage(error);
   final text = '$error';
   final notASecret = RegExp(r'Invalid key|Base64|base64|Invalid secret|decode',
           caseSensitive: false)
