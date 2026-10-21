@@ -26,6 +26,7 @@ import {
   copyResourceTree,
   moveBlockedReason,
   replaceWithRedirect,
+  trashDescendants,
 } from '../helpers/moveResource';
 
 interface MoveResourceDialogProps {
@@ -86,6 +87,7 @@ export function MoveResourceDialog({
 
         if (redirect) {
           await replaceWithRedirect(original, copy);
+          await trashDescendants(store, subject);
         } else {
           await moveToTrash(store, subject, store.driveOfSubject(subject));
         }

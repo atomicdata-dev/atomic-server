@@ -18,10 +18,10 @@ How it works: copy = fresh genesis ids, children via `parent`, references inside
 rewritten, rights not carried over (they follow the new parent). Files are copied by value; blobs
 are content-addressed, so the copy points at the same bytes. Rich-text bodies are seeded from the
 original's Loro doc. The original keeps parent/drive/genesis/rights and is overwritten to
-`isA=Redirect` + `destination`.
+`isA=Redirect` + `destination`, keeping `name`/`shortname`/`filename` so the old sidebar row keeps its title.
+After the copy and the Redirect saved, the original's direct children go to the old drive's Trash
+(`trashDescendants`; trash moves a subtree), so a failure earlier loses nothing.
 
-- [ ] Descendants of the original stay under the Redirect (hidden, still reachable by id); trash or destroy them
 - [ ] Trees with Properties/Tables (content-addressed ids) are refused; copying needs the ids re-derived
 - [ ] Links inside rich-text bodies are not rewritten to the new ids
-- [ ] Redirect shows up as an untitled row in the old parent's sidebar; give it a title/icon or hide it
 - [ ] Screenshots + e2e (only if the smoke tier needs it)

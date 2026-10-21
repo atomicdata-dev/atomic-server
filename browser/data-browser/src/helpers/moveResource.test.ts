@@ -4,6 +4,7 @@ import {
   copyResourceTree,
   moveBlockedReason,
   replaceWithRedirect,
+  trashDescendants,
 } from './moveResource';
 
 // drive <- a <- b <- c ; drive <- d ; other (separate drive)
@@ -128,6 +129,31 @@ describe('copyResourceTree', () => {
       [server.properties.destination]: 'new:0',
       [core.properties.parent]: 'old:drive',
       [core.properties.write]: ['agent'],
+      [core.properties.name]: 'F',
     });
+  });
+
+  it('trashes the direct children of the Redirect, and only those', async () => {
+    const trashed: string[][] = [];
+    const trashStore = {
+      driveOfSubject: () => 'old:drive',
+      getResource: async () => ({
+        getChildrenCollection: async () => ({
+          getAllMembers: async () => ['old:child', 'old:child2'],
+        }),
+      }),
+      trash: async (s: string, d: string) => {
+        trashed.push([s, d]);
+
+        return true;
+      },
+    } as unknown as Parameters<typeof trashDescendants>[0];
+
+    await trashDescendants(trashStore, 'old:folder');
+
+    expect(trashed).toEqual([
+      ['old:child', 'old:drive'],
+      ['old:child2', 'old:drive'],
+    ]);
   });
 });

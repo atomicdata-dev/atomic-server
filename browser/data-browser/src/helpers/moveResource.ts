@@ -8,6 +8,7 @@ import {
   type Store,
 } from '@tomic/react';
 import { isContentAddressed } from './propertyIdentity';
+import { moveToTrash } from './trash';
 
 /**
  * Why `subject` cannot be re-parented under `target`, or undefined when it can.
@@ -109,13 +110,20 @@ export async function copyResourceTree(
 /**
  * Turns `resource` into a `Redirect` to `destination`. Parent, drive, genesis
  * and rights stay as they were, so the old link still resolves for whoever
- * could read it; everything else is dropped.
+ * could read it; everything else is dropped, except what names the row in the
+ * sidebar (`Resource.title`), so the Redirect keeps the old name.
  */
 export async function replaceWithRedirect(
   resource: Resource,
   destination: string,
 ): Promise<void> {
-  const keep = new Set([...IDENTITY_PROPS, ...RIGHTS_PROPS]);
+  const keep = new Set([
+    ...IDENTITY_PROPS,
+    ...RIGHTS_PROPS,
+    core.properties.name,
+    core.properties.shortname,
+    server.properties.filename,
+  ]);
 
   for (const prop of Object.keys(resource.getPropVals())) {
     if (!keep.has(prop)) resource.remove(prop);
@@ -124,4 +132,23 @@ export async function replaceWithRedirect(
   await resource.set(core.properties.isA, [server.classes.redirect], false);
   await resource.set(server.properties.destination, destination, false);
   await resource.save();
+}
+
+/**
+ * Sends the children of `subject` (a Redirect now) to its drive's Trash. Trash
+ * moves a subtree, so the grandchildren go along. Call it only after the copy
+ * saved: the originals are parked, not destroyed.
+ */
+export async function trashDescendants(
+  store: Store,
+  subject: string,
+): Promise<void> {
+  const drive = store.driveOfSubject(subject);
+  const children = await (
+    await (await store.getResource(subject)).getChildrenCollection(1000)
+  ).getAllMembers();
+
+  for (const child of children) {
+    await moveToTrash(store, child, drive);
+  }
 }
