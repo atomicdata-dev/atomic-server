@@ -59,9 +59,9 @@ That shape is the common denominator.
 
 ## Phases (each must net-remove code)
 
-0. **Spec + derive.** Define `ActionSpec` and the JSON file. Generate
-   `tools/list` for the 7 read tools and `delete_resource` from it. Gate: net
-   lines in `server/src/mcp/tools.rs` go down, not up.
+0. **Spec + derive.** DONE: `ActionSpec` and `server/src/mcp/tools.json` list all
+   11 built-in tools (7 read, 4 write) for `tools/list`; output verified
+   byte-identical. Gate met: net lines in `server/src/mcp/tools.rs` went down.
 1. **Data verbs to Rust.** Move trash, restore, delete, favorite onto one
    `atomic_lib` function each. Delete the TS copies in `@tomic/lib`'s `Store`
    where the Rust one is called instead. Coordinates with the Trash work
