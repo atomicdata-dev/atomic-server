@@ -72,6 +72,10 @@ pub struct Activity {
     /// The resource's name at that time (for a deletion: the last known one).
     pub name: String,
     pub class_name: String,
+    /// The server's history attribution was read for this entry (its actor
+    /// and time are the newest signed change's). Cleared by a newer change.
+    #[serde(default)]
+    pub checked: bool,
 }
 
 #[derive(Default, serde::Serialize, serde::Deserialize)]
@@ -394,6 +398,7 @@ impl RecentsIndex {
             actor,
             name: name_of(resource),
             class_name: class_name_of(store, resource).await,
+            checked: false,
         };
         self.with(|s| {
             record_activity(&mut s.recents, new);
@@ -412,6 +417,7 @@ impl RecentsIndex {
                 kind: ActivityKind::Deleted,
                 at: crate::utils::now(),
                 actor,
+                checked: true,
                 ..old.clone()
             };
             record_activity(&mut s.recents, new);
@@ -649,6 +655,59 @@ impl RecentsIndex {
         Ok(out)
     }
 
+    /// Put an entry in the log as an event would (tests).
+    #[cfg(test)]
+    pub(crate) fn record_for_test(&self, new: Activity) {
+        self.with(|s| record_activity(&mut s.recents, new));
+    }
+
+    /// Entries of `subjects` the server's attribution was not read for yet.
+    pub fn unchecked(&self, subjects: &[String]) -> Vec<String> {
+        self.with(|s| {
+            subjects
+                .iter()
+                .filter(|sub| {
+                    s.recents
+                        .activity
+                        .iter()
+                        .any(|a| &a.subject == *sub && !a.checked)
+                })
+                .cloned()
+                .collect()
+        })
+    }
+
+    /// Put what the server says about the newest change of `subject` on its
+    /// entries: one entry, by that signer, at that time. `kind` is Created
+    /// only for the change that made the resource. Other agents' entries of
+    /// the subject that are older than this change are dropped (the web
+    /// names the newest editor only).
+    pub fn apply_server_editor(&self, subject: &str, editor: &super::profiles::LastEditor) {
+        self.with(|s| {
+            let log = &mut s.recents.activity;
+            let Some(i) = log.iter().position(|a| a.subject == subject) else {
+                return;
+            };
+            let mut entry = log.remove(i);
+            if entry.kind == ActivityKind::Deleted {
+                log.insert(i, entry);
+                return;
+            }
+            log.retain(|a| a.subject != subject || a.at > editor.at);
+            entry.actor = Some(editor.signer.clone());
+            entry.at = editor.at;
+            entry.kind = if editor.genesis {
+                ActivityKind::Created
+            } else {
+                ActivityKind::Changed
+            };
+            entry.checked = true;
+            let at = log.partition_point(|a| a.at > entry.at);
+            log.insert(at, entry);
+            s.dirty = true;
+        });
+    }
+
     /// The `limit` newest activity entries, newest first.
     pub fn activity(&self, limit: usize) -> Vec<Activity> {
         self.with(|s| s.recents.activity.iter().take(limit).cloned().collect())
@@ -733,6 +792,7 @@ mod tests {
             actor: Some("did:ad:agent:a".into()),
             name: format!("name of {subject}"),
             class_name: "Document".into(),
+            checked: false,
         }
     }
 

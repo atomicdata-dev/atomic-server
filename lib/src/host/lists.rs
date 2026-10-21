@@ -6,9 +6,12 @@ use super::{
     own_profile::own_profile,
     profiles::{same_agent, short_agent, AgentProfiles},
     recents::{ActivityKind, RecentsIndex},
-    rows::{emoji_of, first_class, name_of, resource_row, row_resource, with_icon, DriveCache},
+    rows::{
+        emoji_of, first_class, name_of, picture_fields, resource_row, row_resource, with_icon,
+        DriveCache,
+    },
 };
-use crate::{errors::AtomicResult, Db, Storelike, Subject};
+use crate::{errors::AtomicResult, urls, Db, Storelike, Subject};
 use serde_json::{json, Value as Json};
 use std::collections::HashMap;
 
@@ -71,6 +74,77 @@ pub struct ActivityRow {
     pub actor: String,
     pub name: String,
     pub class_name: String,
+    /// The resource's own picture fields (`emoji?`, `icon_file?`,
+    /// `image_url?`; see [`picture_fields`]).
+    pub picture: serde_json::Map<String, Json>,
+    /// `{subject, name, emoji?, icon_file?, image_url?}` of the agent, as far
+    /// as the store or the server's profile says (the name is in `actor`).
+    pub actor_picture: Json,
+    /// `{subject, name, emoji?, icon_file?, image_url?}` of the drive.
+    pub drive_picture: Json,
+}
+
+/// How many entries of a page are checked against the server's history
+/// attribution at once, and how many lookups run together.
+const ATTRIBUTION_BATCH: usize = 40;
+const ATTRIBUTION_PARALLEL: usize = 8;
+/// How long a page waits for those lookups; they go on without it.
+const ATTRIBUTION_WAIT: std::time::Duration = std::time::Duration::from_millis(1_500);
+
+/// The way the web app's Drive Activity names an edit's author: the signer of
+/// the resource's newest change, from the server's `/history-attribution`.
+/// The log only knows what this device saw (creators, and commits it applied);
+/// edits by others arrive as plain state without a signer. For the entries
+/// of the page about to be listed that were not read yet, ask the server and
+/// put its answer (signer and time of the newest change) in the log, which
+/// keeps it for the next read and for offline. Unreachable server: nothing
+/// changes, the log is the fallback.
+async fn refine_with_server(
+    recents: &RecentsIndex,
+    profiles: &AgentProfiles,
+    window: Vec<super::recents::Activity>,
+) {
+    use futures::StreamExt;
+    let subjects: Vec<String> = window.into_iter().map(|a| a.subject).collect();
+    let todo = recents.unchecked(&subjects);
+    if todo.is_empty() {
+        return;
+    }
+    let lookups = futures::stream::iter(todo.into_iter().take(ATTRIBUTION_BATCH))
+        .map(|subject| async move {
+            if let Some(editor) = profiles.last_editor(&subject).await {
+                recents.apply_server_editor(&subject, &editor);
+            }
+        })
+        .buffer_unordered(ATTRIBUTION_PARALLEL)
+        .collect::<Vec<_>>();
+    let _ = tokio::time::timeout(ATTRIBUTION_WAIT, lookups).await;
+}
+
+/// `{subject, name, emoji?, icon_file?, image_url?}` of an agent: its
+/// resource in the store, else the server's profile.
+async fn actor_picture(store: &Db, profiles: &AgentProfiles, agent: &str) -> Json {
+    if let Some(p) = super::rows::agent_picture(store, agent).await {
+        if p.get("icon_file").is_some() || p.get("image_url").is_some() {
+            return p;
+        }
+    }
+    let mut out = serde_json::Map::new();
+    out.insert("subject".into(), json!(agent));
+    if let Some(body) = profiles.get(agent).await {
+        if let Ok(json) = serde_json::from_str::<Json>(&body) {
+            let get = |p: &str| json.get(p).and_then(Json::as_str).map(str::to_string);
+            if let Some(file) =
+                get(super::own_profile::ICON).or_else(|| get(super::own_profile::IMAGE))
+            {
+                out.insert("icon_file".into(), json!(file));
+            }
+            if let Some(url) = get(urls::IMAGE_URL).filter(|u| u.starts_with("http")) {
+                out.insert("image_url".into(), json!(url));
+            }
+        }
+    }
+    Json::Object(out)
 }
 
 /// How long [`list_activity`] waits for the server's profiles of agents it
@@ -135,13 +209,14 @@ fn activity_entries(
     before: Option<(i64, &str)>,
     limit: usize,
     include_own: bool,
+    unattributed: bool,
 ) -> Vec<super::recents::Activity> {
     let mut entries: Vec<_> = recents
         .activity(usize::MAX)
         .into_iter()
         .filter(|a| {
             let Some(actor) = a.actor.as_deref() else {
-                return false;
+                return unattributed;
             };
             if !include_own && own.is_some_and(|own| same_agent(own, actor)) {
                 return false;
@@ -203,6 +278,17 @@ async fn list_activity_rows(
         .ok()
         .map(|a| a.subject.to_string());
     let drive = drive.map(drive_key);
+    // The window this page covers, with the entries nobody is named for yet.
+    let window = activity_entries(
+        recents,
+        own.as_deref(),
+        drive.as_deref(),
+        before,
+        limit,
+        include_own,
+        true,
+    );
+    refine_with_server(recents, profiles, window).await;
     let entries = activity_entries(
         recents,
         own.as_deref(),
@@ -210,6 +296,7 @@ async fn list_activity_rows(
         before,
         limit,
         include_own,
+        false,
     );
 
     let mut names: HashMap<String, Option<String>> = Default::default();
@@ -234,34 +321,56 @@ async fn list_activity_rows(
         }
     }
 
-    entries
-        .into_iter()
-        .map(|a| {
-            let actor_subject = a.actor.unwrap_or_default();
-            let actor = if own
-                .as_deref()
-                .is_some_and(|own| same_agent(own, &actor_subject))
-            {
-                "You".to_string()
-            } else {
-                names
-                    .get(&actor_subject)
-                    .cloned()
-                    .flatten()
-                    .unwrap_or_else(|| short_agent(&actor_subject))
-            };
-            ActivityRow {
-                subject: a.subject,
-                drive: a.drive,
-                kind: a.kind,
-                at: a.at,
-                actor_subject,
-                actor,
-                name: a.name,
-                class_name: a.class_name,
+    let mut pictures: HashMap<String, Json> = Default::default();
+    let mut drives: HashMap<String, Json> = Default::default();
+    let mut rows = Vec::new();
+    for a in entries {
+        let actor_subject = a.actor.clone().unwrap_or_default();
+        let actor = if own
+            .as_deref()
+            .is_some_and(|own| same_agent(own, &actor_subject))
+        {
+            "You".to_string()
+        } else {
+            names
+                .get(&actor_subject)
+                .cloned()
+                .flatten()
+                .unwrap_or_else(|| short_agent(&actor_subject))
+        };
+        if !pictures.contains_key(&actor_subject) {
+            let p = actor_picture(store, profiles, &actor_subject).await;
+            pictures.insert(actor_subject.clone(), p);
+        }
+        let key = drive_key(&a.drive);
+        if !drives.contains_key(&key) {
+            let mut out = serde_json::Map::new();
+            out.insert("subject".into(), json!(a.drive));
+            if let Some(r) = row_resource(store, &Subject::from(a.drive.as_str())).await {
+                out.insert("name".into(), json!(name_of(&r)));
+                out.extend(picture_fields(store, &r, false));
             }
-        })
-        .collect()
+            drives.insert(key.clone(), Json::Object(out));
+        }
+        let picture = match row_resource(store, &Subject::from(a.subject.as_str())).await {
+            Some(r) => picture_fields(store, &r, false),
+            None => Default::default(),
+        };
+        rows.push(ActivityRow {
+            subject: a.subject,
+            drive: a.drive,
+            kind: a.kind,
+            at: a.at,
+            actor_picture: pictures[&actor_subject].clone(),
+            drive_picture: drives[&key].clone(),
+            picture,
+            actor_subject,
+            actor,
+            name: a.name,
+            class_name: a.class_name,
+        });
+    }
+    rows
 }
 
 /// Put `drives` in the order every drive list shows them: the `active`
@@ -1001,6 +1110,101 @@ mod tests {
         async fn fetch_agent_resource(&self, _agent: &str) -> Option<String> {
             Some(json!({ urls::NAME: self.0 }).to_string())
         }
+    }
+
+    /// Answers a history attribution per subject, counting the calls.
+    struct Attributed {
+        body: String,
+        calls: std::sync::atomic::AtomicUsize,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::host::AgentProfileFetcher for Attributed {
+        async fn fetch_agent_resource(&self, _agent: &str) -> Option<String> {
+            None
+        }
+        async fn fetch_history_attribution(&self, _subject: &str) -> Option<String> {
+            self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Some(self.body.clone())
+        }
+    }
+
+    #[tokio::test]
+    async fn the_server_names_who_edited_a_known_resource() {
+        let d = Device::new().await;
+        let folder = d
+            .store
+            .create_resource(urls::FOLDER, &d.drive, "Edited elsewhere", None)
+            .await
+            .unwrap();
+        d.set_emoji(&folder, "🦊").await;
+        let polle = "did:ad:agent:polle";
+        // Seen as plain state: nobody is named, so the feed hides it.
+        d.recents.record_for_test(super::super::recents::Activity {
+            subject: folder.clone(),
+            drive: d.drive.clone(),
+            kind: ActivityKind::Changed,
+            at: 1_000,
+            actor: None,
+            name: "Edited elsewhere".into(),
+            class_name: "Folder".into(),
+            checked: false,
+        });
+        let none = AgentProfiles::none();
+        assert!(list_activity(&d.store, &d.recents, &none, None, 50)
+            .await
+            .iter()
+            .all(|a| a.subject != folder));
+
+        let fetcher = std::sync::Arc::new(Attributed {
+            body: json!({"subject": folder, "attributions": [
+                {"signer": "did:ad:agent:first", "created_at": 5_000, "genesis": true, "destroy": false},
+                {"signer": polle, "created_at": 9_000, "genesis": false, "destroy": false},
+                {"signer": "did:ad:agent:gone", "created_at": 9_500, "genesis": false, "destroy": true},
+            ]})
+            .to_string(),
+            calls: Default::default(),
+        });
+        let profiles = AgentProfiles::new(fetcher.clone());
+        let rows = list_activity(&d.store, &d.recents, &profiles, None, 50).await;
+        let row = rows.iter().find(|a| a.subject == folder).unwrap();
+        assert_eq!(row.actor_subject, polle);
+        assert_eq!(row.at, 9_000);
+        assert_eq!(row.kind, ActivityKind::Changed);
+        assert_eq!(row.picture["emoji"], "🦊");
+        assert_eq!(row.drive_picture["subject"], d.drive.as_str());
+        assert_eq!(row.actor_picture["subject"], polle);
+        // Read once; the answer lives in the log (and its file) from now on.
+        let again = list_activity(&d.store, &d.recents, &none, None, 50).await;
+        assert_eq!(
+            again.iter().find(|a| a.subject == folder).unwrap().at,
+            9_000
+        );
+        assert_eq!(fetcher.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_server_leaves_the_local_feed() {
+        let d = Device::new().await;
+        let folder = d
+            .store
+            .create_resource(urls::FOLDER, &d.drive, "Local", None)
+            .await
+            .unwrap();
+        d.recents.record_for_test(super::super::recents::Activity {
+            subject: folder.clone(),
+            drive: d.drive.clone(),
+            kind: ActivityKind::Created,
+            at: 2_000,
+            actor: Some("did:ad:agent:bob".into()),
+            name: "Local".into(),
+            class_name: "Folder".into(),
+            checked: false,
+        });
+        let rows = list_activity(&d.store, &d.recents, &AgentProfiles::none(), None, 50).await;
+        let row = rows.iter().find(|a| a.subject == folder).unwrap();
+        assert_eq!(row.at, 2_000);
+        assert_eq!(row.kind, ActivityKind::Created);
     }
 
     /// `agent` renames `subject` with a commit applied here (as a commit frame

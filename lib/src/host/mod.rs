@@ -85,6 +85,30 @@ pub trait AgentProfileFetcher: Send + Sync {
     /// `None` when it cannot be found (now). [`profiles::AgentProfiles`]
     /// bounds how long this may take.
     async fn fetch_agent_resource(&self, agent: &str) -> Option<String>;
+
+    /// The server's `GET /history-attribution?subject=...` answer for a
+    /// resource (who signed its history), as the JSON body, requested with
+    /// the agent's signature like the web app does. `None` when there is no
+    /// server, it refuses or it cannot be reached.
+    async fn fetch_history_attribution(&self, _subject: &str) -> Option<String> {
+        None
+    }
+}
+
+/// `GET {origin}/history-attribution?subject=...` with the agent's signature,
+/// the request the web app's Drive Activity makes per resource
+/// (`store.getHistoryAttribution`). The signed URL is the URL requested,
+/// query included. The body is the server's JSON; `None` on any failure.
+pub async fn fetch_history_attribution(
+    origin: &str,
+    subject: &str,
+    agent: Option<&crate::agents::Agent>,
+) -> Option<String> {
+    let base = format!("{}/history-attribution", origin.trim_end_matches('/'));
+    let url = url::Url::parse_with_params(&base, [("subject", subject)]).ok()?;
+    crate::client::fetch_body(url.as_str(), "application/json", agent)
+        .await
+        .ok()
 }
 
 /// An [`AgentProfileFetcher`] that knows no agents.
@@ -105,5 +129,54 @@ pub fn own_commit_opts() -> CommitOpts {
         validate_rights: false,
         update_index: true,
         ..CommitOpts::no_validations_no_index()
+    }
+}
+
+#[cfg(test)]
+mod attribution_fetch_tests {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    /// A one-shot HTTP server that records the request and answers `body`.
+    async fn serve(body: &'static str, status: u16) -> (String, tokio::task::JoinHandle<String>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let task = tokio::spawn(async move {
+            let (mut sock, _) = listener.accept().await.unwrap();
+            let mut buf = vec![0u8; 8192];
+            let n = sock.read(&mut buf).await.unwrap();
+            let request = String::from_utf8_lossy(&buf[..n]).to_string();
+            let reply = format!(
+                "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            sock.write_all(reply.as_bytes()).await.unwrap();
+            request
+        });
+        (origin, task)
+    }
+
+    #[tokio::test]
+    async fn the_request_is_the_webs_signed_history_attribution_get() {
+        let (origin, task) = serve(r#"{"attributions":[]}"#, 200).await;
+        let agent = crate::agents::Agent::new(Some("Me")).unwrap();
+        let body = fetch_history_attribution(&origin, "did:ad:abc", Some(&agent)).await;
+        assert_eq!(body.as_deref(), Some(r#"{"attributions":[]}"#));
+        let request = task.await.unwrap().to_ascii_lowercase();
+        assert!(
+            request.starts_with("get /history-attribution?subject=did%3aad%3aabc "),
+            "{request}"
+        );
+        for header in ["x-atomic-signature:", "x-atomic-public-key:", "x-atomic-timestamp:"] {
+            assert!(request.contains(header), "{header} in {request}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_refusal_is_none() {
+        let (origin, _task) = serve("{}", 403).await;
+        assert!(fetch_history_attribution(&origin, "did:ad:abc", None)
+            .await
+            .is_none());
     }
 }

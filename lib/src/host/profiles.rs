@@ -41,6 +41,39 @@ struct Inner {
     entries: Mutex<HashMap<String, Entry>>,
     timeout: Duration,
     retry: Duration,
+    /// Subjects whose attribution lookup failed lately.
+    attribution_failed: Mutex<HashMap<String, Instant>>,
+}
+
+/// Who signed a resource's newest change, per the server's
+/// `/history-attribution` (what the web app's Drive Activity reads).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LastEditor {
+    pub signer: String,
+    /// Commit `createdAt`, Unix ms.
+    pub at: i64,
+    /// That change made the resource.
+    pub genesis: bool,
+}
+
+/// The newest non-destroying attribution of a `/history-attribution` body.
+pub fn last_editor_from_json(body: &str) -> Option<LastEditor> {
+    let json: Json = serde_json::from_str(body).ok()?;
+    json.get("attributions")?
+        .as_array()?
+        .iter()
+        .filter(|a| a.get("destroy").and_then(Json::as_bool) != Some(true))
+        .filter_map(|a| {
+            Some(LastEditor {
+                signer: a.get("signer")?.as_str()?.to_string(),
+                at: a
+                    .get("created_at")
+                    .or_else(|| a.get("createdAt"))?
+                    .as_i64()?,
+                genesis: a.get("genesis").and_then(Json::as_bool) == Some(true),
+            })
+        })
+        .reduce(|best, a| if a.at >= best.at { a } else { best })
 }
 
 /// The shared, in-memory cache of fetched agent profiles. Cheap to clone.
@@ -75,6 +108,7 @@ impl AgentProfiles {
             entries: Default::default(),
             timeout,
             retry,
+            attribution_failed: Default::default(),
         }))
     }
 
@@ -119,6 +153,34 @@ impl AgentProfiles {
             State::Failed => None,
             State::Pending(lookup) => lookup.await,
         }
+    }
+
+    /// Who signed the newest change of `subject`, from the connected server.
+    /// Bounded by the cache's timeout; a failure is not repeated for a while.
+    pub async fn last_editor(&self, subject: &str) -> Option<LastEditor> {
+        {
+            let failed = self.0.attribution_failed.lock().ok()?;
+            if failed
+                .get(subject)
+                .is_some_and(|at| at.elapsed() < self.0.retry)
+            {
+                return None;
+            }
+        }
+        let found = tokio::time::timeout(
+            self.0.timeout,
+            self.0.fetcher.fetch_history_attribution(subject),
+        )
+        .await
+        .ok()
+        .flatten()
+        .and_then(|body| last_editor_from_json(&body));
+        if found.is_none() {
+            if let Ok(mut failed) = self.0.attribution_failed.lock() {
+                failed.insert(subject.to_string(), Instant::now());
+            }
+        }
+        found
     }
 
     /// The cached profile, never waiting: when it is not cached a lookup
