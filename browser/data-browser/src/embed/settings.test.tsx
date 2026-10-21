@@ -27,6 +27,8 @@ vi.mock('../helpers/AppSettings', () => ({
     setColorfulMode: () => undefined,
     hideTemplates: false,
     setHideTemplates: () => undefined,
+    showSidebarIcons: true,
+    setShowSidebarIcons: () => undefined,
     navbarTop: false,
     setNavbarTop: () => undefined,
     mainColor: '#4C6FA5',
@@ -137,6 +139,7 @@ it('shows only the allow-listed sections and options in the embed', () => {
   expect(showAppearanceOption('colorfulMode', true)).toBe(false);
   expect(showAppearanceOption('panels', true)).toBe(false);
   expect(embedAppearanceOptions.has('language')).toBe(true);
+  expect(showAppearanceOption('sidebarIcons', true)).toBe(true);
 });
 
 it('renders the full page outside the embed', () => {
@@ -180,4 +183,12 @@ it('turns the web AI off in the embed only', () => {
   expect(showWebAI(true)).toBe(false);
   vi.spyOn(embedMode, 'isEmbedded').mockReturnValue(true);
   expect(showWebAI()).toBe(false);
+});
+
+it('offers "Show icons in the sidebar", on by default', () => {
+  renderPage();
+  expect(screen.getByText('Show icons in the sidebar')).toBeTruthy();
+  expect(
+    screen.getByText('Show icons and pictures next to items in the sidebar'),
+  ).toBeTruthy();
 });

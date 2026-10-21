@@ -70,6 +70,7 @@ function Item({ subject }: ItemProps): JSX.Element {
   const [title] = useTitle(resource);
 
   const Icon = getIconForClass(core.classes.ontology);
+  const { showSidebarIcons } = useSettings();
 
   if (resource.loading) {
     return <div>loading</div>;
@@ -87,7 +88,7 @@ function Item({ subject }: ItemProps): JSX.Element {
     <StyledLink subject={subject} clean>
       <SideBarMenuRow>
         <OntologyItemRow gap='1ch' center>
-          <Icon />
+          {showSidebarIcons && <Icon />}
           <OntologyTitle>{title}</OntologyTitle>
         </OntologyItemRow>
       </SideBarMenuRow>

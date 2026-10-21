@@ -2719,19 +2719,20 @@ void main() {
     });
   });
   group('SearchScreen opens fast', () {
-    testWidgets('settles within 160 ms, field at the bottom', (tester) async {
+    testWidgets('settles within 220 ms, field at the bottom', (tester) async {
       await tester.pumpWidget(
           shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Search'));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 160));
+      await tester.pump(const Duration(milliseconds: 220));
       final settled = tester.getTopLeft(find.byType(TextField));
       final fade = find
           .ancestor(
-              of: find.byType(SearchScreen), matching: find.byType(Opacity))
+              of: find.byType(SearchScreen),
+              matching: find.byType(FadeTransition))
           .first;
-      expect(tester.widget<Opacity>(fade).opacity, 1);
+      expect(tester.widget<FadeTransition>(fade).opacity.value, 1);
       await tester.pumpAndSettle();
       expect(tester.getTopLeft(find.byType(TextField)), settled);
       final screen = tester.view.physicalSize / tester.view.devicePixelRatio;

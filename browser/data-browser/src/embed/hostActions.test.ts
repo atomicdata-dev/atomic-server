@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   openNative,
   reportShown,
+  reportSidebarIcons,
+  SHOW_SIDEBAR_ICONS_KEY,
   reportTheme,
   setActionsHost,
   SHOWN_DELAY_MS,
@@ -90,4 +92,16 @@ it('tells the app the theme chosen on the page', () => {
     ['theme', ['light']],
     ['theme', ['auto']],
   ]);
+});
+
+it('reports the sidebar icons choice to the app, which may not know the call', () => {
+  const call = vi.fn().mockResolvedValue(true);
+
+  setActionsHost({ call });
+  reportSidebarIcons(false);
+  expect(call).toHaveBeenCalledWith('sidebarIcons', [false]);
+
+  setActionsHost({ call: vi.fn().mockRejectedValue(new Error('unknown')) });
+  expect(() => reportSidebarIcons(true)).not.toThrow();
+  expect(SHOW_SIDEBAR_ICONS_KEY).toBe('showSidebarIcons');
 });

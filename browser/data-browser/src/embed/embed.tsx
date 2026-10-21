@@ -56,7 +56,12 @@ import {
   registerEmbedActions,
 } from './embedStore';
 import { closeTopOverlay } from './overlayBack';
-import { reportShown, setActionsHost } from './hostActions';
+import {
+  reportShown,
+  setActionsHost,
+  SHOW_SIDEBAR_ICONS_KEY,
+} from './hostActions';
+import { setLocalStorageValue } from '../hooks/useLocalStorage';
 import { useNativeChatRoom } from './useNativeChatRoom';
 import { embedTouchCss } from './touchStyle';
 
@@ -71,6 +76,22 @@ const startScheme = new URLSearchParams(location.search).get('scheme');
 if (startScheme === 'dark' || startScheme === 'light') {
   setHostColorScheme(startScheme);
   document.documentElement.style.colorScheme = startScheme;
+}
+
+// "Show icons in the sidebar" is the app's setting (one value for the app's
+// lists and this page): it passes it in the URL (`?sidebarIcons=0`) and updates
+// it with `atomicEmbed.setSidebarIcons`. Written to the page's own storage so
+// the settings page and the sidebar hook read it like the browser's setting.
+function applyHostSidebarIcons(show: boolean): void {
+  setLocalStorageValue(SHOW_SIDEBAR_ICONS_KEY, show);
+}
+
+const startSidebarIcons = new URLSearchParams(location.search).get(
+  'sidebarIcons',
+);
+
+if (startSidebarIcons === '0' || startSidebarIcons === '1') {
+  applyHostSidebarIcons(startSidebarIcons === '1');
 }
 
 // The app already lays the page out inside the system bars, but the web view
@@ -122,6 +143,7 @@ declare global {
       back(): boolean;
       flush(leaving?: boolean): Promise<void>;
       setColorScheme(scheme: HostColorScheme | undefined): void;
+      setSidebarIcons(show: boolean): void;
     };
   }
 }
@@ -345,6 +367,9 @@ window.atomicEmbed = {
   /** The app's own light/dark mode; "Auto" in the settings follows it. */
   setColorScheme(scheme) {
     setHostColorScheme(scheme);
+  },
+  setSidebarIcons(show) {
+    applyHostSidebarIcons(!!show);
   },
   openMenu(anchor) {
     window.dispatchEvent(

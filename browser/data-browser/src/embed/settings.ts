@@ -28,13 +28,15 @@ export type AppearanceOptionId =
   | 'colorfulMode'
   | 'language'
   | 'panels'
-  | 'hideTemplates';
+  | 'hideTemplates'
+  | 'sidebarIcons';
 
 export const embedAppearanceOptions: ReadonlySet<AppearanceOptionId> = new Set([
   'theme',
   'mainColor',
   'language',
   'hideTemplates',
+  'sidebarIcons',
 ]);
 
 /** Is this section part of the settings page? Everything is, outside the embed. */

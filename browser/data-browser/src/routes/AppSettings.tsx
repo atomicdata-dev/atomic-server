@@ -35,6 +35,9 @@ import {
 } from '../embed/settings';
 
 /** Touch screens: focusing a field there raises the keyboard. */
+const SIDEBAR_ICONS_DESCRIPTION =
+  'Show icons and pictures next to items in the sidebar';
+
 const isTouchDevice = () =>
   typeof window !== 'undefined' &&
   window.matchMedia?.('(pointer: coarse)').matches;
@@ -69,6 +72,8 @@ const AppSettings: React.FunctionComponent = () => {
     setSidebarKeyboardDndEnabled,
     hideTemplates,
     setHideTemplates,
+    showSidebarIcons,
+    setShowSidebarIcons,
     navbarTop,
     setNavbarTop,
   } = useSettings();
@@ -138,7 +143,7 @@ const AppSettings: React.FunctionComponent = () => {
                 label='Appearance'
                 // The only section in the embed: open from the start.
                 {...(header ? {} : { open: true, initialState: true })}
-                childSearchKeywords='language locale panels messages favorites shared with me templates ontology aichats hide templates'
+                childSearchKeywords='sidebar icons pictures avatars language locale panels messages favorites shared with me templates ontology aichats hide templates'
               >
                 <Column gap='1rem'>
                   {show('theme') && (
@@ -199,6 +204,18 @@ const AppSettings: React.FunctionComponent = () => {
                         onChange={setColorfulMode}
                       />{' '}
                       <span>Colorful mode</span>
+                    </CheckboxLabel>
+                  )}
+                  {show('sidebarIcons') && (
+                    <CheckboxLabel title={SIDEBAR_ICONS_DESCRIPTION}>
+                      <Checkbox
+                        checked={showSidebarIcons}
+                        onChange={setShowSidebarIcons}
+                      />{' '}
+                      <span>
+                        Show icons in the sidebar
+                        <SettingHint>{SIDEBAR_ICONS_DESCRIPTION}</SettingHint>
+                      </span>
                     </CheckboxLabel>
                   )}
                   {show('language') && (
@@ -415,6 +432,12 @@ const ClearButton = styled.button`
   &:hover {
     color: ${p => p.theme.colors.text};
   }
+`;
+
+const SettingHint = styled.span`
+  display: block;
+  font-size: 0.85rem;
+  color: ${p => p.theme.colors.textLight};
 `;
 
 const SubLabel = styled.span`

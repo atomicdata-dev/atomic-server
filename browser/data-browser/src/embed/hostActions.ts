@@ -74,3 +74,16 @@ export type HostThemeChoice = 'auto' | 'dark' | 'light';
 export function reportTheme(choice: HostThemeChoice): void {
   host?.call('theme', [choice]).catch(() => undefined);
 }
+
+/** localStorage key of the "Show icons in the sidebar" setting. */
+export const SHOW_SIDEBAR_ICONS_KEY = 'showSidebarIcons';
+
+/**
+ * Tells the app the person switched "Show icons in the sidebar" on the settings
+ * page. The app owns the one value (its Home list obeys it too) and pushes it
+ * back in with `atomicEmbed.setSidebarIcons` and `?sidebarIcons=` at load. An
+ * app that does not know the call keeps its own.
+ */
+export function reportSidebarIcons(show: boolean): void {
+  host?.call('sidebarIcons', [show]).catch(() => undefined);
+}

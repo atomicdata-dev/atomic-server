@@ -107,34 +107,14 @@ class SearchScreen extends StatefulWidget {
     String initialQuery = '',
     RouteSettings? settings,
   }) =>
-      PageRouteBuilder<void>(
+      _SearchRoute(
         settings: settings,
-        pageBuilder: (_, __, ___) => CoveredInsetsFreeze(
-            child: SearchScreen(
-                drive: drive,
-                api: api,
-                scopeDrive: scopeDrive,
-                kind: kind,
-                initialQuery: initialQuery)),
-        transitionDuration: const Duration(milliseconds: 140),
-        reverseTransitionDuration: const Duration(milliseconds: 110),
-        transitionsBuilder: (context, animation, _, child) => AnimatedBuilder(
-          animation: animation,
-          child: child,
-          builder: (context, child) {
-            final t = (animation.status == AnimationStatus.reverse
-                    ? Curves.easeIn
-                    : Curves.easeOut)
-                .transform(animation.value);
-            return Opacity(
-              opacity: t,
-              child: Transform.translate(
-                offset: Offset(0, 24 * (1 - t)),
-                child: child,
-              ),
-            );
-          },
-        ),
+        child: SearchScreen(
+            drive: drive,
+            api: api,
+            scopeDrive: scopeDrive,
+            kind: kind,
+            initialQuery: initialQuery),
       );
 
   @override
@@ -155,16 +135,8 @@ Future<void> showSearchPalette({
   if (context == null || shell.searching.value) return;
   shell.searching.value = true;
   try {
-    await showGeneralDialog<void>(
-      context: context,
-      useRootNavigator: true,
-      barrierDismissible: true,
+    await Navigator.of(context, rootNavigator: true).push(_PaletteRoute(
       barrierLabel: 'Close search',
-      barrierColor: Colors.black54,
-      transitionDuration: const Duration(milliseconds: 120),
-      transitionBuilder: (context, animation, _, child) => FadeTransition(
-          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
-          child: child),
       pageBuilder: (dialog, _, __) => ShellScope(
         controller: shell,
         layout: ShellLayout.split,
@@ -179,9 +151,119 @@ Future<void> showSearchPalette({
           ),
         ),
       ),
-    );
+    ));
   } finally {
     shell.searching.value = false;
+  }
+}
+
+bool get _reducedMotion => WidgetsBinding
+    .instance.platformDispatcher.accessibilityFeatures.disableAnimations;
+
+/// The phone's search: 220 ms in (easeOutCubic), 160 ms out (easeIn). The
+/// page fades in, rises 10 dp and grows from 0.98; the results follow the
+/// field a little later (see [_Lag]). The keyboard rises meanwhile: the field
+/// asks for the focus when the screen is built, not when the motion ends.
+/// With reduced motion the page is just there.
+class _SearchRoute extends PageRouteBuilder<void> {
+  _SearchRoute({super.settings, required Widget child})
+      : super(
+          pageBuilder: (_, __, ___) => CoveredInsetsFreeze(child: child),
+          transitionDuration: const Duration(milliseconds: 220),
+          reverseTransitionDuration: const Duration(milliseconds: 160),
+        );
+
+  @override
+  Duration get transitionDuration =>
+      _reducedMotion ? Duration.zero : super.transitionDuration;
+
+  @override
+  Duration get reverseTransitionDuration =>
+      _reducedMotion ? Duration.zero : super.reverseTransitionDuration;
+
+  @override
+  Widget buildTransitions(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation, Widget child) {
+    if (MediaQuery.disableAnimationsOf(context) || _reducedMotion) return child;
+    final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeIn);
+    return RepaintBoundary(
+      child: FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween(begin: const Offset(0, 10 / 800), end: Offset.zero)
+              .animate(curved),
+          child: ScaleTransition(
+            scale: Tween(begin: 0.98, end: 1.0).animate(curved),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The tablet's palette: the scrim fades in with the route (200 ms), the card
+/// fades, drops 8 dp and grows from 0.96 anchored at its top centre; out in
+/// 140 ms. With reduced motion there is no motion.
+class _PaletteRoute extends RawDialogRoute<void> {
+  _PaletteRoute({required super.pageBuilder, super.barrierLabel})
+      : super(
+          barrierDismissible: true,
+          barrierColor: Colors.black54,
+          transitionDuration: const Duration(milliseconds: 200),
+        );
+
+  @override
+  Duration get transitionDuration =>
+      _reducedMotion ? Duration.zero : const Duration(milliseconds: 200);
+
+  @override
+  Duration get reverseTransitionDuration =>
+      _reducedMotion ? Duration.zero : const Duration(milliseconds: 140);
+
+  @override
+  Widget buildTransitions(BuildContext context, Animation<double> animation,
+      Animation<double> secondaryAnimation, Widget child) {
+    if (MediaQuery.disableAnimationsOf(context) || _reducedMotion) return child;
+    final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeIn);
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(
+        position: Tween(begin: const Offset(0, -8 / 800), end: Offset.zero)
+            .animate(curved),
+        child: ScaleTransition(
+          scale: Tween(begin: 0.96, end: 1.0).animate(curved),
+          alignment: Alignment.topCenter,
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// The results of the phone's search come in a little after the field: they
+/// fade with the route's animation delayed by a quarter.
+class _Lag extends StatelessWidget {
+  final Widget child;
+
+  const _Lag({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final animation = ModalRoute.of(context)?.animation;
+    if (animation == null) return child;
+    return FadeTransition(
+      opacity: CurvedAnimation(
+          parent: animation,
+          curve: const Interval(0.25, 1, curve: Curves.easeOut)),
+      child: child,
+    );
   }
 }
 
@@ -950,10 +1032,12 @@ class _SearchScreenState extends State<SearchScreen> {
         bottom: false,
         child: ListAndField(
           minHeight: _fieldRoom,
-          list: RepaintBoundary(
-            child: ListenableBuilder(
-              listenable: _model,
-              builder: (context, _) => _results(context),
+          list: _Lag(
+            child: RepaintBoundary(
+              child: ListenableBuilder(
+                listenable: _model,
+                builder: (context, _) => _results(context),
+              ),
             ),
           ),
           field: _field,

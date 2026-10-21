@@ -59,12 +59,14 @@ export const SidebarItemTitle = memo(
       ref,
     ): React.JSX.Element => {
       const resource = useResource(subject);
-      const { sidebarKeyboardDndEnabled } = useSettings();
+      const { sidebarKeyboardDndEnabled, showSidebarIcons } = useSettings();
       // A resource's own icon image or emoji takes precedence over its
       // class icon (the precedence lives in ResourceGlyph).
+      // With "Show icons in the sidebar" off there is no glyph at all: the
+      // title starts at the row's own padding.
       const glyph = (
         <GlyphSlot aria-hidden>
-          <ResourceGlyph resource={resource} />
+          {showSidebarIcons && <ResourceGlyph resource={resource} />}
         </GlyphSlot>
       );
       // Reactive title via `useTitle` (subscribes to `name`/`shortname`/
@@ -86,12 +88,17 @@ export const SidebarItemTitle = memo(
       // An expandable row keeps its icon and wears the caret as a small
       // badge in its corner: always visible, so the row reads as a folder
       // without hovering it, and grown on hover.
-      const expandControl = (
+      // Without icons the caret stands alone, as the folder's only mark.
+      const expandControl = showSidebarIcons ? (
         <GlyphWithCaret>
           {glyph}
           <CaretBadge aria-hidden>
             <ExpandCaret $open={expanded} />
           </CaretBadge>
+        </GlyphWithCaret>
+      ) : (
+        <GlyphWithCaret>
+          <ExpandCaret $open={expanded} aria-hidden />
         </GlyphWithCaret>
       );
 
@@ -208,7 +215,7 @@ export const SidebarItemTitle = memo(
                 resource={subject}
               >
                 <TextWrapper>
-                  <LeadingSlot>{glyph}</LeadingSlot>
+                  {showSidebarIcons && <LeadingSlot>{glyph}</LeadingSlot>}
                   <TreeRowTitle>{title}</TreeRowTitle>
                   <SidebarPresence subject={subject} />
                 </TextWrapper>
