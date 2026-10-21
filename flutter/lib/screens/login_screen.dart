@@ -701,19 +701,16 @@ class _LoginScreenState extends State<LoginScreen> {
             // problem, and asks it as an address when the answer is usually a
             // device you can just scan.
             // Password managers pair a credential with an account name: a fixed,
-            // read-only one, so the secret is saved and offered as "atomic.place".
-            TextField(
-              key: const ValueKey('signin-username'),
-              controller: _accountNameController,
-              readOnly: true,
-              autofillHints: const [AutofillHints.username],
-              decoration: const InputDecoration(
-                labelText: 'Account',
-                border: OutlineInputBorder(),
-                isDense: true,
+            // hidden one, so the secret is saved and offered as "atomic.place"
+            // without showing a field nobody fills in.
+            Offstage(
+              child: TextField(
+                key: const ValueKey('signin-username'),
+                controller: _accountNameController,
+                readOnly: true,
+                autofillHints: const [AutofillHints.username],
               ),
             ),
-            const SizedBox(height: 12),
             TextField(
               key: const ValueKey('signin-secret'),
               controller: _secretController,

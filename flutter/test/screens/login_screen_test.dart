@@ -50,9 +50,11 @@ void main() {
     expect(secret.obscureText, isTrue);
     expect(secret.enableSuggestions, isFalse);
     expect(secret.autocorrect, isFalse);
-    final user =
-        tester.widget<TextField>(find.byKey(const ValueKey('signin-username')));
+    final user = tester.widget<TextField>(find.byKey(
+        const ValueKey('signin-username'),
+        skipOffstage: false));
     expect(user.autofillHints, [AutofillHints.username]);
+    expect(find.text('Account'), findsNothing);
 
     // The reveal toggle still works.
     await tester.tap(find.byTooltip('Show'));
