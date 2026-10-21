@@ -200,35 +200,66 @@ class SyncCard extends StatelessWidget {
   }
 }
 
-/// One line: an optional icon, a label and a value, 48 dp at least. Tapping
-/// copies [copy] when given (and says so), else calls [onTap].
+/// The grid every [KeyValueRow] sits on, so the rows of a card line up:
+/// 16 dp from the card's edge, then a 24 dp icon and 12 dp gap (when the row
+/// has an icon), the label column, the value column (left-aligned at one x
+/// for every row) and a fixed [trailingSlot] wide slot at the right edge.
+abstract final class KeyValueGrid {
+  /// Rows are at least this tall; single-line rows are exactly this tall.
+  static const rowHeight = 48.0;
+
+  /// The fixed slot at the right edge: copy, refresh, chevron, spinner.
+  static const trailingSlot = 48.0;
+
+  /// The space right of the slot (the slot's own padding is inside it).
+  static const rightInset = SyncGap.xs;
+
+  /// The label column, scaled with the text so a large font does not wrap it.
+  static double labelWidth(BuildContext context) =>
+      MediaQuery.textScalerOf(context).scale(100);
+}
+
+/// One line on the [KeyValueGrid]: an optional icon, a label, a left-aligned
+/// value on one line (ellipsised) with an optional muted [subtitle] below it,
+/// and a trailing slot. Label and value share a baseline. Tapping copies
+/// [copy] when given (and says so), else calls [onTap].
 class KeyValueRow extends StatelessWidget {
   const KeyValueRow({
     super.key,
     required this.label,
     this.value,
     this.valueWidget,
+    this.subtitle,
     this.icon,
     this.copy,
     this.copyLabel,
     this.onTap,
     this.trailing,
     this.mono = false,
+    this.expanded,
   });
 
   final String label;
   final String? value;
 
-  /// Instead of [value]: a bar, a spinner.
+  /// Instead of [value]: a chip, a spinner.
   final Widget? valueWidget;
+
+  /// A muted line under the value.
+  final String? subtitle;
   final IconData? icon;
 
   /// The text a tap copies, with [copyLabel] ("ID") for the "… copied" note.
   final String? copy;
   final String? copyLabel;
   final VoidCallback? onTap;
+
+  /// Fills the trailing slot (centred in it); a copy icon when [copy] is set.
   final Widget? trailing;
   final bool mono;
+
+  /// Set on a row that expands something: announces expanded/collapsed.
+  final bool? expanded;
 
   @override
   Widget build(BuildContext context) {
@@ -241,46 +272,84 @@ class KeyValueRow extends StatelessWidget {
                 duration: const Duration(seconds: 2)));
           }
         : onTap;
+    final slot = trailing ??
+        (copy != null
+            ? Icon(Icons.copy, size: 20, color: c.textSecondary)
+            : null);
+    final valueStyle = mono ? SyncText.mono(c) : SyncText.caption(c);
+    final labelText = Text(label,
+        key: const Key('kv-label'),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: SyncText.body(c));
+    final Widget valueColumn = valueWidget != null
+        ? Align(alignment: Alignment.centerLeft, child: valueWidget)
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(value ?? '',
+                  key: const Key('kv-value'),
+                  style: valueStyle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
+              if (subtitle != null && subtitle!.isNotEmpty)
+                Text(subtitle!,
+                    key: const Key('kv-subtitle'),
+                    style: SyncText.caption(c),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+            ],
+          );
+    final grid = valueWidget != null
+        ? Row(children: [
+            SizedBox(
+                width: KeyValueGrid.labelWidth(context),
+                child:
+                    Align(alignment: Alignment.centerLeft, child: labelText)),
+            const SizedBox(width: SyncGap.s),
+            Expanded(child: valueColumn),
+          ])
+        : Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              SizedBox(
+                  width: KeyValueGrid.labelWidth(context), child: labelText),
+              const SizedBox(width: SyncGap.s),
+              Expanded(child: valueColumn),
+            ],
+          );
     final row = ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 48),
+      key: const Key('kv-row'),
+      constraints: const BoxConstraints(minHeight: KeyValueGrid.rowHeight),
       child: Padding(
-        padding: const EdgeInsets.symmetric(
-            horizontal: SyncGap.l, vertical: SyncGap.s),
+        padding: EdgeInsets.only(
+            left: SyncGap.l,
+            right: KeyValueGrid.rightInset,
+            top: subtitle == null ? 0 : SyncGap.s,
+            bottom: subtitle == null ? 0 : SyncGap.s),
         child: Row(children: [
           if (icon != null) ...[
             Icon(icon, size: 24, color: c.main),
             const SizedBox(width: SyncGap.m),
           ],
-          Flexible(
-            flex: 2,
-            child: Text(label, style: SyncText.body(c)),
-          ),
-          const SizedBox(width: SyncGap.m),
-          Expanded(
-            flex: 3,
-            child: valueWidget ??
-                Text(value ?? '',
-                    textAlign: TextAlign.end,
-                    style: mono ? SyncText.mono(c) : SyncText.caption(c),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 2),
-          ),
-          if (copy != null) ...[
-            const SizedBox(width: SyncGap.s),
-            Icon(Icons.copy, size: 20, color: c.textSecondary),
-          ],
-          if (trailing != null) ...[
-            const SizedBox(width: SyncGap.s),
-            trailing!,
-          ],
+          Expanded(child: grid),
+          SizedBox(
+              key: const Key('kv-slot'),
+              width: KeyValueGrid.trailingSlot,
+              child: Center(child: slot)),
         ]),
       ),
     );
     if (tap == null) return row;
     return InkWell(
       onTap: tap,
-      child:
-          Semantics(button: true, label: '$label, ${value ?? ''}', child: row),
+      child: Semantics(
+          button: true,
+          expanded: expanded,
+          label: '$label, ${value ?? ''}',
+          child: row),
     );
   }
 }

@@ -10,6 +10,7 @@ import 'package:atomic_app/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _Servers extends shared.AtomicServerBackend {
   final bool managed;
@@ -414,6 +415,7 @@ void main() {
   });
 
   group('This device card', () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
     final stats = shared.StoreStats.fromJson({
       'resources': 1700,
       'loro_bytes': 3 * 1024 * 1024,
@@ -443,33 +445,110 @@ void main() {
         {'node_id': 'n1', 'name': 'Laptop', 'last_synced': '1700000000000'},
       ];
 
-    testWidgets('shows name, platform, version, size and drives in order',
-        (tester) async {
-      await tester.pumpWidget(_app(SyncScreen(
-        backend: full(),
-        loadAccount: (_) async => null,
-      )));
+    Future<void> pumpScreen(WidgetTester tester, _Backend backend,
+        {Size size = const Size(393, 852),
+        double scale = 1,
+        Brightness brightness = Brightness.dark,
+        Widget Function(String, String)? storagePage}) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(
+        theme: ThemeData(brightness: brightness, extensions: [
+          brightness == Brightness.dark ? AppColors.dark : AppColors.light
+        ]),
+        builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: TextScaler.linear(scale)),
+            child: child!),
+        home: SyncScreen(
+            backend: backend,
+            loadAccount: (_) async => null,
+            storagePage: storagePage),
+      ));
       await tester.pumpAndSettle();
+    }
+
+    Future<void> showStorage(WidgetTester tester) async {
+      await tester.ensureVisible(find.byKey(const Key('stats-total')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('shows name, platform, version and the storage total',
+        (tester) async {
+      await pumpScreen(tester, full());
 
       expect(find.text('Pixel'), findsOneWidget);
       expect(find.text('Android · aarch64'), findsOneWidget);
       expect(find.text('0.41.0'), findsOneWidget);
-      expect(find.text('4.0 MB · 1.7k resources'), findsOneWidget);
+      await showStorage(tester);
+      expect(find.text('4.0 MB · 2 drives'), findsOneWidget);
+      expect(find.text('1.7k resources · 1.0 MB files'), findsOneWidget);
       expect(find.text('9.0 MB'), findsOneWidget);
       expect(find.text('Synced with'), findsOneWidget);
       expect(find.text('1 device'), findsOneWidget);
+      // The paired device says it does not know how much it holds.
+      await tester.scrollUntilVisible(find.text('Data size unknown'), 300,
+          scrollable: find.byType(Scrollable).first);
+      expect(find.text('Data size unknown'), findsOneWidget);
+    });
+
+    testWidgets('the per-drive storage is collapsed until the row is tapped',
+        (tester) async {
+      await pumpScreen(tester, full());
+      await showStorage(tester);
+      expect(find.byKey(const ValueKey('drive-row-did:ad:a')), findsNothing);
+      expect(find.byKey(const ValueKey('drive-row-did:ad:b')), findsNothing);
+
+      // Tapping anywhere on the row (its value, not just the chevron).
+      await tester.tap(find.text('4.0 MB · 2 drives'));
+      await tester.pumpAndSettle();
       // Biggest drive first, with its size and count.
       final archive =
           tester.getTopLeft(find.byKey(const ValueKey('drive-row-did:ad:a')));
       final team =
           tester.getTopLeft(find.byKey(const ValueKey('drive-row-did:ad:b')));
       expect(archive.dy, lessThan(team.dy));
-      expect(find.text('3.0 MB · 1.5k resources'), findsOneWidget);
-      expect(find.text('1.0 MB · 200 resources'), findsOneWidget);
-      // The paired device says it does not know how much it holds.
-      await tester.scrollUntilVisible(find.text('Data size unknown'), 300,
-          scrollable: find.byType(Scrollable).first);
-      expect(find.text('Data size unknown'), findsOneWidget);
+      expect(find.text('3.0 MB'), findsOneWidget);
+      expect(find.text('1.5k resources'), findsOneWidget);
+      expect(find.text('200 resources'), findsOneWidget);
+
+      await tester.tap(find.text('4.0 MB · 2 drives'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('drive-row-did:ad:a')), findsNothing);
+    });
+
+    testWidgets('the expanded state is kept across a rebuild', (tester) async {
+      await pumpScreen(tester, full());
+      await showStorage(tester);
+      await tester.tap(find.byKey(const Key('stats-total')));
+      await tester.pumpAndSettle();
+      expect(
+          (await SharedPreferences.getInstance())
+              .getBool('sync_storage_expanded'),
+          true);
+
+      await tester.pumpWidget(const SizedBox());
+      await pumpScreen(tester, full());
+      await showStorage(tester);
+      expect(find.byKey(const ValueKey('drive-row-did:ad:a')), findsOneWidget);
+    });
+
+    testWidgets('a drive row opens that drive\'s storage page', (tester) async {
+      final opened = <String>[];
+      await pumpScreen(tester, full(), storagePage: (drive, title) {
+        opened.add('$drive|$title');
+        return Scaffold(body: Text('page $title'));
+      });
+      await showStorage(tester);
+      await tester.tap(find.byKey(const Key('stats-total')));
+      await tester.pumpAndSettle();
+      await tester
+          .ensureVisible(find.byKey(const ValueKey('drive-row-did:ad:b')));
+      await tester.tap(find.byKey(const ValueKey('drive-row-did:ad:b')));
+      await tester.pumpAndSettle();
+      expect(opened, ['did:ad:b|Storage · Team']);
+      expect(find.text('page Storage · Team'), findsOneWidget);
     });
 
     testWidgets('a spinner stands in while the data is counted',
@@ -523,6 +602,144 @@ void main() {
       expect(copied, 'a1b2c3d4e5f6a7b8c9d0e1f2');
       expect(find.text('Device ID copied'), findsOneWidget);
       await tester.pumpAndSettle(const Duration(seconds: 5));
+    });
+  });
+
+  group('This device card alignment', () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    final stats = shared.StoreStats.fromJson({
+      'resources': 3,
+      'loro_bytes': 2048,
+      'disk_bytes': 4096,
+      'drives': [
+        {
+          'subject': 'did:ad:a',
+          'name': 'Private',
+          'resources': 3,
+          'bytes': 2048
+        },
+      ],
+    })!;
+
+    for (final size in [const Size(393, 852), const Size(1200, 900)]) {
+      for (final brightness in Brightness.values) {
+        for (final scale in [1.0, 1.3]) {
+          testWidgets(
+              'one grid: ${size.width.toInt()} dp, ${brightness.name}, x$scale',
+              (tester) async {
+            tester.view.physicalSize = size;
+            tester.view.devicePixelRatio = 1;
+            addTearDown(tester.view.reset);
+            final backend = _Backend()
+              ..stats = (() async => stats)
+              ..info = const shared.DeviceInfo(
+                  platform: 'Android', appVersion: '0.41.0-a-very-long-build')
+              ..peers = [
+                {
+                  'node_id': 'n1',
+                  'name': 'Laptop',
+                  'last_synced': '1700000000000'
+                },
+              ];
+            await tester.pumpWidget(MaterialApp(
+              theme: ThemeData(brightness: brightness, extensions: [
+                brightness == Brightness.dark ? AppColors.dark : AppColors.light
+              ]),
+              builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(context)
+                      .copyWith(textScaler: TextScaler.linear(scale)),
+                  child: child!),
+              home:
+                  SyncScreen(backend: backend, loadAccount: (_) async => null),
+            ));
+            await tester.pumpAndSettle();
+
+            final card = find.ancestor(
+                of: find.byKey(const Key('this-device-name')),
+                matching: find.byType(SyncCard));
+            await tester.ensureVisible(find.byKey(const Key('stats-disk')));
+            await tester.pumpAndSettle();
+            final cardRect = tester.getRect(card);
+            final rows = find.descendant(
+                of: card, matching: find.byKey(const Key('kv-row')));
+            expect(rows, findsAtLeastNWidgets(6));
+
+            final labelX = <double>{};
+            final valueX = <double>{};
+            final slotRight = <double>{};
+            final singleLineHeights = <double>{};
+            final baselineDiff = <double>[];
+            for (final row in rows.evaluate()) {
+              final f = find.byElementPredicate((e) => e == row);
+              final rect = tester.getRect(f);
+              expect(rect.height, greaterThanOrEqualTo(48));
+              final label = find.descendant(
+                  of: f, matching: find.byKey(const Key('kv-label')));
+              final value = find.descendant(
+                  of: f, matching: find.byKey(const Key('kv-value')));
+              final slot = find.descendant(
+                  of: f, matching: find.byKey(const Key('kv-slot')));
+              labelX.add(tester.getTopLeft(label).dx);
+              slotRight.add(tester.getRect(slot).right);
+              if (value.evaluate().isNotEmpty) {
+                valueX.add(tester.getTopLeft(value).dx);
+                // Both text boxes are one line of the same row: their
+                // vertical centres differ only by the font-size difference.
+                baselineDiff.add((tester.getRect(label).bottom -
+                        tester.getRect(value).bottom)
+                    .abs());
+              }
+              if (find
+                  .descendant(
+                      of: f, matching: find.byKey(const Key('kv-subtitle')))
+                  .evaluate()
+                  .isEmpty) {
+                singleLineHeights.add(rect.height);
+              }
+              // Everything stays inside the card's inner 16 dp.
+              expect(rect.left, cardRect.left + 1);
+            }
+            expect(labelX.length, 1, reason: 'label x $labelX');
+            // Value x differs from the label x by the same width for all rows.
+            expect(valueX.length, 1, reason: 'value x $valueX');
+            expect(slotRight.length, 1, reason: 'slot right $slotRight');
+            expect(singleLineHeights.length, 1,
+                reason: 'heights $singleLineHeights');
+            expect(slotRight.single, closeTo(cardRect.right - 1 - 4, 0.5));
+            // Label x is the 16 dp gutter + 24 icon + 12 gap from the card.
+            expect(
+                labelX.single - cardRect.left, closeTo(1 + 16 + 24 + 12, 0.5));
+            // The header's text sits at the same x as the labels.
+            final nameX = tester.getTopLeft(find.text('Pixel')).dx;
+            expect(nameX, labelX.single);
+            // Baselines: label (14 sp) and value (13 sp) bottoms are within a
+            // pixel or two of each other once baseline-aligned.
+            for (final d in baselineDiff) {
+              expect(d, lessThan(3));
+            }
+          });
+        }
+      }
+    }
+
+    testWidgets('a long value ellipsises on one line, keeping the grid',
+        (tester) async {
+      tester.view.physicalSize = const Size(393, 852);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final backend = _Backend()
+        ..stats = (() async => stats)
+        ..info = shared.DeviceInfo(platform: 'Android', appVersion: 'v' * 80);
+      await tester.pumpWidget(
+          _app(SyncScreen(backend: backend, loadAccount: (_) async => null)));
+      await tester.pumpAndSettle();
+      final v = find.text('v' * 80);
+      expect(tester.getSize(v).height, lessThan(24));
+      final slot = tester.getRect(find.descendant(
+          of: find.ancestor(of: v, matching: find.byKey(const Key('kv-row'))),
+          matching: find.byKey(const Key('kv-slot'))));
+      expect(tester.getRect(v).right, lessThanOrEqualTo(slot.left));
     });
   });
 

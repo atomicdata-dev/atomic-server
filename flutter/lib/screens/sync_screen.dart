@@ -11,6 +11,8 @@ import 'package:atomic_chat/atomic_chat.dart'
         AppTopBar,
         ProfileAvatar,
         ReadableWidth,
+        openFromList,
+        ResourceView,
         ResourceWebView,
         openResourceView,
         timeAgo;
@@ -58,6 +60,11 @@ class SyncScreen extends StatefulWidget {
   @visibleForTesting
   final Widget Function(String subject)? profilePage;
 
+  /// Test seam for the page a drive's storage opens in: the drive subject and
+  /// the page title.
+  @visibleForTesting
+  final Widget Function(String drive, String title)? storagePage;
+
   /// Test seam for the page the portal opens in.
   @visibleForTesting
   final Widget Function(ResourceWebView page)? portalPage;
@@ -71,6 +78,7 @@ class SyncScreen extends StatefulWidget {
     this.portalCookie,
     this.portalPage,
     this.profilePage,
+    this.storagePage,
   });
 
   @override
@@ -301,6 +309,20 @@ class _SyncScreenState extends State<SyncScreen> {
     if (mounted) await _load();
   }
 
+  /// The web app's storage page for [drive], in the shell's detail pane next
+  /// to the list, else pushed with the native app bar.
+  void _openStorage(String drive, String name) {
+    final title = 'Storage · $name';
+    Widget build(BuildContext _) =>
+        widget.storagePage?.call(drive, title) ??
+        ResourceView(
+            api: const AtomicAssistantApi(),
+            drive: drive,
+            title: title,
+            path: '/app/storage');
+    openFromList<void>(context, build, subject: '$drive#storage');
+  }
+
   Future<void> _newWorkspace() async {
     final name = await _ask('New workspace', 'Name');
     if (name == null || name.isEmpty) return;
@@ -460,6 +482,7 @@ class _SyncScreenState extends State<SyncScreen> {
                   identity: _agent?.subject,
                   driveNames: _drives,
                   onRename: _rename,
+                  onOpenStorage: _openStorage,
                 ),
                 // Servers, paired devices and the pairing code: the browser's
                 // Devices list.
