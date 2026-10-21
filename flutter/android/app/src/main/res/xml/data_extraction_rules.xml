@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 and newer: see backup_rules.xml. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+    </device-transfer>
+</data-extraction-rules>
