@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'chat_text_styles.dart';
+
 /// One window of a chat as the host reads it: [items] oldest first, [older]
 /// the cursor of the window before (null at the start of the chat),
 /// [newest] the cursor of the last item (null when there is none; for
@@ -545,11 +547,13 @@ class DaySeparator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         child: Center(
           child: Text(label,
               key: const Key('day-separator'),
-              style: TextStyle(color: color, fontSize: 12)),
+              style: ChatTextStyles.of(context)
+                  .daySeparator
+                  .copyWith(color: color)),
         ),
       );
 }

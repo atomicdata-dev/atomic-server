@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'app_top_bar.dart';
 import 'home_sections.dart' show HomeSection;
+import 'chat_text_styles.dart';
 import 'chat_window.dart';
 import 'scroll_to_bottom_button.dart';
 
@@ -187,14 +188,15 @@ class _ConversationScreenState extends State<ConversationScreen>
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    return SectionBack(
-        section: HomeSection.messages,
-        child: Scaffold(
-          backgroundColor: c.bgBody,
-          appBar: AppTopBar(
-              title: widget.title.isEmpty ? 'Conversation' : widget.title),
-          body: ListAndField(list: _list(c), field: _composer(c)),
-        ));
+    return ChatTextScope(
+        child: SectionBack(
+            section: HomeSection.messages,
+            child: Scaffold(
+              backgroundColor: c.bgBody,
+              appBar: AppTopBar(
+                  title: widget.title.isEmpty ? 'Conversation' : widget.title),
+              body: ListAndField(list: _list(c), field: _composer(c)),
+            )));
   }
 
   Widget _list(AppColors c) {
@@ -214,8 +216,8 @@ class _ConversationScreenState extends State<ConversationScreen>
     final shown = [..._window.items, ..._pending];
     if (shown.isEmpty) {
       return Center(
-        child: Text('No messages yet',
-            style: TextStyle(color: c.textSecondary, fontSize: 13)),
+        child:
+            Text('No messages yet', style: ChatTextStyles.of(context).status),
       );
     }
     // Others' names show when more than one other person has spoken.
@@ -238,53 +240,57 @@ class _ConversationScreenState extends State<ConversationScreen>
       _enterId = _scroll.atBottom && !readBack ? newest : null;
     }
     _prevNewest = newest;
-    final list = ListView.builder(
-      controller: _scroll.controller,
-      reverse: true,
-      physics: chatScrollPhysics,
-      scrollCacheExtent: const ScrollCacheExtent.viewport(1.5),
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.all(16),
-      itemCount: shown.length + (_window.hasOlder ? 1 : 0),
-      findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
-      itemBuilder: (context, i) {
-        if (i == shown.length) {
-          // The top: older messages are being read.
-          return const Padding(
-            padding: EdgeInsets.all(12),
-            child: Center(
-                child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2))),
-          );
-        }
-        _scroll.built(i);
-        final index = shown.length - 1 - i;
-        final m = shown[index];
-        final first = index == 0 || !sameGroup(shown[index - 1], m);
-        final last =
-            index == shown.length - 1 || !sameGroup(m, shown[index + 1]);
-        final newDay = index == 0 && !_window.hasOlder ||
-            index > 0 && otherDay(shown[index - 1].createdAt, m.createdAt);
-        final bubble = _bubble(c, m,
-            name: group && !m.mine && first ? _nameOf(m) : null,
-            time: last ? messageTime(m.createdAt) : null,
-            gapAbove: first);
-        return KeyedSubtree(
-          key: ValueKey(m.id),
-          child: RowEntrance(
-            animate: m.id == _enterId,
-            child: newDay
-                ? Column(children: [
-                    DaySeparator(dayLabel(m.createdAt), color: c.textSecondary),
-                    bubble,
-                  ])
-                : bubble,
-          ),
-        );
-      },
-    );
+    final list = LayoutBuilder(
+        builder: (context, box) => ListView.builder(
+              controller: _scroll.controller,
+              reverse: true,
+              physics: chatScrollPhysics,
+              scrollCacheExtent: const ScrollCacheExtent.viewport(1.5),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.all(16),
+              itemCount: shown.length + (_window.hasOlder ? 1 : 0),
+              findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
+              itemBuilder: (context, i) {
+                if (i == shown.length) {
+                  // The top: older messages are being read.
+                  return const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Center(
+                        child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2))),
+                  );
+                }
+                _scroll.built(i);
+                final index = shown.length - 1 - i;
+                final m = shown[index];
+                final first = index == 0 || !sameGroup(shown[index - 1], m);
+                final last = index == shown.length - 1 ||
+                    !sameGroup(m, shown[index + 1]);
+                final newDay = index == 0 && !_window.hasOlder ||
+                    index > 0 &&
+                        otherDay(shown[index - 1].createdAt, m.createdAt);
+                final bubble = _bubble(c, m,
+                    name: group && !m.mine && first ? _nameOf(m) : null,
+                    time: last ? messageTime(m.createdAt) : null,
+                    gapAbove: first,
+                    listWidth: box.maxWidth - 32);
+                return KeyedSubtree(
+                  key: ValueKey(m.id),
+                  child: RowEntrance(
+                    animate: m.id == _enterId,
+                    child: newDay
+                        ? Column(children: [
+                            DaySeparator(dayLabel(m.createdAt),
+                                color: c.textSecondary),
+                            bubble,
+                          ])
+                        : bubble,
+                  ),
+                );
+              },
+            ));
     final unseen = _window.unseen;
     return Stack(children: [
       list,
@@ -296,15 +302,18 @@ class _ConversationScreenState extends State<ConversationScreen>
       m.authorName.isEmpty ? 'Unknown member' : m.authorName;
 
   Widget _bubble(AppColors c, ConversationMessage m,
-      {String? name, String? time, required bool gapAbove}) {
+      {String? name,
+      String? time,
+      required bool gapAbove,
+      required double listWidth}) {
     final mine = m.mine;
     final readable = m.text != null;
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: EdgeInsets.only(top: gapAbove ? 8 : 2, bottom: 2),
+        margin: EdgeInsets.only(top: ChatTextStyles.gapAbove(gapAbove)),
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.85,
+          maxWidth: ChatTextStyles.bubbleMaxWidth(listWidth),
         ),
         child: Column(
           crossAxisAlignment:
@@ -315,27 +324,28 @@ class _ConversationScreenState extends State<ConversationScreen>
                 padding: const EdgeInsets.only(left: 4, bottom: 2),
                 child: Text(name,
                     key: const Key('message-author'),
-                    style: TextStyle(color: c.textSecondary, fontSize: 12)),
+                    style: ChatTextStyles.of(context).sender),
               ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: ChatTextStyles.bubblePadding,
               decoration: BoxDecoration(
                 color: mine ? c.mainSelectedBg : c.bg1,
-                borderRadius: BorderRadius.circular(9),
+                borderRadius:
+                    BorderRadius.circular(ChatTextStyles.bubbleRadius),
               ),
               child: readable
                   ? SelectableText(
                       m.text!,
-                      style: TextStyle(
-                        color: mine ? c.mainSelectedFg : c.textPrimary,
-                      ),
+                      style: mine
+                          ? ChatTextStyles.of(context).bodyMine
+                          : ChatTextStyles.of(context).body,
                     )
                   : Text(
                       "This message can't be opened",
-                      style: TextStyle(
-                        color: c.textSecondary,
-                        fontStyle: FontStyle.italic,
-                      ),
+                      style: ChatTextStyles.of(context).body.copyWith(
+                            color: c.textSecondary,
+                            fontStyle: FontStyle.italic,
+                          ),
                     ),
             ),
             if (time != null)
@@ -343,7 +353,7 @@ class _ConversationScreenState extends State<ConversationScreen>
                 padding: const EdgeInsets.only(top: 2, left: 4, right: 4),
                 child: Text(time,
                     key: const Key('message-time'),
-                    style: TextStyle(color: c.textSecondary, fontSize: 11)),
+                    style: ChatTextStyles.of(context).meta),
               ),
           ],
         ),
@@ -361,7 +371,8 @@ class _ConversationScreenState extends State<ConversationScreen>
                 Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Text(_error!,
-                      style: TextStyle(color: c.alert, fontSize: 12)),
+                      style: TextStyle(
+                          color: c.alert, fontSize: ChatTextStyles.metaSize)),
                 ),
               Row(
                 children: [
@@ -374,12 +385,15 @@ class _ConversationScreenState extends State<ConversationScreen>
                       textInputAction: TextInputAction.send,
                       onEditingComplete: () {},
                       onSubmitted: (_) => _send(),
+                      style: ChatTextStyles.of(context).composer,
                       decoration: InputDecoration(
                         hintText: 'Message',
+                        hintStyle: ChatTextStyles.of(context).composerHint,
                         filled: true,
                         fillColor: c.bg1,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(9),
+                          borderRadius: BorderRadius.circular(
+                              ChatTextStyles.bubbleRadius),
                           borderSide: BorderSide.none,
                         ),
                       ),

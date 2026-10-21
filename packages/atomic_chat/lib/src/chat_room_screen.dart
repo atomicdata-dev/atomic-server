@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 
 import 'app_top_bar.dart';
 import 'home_sections.dart' show HomeSection;
+import 'chat_text_styles.dart';
 import 'chat_window.dart';
 import 'scroll_to_bottom_button.dart';
 import 'assistant_api.dart';
@@ -254,22 +255,23 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    return SectionBack(
-        section: HomeSection.messages,
-        child: Scaffold(
-          backgroundColor: c.bgBody,
-          appBar: AppTopBar(
-            title: _title.isEmpty ? 'Chat' : _title,
-            actions: [
-              IconButton(
-                tooltip: 'Rename',
-                icon: const Icon(Icons.edit_outlined),
-                onPressed: _rename,
+    return ChatTextScope(
+        child: SectionBack(
+            section: HomeSection.messages,
+            child: Scaffold(
+              backgroundColor: c.bgBody,
+              appBar: AppTopBar(
+                title: _title.isEmpty ? 'Chat' : _title,
+                actions: [
+                  IconButton(
+                    tooltip: 'Rename',
+                    icon: const Icon(Icons.edit_outlined),
+                    onPressed: _rename,
+                  ),
+                ],
               ),
-            ],
-          ),
-          body: ListAndField(list: _list(c), field: _composer(c)),
-        ));
+              body: ListAndField(list: _list(c), field: _composer(c)),
+            )));
   }
 
   Widget _list(AppColors c) {
@@ -289,8 +291,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     final shown = [..._window.items, ..._pending];
     if (shown.isEmpty) {
       return Center(
-        child: Text('No messages yet',
-            style: TextStyle(color: c.textSecondary, fontSize: 13)),
+        child:
+            Text('No messages yet', style: ChatTextStyles.of(context).status),
       );
     }
     // Bubbles of one author in a row (events and gaps end it) share a header.
@@ -311,58 +313,62 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       _enterId = _keeper.atBottom && !readBack ? newest : null;
     }
     _prevNewest = newest;
-    final list = ListView.builder(
-      controller: _scroll,
-      reverse: true,
-      physics: chatScrollPhysics,
-      scrollCacheExtent: const ScrollCacheExtent.viewport(1.5),
-      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-      padding: const EdgeInsets.all(16),
-      itemCount: shown.length + (_window.hasOlder ? 1 : 0),
-      findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
-      itemBuilder: (context, i) {
-        if (i == shown.length) {
-          // The top: older lines are being read.
-          return const Padding(
-            padding: EdgeInsets.all(12),
-            child: Center(
-                child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2))),
-          );
-        }
-        _keeper.built(i);
-        final index = shown.length - 1 - i;
-        final m = shown[index];
-        final Widget row;
-        if (m.kind == ChatRoomKind.event) {
-          row = _eventRow(c, m);
-        } else {
-          final first = index == 0 || !sameGroup(shown[index - 1], m);
-          final last =
-              index == shown.length - 1 || !sameGroup(m, shown[index + 1]);
-          row = _bubble(c, m,
-              header: first,
-              time: last ? messageTime(m.createdAt) : null,
-              gapAbove: first);
-        }
-        final newDay = index == 0 && !_window.hasOlder ||
-            index > 0 && otherDay(shown[index - 1].createdAt, m.createdAt);
-        return KeyedSubtree(
-          key: ValueKey(m.id),
-          child: RowEntrance(
-            animate: m.id == _enterId,
-            child: newDay
-                ? Column(children: [
-                    DaySeparator(dayLabel(m.createdAt), color: c.textSecondary),
-                    row,
-                  ])
-                : row,
-          ),
-        );
-      },
-    );
+    final list = LayoutBuilder(
+        builder: (context, box) => ListView.builder(
+              controller: _scroll,
+              reverse: true,
+              physics: chatScrollPhysics,
+              scrollCacheExtent: const ScrollCacheExtent.viewport(1.5),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.all(16),
+              itemCount: shown.length + (_window.hasOlder ? 1 : 0),
+              findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
+              itemBuilder: (context, i) {
+                if (i == shown.length) {
+                  // The top: older lines are being read.
+                  return const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Center(
+                        child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2))),
+                  );
+                }
+                _keeper.built(i);
+                final index = shown.length - 1 - i;
+                final m = shown[index];
+                final Widget row;
+                if (m.kind == ChatRoomKind.event) {
+                  row = _eventRow(c, m);
+                } else {
+                  final first = index == 0 || !sameGroup(shown[index - 1], m);
+                  final last = index == shown.length - 1 ||
+                      !sameGroup(m, shown[index + 1]);
+                  row = _bubble(c, m,
+                      header: first,
+                      time: last ? messageTime(m.createdAt) : null,
+                      gapAbove: first,
+                      listWidth: box.maxWidth - 32);
+                }
+                final newDay = index == 0 && !_window.hasOlder ||
+                    index > 0 &&
+                        otherDay(shown[index - 1].createdAt, m.createdAt);
+                return KeyedSubtree(
+                  key: ValueKey(m.id),
+                  child: RowEntrance(
+                    animate: m.id == _enterId,
+                    child: newDay
+                        ? Column(children: [
+                            DaySeparator(dayLabel(m.createdAt),
+                                color: c.textSecondary),
+                            row,
+                          ])
+                        : row,
+                  ),
+                );
+              },
+            ));
     final unseen = _window.unseen;
     return Stack(children: [
       list,
@@ -389,7 +395,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
       child: Row(
         children: [
-          Icon(Icons.near_me_outlined, size: 13, color: c.textSecondary),
+          Icon(Icons.near_me_outlined, size: 14, color: c.textSecondary),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -397,18 +403,17 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
               key: const Key('event-text'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: c.textSecondary,
-                fontSize: 12,
-                decoration:
-                    tappable ? TextDecoration.underline : TextDecoration.none,
-                decorationColor: c.textSecondary,
-              ),
+              style: ChatTextStyles.of(context).meta.copyWith(
+                    decoration: tappable
+                        ? TextDecoration.underline
+                        : TextDecoration.none,
+                    decorationColor: c.textSecondary,
+                  ),
             ),
           ),
           const SizedBox(width: 8),
           Text(messageTime(m.createdAt),
-              style: TextStyle(color: c.textSecondary, fontSize: 11)),
+              style: ChatTextStyles.of(context).meta),
         ],
       ),
     );
@@ -431,13 +436,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
       radius: 14,
       backgroundColor: c.bg2,
       child: Text(initial,
-          style: TextStyle(
-              color: c.textPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
+          style:
+              ChatTextStyles.of(context).sender.copyWith(color: c.textPrimary)),
     );
   }
 
   Widget _bubble(AppColors c, ChatRoomMessage m,
-      {required bool header, String? time, required bool gapAbove}) {
+      {required bool header,
+      String? time,
+      required bool gapAbove,
+      required double listWidth}) {
     final mine = m.mine;
     final content = Column(
       crossAxisAlignment:
@@ -448,17 +456,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
             padding: const EdgeInsets.only(left: 4, bottom: 2),
             child: Text(_nameOf(m),
                 key: const Key('message-author'),
-                style: TextStyle(color: c.textSecondary, fontSize: 12)),
+                style: ChatTextStyles.of(context).sender),
           ),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: ChatTextStyles.bubblePadding,
           decoration: BoxDecoration(
             color: mine ? c.mainSelectedBg : c.bg1,
-            borderRadius: BorderRadius.circular(9),
+            borderRadius: BorderRadius.circular(ChatTextStyles.bubbleRadius),
           ),
           child: SelectableText(
             m.text,
-            style: TextStyle(color: mine ? c.mainSelectedFg : c.textPrimary),
+            style: mine
+                ? ChatTextStyles.of(context).bodyMine
+                : ChatTextStyles.of(context).body,
           ),
         ),
         if (time != null)
@@ -466,16 +476,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
             padding: const EdgeInsets.only(top: 2, left: 4, right: 4),
             child: Text(time,
                 key: const Key('message-time'),
-                style: TextStyle(color: c.textSecondary, fontSize: 11)),
+                style: ChatTextStyles.of(context).meta),
           ),
       ],
     );
-    final width = MediaQuery.of(context).size.width;
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: EdgeInsets.only(top: gapAbove ? 8 : 2, bottom: 2),
-        constraints: BoxConstraints(maxWidth: width * 0.85),
+        margin: EdgeInsets.only(top: ChatTextStyles.gapAbove(gapAbove)),
+        constraints:
+            BoxConstraints(maxWidth: ChatTextStyles.bubbleMaxWidth(listWidth)),
         child: mine
             ? content
             : Row(
@@ -506,7 +516,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                 Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Text(_error!,
-                      style: TextStyle(color: c.alert, fontSize: 12)),
+                      style: TextStyle(
+                          color: c.alert, fontSize: ChatTextStyles.metaSize)),
                 ),
               Row(
                 children: [
@@ -519,12 +530,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                       textInputAction: TextInputAction.send,
                       onEditingComplete: () {},
                       onSubmitted: (_) => _send(),
+                      style: ChatTextStyles.of(context).composer,
                       decoration: InputDecoration(
                         hintText: 'Message',
+                        hintStyle: ChatTextStyles.of(context).composerHint,
                         filled: true,
                         fillColor: c.bg1,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(9),
+                          borderRadius: BorderRadius.circular(
+                              ChatTextStyles.bubbleRadius),
                           borderSide: BorderSide.none,
                         ),
                       ),

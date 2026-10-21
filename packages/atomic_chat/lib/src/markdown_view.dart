@@ -138,7 +138,7 @@ class _Renderer {
 
   _Renderer(this.c, this.base, this.onLink, {this.scale = 1});
 
-  double get _size => base.fontSize ?? 14;
+  double get _size => base.fontSize ?? 16;
 
   double gapBefore(MdBlock b) => switch (b) {
         MdHeading() => _size * 0.9,
@@ -164,9 +164,9 @@ class _Renderer {
             style: base.copyWith(
               fontSize: _size *
                   switch (level) {
-                    1 => 1.4,
-                    2 => 1.25,
-                    3 => 1.12,
+                    1 => 22 / 16,
+                    2 => 20 / 16,
+                    3 => 18 / 16,
                     _ => 1.0,
                   },
               fontWeight: FontWeight.w700,
@@ -307,7 +307,7 @@ class _Renderer {
             style: style.copyWith(
               fontFamily: _mono,
               fontFamilyFallback: _monoFallback,
-              fontSize: (style.fontSize ?? 14) * 0.92,
+              fontSize: (style.fontSize ?? 16) * 0.92,
               backgroundColor: c.bg2.withValues(alpha: 0.35),
             ),
           ),
@@ -409,7 +409,7 @@ class _CodeBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = colors;
-    final size = (style.fontSize ?? 14) * 0.88;
+    final size = (style.fontSize ?? 16) * 0.88;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(

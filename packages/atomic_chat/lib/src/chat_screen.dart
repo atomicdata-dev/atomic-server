@@ -19,6 +19,7 @@ import 'chat_parts.dart';
 import 'chat_window.dart';
 import 'scroll_to_bottom_button.dart';
 import 'markdown_view.dart';
+import 'chat_text_styles.dart';
 import 'tool_step.dart';
 import 'native_views.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -1099,19 +1100,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    return SectionBack(
-        section: HomeSection.chats,
-        child: Scaffold(
-          backgroundColor: c.bgBody,
-          appBar: AppTopBar(
-            title: widget.title.isEmpty
-                ? (_chat == null
-                    ? (widget.voiceMode ? 'Voice chat' : 'New chat')
-                    : 'Untitled chat')
-                : widget.title,
-          ),
-          body: ListAndField(list: _list(c), field: _composer(c)),
-        ));
+    return ChatTextScope(
+        child: SectionBack(
+            section: HomeSection.chats,
+            child: Scaffold(
+              backgroundColor: c.bgBody,
+              appBar: AppTopBar(
+                title: widget.title.isEmpty
+                    ? (_chat == null
+                        ? (widget.voiceMode ? 'Voice chat' : 'New chat')
+                        : 'Untitled chat')
+                    : widget.title,
+              ),
+              body: ListAndField(list: _list(c), field: _composer(c)),
+            )));
   }
 
   Widget _list(AppColors c) {
@@ -1168,16 +1170,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             final bubble = Align(
               alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
               child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                margin: EdgeInsets.only(
+                    top: ChatTextStyles.gapAbove(
+                        index == 0 || shown[index - 1].role != m.role)),
+                padding: ChatTextStyles.bubblePadding,
                 constraints: BoxConstraints(
                   // An answer may hold code and tables: a little wider.
-                  maxWidth: (box.maxWidth - 32) * (mine ? 0.85 : 0.95),
+                  maxWidth: ChatTextStyles.bubbleMaxWidth(box.maxWidth - 32,
+                      answer: !mine),
                 ),
                 decoration: BoxDecoration(
                   color: mine ? c.mainSelectedBg : c.bg1,
-                  borderRadius: BorderRadius.circular(9),
+                  borderRadius:
+                      BorderRadius.circular(ChatTextStyles.bubbleRadius),
                 ),
                 child: _bubble(c, m, mine),
               ),
@@ -1266,7 +1271,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             key: partial && last ? const Key('chat-partial') : null,
             streaming: partial && last,
             inline: mine,
-            style: mine ? TextStyle(color: c.mainSelectedFg) : null,
+            style: mine
+                ? ChatTextStyles.of(context).bodyMine
+                : ChatTextStyles.of(context).body,
             onLink: _openLink,
           ),
         ToolPart() =>
@@ -1324,7 +1331,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: ChatTextStyles.metaSize,
               color: on ? c.main : c.textSecondary,
             ),
           ),
@@ -1367,7 +1374,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           children: [
             Text(
               'Add context?',
-              style: TextStyle(color: c.textSecondary, fontSize: 12),
+              style: TextStyle(
+                  color: c.textSecondary, fontSize: ChatTextStyles.metaSize),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -1544,7 +1552,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Text(
             text,
-            style: TextStyle(color: c.textSecondary, fontSize: 13),
+            style: TextStyle(
+                color: c.textSecondary, fontSize: ChatTextStyles.statusSize),
             textAlign: TextAlign.center,
           ),
         );
@@ -1568,7 +1577,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               Text(
                 'Messages you send here are processed by your account '
                 "provider's AI, and use your account's credits.",
-                style: TextStyle(color: c.textSecondary, fontSize: 13),
+                style: TextStyle(
+                    color: c.textSecondary,
+                    fontSize: ChatTextStyles.statusSize),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
@@ -1577,7 +1588,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 child: const Text('Turn on AI'),
               ),
               if (_error != null)
-                Text(_error!, style: TextStyle(color: c.alert, fontSize: 12)),
+                Text(_error!,
+                    style: TextStyle(
+                        color: c.alert, fontSize: ChatTextStyles.metaSize)),
             ],
           ),
         ),
@@ -1594,7 +1607,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
                   _error!,
-                  style: TextStyle(color: c.alert, fontSize: 12),
+                  style: TextStyle(
+                      color: c.alert, fontSize: ChatTextStyles.metaSize),
                 ),
               ),
             if (_files.isNotEmpty ||
@@ -1626,12 +1640,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     readOnly: _transcribing,
                     onEditingComplete: () {},
                     onSubmitted: (_) => _send(),
+                    style: ChatTextStyles.of(context).composer,
                     decoration: InputDecoration(
                       hintText: 'Message',
+                      hintStyle: ChatTextStyles.of(context).composerHint,
                       filled: true,
                       fillColor: c.bg1,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(9),
+                        borderRadius:
+                            BorderRadius.circular(ChatTextStyles.bubbleRadius),
                         borderSide: BorderSide.none,
                       ),
                     ),
@@ -1675,7 +1692,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 child: Text(
                   _voiceNote!,
                   key: const Key('voice-note'),
-                  style: TextStyle(color: c.textSecondary, fontSize: 12),
+                  style: TextStyle(
+                      color: c.textSecondary,
+                      fontSize: ChatTextStyles.metaSize),
                 ),
               ),
             if (_noSpeechHint && !_listening)
@@ -1685,7 +1704,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   "Didn't hear anything. Check the language (long-press the "
                   'mic) and try again.',
                   key: const Key('voice-hint'),
-                  style: TextStyle(color: c.textSecondary, fontSize: 12),
+                  style: TextStyle(
+                      color: c.textSecondary,
+                      fontSize: ChatTextStyles.metaSize),
                 ),
               ),
           ],
@@ -1714,7 +1735,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             child: Text(
               status,
               key: const Key('voice-status'),
-              style: TextStyle(color: c.textSecondary, fontSize: 13),
+              style: TextStyle(
+                  color: c.textSecondary, fontSize: ChatTextStyles.statusSize),
             ),
           ),
           running

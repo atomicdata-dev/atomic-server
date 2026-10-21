@@ -5,6 +5,7 @@ import 'package:atomic_flutter/atomic_flutter.dart'
 import 'package:flutter/material.dart';
 
 import 'chat_parts.dart';
+import 'chat_text_styles.dart';
 
 String _cut(String s, int max) =>
     s.length <= max ? s : '${s.substring(0, max - 1)}…';
@@ -173,7 +174,7 @@ class _ToolStepRowState extends State<ToolStepRow> {
     final running = p.state.running;
     final failed = p.state == ToolState.outputError;
     final label = toolLabel(p, titles: widget.titles);
-    final small = TextStyle(color: c.textSecondary, fontSize: 13, height: 1.3);
+    final small = ChatTextStyles.of(context).status;
     final Widget status = running
         ? SizedBox(
             width: 14,
@@ -239,13 +240,7 @@ class _ToolStepRowState extends State<ToolStepRow> {
   Widget _details(AppColors c, TextStyle small) {
     final p = widget.part;
     final input = p.input;
-    final mono = TextStyle(
-      color: c.textSecondary,
-      fontSize: 12,
-      height: 1.35,
-      fontFamily: 'monospace',
-      fontFamilyFallback: const ['Menlo', 'Courier'],
-    );
+    final mono = ChatTextStyles.of(context).statusMono;
     String args;
     try {
       args = const JsonEncoder.withIndent('  ').convert(input ?? const {});
@@ -267,7 +262,8 @@ class _ToolStepRowState extends State<ToolStepRow> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Tool: ${p.toolName}', style: small.copyWith(fontSize: 12)),
+              Text('Tool: ${p.toolName}',
+                  style: small.copyWith(fontSize: ChatTextStyles.metaSize)),
               const SizedBox(height: 4),
               Text(_cut(args, 800), style: mono),
               if (!p.state.running) ...[
@@ -276,7 +272,7 @@ class _ToolStepRowState extends State<ToolStepRow> {
                   toolResultSummary(p, titles: widget.titles),
                   key: Key('tool-result-${p.toolCallId}'),
                   style: small.copyWith(
-                    fontSize: 12,
+                    fontSize: ChatTextStyles.metaSize,
                     color: p.state == ToolState.outputError
                         ? c.alert
                         : c.textSecondary,
