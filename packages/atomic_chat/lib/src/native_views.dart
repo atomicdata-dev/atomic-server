@@ -47,15 +47,13 @@ void registerNativeView(String classUrl, NativeViewBuilder? builder) {
 
 /// The view to open a resource in: the native one for its class ([classUrl],
 /// the class's subject) when there is one, else the web app's rendering of
-/// it. [className] is only the class's display name and does not choose the
-/// view.
+/// it.
 Widget openResourceView({
   required AssistantApi api,
   required String drive,
   required String subject,
   String title = '',
   String classUrl = '',
-  String className = '',
 }) {
   final native = nativeViews[classUrl];
   if (native != null) return native(api, drive, subject, title);

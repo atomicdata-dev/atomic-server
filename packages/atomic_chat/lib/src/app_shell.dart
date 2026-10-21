@@ -781,7 +781,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     if (drive.isEmpty) return null;
     final recent = await widget.api.recentResources(drive);
     for (final r in recent) {
-      if (!hasNativeView(r.className)) return r.subject;
+      if (!hasNativeView(r.classUrl)) return r.subject;
     }
     return null;
   }

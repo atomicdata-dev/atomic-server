@@ -303,7 +303,6 @@ class _SyncScreenState extends State<SyncScreen> {
               drive: drive,
               subject: agent.subject,
               title: (agent.name?.isNotEmpty ?? false) ? agent.name! : 'You',
-              className: 'agent',
             ),
       ));
     }
