@@ -38,8 +38,10 @@ android {
     }
 
     buildTypes {
+        // Dev builds name their variant; a store build is plain atomic.place.
         debug {
             buildConfigField("boolean", "PERF_MARKS", "true")
+            resValue("string", "app_name", "atomic.place (kotlin)")
         }
         release {
             isMinifyEnabled = true
@@ -47,6 +49,7 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("debug")
             buildConfigField("boolean", "PERF_MARKS", "false")
+            resValue("string", "app_name", "atomic.place")
         }
         // Release-like (minified, not debuggable, release Rust) but profileable, with the
         // seed and the [perf] marks: what perf runs measure. See README "Benchmark build".
@@ -56,6 +59,7 @@ android {
             isDebuggable = false
             signingConfig = signingConfigs.getByName("debug")
             buildConfigField("boolean", "PERF_MARKS", "true")
+            resValue("string", "app_name", "atomic.place (kotlin)")
         }
     }
 
@@ -67,6 +71,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        resValues = true
     }
 
     sourceSets.getByName("main") {
