@@ -1155,7 +1155,7 @@ class _SplitPanesState extends State<_SplitPanes>
                           ),
                         ),
                       ),
-                      _PaneDivider(shown: !gone),
+                      _PaneDivider(shown: !gone, active: dragging != null),
                       Expanded(
                         // The whole height of the window, folded or not.
                         // Laid out at the width it will have once the list
@@ -1200,6 +1200,7 @@ class _SplitPanesState extends State<_SplitPanes>
                 ),
                 _PaneHandle(
                   at: shown,
+                  dragging: dragging != null,
                   collapsed: shell.listCollapsed.value,
                   onTap: _toggle,
                   onDragStart: () => _dragStart(full, room),
@@ -1218,9 +1219,12 @@ class _SplitPanesState extends State<_SplitPanes>
 /// The divider's handle: a small tab on the line, half-way down, with a
 /// chevron that says which way a tap folds the list. Along the whole line a
 /// strip takes drags (to resize); the tab is a full touch target.
-class _PaneHandle extends StatelessWidget {
+class _PaneHandle extends StatefulWidget {
   /// Where the divider is (the list pane's width now).
   final double at;
+
+  /// The divider is being dragged.
+  final bool dragging;
   final bool collapsed;
   final VoidCallback onTap;
   final VoidCallback onDragStart;
@@ -1229,6 +1233,7 @@ class _PaneHandle extends StatelessWidget {
 
   const _PaneHandle({
     required this.at,
+    required this.dragging,
     required this.collapsed,
     required this.onTap,
     required this.onDragStart,
@@ -1243,9 +1248,29 @@ class _PaneHandle extends StatelessWidget {
   static const _tab = Size(24, 48);
   static const _target = Size(48, 64);
 
+  /// How visible the tab is at rest, and on hover or drag.
+  static const restOpacity = 0.15;
+  static const activeOpacity = 0.4;
+
+  @override
+  State<_PaneHandle> createState() => _PaneHandleState();
+}
+
+class _PaneHandleState extends State<_PaneHandle> {
+  bool _hover = false;
+
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
+    final at = widget.at;
+    final collapsed = widget.collapsed;
+    final onTap = widget.onTap;
+    final onDragStart = widget.onDragStart;
+    final onDragUpdate = widget.onDragUpdate;
+    final onDragEnd = widget.onDragEnd;
+    const strip = _PaneHandle._strip;
+    const tab = _PaneHandle._tab;
+    const target = _PaneHandle._target;
     final x = at;
     Widget drag(Widget child) => GestureDetector(
           behavior: HitTestBehavior.translucent,
@@ -1261,11 +1286,15 @@ class _PaneHandle extends StatelessWidget {
         return Stack(children: [
           if (!collapsed)
             Positioned(
-              left: at - _strip / 2,
+              left: at - strip / 2,
               top: 0,
               bottom: 0,
-              width: _strip,
-              child: drag(const SizedBox.expand()),
+              width: strip,
+              child: MouseRegion(
+                onEnter: (_) => setState(() => _hover = true),
+                onExit: (_) => setState(() => _hover = false),
+                child: drag(const SizedBox.expand()),
+              ),
             ),
           // Folded: a strip along the window's left edge opens the list with
           // one drag that follows the finger. It starts beyond the system
@@ -1279,7 +1308,7 @@ class _PaneHandle extends StatelessWidget {
               left: MediaQuery.systemGestureInsetsOf(context).left,
               top: 0,
               bottom: 0,
-              width: edgeStrip,
+              width: _PaneHandle.edgeStrip,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onHorizontalDragStart: (_) => onDragStart(),
@@ -1307,41 +1336,52 @@ class _PaneHandle extends StatelessWidget {
             ),
           if (!collapsed)
             Positioned(
-              left: x - _target.width / 2,
-              top: middle - _target.height / 2,
-              width: _target.width,
-              height: _target.height,
-              child: drag(Tooltip(
-                message: 'Hide list',
-                child: Semantics(
-                  button: true,
-                  label: 'Hide list',
-                  excludeSemantics: true,
-                  child: GestureDetector(
-                    key: const Key('list-toggle'),
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onTap,
-                    child: Center(
-                      child: Container(
-                        width: _tab.width,
-                        height: _tab.height,
-                        decoration: BoxDecoration(
-                          color: c.barSurface,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color:
-                                  Theme.of(context).colorScheme.outlineVariant),
-                        ),
-                        child: Icon(
-                          Icons.chevron_left,
-                          size: 18,
-                          color: c.textSecondary,
+              left: x - target.width / 2,
+              top: middle - target.height / 2,
+              width: target.width,
+              height: target.height,
+              child: MouseRegion(
+                  onEnter: (_) => setState(() => _hover = true),
+                  onExit: (_) => setState(() => _hover = false),
+                  child: drag(Tooltip(
+                    message: 'Hide list',
+                    child: Semantics(
+                      button: true,
+                      label: 'Hide list',
+                      excludeSemantics: true,
+                      child: GestureDetector(
+                        key: const Key('list-toggle'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: onTap,
+                        child: Center(
+                          child: AnimatedOpacity(
+                            key: const Key('pane-grabber'),
+                            duration: const Duration(milliseconds: 180),
+                            opacity: _hover || widget.dragging
+                                ? _PaneHandle.activeOpacity
+                                : _PaneHandle.restOpacity,
+                            child: Container(
+                              width: tab.width,
+                              height: tab.height,
+                              decoration: BoxDecoration(
+                                color: c.barSurface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .outlineVariant),
+                              ),
+                              child: Icon(
+                                Icons.chevron_left,
+                                size: 18,
+                                color: c.textSecondary,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-              )),
+                  ))),
             ),
         ]);
       }),
@@ -1505,12 +1545,23 @@ class _Pane extends StatelessWidget {
 class _PaneDivider extends StatelessWidget {
   final bool shown;
 
-  const _PaneDivider({required this.shown});
+  /// Being dragged: the line brightens a little as feedback.
+  final bool active;
 
-  /// The theme's divider: a hairline that is quiet in light and dark.
+  const _PaneDivider({required this.shown, this.active = false});
+
+  /// A 1 dp hairline in the border token, barely there at rest (light 8%,
+  /// dark 10%) and 18% while dragged.
+  static Color colorFor(Color bgBody, {required bool active}) {
+    final dark = bgBody.computeLuminance() < 0.5;
+    return (dark ? Colors.white : Colors.black)
+        .withValues(alpha: active ? 0.18 : (dark ? 0.10 : 0.08));
+  }
+
   @override
   Widget build(BuildContext context) => ColoredBox(
-      color: Theme.of(context).colorScheme.outlineVariant,
+      key: const Key('pane-divider'),
+      color: colorFor(context.appColors.bgBody, active: active),
       child: SizedBox(width: shown ? 1 : 0));
 }
 

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:atomic_chat/atomic_chat.dart';
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -677,6 +678,64 @@ void main() {
           Offset(-wider + 20, 0));
       await _settle(tester);
       expect(_controller(tester).listCollapsed.value, isTrue);
+      await _done(tester);
+    });
+  });
+
+  group('the divider is a quiet hairline', () {
+    Widget themed(Brightness b) => app(
+        AppShell(
+          api: _api(),
+          drive: 'did:ad:drive',
+          warmPool: (_) => null,
+          profile: (_) => const Scaffold(body: Text('profile page')),
+          home: ChatsScreen(drive: 'did:ad:drive', api: _api()),
+        ),
+        brightness: b);
+
+    ColoredBox line(WidgetTester tester) =>
+        tester.widget<ColoredBox>(find.byKey(const Key('pane-divider')));
+    double grabber(WidgetTester tester) => tester
+        .widget<AnimatedOpacity>(find.byKey(const Key('pane-grabber')))
+        .opacity;
+
+    for (final b in Brightness.values) {
+      testWidgets('${b.name}: faint 1 dp line, grabber hidden at rest',
+          (tester) async {
+        _size(tester, _landscape);
+        await tester.pumpWidget(themed(b));
+        await _settle(tester);
+        expect(line(tester).color.a, lessThanOrEqualTo(0.12));
+        expect(line(tester).color.a, greaterThan(0));
+        expect(tester.getSize(find.byKey(const Key('pane-divider'))).width,
+            lessThanOrEqualTo(1));
+        expect(grabber(tester), lessThanOrEqualTo(0.2));
+        await _done(tester);
+      });
+    }
+
+    testWidgets('hover and drag bring the grabber and line up', (tester) async {
+      _size(tester, _landscape);
+      await tester.pumpWidget(themed(Brightness.light));
+      await _settle(tester);
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      await mouse
+          .moveTo(tester.getCenter(find.byKey(const Key('list-toggle'))));
+      await _settle(tester);
+      expect(grabber(tester), greaterThan(0.2));
+      await mouse.moveTo(Offset.zero);
+      await _settle(tester);
+      expect(grabber(tester), lessThanOrEqualTo(0.2));
+      final drag = await tester
+          .startGesture(tester.getCenter(find.byKey(const Key('list-toggle'))));
+      await drag.moveBy(const Offset(40, 0));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(grabber(tester), greaterThan(0.2));
+      expect(line(tester).color.a, closeTo(0.18, 0.01));
+      await drag.up();
+      await _settle(tester);
+      expect(line(tester).color.a, lessThanOrEqualTo(0.12));
       await _done(tester);
     });
   });
