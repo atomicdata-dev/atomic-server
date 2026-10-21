@@ -87,7 +87,7 @@ void main() {
     page.send(jsonEncode({
       'id': 7,
       'method': 'openNative',
-      'args': ['chatroom', 'did:ad:room', 'Standup'],
+      'args': [chatRoomClass, 'did:ad:room', 'Standup'],
     }));
     await tester.pumpAndSettle();
 
