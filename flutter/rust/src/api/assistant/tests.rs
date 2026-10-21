@@ -485,3 +485,20 @@ async fn an_imported_chat_reads_back_in_order() {
     assert_eq!(read[1]["parts"][0]["text"], "Antwoord");
     assert_eq!(read[1]["c"], 2_000);
 }
+
+#[test]
+fn the_conversations_endpoint_answer_is_read_as_links_or_nested_resources() {
+    let prop = atomic_lib::urls::CONVERSATIONS;
+    let links = json!({ prop: ["did:ad:one", "did:ad:two"] }).to_string();
+    assert_eq!(
+        super::conversations_in_json_ad(&links),
+        vec!["did:ad:one", "did:ad:two"]
+    );
+    let nested = json!([{ prop: [{ "@id": "did:ad:three" }] }]).to_string();
+    assert_eq!(
+        super::conversations_in_json_ad(&nested),
+        vec!["did:ad:three"]
+    );
+    assert!(super::conversations_in_json_ad("not json").is_empty());
+    assert!(super::conversations_in_json_ad("{}").is_empty());
+}

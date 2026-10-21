@@ -191,7 +191,17 @@ impl Conversations {
         let me = agent.subject.to_string();
         let proof = vault_proof(&agent).ok();
         let mut out: Vec<(i64, Json)> = Vec::new();
-        for subject in private_drive_list(store, urls::CONVERSATIONS).await? {
+        let mut subjects = private_drive_list(store, urls::CONVERSATIONS).await?;
+        // Conversations someone else started are not in the private drive's
+        // list (the web app only lists them once opened, and otherwise asks
+        // the server): every one this device holds and this agent is in is
+        // listed too.
+        for held in held_conversations(store, &me).await {
+            if !subjects.iter().any(|s| drive_key(s) == drive_key(&held)) {
+                subjects.push(held);
+            }
+        }
+        for subject in subjects {
             if out.len() >= limit {
                 break;
             }
@@ -469,6 +479,31 @@ pub async fn send_message(
     let response = node.apply_local_commit(commit, &own_commit_opts()).await?;
     pusher.push(&response).await;
     Ok(message)
+}
+
+/// The conversations this device holds that `me` is a member of, in no
+/// particular order.
+async fn held_conversations(store: &Db, me: &str) -> Vec<String> {
+    let mut query = Query::new_prop_val(urls::IS_A, urls::CONVERSATION);
+    query.limit = Some(500);
+    let Ok(found) = store.query(&query).await else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for subject in found.subjects {
+        let Some(conversation) = row_resource(store, &subject).await else {
+            continue;
+        };
+        if members_of(&conversation).iter().any(|m| same_agent(m, me)) {
+            out.push(subject.to_string());
+        }
+    }
+    out
+}
+
+/// A conversation's subject without query or drive hint, for comparing.
+fn drive_key(subject: &str) -> String {
+    crate::identifiers::canonicalize_scheme(&Subject::from(subject).pure_id())
 }
 
 /// The members of a conversation: its `read` list.
@@ -987,5 +1022,220 @@ mod tests {
             .unwrap();
         assert_eq!(messages.len(), 1);
         assert!(messages[0]["text"].is_null());
+    }
+
+    // ── Two devices: A and B are different agents sharing a conversation ──
+
+    /// The state of `subject` on `from`, applied on `to` as a sync UPDATE
+    /// (what the WebSocket and Iroh paths deliver).
+    async fn ship(from: &Device, to: &Device, subject: &str) {
+        use crate::db::trees::Tree;
+        let key = Subject::from(subject).pure_id();
+        let state = from
+            .store
+            .kv
+            .get(Tree::LoroSnapshots, key.as_bytes())
+            .unwrap()
+            .expect("the sender holds a state for the subject");
+        crate::sync::ws_apply::apply_state_update(&to.store, subject, &state)
+            .await
+            .unwrap();
+    }
+
+    /// A conversation started on `a` with `b`'s agent, shipped to `b`.
+    async fn start_between(a: &Device, b: &Device) -> String {
+        let me = a.store.get_default_agent().unwrap();
+        let other = b.store.get_default_agent().unwrap();
+        let (pa, pb) = (vault_proof(&me).unwrap(), vault_proof(&other).unwrap());
+        let mut keyring = Keyring::default();
+        keyring
+            .add_epoch(&[
+                Member {
+                    agent: me.subject.to_string(),
+                    encryption_key: encryption_public_key(&pa),
+                },
+                Member {
+                    agent: other.subject.to_string(),
+                    encryption_key: encryption_public_key(&pb),
+                },
+            ])
+            .unwrap();
+        let mut builder = CommitBuilder::new("placeholder".into());
+        builder.set(
+            urls::IS_A.into(),
+            Value::ResourceArray(vec![urls::CONVERSATION.into(), urls::DRIVE.into()]),
+        );
+        builder.set(urls::NAME.into(), Value::String("Conversation".into()));
+        builder.set(
+            urls::READ.into(),
+            Value::ResourceArray(vec![
+                me.subject.to_string().into(),
+                other.subject.to_string().into(),
+            ]),
+        );
+        builder.set(
+            urls::CONVERSATION_KEYS.into(),
+            Value::String(keyring.to_json().unwrap()),
+        );
+        let commit = Commit::create_did(builder, &me, &a.store).await.unwrap();
+        let conversation = commit.subject.to_string();
+        a.node
+            .apply_local_commit(commit, &own_commit_opts())
+            .await
+            .unwrap();
+        ship(a, b, &conversation).await;
+        conversation
+    }
+
+    fn texts(page: &Json) -> Vec<String> {
+        page["messages"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|m| m["text"].as_str().unwrap_or("<unopenable>").to_string())
+            .collect()
+    }
+
+    /// A sends, B reads, B replies, A reads: first message and reply, each
+    /// side seeing the other's as not `mine`.
+    #[tokio::test]
+    async fn a_message_and_its_reply_reach_the_other_device() {
+        let (a, b) = (Device::new().await, Device::new().await);
+        let conversation = start_between(&a, &b).await;
+
+        let m1 = send_message(&a.node, &NoPush, &conversation, "hoi")
+            .await
+            .unwrap();
+        ship(&a, &b, &m1).await;
+        let seen = conversations().read(&b.store, &conversation).await.unwrap();
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0]["text"], "hoi");
+        assert_eq!(seen[0]["mine"], false);
+
+        tick().await;
+        let m2 = send_message(&b.node, &NoPush, &conversation, "hallo")
+            .await
+            .unwrap();
+        ship(&b, &a, &m2).await;
+        let on_a = conversations().read(&a.store, &conversation).await.unwrap();
+        assert_eq!(on_a.len(), 2);
+        assert_eq!(on_a[1]["text"], "hallo");
+        assert_eq!(on_a[1]["mine"], false);
+        assert_eq!(on_a[0]["mine"], true);
+    }
+
+    /// Both sides send at the same time; after exchanging, both read the same
+    /// order, in the window and through the cursor.
+    #[tokio::test]
+    async fn concurrent_sends_converge_to_one_order_on_both_devices() {
+        let (a, b) = (Device::new().await, Device::new().await);
+        let conversation = start_between(&a, &b).await;
+        let mut sent = Vec::new();
+        for i in 0..3 {
+            let ma = send_message(&a.node, &NoPush, &conversation, &format!("a{i}"))
+                .await
+                .unwrap();
+            let mb = send_message(&b.node, &NoPush, &conversation, &format!("b{i}"))
+                .await
+                .unwrap();
+            sent.push((ma, mb));
+        }
+        for (ma, mb) in &sent {
+            ship(&a, &b, ma).await;
+            ship(&b, &a, mb).await;
+        }
+        let (c1, c2) = (conversations(), conversations());
+        let on_a = c1
+            .read_page(&a.store, &conversation, None, 50)
+            .await
+            .unwrap();
+        let on_b = c2
+            .read_page(&b.store, &conversation, None, 50)
+            .await
+            .unwrap();
+        assert_eq!(texts(&on_a).len(), 6);
+        assert_eq!(texts(&on_a), texts(&on_b));
+    }
+
+    /// B has the conversation open (cursor at its newest) while A's messages
+    /// arrive: each poll picks up exactly the new ones.
+    #[tokio::test]
+    async fn an_open_conversation_picks_up_what_arrives() {
+        let (a, b) = (Device::new().await, Device::new().await);
+        let conversation = start_between(&a, &b).await;
+        let m0 = send_message(&a.node, &NoPush, &conversation, "one")
+            .await
+            .unwrap();
+        ship(&a, &b, &m0).await;
+        let c = conversations();
+        let first = c
+            .read_page(&b.store, &conversation, None, 50)
+            .await
+            .unwrap();
+        let mut cursor = first["newest"].as_str().unwrap().to_string();
+        for i in 0..5 {
+            tick().await;
+            let m = send_message(&a.node, &NoPush, &conversation, &format!("next{i}"))
+                .await
+                .unwrap();
+            ship(&a, &b, &m).await;
+            let after = c
+                .read_after(&b.store, &conversation, &cursor, 50)
+                .await
+                .unwrap();
+            assert_eq!(texts(&after), vec![format!("next{i}")]);
+            cursor = after["newest"].as_str().unwrap().to_string();
+        }
+    }
+
+    /// A message written earlier (by its author's clock) than one B already
+    /// shows, but arriving later (A was offline, or its clock is behind), is
+    /// older than the poll's cursor: `read_after` is strict, so the app's
+    /// poll also looks at the newest window (`ChatWindow.poll`), where it is.
+    #[tokio::test]
+    async fn a_late_arriving_older_message_shows_in_the_newest_window() {
+        let (a, b) = (Device::new().await, Device::new().await);
+        let conversation = start_between(&a, &b).await;
+        let early = send_message(&a.node, &NoPush, &conversation, "written first")
+            .await
+            .unwrap();
+        tick().await;
+        send_message(&b.node, &NoPush, &conversation, "written second")
+            .await
+            .unwrap();
+        let c = conversations();
+        let open = c
+            .read_page(&b.store, &conversation, None, 50)
+            .await
+            .unwrap();
+        assert_eq!(texts(&open), vec!["written second"]);
+        let cursor = open["newest"].as_str().unwrap().to_string();
+        ship(&a, &b, &early).await;
+        let after = c
+            .read_after(&b.store, &conversation, &cursor, 50)
+            .await
+            .unwrap();
+        assert!(texts(&after).is_empty(), "the cursor is strict");
+        let fresh = c
+            .read_page(&b.store, &conversation, None, 50)
+            .await
+            .unwrap();
+        assert_eq!(texts(&fresh), vec!["written first", "written second"]);
+    }
+
+    /// B's list shows a conversation A started, with A's latest message,
+    /// although B never listed it in its own private drive.
+    #[tokio::test]
+    async fn a_conversation_someone_else_started_is_listed() {
+        let (a, b) = (Device::new().await, Device::new().await);
+        let conversation = start_between(&a, &b).await;
+        let m = send_message(&a.node, &NoPush, &conversation, "hi from A")
+            .await
+            .unwrap();
+        ship(&a, &b, &m).await;
+        let list = conversations().list(&b.store, 10).await.unwrap();
+        assert_eq!(list.len(), 1, "B holds the conversation, so it lists it");
+        assert_eq!(list[0]["subject"], conversation.as_str());
+        assert_eq!(list[0]["last_message"], "hi from A");
     }
 }

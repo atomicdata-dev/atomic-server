@@ -112,6 +112,9 @@ pub async fn open_ws_sync(server_origin: &str) -> Result<(), String> {
             // The session now knows a server: the person's other drives may
             // be on it.
             tokio::spawn(super::follow_listed_drives(drive));
+            // Conversations are drives of their own that nothing above
+            // lists: subscribe to them and catch up on what was said.
+            crate::api::assistant::follow_conversations_in_background();
         }
     }
 
@@ -156,6 +159,13 @@ async fn handle_ws_message(store: &atomic_lib::Db, msg: WsMessage) -> Result<(),
             ..
         } => {
             ws_apply::apply_state_update(store, &subject, &loro_bytes)
+                .await
+                .map_err(err)?;
+        }
+        // The answer to `catch_up_drive`: the state of what this device
+        // lacks or has an older version of.
+        WsMessage::SyncPush { entries, .. } => {
+            ws_apply::apply_state_updates(store, &entries, false)
                 .await
                 .map_err(err)?;
         }
@@ -256,6 +266,53 @@ pub(crate) async fn follow_drive(drive: &str) -> Result<(), String> {
     let store = db()?;
     client.subscribe_drive(drive).await.map_err(err)?;
     ensure_drive_materialized(store.as_ref(), drive).await
+}
+
+/// Ask the server for what this device lacks of `drive`: a `SYNC` with this
+/// device's version vectors, which the server answers with the state of every
+/// resource it has newer (`SYNC_PUSH`, applied by the session's message loop).
+/// A `SUB` only delivers what happens from then on, so a drive this device
+/// already holds needs this to get what was said while it was closed or
+/// offline. Does not wait for the answer.
+pub(crate) async fn catch_up_drive(drive: &str) -> Result<(), String> {
+    use std::collections::HashMap;
+    let client = ws_client_slot()
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone()
+        .ok_or_else(|| "WS session not open".to_string())?;
+    let store = db()?;
+    let subject = atomic_lib::Subject::from(drive);
+    let subjects = atomic_lib::sync::engine::collect_drive_subjects(store.as_ref(), &subject).await;
+    let vvs = atomic_lib::sync::engine::build_drive_vvs(store.as_ref(), &subjects);
+    let mut peers: Vec<String> = Vec::new();
+    for vv in vvs.values() {
+        for peer in vv.keys() {
+            if !peers.contains(peer) {
+                peers.push(peer.clone());
+            }
+        }
+    }
+    let resources: HashMap<String, Vec<i32>> = vvs
+        .iter()
+        .map(|(subject, vv)| {
+            let counters = peers
+                .iter()
+                .map(|p| vv.get(p).copied().unwrap_or(0))
+                .collect();
+            (subject.clone(), counters)
+        })
+        .collect();
+    // An empty hash never matches the server's, so it always compares.
+    client
+        .send_binary(protocol::encode_sync(
+            &subject.pure_id(),
+            "",
+            &peers,
+            &resources,
+        ))
+        .await
+        .map_err(err)
 }
 
 /// Post a commit JSON-AD over the open WS session (falls back to error if closed).

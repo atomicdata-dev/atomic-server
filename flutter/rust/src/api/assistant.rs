@@ -137,6 +137,9 @@ pub async fn list_favorites(limit: u32) -> Result<String, String> {
 /// message ("" when there is none or it cannot be opened). `class_name` is
 /// `conversation`, which the app opens natively.
 pub async fn list_conversations(limit: u32) -> Result<String, String> {
+    // What others started, or said while this device was away, is fetched in
+    // the background; the next list shows it.
+    follow_conversations_in_background();
     to_json(
         &conversations()
             .list(db()?, limit as usize)
@@ -171,7 +174,88 @@ pub async fn send_conversation_message(subject: String, text: String) -> Result<
 /// sync session. Errors (no session, not hosted there) are for the caller to
 /// ignore; reading what is already local does not need this.
 pub async fn follow_conversation(subject: String) -> Result<(), String> {
-    super::simple::ws_sync::follow_drive(&subject).await
+    super::simple::ws_sync::follow_drive(&subject).await?;
+    // The subscription only brings what is said from now on.
+    super::simple::ws_sync::catch_up_drive(&subject).await
+}
+
+static CONVERSATIONS_FOLLOWING: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// Conversations are drives of their own, listed in neither `drives` nor (for
+/// ones someone else started) the private drive; so nothing else brings them
+/// here or subscribes to them. This does, in the background and one run at a
+/// time: for every conversation the private drive lists and every one the
+/// connected server finds the person in (`GET /conversations`, as the web app
+/// asks), fetch it when missing, subscribe, and ask for what was said while
+/// this device was away. Errors (no session, no endpoint) are left for the
+/// next run.
+pub(crate) fn follow_conversations_in_background() {
+    use std::sync::atomic::Ordering;
+    if CONVERSATIONS_FOLLOWING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    tokio::spawn(async {
+        let followed = follow_conversations().await;
+        tracing::info!("[conversations] followed {followed}");
+        CONVERSATIONS_FOLLOWING.store(false, Ordering::SeqCst);
+    });
+}
+
+async fn follow_conversations() -> usize {
+    let Ok(store) = db() else { return 0 };
+    let mut subjects = lists::private_drive_list(store, atomic_lib::urls::CONVERSATIONS)
+        .await
+        .unwrap_or_default();
+    if let Some(origin) = connected_server() {
+        let agent = atomic_lib::Storelike::get_default_agent(store.as_ref()).ok();
+        let url = format!("{}/conversations", origin.trim_end_matches('/'));
+        if let Ok(body) =
+            atomic_lib::client::fetch_body(&url, atomic_lib::parse::JSON_AD_MIME, agent.as_ref())
+                .await
+        {
+            for found in conversations_in_json_ad(&body) {
+                if !subjects.contains(&found) {
+                    subjects.push(found);
+                }
+            }
+        }
+    }
+    let mut followed = 0;
+    for subject in subjects {
+        if super::simple::ws_sync::follow_drive(&subject).await.is_ok() {
+            let _ = super::simple::ws_sync::catch_up_drive(&subject).await;
+            followed += 1;
+        }
+    }
+    followed
+}
+
+/// The subjects `GET /conversations` lists: the `conversations` property of
+/// its JSON-AD body (links, or nested resources with an `@id`).
+fn conversations_in_json_ad(body: &str) -> Vec<String> {
+    let Ok(json) = serde_json::from_str::<serde_json::Value>(body) else {
+        return Vec::new();
+    };
+    let root = match &json {
+        serde_json::Value::Array(items) => items.first().unwrap_or(&json),
+        other => other,
+    };
+    root.get(atomic_lib::urls::CONVERSATIONS)
+        .and_then(|v| v.as_array())
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| match item {
+                    serde_json::Value::String(s) => Some(s.clone()),
+                    other => other
+                        .get("@id")
+                        .and_then(|id| id.as_str())
+                        .map(str::to_string),
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// The entries of a chat, oldest first, as a JSON array of the fields the web
@@ -397,13 +481,17 @@ pub async fn import_ai_chat(name: String, entries_json: String) -> Result<String
         .map_err(err)?
         .subject
         .to_string();
-    let raw: Vec<serde_json::Value> = serde_json::from_str(&entries_json).map_err(|e| e.to_string())?;
+    let raw: Vec<serde_json::Value> =
+        serde_json::from_str(&entries_json).map_err(|e| e.to_string())?;
     let now = super::simple::state::now_ms();
     let entries: Vec<atomic_lib::chat_log::Entry> = raw
         .iter()
         .map(|e| {
-            let mut entry =
-                atomic_lib::chat_log::Entry::new(author.clone(), "", e["c"].as_i64().unwrap_or(now));
+            let mut entry = atomic_lib::chat_log::Entry::new(
+                author.clone(),
+                "",
+                e["c"].as_i64().unwrap_or(now),
+            );
             let role = e["role"].as_str().unwrap_or("user");
             let parts = match &e["parts"] {
                 serde_json::Value::String(s) => s.clone(),
