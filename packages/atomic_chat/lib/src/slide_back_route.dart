@@ -51,6 +51,17 @@ class SlideBackRoute<T> extends PageRouteBuilder<T> {
   /// through a curve that starts fast and settles slowly.
   bool _byHand = false;
 
+  /// True while a finger or a spring moves the page (subclasses with their own
+  /// transition scrub it with the animation's value then).
+  bool get byHand => _byHand;
+
+  /// Starts of a drag within the left system gesture inset are the system's
+  /// back gesture, not the page's. Off by default.
+  bool respectSystemGestureInset = false;
+
+  /// [child] with this route's page-wide swipe back around it.
+  Widget swipeable(Widget child) => _SwipeBack(route: this, child: child);
+
   /// The page-wide swipe, when this route has one (not in the split layout).
   _SwipeBackState? _swipe;
 
@@ -62,7 +73,7 @@ class SlideBackRoute<T> extends PageRouteBuilder<T> {
     // Already moved by the page's own drag (over a Flutter widget): that one
     // keeps it.
     if (swipe == null || swipe._dragging) return false;
-    swipe._start(DragStartDetails());
+    swipe._start(DragStartDetails(), fromEdge: false);
     swipe._hand = swipe._dragging;
     return swipe._hand;
   }
@@ -139,6 +150,13 @@ class _SwipeBackState extends State<_SwipeBack> {
   /// detector below.
   bool _hand = false;
 
+  Offset _down = Offset.zero;
+
+  /// What had the focus when the drag began: while the page is dragged it
+  /// cannot have it (the route takes it away), and a page that stays gets it
+  /// back (the keyboard stays up).
+  FocusNode? _focused;
+
   @override
   void initState() {
     super.initState();
@@ -155,9 +173,18 @@ class _SwipeBackState extends State<_SwipeBack> {
       // ignore: invalid_use_of_protected_member
       widget.route.controller;
 
-  void _start(DragStartDetails _) {
+  void _start(DragStartDetails d, {bool fromEdge = true}) {
+    // The drag starts after the touch slop: where the finger went down is
+    // what tells the system's back gesture from the page's.
+    if (fromEdge &&
+        widget.route.respectSystemGestureInset &&
+        _down.dx <
+            (MediaQuery.maybeOf(context)?.systemGestureInsets.left ?? 0)) {
+      return;
+    }
     if (!widget.route.isCurrent || !widget.route.navigator!.canPop()) return;
     _dragging = true;
+    _focused = FocusManager.instance.primaryFocus;
     widget.route._byHand = true;
     widget.route.navigator!.didStartUserGesture();
   }
@@ -214,6 +241,7 @@ class _SwipeBackState extends State<_SwipeBack> {
         controller.removeStatusListener(done);
         widget.route._byHand = false;
         navigator.didStopUserGesture();
+        if (!leave) _restoreFocus();
       }
     }
 
@@ -226,6 +254,19 @@ class _SwipeBackState extends State<_SwipeBack> {
     _controller?.animateTo(1, duration: const Duration(milliseconds: 200));
     widget.route._byHand = false;
     widget.route.navigator!.didStopUserGesture();
+    _restoreFocus();
+  }
+
+  void _restoreFocus() {
+    final node = _focused;
+    _focused = null;
+    if (node == null || node is FocusScopeNode) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.route.isCurrent && node.context != null) {
+        node.requestFocus();
+      }
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   @override
@@ -237,8 +278,17 @@ class _SwipeBackState extends State<_SwipeBack> {
           ? widget.child
           : _swipe();
 
-  Widget _swipe() => GestureDetector(
+  Widget _swipe() => Listener(
         behavior: HitTestBehavior.translucent,
+        onPointerDown: (e) => _down = e.position,
+        child: _detector(),
+      );
+
+  // Without semantics of its own: the drag's scroll actions would merge the
+  // whole page into one node for a screen reader.
+  Widget _detector() => GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        excludeFromSemantics: true,
         onHorizontalDragStart: (d) => _hand ? null : _start(d),
         onHorizontalDragUpdate: (d) => _hand ? null : _update(d),
         onHorizontalDragEnd: (d) => _hand ? null : _end(d),

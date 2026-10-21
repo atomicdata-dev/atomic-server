@@ -9,7 +9,8 @@ import 'package:flutter/services.dart';
 import 'app_top_bar.dart';
 
 import 'models.dart';
-import 'covered_insets_freeze.dart';
+import 'page_swipe.dart';
+import 'slide_back_route.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'resource_row.dart';
@@ -166,44 +167,62 @@ bool get _reducedMotion => WidgetsBinding
 /// field a little later (see [_Lag]). The keyboard rises meanwhile: the field
 /// asks for the focus when the screen is built, not when the motion ends.
 /// With reduced motion the page is just there.
-class _SearchRoute extends PageRouteBuilder<void> {
+class _SearchRoute extends SlideBackRoute<void> {
   _SearchRoute({super.settings, required Widget child})
-      : super(
-          pageBuilder: (_, __, ___) => CoveredInsetsFreeze(child: child),
-          transitionDuration: const Duration(milliseconds: 220),
-          reverseTransitionDuration: const Duration(milliseconds: 160),
-        );
+      : super(builder: (_) => child) {
+    respectSystemGestureInset = true;
+  }
 
   @override
   Duration get transitionDuration =>
-      _reducedMotion ? Duration.zero : super.transitionDuration;
+      _reducedMotion ? Duration.zero : const Duration(milliseconds: 220);
 
   @override
   Duration get reverseTransitionDuration =>
-      _reducedMotion ? Duration.zero : super.reverseTransitionDuration;
+      _reducedMotion ? Duration.zero : const Duration(milliseconds: 160);
 
   @override
   Widget buildTransitions(BuildContext context, Animation<double> animation,
       Animation<double> secondaryAnimation, Widget child) {
     if (MediaQuery.disableAnimationsOf(context) || _reducedMotion) return child;
-    final curved = CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeOutCubic,
-        reverseCurve: Curves.easeIn);
+    // A rightward swipe anywhere on the page (also from the field: a quick
+    // flick there closes it too) takes the page along with the finger, like
+    // the other phone pages; the fade and scale are for push and the button.
+    // One tree in both modes, so the swipe's state survives the switch.
+    double eased() => animation.status == AnimationStatus.reverse
+        ? Curves.easeIn.transform(animation.value)
+        : Curves.easeOutCubic.transform(animation.value);
     return RepaintBoundary(
       child: FadeTransition(
-        opacity: curved,
+        opacity: _Mapped(animation, () => byHand ? 1.0 : eased()),
         child: SlideTransition(
-          position: Tween(begin: const Offset(0, 10 / 800), end: Offset.zero)
-              .animate(curved),
+          position: _Mapped(
+              animation,
+              () => byHand
+                  ? Offset(1 - animation.value, 0)
+                  : Offset(0, (1 - eased()) * 10 / 800)),
+          transformHitTests: true,
           child: ScaleTransition(
-            scale: Tween(begin: 0.98, end: 1.0).animate(curved),
-            child: child,
+            scale:
+                _Mapped(animation, () => byHand ? 1.0 : 0.98 + 0.02 * eased()),
+            child: swipeable(child),
           ),
         ),
       ),
     );
   }
+}
+
+/// [parent] seen through [map]: its listeners are the parent's.
+class _Mapped<T> extends Animation<T> with AnimationWithParentMixin<double> {
+  _Mapped(this.parent, this.map);
+
+  @override
+  final Animation<double> parent;
+  final T Function() map;
+
+  @override
+  T get value => map();
 }
 
 /// The tablet's palette: the scrim fades in with the route (200 ms), the card
@@ -916,7 +935,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                 ),
               Expanded(
-                child: Builder(builder: (context) {
+                child: _swipeOver(Builder(builder: (context) {
                   final c = context.appColors;
                   // Only the hint follows the kind: typing rebuilds no field.
                   return ValueListenableBuilder<SearchKind>(
@@ -925,6 +944,13 @@ class _SearchScreenState extends State<SearchScreen> {
                             controller: _text,
                             focusNode: _focus,
                             autofocus: true,
+                            // The phone's field does not scroll sideways
+                            // under a finger, so a rightward swipe that
+                            // starts on it still closes the screen (the
+                            // text follows the caret).
+                            scrollPhysics: widget.palette
+                                ? null
+                                : const NeverScrollableScrollPhysics(),
                             textInputAction: TextInputAction.search,
                             // Keeps the keyboard (and focus) after Enter.
                             onEditingComplete: () {},
@@ -943,7 +969,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               suffixIcon: _clearButton(c),
                             ),
                           ));
-                }),
+                })),
               ),
               ListenableBuilder(
                 listenable: _model,
@@ -955,6 +981,16 @@ class _SearchScreenState extends State<SearchScreen> {
       }),
     ),
   );
+
+  /// The field wins every horizontal touch in the arena, so the page-wide
+  /// swipe never sees one that starts on it: this reads the raw pointers over
+  /// the field (taps and the caret still reach it) and drives the same slide.
+  Widget _swipeOver(Widget field) => widget.palette
+      ? field
+      : Stack(children: [
+          field,
+          Positioned.fill(child: PageSwipe(blocked: () => false)),
+        ]);
 
   /// Next to the pages in the split layout, with no route to pop: the bar's
   /// back goes to the home's list.
