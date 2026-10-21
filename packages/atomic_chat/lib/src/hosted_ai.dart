@@ -148,6 +148,12 @@ class HostedAi {
   /// used.
   static Duration webSetupTimeout = const Duration(seconds: 30);
 
+  /// How long the first model request waits for the web app's tools and
+  /// prompt when they are not ready yet. The request must not wait for a
+  /// hidden page to boot: after this it goes with the short prompt and the
+  /// built-in tools, and the web ones are used from the next step or answer on.
+  static Duration webGrace = const Duration(milliseconds: 150);
+
   /// The most of an attached text file sent to the model.
   static const maxFileChars = 20000;
 
@@ -197,18 +203,25 @@ class HostedAi {
     List<AiTool> tools = const [],
     WebToolBridge? bridge,
   }) async* {
+    final clock = Stopwatch()..start();
     final recent = _recent(history);
+    final builtIn = tools;
+    var usedWeb = false;
+    var webReady = false;
     String? webPrompt;
-    if (bridge != null && _completions != null) {
-      final web = await _webSetup(bridge);
+    final webState =
+        bridge != null && _completions != null ? _prepare(bridge) : null;
+    if (webState != null) {
+      var web = webState.ready;
+      if (web == null && webGrace > Duration.zero) {
+        // Not ready: wait a moment at most (a warm page answers at once).
+        web = await webState.future.timeout(webGrace, onTimeout: () => null);
+      }
       if (web != null) {
-        final names = {for (final t in web.tools) t.name};
-        tools = [
-          ...web.tools,
-          for (final t in tools)
-            if (!names.contains(t.name)) t,
-        ];
+        tools = _mergeTools(web, builtIn);
         webPrompt = web.prompt;
+        usedWeb = true;
+        webReady = true;
       }
     }
     final system = [
@@ -237,88 +250,162 @@ class HostedAi {
       ...system,
       for (final e in recent) ..._wire(e),
     ];
-    final defs = tools.isEmpty ? null : [for (final t in tools) t.definition];
+    var defs = tools.isEmpty ? null : [for (final t in tools) t.definition];
     debugPrint('[ai] sending ${messages.length} messages '
         '(${recent.length} of ${history.length} of the chat, '
         '${tools.length} tools) to model "$model"');
-    for (var step = 0; step < maxSteps; step++) {
-      final text = StringBuffer();
-      final calls = <_Call>[];
-      await for (final chunk in completions(messages, model, defs)) {
-        final choices = chunk['choices'];
-        if (choices is! List || choices.isEmpty) continue;
-        final delta = (choices.first as Map)['delta'];
-        if (delta is! Map) continue;
-        final content = delta['content'];
-        if (content is String && content.isNotEmpty) {
-          text.write(content);
-          yield AiTextDelta(content);
-        }
-        final toolCalls = delta['tool_calls'];
-        if (toolCalls is List) {
-          for (final raw in toolCalls) {
-            if (raw is Map) _addCallDelta(calls, raw);
+    var calledTools = false;
+    var chunks = 0;
+    try {
+      for (var step = 0; step < maxSteps; step++) {
+        if (webState != null && !usedWeb) {
+          // The page became ready meanwhile: its tools and prompt from here on.
+          final web = webState.ready;
+          if (web != null) {
+            usedWeb = true;
+            tools = _mergeTools(web, builtIn);
+            defs = [for (final t in tools) t.definition];
+            if (web.prompt != null) {
+              messages[0] = {'role': 'system', 'content': web.prompt};
+            }
           }
         }
-      }
-      if (calls.isEmpty) return;
-      messages.add({
-        'role': 'assistant',
-        'content': text.isEmpty ? null : text.toString(),
-        'tool_calls': [
-          for (final c in calls)
-            {
-              'id': c.id,
-              'type': 'function',
-              'function': {'name': c.name, 'arguments': c.args.toString()},
-            },
-        ],
-      });
-      for (final c in calls) {
-        final raw = c.args.toString();
-        final input = _decodeArgs(raw);
-        final badArgs = _argsError(raw);
-        final part = ToolPart(
-          toolCallId: c.id,
-          toolName: c.name,
-          state: ToolState.inputAvailable,
-          input: input,
-        );
-        yield AiToolStarted(part);
-        String result;
-        AiToolFinished finished;
-        final tool = tools.where((t) => t.name == c.name).firstOrNull;
-        try {
-          if (tool == null) throw StateError('Unknown tool ${c.name}');
-          if (badArgs != null) throw StateError(badArgs);
-          final output = await tool.execute(input).timeout(toolTimeout);
-          finished = AiToolFinished(part.done(output));
-          result =
-              tool.rawResult && output is String ? output : jsonEncode(output);
-        } catch (e) {
-          final message = e is StateError
-              ? e.message
-              : e is TimeoutException
-                  ? 'The tool took longer than ${toolTimeout.inSeconds} '
-                      'seconds and was stopped.'
-                  : '$e';
-          finished = AiToolFinished(part.failed(message));
-          result = 'Error: $message';
+        final text = StringBuffer();
+        final calls = <_Call>[];
+        debugPrint(
+            '[ai-perf] step $step request sent +${clock.elapsedMilliseconds}ms '
+            '(web tools ${usedWeb ? 'on' : webReady ? 'on' : 'off'})');
+        await for (final chunk in completions(messages, model, defs)) {
+          if (chunks++ == 0) {
+            debugPrint('[ai-perf] first chunk +${clock.elapsedMilliseconds}ms');
+          }
+          final choices = chunk['choices'];
+          if (choices is! List || choices.isEmpty) continue;
+          final delta = (choices.first as Map)['delta'];
+          if (delta is! Map) continue;
+          final content = delta['content'];
+          if (content is String && content.isNotEmpty) {
+            text.write(content);
+            yield AiTextDelta(content);
+          }
+          final toolCalls = delta['tool_calls'];
+          if (toolCalls is List) {
+            for (final raw in toolCalls) {
+              if (raw is Map) _addCallDelta(calls, raw);
+            }
+          }
         }
-        yield finished;
+        if (calls.isEmpty) return;
+        calledTools = true;
         messages.add({
-          'role': 'tool',
-          'tool_call_id': c.id,
-          'content': result,
+          'role': 'assistant',
+          'content': text.isEmpty ? null : text.toString(),
+          'tool_calls': [
+            for (final c in calls)
+              {
+                'id': c.id,
+                'type': 'function',
+                'function': {'name': c.name, 'arguments': c.args.toString()},
+              },
+          ],
         });
+        for (final c in calls) {
+          final raw = c.args.toString();
+          final input = _decodeArgs(raw);
+          final badArgs = _argsError(raw);
+          final part = ToolPart(
+            toolCallId: c.id,
+            toolName: c.name,
+            state: ToolState.inputAvailable,
+            input: input,
+          );
+          yield AiToolStarted(part);
+          String result;
+          AiToolFinished finished;
+          final tool = tools.where((t) => t.name == c.name).firstOrNull;
+          try {
+            if (tool == null) throw StateError('Unknown tool ${c.name}');
+            if (badArgs != null) throw StateError(badArgs);
+            final output = await tool.execute(input).timeout(toolTimeout);
+            finished = AiToolFinished(part.done(output));
+            result = tool.rawResult && output is String
+                ? output
+                : jsonEncode(output);
+          } catch (e) {
+            final message = e is StateError
+                ? e.message
+                : e is TimeoutException
+                    ? 'The tool took longer than ${toolTimeout.inSeconds} '
+                        'seconds and was stopped.'
+                    : '$e';
+            finished = AiToolFinished(part.failed(message));
+            result = 'Error: $message';
+          }
+          yield finished;
+          messages.add({
+            'role': 'tool',
+            'tool_call_id': c.id,
+            'content': result,
+          });
+        }
+      }
+    } finally {
+      debugPrint('[ai-perf] done +${clock.elapsedMilliseconds}ms '
+          '($chunks chunks)');
+      // Tools may have changed the drive (classes, tables): the prompt and
+      // tool list are read again in the background for the next answer.
+      if (calledTools && webState != null && bridge != null) {
+        _refreshWeb(bridge);
       }
     }
   }
 
+  static List<AiTool> _mergeTools(_WebSetup web, List<AiTool> builtIn) {
+    final names = {for (final t in web.tools) t.name};
+    return [
+      ...web.tools,
+      for (final t in builtIn)
+        if (!names.contains(t.name)) t,
+    ];
+  }
+
+  final _webStates = Expando<_WebState>();
+
+  /// Starts reading the web app's tools and prompt from [bridge] (booting its
+  /// page) if that is not done yet, and keeps them for the life of the
+  /// bridge. The chat screen calls this when it opens, so the first answer
+  /// finds them ready.
+  void warmWeb(WebToolBridge bridge) => _prepare(bridge);
+
+  _WebState _prepare(WebToolBridge bridge) {
+    final state = _webStates[bridge] ??= _WebState();
+    if (state.loading == null && state.ready == null) {
+      _load(bridge, state);
+    }
+    return state;
+  }
+
+  void _refreshWeb(WebToolBridge bridge) {
+    final state = _webStates[bridge];
+    if (state == null || state.loading != null) return;
+    // The old setup keeps serving until the new one is there.
+    _load(bridge, state);
+  }
+
+  void _load(WebToolBridge bridge, _WebState state) {
+    final done = Completer<_WebSetup?>();
+    state.loading = done.future;
+    state.future = done.future;
+    _webSetup(bridge).then((web) {
+      if (web != null) state.ready = web;
+      state.loading = null;
+      done.complete(web ?? state.ready);
+    });
+  }
+
   /// The web app's tools and prompt from [bridge]; null when it cannot be
   /// reached or offers no tool (the built-in tools are then used).
-  Future<({List<AiTool> tools, String? prompt})?> _webSetup(
-      WebToolBridge bridge) async {
+  Future<_WebSetup?> _webSetup(WebToolBridge bridge) async {
     try {
       final defs = await bridge.listTools().timeout(webSetupTimeout);
       if (defs.isEmpty) return null;
@@ -329,10 +416,7 @@ class HostedAi {
       } catch (e) {
         debugPrint('[ai] no system prompt from the web app: $e');
       }
-      return (
-        tools: [for (final d in defs) AiTool.web(d, bridge)],
-        prompt: prompt,
-      );
+      return _WebSetup([for (final d in defs) AiTool.web(d, bridge)], prompt);
     } catch (e) {
       debugPrint('[ai] web tools unavailable, using the built-in ones: $e');
       return null;
@@ -505,6 +589,22 @@ class HostedAi {
       voiceStatus: client.voiceStatus,
     );
   }
+}
+
+/// The web app's tools and prompt, read from its page.
+class _WebSetup {
+  final List<AiTool> tools;
+  final String? prompt;
+  _WebSetup(this.tools, this.prompt);
+}
+
+/// What was read from one bridge: [ready] once it is there; [future] is the
+/// read in progress (completing with null when it failed and nothing older
+/// is kept).
+class _WebState {
+  _WebSetup? ready;
+  Future<_WebSetup?>? loading;
+  Future<_WebSetup?> future = Future.value(null);
 }
 
 /// A tool call as its pieces arrive.

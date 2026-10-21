@@ -25,6 +25,7 @@ import 'markdown_view.dart';
 import 'chat_bubbles.dart';
 import 'chat_text_styles.dart';
 import 'tool_step.dart';
+import 'toast.dart';
 import 'native_views.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'hosted_ai.dart';
@@ -118,6 +119,20 @@ class ChatScreen extends StatefulWidget {
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
+
+/// An answer being written, owned by no screen: it outlives the screen that
+/// asked, and a screen opened on the chat meanwhile attaches to it.
+class _LiveRun {
+  /// The answer's parts so far.
+  final parts = ValueNotifier<List<ChatPart>>(const []);
+
+  /// Completes when the answer is written to the store (or given up).
+  final _done = Completer<void>();
+  Future<void> get done => _done.future;
+}
+
+/// The runs of the chats being answered, by chat subject.
+final _liveRuns = <String, _LiveRun>{};
 
 class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _input = TextEditingController();
@@ -313,10 +328,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    _flush?.cancel();
-    _sub?.cancel();
-    final own = _ownBridge;
-    if (own is WebViewToolBridge) own.close();
+    // An answer on its way is NOT cancelled by leaving the screen: it runs to
+    // its end, is saved, and a screen opened meanwhile shows it live (see
+    // [_LiveRun]). Cancelling here lost the whole answer.
+    if (_sending) {
+      _ownBridgeOpenUntilDone = true;
+    } else {
+      _flush?.cancel();
+      _sub?.cancel();
+      final own = _ownBridge;
+      if (own is WebViewToolBridge) own.close();
+    }
     _window.removeListener(_windowChanged);
     _window.dispose();
     _keeper.dispose();
@@ -334,6 +356,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _input.dispose();
     super.dispose();
   }
+
+  bool _ownBridgeOpenUntilDone = false;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -688,6 +712,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     }
     await _window.open();
     if (!mounted || _window.error != null) return;
+    final live = _liveRuns[chat];
+    if (live != null && !_sending) _followRun(live);
     final messages = _window.items;
     // Back in a chat whose newest answer is longer than the screen: open at
     // its start, not at its end.
@@ -700,6 +726,39 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         'chat painted ${messages.length}', _opened.elapsedMilliseconds));
     if (messages.isEmpty) _readPicker();
   }
+
+  /// Shows an answer that is still being written by an earlier screen of this
+  /// chat; when it is saved the chat is read again.
+  void _followRun(_LiveRun live) {
+    void show() {
+      if (mounted) setState(() => _partial = List.of(live.parts.value));
+    }
+
+    setState(() {
+      _sending = true;
+      _partial = List.of(live.parts.value);
+      _answerId = 'partial';
+      _follow = true;
+    });
+    live.parts.addListener(show);
+    live.done.whenComplete(() async {
+      live.parts.removeListener(show);
+      if (!mounted) return;
+      await _window.open();
+      if (!mounted) return;
+      setState(() {
+        _sending = false;
+        _partial = null;
+        final all = _window.items;
+        if (all.isNotEmpty && all.last.role == 'assistant') {
+          _answerId = all.last.id;
+        }
+      });
+    });
+  }
+
+  /// The run this screen started.
+  _LiveRun? _live;
 
   /// The list's box and the top line answers are held at (below the
   /// list's padding), in global coordinates.
@@ -861,6 +920,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           _ai = ai;
           _aiLooked = true;
         });
+        // Warm at open: boot the hidden page and read its tools and prompt
+        // now, so the first answer does not wait for them.
+        if (ai != null && ai.supportsTools) {
+          final bridge = _toolBridge();
+          if (bridge != null) ai.warmWeb(bridge);
+        }
         if (widget.voiceMode) {
           if (ai != null && ai.available && ai.consent) _startVoice();
         } else {
@@ -894,13 +959,57 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _persistTail = Future.value();
   int _localId = 0;
 
+  ToastController? _toasts;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _toasts = ToastScope.maybeOf(context);
+  }
+
+  /// Backoff between the tries of a failing write.
+  @visibleForTesting
+  static List<Duration> saveBackoff = const [
+    Duration(milliseconds: 500),
+    Duration(seconds: 2),
+    Duration(seconds: 6),
+  ];
+
+  /// Runs a write, again after a pause when it fails: a write that fails
+  /// quietly lost the answer. The person is told, with a retry.
   void _persist(String label, Future<void> Function() job) {
     _persistTail = _persistTail.then((_) async {
       final sw = Stopwatch()..start();
-      try {
-        await job();
-      } catch (e) {
-        if (mounted) setState(() => _error = '$e');
+      Object? failure;
+      for (var attempt = 0; attempt <= saveBackoff.length; attempt++) {
+        try {
+          await job();
+          failure = null;
+          break;
+        } catch (e) {
+          failure = e;
+          debugPrint('[chat] persist $label failed (try ${attempt + 1}): $e');
+          if (attempt == 0) {
+            _toasts?.show('chat-save', "Couldn't save the answer, retrying",
+                severity: ToastSeverity.error);
+          }
+          if (attempt < saveBackoff.length) {
+            await Future<void>.delayed(saveBackoff[attempt]);
+          }
+        }
+      }
+      final toasts = _toasts;
+      if (failure == null) {
+        toasts?.resolve('chat-save');
+      } else {
+        final error = failure;
+        toasts?.dismiss('chat-save');
+        toasts?.show('chat-save', "Couldn't save the $label",
+            severity: ToastSeverity.error,
+            actionLabel: 'Retry',
+            duration: const Duration(seconds: 15),
+            onAction: () => _persist(label, job));
+        if (mounted) setState(() => _error = '$error');
       }
       debugPrint('[chat] persist $label took ${sw.elapsedMilliseconds}ms');
     });
@@ -934,7 +1043,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _input.clear();
     final sw = Stopwatch()..start();
     void lap(String what) =>
-        debugPrint('[chat] +${sw.elapsedMilliseconds}ms $what');
+        debugPrint('[ai-perf] +${sw.elapsedMilliseconds}ms $what');
     final userParts = <ChatPart>[
       if (text.isNotEmpty) TextPart(text),
       ..._files,
@@ -969,6 +1078,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     // Written in: New makes another chat from now on, also while the chat
     // itself is still being created.
     if (_chat == null) _noLongerNew();
+    // The run belongs to the app, not to this screen (see [_LiveRun]).
+    final live = _live = _LiveRun();
+    if (_chat != null) _liveRuns[_chat!] = live;
     // The user message is saved in the background; the chat exists from the
     // first message on, named after it.
     _persist('user message', () async {
@@ -977,6 +1089,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         name.length > 40 ? '${name.substring(0, 40)}…' : name,
       );
       if (isNew) _noLongerNew();
+      _liveRuns[chat] ??= live;
       await widget.api.addEntry(chat, 'user', userParts);
     });
     String? spoken;
@@ -1075,6 +1188,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         });
       }
       lap('done');
+      _live?.parts.value = List.of(parts);
+      // The run is over once its answer is written (or given up on).
+      _persistTail.whenComplete(() {
+        if (_live == live) _live = null;
+        _liveRuns.removeWhere((_, r) => identical(r, live));
+        if (!live._done.isCompleted) live._done.complete();
+        if (_ownBridgeOpenUntilDone && !mounted) {
+          final own = _ownBridge;
+          if (own is WebViewToolBridge) own.close();
+        }
+      });
     }
     final answer = ChatEntry.textOf(parts);
     if (stopped || answer.isEmpty) return;
@@ -1090,7 +1214,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// clock: a fast stream redraws (and re-reads its Markdown) less often
   /// than it delivers pieces.
   void _showLater(List<ChatPart> parts) {
-    if (_flush != null || !mounted) return;
+    if (_flush != null) return;
     // The first piece shows at once: the dots give way to text.
     final wait = _partial == null || _partial!.isEmpty
         ? Duration.zero
@@ -1102,6 +1226,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void _showNow(List<ChatPart> parts) {
     _flush?.cancel();
     _flush = null;
+    _live?.parts.value = List.of(parts);
     if (mounted && _partial != null) {
       setState(() => _partial = List.of(parts));
     }

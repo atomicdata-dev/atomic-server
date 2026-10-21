@@ -906,4 +906,70 @@ mod tests {
             .iter()
             .any(|c| c["subject"] == chat.as_str() && c["name"] == "Phone chat"));
     }
+
+    /// The bug report: an answer appended right after the question (same
+    /// millisecond, also across a page boundary) is read back at once, in
+    /// order, by the newest window and by `read_chat_after`.
+    #[tokio::test]
+    async fn a_question_and_its_answer_are_read_back_in_order_at_a_page_boundary() {
+        let d = Device::new().await;
+        let cap = crate::chat_log::CHAT_LOG_CAPACITY;
+        for filled in [3, cap - 1, cap - 2, cap] {
+            let entries: Vec<Entry> = (0..filled)
+                .map(|i| d.ai_entry("user", &format!("old {i}"), T0 + i as i64))
+                .collect();
+            let chat = import_ai_chat(&d.node, &crate::host::NoPush, "Boundary", &entries)
+                .await
+                .unwrap();
+            let before = read_chat_page(&d.store, &chat, None, 5).await.unwrap();
+            let newest = before["newest"].as_str().unwrap().to_string();
+            let parts = |t: &str| json!([{ "type": "text", "text": t }]).to_string();
+            for round in 0..3 {
+                append_chat_entry(
+                    &d.node,
+                    &crate::host::NoPush,
+                    &chat,
+                    "user",
+                    &parts(&format!("q{round}")),
+                )
+                .await
+                .unwrap();
+                append_chat_entry(
+                    &d.node,
+                    &crate::host::NoPush,
+                    &chat,
+                    "assistant",
+                    &parts(&format!("a{round}")),
+                )
+                .await
+                .unwrap();
+            }
+            let page = read_chat_page(&d.store, &chat, None, 6).await.unwrap();
+            let texts: Vec<String> = page["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(text_of)
+                .collect();
+            assert_eq!(
+                texts,
+                ["q0", "a0", "q1", "a1", "q2", "a2"],
+                "filled {filled}"
+            );
+            let after = read_chat_after(&d.store, &chat, &newest, 100)
+                .await
+                .unwrap();
+            let texts: Vec<String> = after["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(text_of)
+                .collect();
+            assert_eq!(
+                texts,
+                ["q0", "a0", "q1", "a1", "q2", "a2"],
+                "after, filled {filled}"
+            );
+        }
+    }
 }
