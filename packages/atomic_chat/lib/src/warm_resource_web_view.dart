@@ -91,7 +91,6 @@ class WebViewEmbedPage implements WarmPage {
     final origin = url.origin;
     final controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.transparent)
       ..addJavaScriptChannel('AtomicFlutter', onMessageReceived: (m) {
         // The page's own "I am up" is not a call.
         if (m.message.contains('"method":"ready"') && m.message.length < 40) {
@@ -114,6 +113,11 @@ class WebViewEmbedPage implements WarmPage {
           if (e.isForMainFrame ?? true) page._fail(e.description);
         },
       ));
+    // macOS' WKWebView has no opaque setting and throws for a background
+    // color, which surfaced as "opaque is not implemented on macOS".
+    if (!Platform.isMacOS) {
+      unawaited(controller.setBackgroundColor(Colors.transparent));
+    }
     page = WebViewEmbedPage._(controller)
       .._onMessage = onMessage
       .._onLoaded = onLoaded;
