@@ -15,7 +15,8 @@ import 'package:atomic_chat/atomic_chat.dart'
         ResourceView,
         ResourceWebView,
         openResourceView,
-        timeAgo;
+        timeAgo,
+        ToastScope;
 
 import '../assistant/atomic_assistant_api.dart';
 import '../atomic/account_store.dart';
@@ -239,8 +240,17 @@ class _SyncScreenState extends State<SyncScreen> {
 
   void _copy(String text, String what) {
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('$what copied')));
+    // The app's toast, once: a SnackBar shows on every Scaffold of the
+    // messenger, so on a tablet both the sidebar and the page drew it.
+    final toasts = ToastScope.maybeOf(context);
+    if (toasts == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('$what copied')));
+      return;
+    }
+    toasts
+      ..clearCooldown('copied')
+      ..show('copied', '$what copied', icon: Icons.check);
   }
 
   void _fail(String what, Object e) =>
