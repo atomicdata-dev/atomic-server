@@ -565,11 +565,11 @@ class AtomicNoAssistedRecovery implements Exception {
 
   const AtomicNoAssistedRecovery(
       [this.reason =
-          "This account's backup only opens with its recovery code or passkey."]);
+          "This account's backup can't be opened in the app yet."]);
 
   @override
-  String toString() => '$reason Paste your Atomic secret, or restore once in '
-      'the web app with your passkey or recovery code and try again.';
+  String toString() => '$reason Paste your Atomic secret, or open your '
+      'identity once in the atomic.place web app and try again.';
 }
 
 class AtomicDeviceLink {
