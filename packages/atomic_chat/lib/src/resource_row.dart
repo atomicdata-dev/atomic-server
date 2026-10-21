@@ -92,6 +92,9 @@ class ResourceRow extends StatelessWidget {
   final String title;
   final String? detail;
 
+  /// A caption of its own (avatars, icons), shown instead of [detail].
+  final Widget? detailWidget;
+
   /// Null for a row that is only information.
   final VoidCallback? onTap;
 
@@ -122,6 +125,7 @@ class ResourceRow extends StatelessWidget {
     this.emoji,
     required this.title,
     this.detail,
+    this.detailWidget,
     this.onTap,
     this.trailing,
     this.image,
@@ -171,12 +175,14 @@ class ResourceRow extends StatelessWidget {
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
       titleTextStyle: TextStyle(
           color: titleColor, fontSize: 15, fontWeight: FontWeight.w400),
-      subtitle: detail == null || detail!.isEmpty ? null : Text(detail!),
+      subtitle: detailWidget ??
+          (detail == null || detail!.isEmpty ? null : Text(detail!)),
       subtitleTextStyle: TextStyle(color: captionColor, fontSize: 13),
       // A plain list of titles reads better tight.
-      visualDensity: detail == null && !_hasLeading(context)
-          ? VisualDensity.compact
-          : VisualDensity.standard,
+      visualDensity:
+          detail == null && detailWidget == null && !_hasLeading(context)
+              ? VisualDensity.compact
+              : VisualDensity.standard,
       trailing: trailing,
       selected: selected,
       selectedTileColor: c.rowHighlight,

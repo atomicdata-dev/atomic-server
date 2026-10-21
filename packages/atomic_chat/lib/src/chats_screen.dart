@@ -707,29 +707,92 @@ class _ChatsScreenState extends State<ChatsScreen> {
     );
   }
 
-  /// `<who> created/edited/deleted · <when>`. A deleted resource is gone, so
-  /// its row is not tappable.
-  Widget _activityRow(ActivityEntry a) => ResourceRow(
-        subject: a.subject,
-        icon: iconForClass(a.className),
-        emoji: _icons[a.subject],
-        title: a.name.isEmpty ? a.subject : a.name,
-        detail: '${a.actor ?? 'Unknown member'} ${activityVerb(a.kind)} · '
-            '${timeAgo(a.at.toInt())}',
-        onTap: a.kind == 'deleted'
-            ? null
-            : () {
-                _visit(
-                    openResourceView(
-                        api: widget.api,
-                        drive: a.drive,
-                        subject: a.subject,
-                        title: a.name,
-                        className: a.className),
-                    drive: a.drive,
-                    subject: a.subject);
-              },
-      );
+  /// An activity row as the web's Drive Activity: the resource's icon and
+  /// title, and who did it with their avatar and when ("Polle · 16h ago"),
+  /// under a feed across drives also which drive. On a wide pane the who and
+  /// when sit at the right; on a phone they are the caption. A deleted
+  /// resource is gone, so its row is not tappable.
+  Widget _activityRow(ActivityEntry a) => Builder(builder: (context) {
+        final showDrive = ActivityDriveFilter.of(context) == null;
+        final wide = MediaQuery.sizeOf(context).width >= 600;
+        final c = context.appColors;
+        final verb = switch (a.kind) {
+          'created' => 'created ',
+          'deleted' => 'deleted ',
+          _ => '',
+        };
+        final who = a.actor ?? 'Unknown member';
+        final when = shortTimeAgo(a.at.toInt());
+        final lead = leadingOf(a.picture, _icons[a.subject], a.className);
+        final style = TextStyle(color: c.textSecondary, fontSize: 13);
+        Widget avatar(double size) => RowLeading(
+              key: const Key('activity-actor-avatar'),
+              size: size,
+              shape: RowShape.circle,
+              showInitial: true,
+              fallbackLabel: who,
+              fallbackIcon: Icons.person_outline,
+              image: ImageSource.of(a.actorPicture),
+            );
+        final driveName = a.driveName ?? '';
+        final driveCaption = showDrive && driveName.isNotEmpty
+            ? Row(key: const Key('activity-drive'), children: [
+                SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: RowLeading(
+                        size: 14,
+                        fallbackIcon: Icons.folder_outlined,
+                        fallbackLabel: driveName,
+                        image: ImageSource.of(a.drivePicture))),
+                const SizedBox(width: 6),
+                Flexible(
+                    child: Text(driveName,
+                        maxLines: 1, overflow: TextOverflow.ellipsis)),
+              ])
+            : null;
+        return ResourceRow(
+          subject: a.subject,
+          icon: lead.icon,
+          image: lead.image,
+          shape: lead.shape,
+          showInitial: lead.initial,
+          title: a.name.isEmpty ? a.subject : a.name,
+          detailWidget: wide
+              ? driveCaption
+              : Row(children: [
+                  avatar(16),
+                  const SizedBox(width: 6),
+                  Flexible(
+                      child: Text('$who $verb· $when'.replaceAll('  ', ' '),
+                          maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  if (driveCaption != null) ...[
+                    const Text(' · '),
+                    Flexible(child: driveCaption),
+                  ],
+                ]),
+          trailing: wide
+              ? Row(mainAxisSize: MainAxisSize.min, children: [
+                  avatar(22),
+                  const SizedBox(width: 8),
+                  Text('$who $verb· $when'.replaceAll('  ', ' '), style: style),
+                ])
+              : null,
+          onTap: a.kind == 'deleted'
+              ? null
+              : () {
+                  _visit(
+                      openResourceView(
+                          api: widget.api,
+                          drive: a.drive,
+                          subject: a.subject,
+                          title: a.name,
+                          className: a.className),
+                      drive: a.drive,
+                      subject: a.subject);
+                },
+        );
+      });
 
   Widget _emptyHome() => Padding(
         padding: const EdgeInsets.all(32),
@@ -866,8 +929,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
           ),
           // The app's mild rubber band, with no stretch or glow.
           body: ScrollConfiguration(
-            behavior: ScrollConfiguration.of(context).copyWith(
-                overscroll: false, physics: const AppScrollPhysics()),
+            behavior: ScrollConfiguration.of(context)
+                .copyWith(overscroll: false, physics: const AppScrollPhysics()),
             // Sideways the camera cutout is at a side: the rows (ListTiles)
             // keep out of it, and so do the headings.
             child: SafeArea(
@@ -895,20 +958,20 @@ ResourceRow _resourceRow(RecentResource r,
     {String? driveName}) {
   final lead = leadingOf(r.picture, r.emoji, r.className);
   return ResourceRow(
-      subject: r.subject,
-      icon: lead.icon,
-      image: lead.image,
-      shape: lead.shape,
-      showInitial: lead.initial,
-      label: r.picture?.name,
-      title: r.title.isEmpty ? r.subject : r.title,
-      detail: [
-        if (driveName != null) driveName,
-        classLabel(r.className),
-        if (r.openedAt > 0) timeAgo(r.openedAt)
-      ].where((t) => t.isNotEmpty).join(' · '),
-      onTap: () => onOpen(drive, r),
-    );
+    subject: r.subject,
+    icon: lead.icon,
+    image: lead.image,
+    shape: lead.shape,
+    showInitial: lead.initial,
+    label: r.picture?.name,
+    title: r.title.isEmpty ? r.subject : r.title,
+    detail: [
+      if (driveName != null) driveName,
+      classLabel(r.className),
+      if (r.openedAt > 0) timeAgo(r.openedAt)
+    ].where((t) => t.isNotEmpty).join(' · '),
+    onTap: () => onOpen(drive, r),
+  );
 }
 
 /// One home section: a heading, the first [_homeItems] rows, a "Show all"
@@ -1237,7 +1300,20 @@ class _ActivityPage extends StatefulWidget {
 }
 
 class _ActivityPageState extends State<_ActivityPage> {
-  List<ActivityEntry> _entries = [];
+  List<ActivityEntry> _all = [];
+
+  /// The entries of the chosen drive (every drive when none is chosen).
+  List<ActivityEntry> get _entries => _drive == null
+      ? _all
+      : [
+          for (final a in _all)
+            if (driveKey(a.drive) == _drive) a
+        ];
+  set _entries(List<ActivityEntry> v) => _all = v;
+
+  /// The chosen drive's [driveKey]; null for every drive.
+  String? _drive;
+  List<DriveInfo> _driveList = const [];
   bool _done = false;
   bool _loading = false;
   bool _failed = false;
@@ -1250,6 +1326,9 @@ class _ActivityPageState extends State<_ActivityPage> {
   void initState() {
     super.initState();
     widget.changed.addListener(_restart);
+    widget.api.drives().then((ds) {
+      if (mounted) setState(() => _driveList = visibleDrives(ds));
+    }).catchError((Object _) {});
     _loadMore();
   }
 
@@ -1276,13 +1355,12 @@ class _ActivityPageState extends State<_ActivityPage> {
     final generation = _generation;
     try {
       final page = await widget.api.activityPage(
-          before: _entries.isEmpty ? null : _entries.last,
-          includeOwn: widget.mine());
+          before: _all.isEmpty ? null : _all.last, includeOwn: widget.mine());
       if (!mounted || generation != _generation) return;
-      final known = {for (final a in _entries) '${a.subject}@${a.at}'};
+      final known = {for (final a in _all) '${a.subject}@${a.at}'};
       setState(() {
-        _entries = [
-          ..._entries,
+        _all = [
+          ..._all,
           for (final a in page)
             if (known.add('${a.subject}@${a.at}')) a
         ];
@@ -1304,7 +1382,8 @@ class _ActivityPageState extends State<_ActivityPage> {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    final empty = _entries.isEmpty && _done;
+    final entries = _entries;
+    final empty = entries.isEmpty && _done;
     return Scaffold(
       backgroundColor: c.bgBody,
       appBar: AppTopBar(title: widget.title, actions: [
@@ -1328,39 +1407,95 @@ class _ActivityPageState extends State<_ActivityPage> {
                             : 'No activity from others yet',
                     style: TextStyle(color: c.textSecondary)),
               )
-            : _entries.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : ListView.builder(
-                    key: const Key('activity-all-list'),
-                    // The rows, then a spinner while more may come or the
-                    // end marker.
-                    itemCount: _entries.length + 1,
-                    itemBuilder: (context, i) {
-                      if (i >= _entries.length - _chatsPrefetch) _loadMore();
-                      if (i < _entries.length) return widget.row(_entries[i]);
-                      if (!_done) {
-                        return const Padding(
-                          key: ValueKey('activity-loading'),
-                          padding: EdgeInsets.all(16),
-                          child: Center(
-                              child: SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2))),
-                        );
-                      }
-                      return Padding(
-                        key: const ValueKey('activity-end'),
-                        padding: const EdgeInsets.all(24),
-                        child: Center(
-                            child: Text("You're all caught up",
-                                style: TextStyle(color: c.textSecondary))),
-                      );
-                    }),
+            : ActivityDriveFilter(
+                drive: _drive,
+                child: Column(children: [
+                  if (_driveList.length > 1) _driveChips(c),
+                  Expanded(
+                      child: entries.isEmpty && _all.isEmpty
+                          ? const Center(child: CircularProgressIndicator())
+                          : ListView.builder(
+                              key: const Key('activity-all-list'),
+                              // The rows, then a spinner while more may come
+                              // or the end marker.
+                              itemCount: entries.length + 1,
+                              itemBuilder: (context, i) {
+                                if (i >= entries.length - _chatsPrefetch) {
+                                  _loadMore();
+                                }
+                                if (i < entries.length) {
+                                  return widget.row(entries[i]);
+                                }
+                                if (!_done) {
+                                  return const Padding(
+                                    key: ValueKey('activity-loading'),
+                                    padding: EdgeInsets.all(16),
+                                    child: Center(
+                                        child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2))),
+                                  );
+                                }
+                                return Padding(
+                                  key: const ValueKey('activity-end'),
+                                  padding: const EdgeInsets.all(24),
+                                  child: Center(
+                                      child: Text(
+                                          entries.isEmpty
+                                              ? 'Nothing in this drive yet'
+                                              : "You're all caught up",
+                                          style: TextStyle(
+                                              color: c.textSecondary))),
+                                );
+                              })),
+                ]),
+              ),
       ),
     );
   }
+
+  /// "All" and one chip per drive, filtering the feed.
+  Widget _driveChips(AppColors c) => SizedBox(
+        height: 48,
+        child: ListView(
+          key: const Key('activity-drive-chips'),
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          children: [
+            for (final (key, label) in [
+              (null, 'All drives'),
+              for (final d in _driveList)
+                (driveKey(d.subject), d.name.isEmpty ? d.subject : d.name),
+            ])
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  key: Key('activity-drive-${key ?? 'all'}'),
+                  label: Text(label),
+                  selected: _drive == key,
+                  onSelected: (_) => setState(() => _drive = key),
+                ),
+              ),
+          ],
+        ),
+      );
+}
+
+/// The drive an activity list is limited to (its [driveKey]); null for a feed
+/// across drives, whose rows then say which drive each change is in.
+class ActivityDriveFilter extends InheritedWidget {
+  final String? drive;
+
+  const ActivityDriveFilter(
+      {super.key, required this.drive, required super.child});
+
+  static String? of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<ActivityDriveFilter>()?.drive;
+
+  @override
+  bool updateShouldNotify(ActivityDriveFilter old) => old.drive != drive;
 }
 
 /// How close to the end of the chats (in rows) the next page is read.
@@ -1461,41 +1596,43 @@ class _ChatsPageState extends State<_ChatsPage> {
                 child: _Empty('No chats yet', widget.colors,
                     key: const Key('list-empty')))
             : ListView.builder(
-          key: const Key('chats-all-list'),
-          itemCount: count,
-          findChildIndexCallback: (key) {
-            if (key is! ValueKey<String>) return null;
-            final i = _entries.indexWhere((e) => switch (e) {
-                  final ChatSummary chat => 'chat-${chat.subject}' == key.value,
-                  final String label => 'heading-$label' == key.value,
-                  _ => false,
-                });
-            return i < 0 ? null : i;
-          },
-          itemBuilder: (context, i) {
-            if (i >= count - _chatsPrefetch) _loadMore();
-            if (i >= _entries.length) {
-              return const Padding(
-                key: ValueKey('chats-loading'),
-                padding: EdgeInsets.all(16),
-                child: Center(
-                    child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2))),
-              );
-            }
-            return switch (_entries[i]) {
-              final ChatSummary chat => KeyedSubtree(
-                  key: ValueKey('chat-${chat.subject}'),
-                  child: widget.row(chat)),
-              final String label => KeyedSubtree(
-                  key: ValueKey('heading-$label'),
-                  child: _Heading(label, widget.colors)),
-              _ => const SizedBox.shrink(),
-            };
-          },
-        ),
+                key: const Key('chats-all-list'),
+                itemCount: count,
+                findChildIndexCallback: (key) {
+                  if (key is! ValueKey<String>) return null;
+                  final i = _entries.indexWhere((e) => switch (e) {
+                        final ChatSummary chat =>
+                          'chat-${chat.subject}' == key.value,
+                        final String label => 'heading-$label' == key.value,
+                        _ => false,
+                      });
+                  return i < 0 ? null : i;
+                },
+                itemBuilder: (context, i) {
+                  if (i >= count - _chatsPrefetch) _loadMore();
+                  if (i >= _entries.length) {
+                    return const Padding(
+                      key: ValueKey('chats-loading'),
+                      padding: EdgeInsets.all(16),
+                      child: Center(
+                          child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2))),
+                    );
+                  }
+                  return switch (_entries[i]) {
+                    final ChatSummary chat => KeyedSubtree(
+                        key: ValueKey('chat-${chat.subject}'),
+                        child: widget.row(chat)),
+                    final String label => KeyedSubtree(
+                        key: ValueKey('heading-$label'),
+                        child: _Heading(label, widget.colors)),
+                    _ => const SizedBox.shrink(),
+                  };
+                },
+              ),
       ),
     );
   }
@@ -1562,6 +1699,19 @@ List<(String, List<ChatSummary>)> groupChatsByAge(List<ChatSummary> chats,
     for (final name in order)
       if (groups[name] != null) (name, groups[name]!),
   ];
+}
+
+/// The web's short relative time: "just now", "5m ago", "16h ago", "1d ago",
+/// "3w ago", then the date after eight weeks.
+String shortTimeAgo(int ms, {DateTime? now}) {
+  final then = DateTime.fromMillisecondsSinceEpoch(ms);
+  final diff = (now ?? DateTime.now()).difference(then);
+  if (diff.inMinutes < 1) return 'just now';
+  if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+  if (diff.inDays < 1) return '${diff.inHours}h ago';
+  if (diff.inDays < 7) return '${diff.inDays}d ago';
+  if (diff.inDays < 56) return '${diff.inDays ~/ 7}w ago';
+  return then.toIso8601String().substring(0, 10);
 }
 
 /// "just now", "5 min ago", "3 h ago", "2 d ago", then the date.

@@ -6,7 +6,7 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `conversations_in_json_ad`, `follow_conversations_in_background`, `follow_conversations`
+// These functions are ignored because they are not marked as `pub`: `activity_entry`, `conversations_in_json_ad`, `follow_conversations_in_background`, `follow_conversations`
 
 /// The emojis of `subjects` as JSON `{subject: emoji}`, only for those that
 /// have one. For rows that do not carry their icon themselves (the activity
@@ -259,6 +259,12 @@ class ActivityEntry {
   final String name;
   final String className;
 
+  /// JSON `{emoji?, icon_file?, image_url?, actor: {subject, name?, emoji?,
+  /// icon_file?, image_url?}, drive: {subject, name?, emoji?, icon_file?,
+  /// image_url?}}`: the resource's own picture, the agent's and the
+  /// drive's, as the other rows carry theirs.
+  final String pictures;
+
   const ActivityEntry({
     required this.subject,
     required this.drive,
@@ -267,6 +273,7 @@ class ActivityEntry {
     this.actor,
     required this.name,
     required this.className,
+    required this.pictures,
   });
 
   @override
@@ -277,7 +284,8 @@ class ActivityEntry {
       at.hashCode ^
       actor.hashCode ^
       name.hashCode ^
-      className.hashCode;
+      className.hashCode ^
+      pictures.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -290,5 +298,6 @@ class ActivityEntry {
           at == other.at &&
           actor == other.actor &&
           name == other.name &&
-          className == other.className;
+          className == other.className &&
+          pictures == other.pictures;
 }

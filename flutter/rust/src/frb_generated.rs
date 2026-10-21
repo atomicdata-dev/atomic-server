@@ -3413,6 +3413,7 @@ impl SseDecode for crate::api::assistant::ActivityEntry {
         let mut var_actor = <Option<String>>::sse_decode(deserializer);
         let mut var_name = <String>::sse_decode(deserializer);
         let mut var_className = <String>::sse_decode(deserializer);
+        let mut var_pictures = <String>::sse_decode(deserializer);
         return crate::api::assistant::ActivityEntry {
             subject: var_subject,
             drive: var_drive,
@@ -3421,6 +3422,7 @@ impl SseDecode for crate::api::assistant::ActivityEntry {
             actor: var_actor,
             name: var_name,
             class_name: var_className,
+            pictures: var_pictures,
         };
     }
 }
@@ -3863,6 +3865,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::assistant::ActivityEntry {
             self.actor.into_into_dart().into_dart(),
             self.name.into_into_dart().into_dart(),
             self.class_name.into_into_dart().into_dart(),
+            self.pictures.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -3988,6 +3991,7 @@ impl SseEncode for crate::api::assistant::ActivityEntry {
         <Option<String>>::sse_encode(self.actor, serializer);
         <String>::sse_encode(self.name, serializer);
         <String>::sse_encode(self.class_name, serializer);
+        <String>::sse_encode(self.pictures, serializer);
     }
 }
 

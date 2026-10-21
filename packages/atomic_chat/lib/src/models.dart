@@ -166,6 +166,16 @@ class ActivityEntry {
   final String name;
   final String className;
 
+  /// The resource's own picture and emoji; null when it has none.
+  final ResourcePicture? picture;
+
+  /// The member's picture (a person); null when none is known.
+  final ResourcePicture? actorPicture;
+
+  /// The drive's name and picture, so a feed across drives says which.
+  final String? driveName;
+  final ResourcePicture? drivePicture;
+
   const ActivityEntry({
     required this.subject,
     required this.drive,
@@ -174,11 +184,55 @@ class ActivityEntry {
     this.actor,
     required this.name,
     required this.className,
+    this.picture,
+    this.actorPicture,
+    this.driveName,
+    this.drivePicture,
   });
 
+  /// An entry whose pictures are the host's `pictures` JSON (`{emoji?,
+  /// icon_file?, image_url?, actor: {...}, drive: {name?, ...}}`).
+  factory ActivityEntry.withPictures({
+    required String subject,
+    required String drive,
+    required String kind,
+    required int at,
+    String? actor,
+    required String name,
+    required String className,
+    required String pictures,
+  }) {
+    Object? json;
+    try {
+      json = jsonDecode(pictures);
+    } catch (_) {}
+    final map = json is Map ? json : const <String, Object?>{};
+    final driveJson = map['drive'];
+    final driveName = driveJson is Map && driveJson['name'] is String
+        ? (driveJson['name'] as String).trim()
+        : '';
+    return ActivityEntry(
+      subject: subject,
+      drive: drive,
+      kind: kind,
+      at: at,
+      actor: actor,
+      name: name,
+      className: className,
+      picture: ResourcePicture.fromJson(map),
+      actorPicture: ResourcePicture.fromJson(
+          (map['actor'] is Map
+              ? {...map['actor'] as Map, 'name': actor}
+              : null),
+          person: true),
+      driveName: driveName.isEmpty ? null : driveName,
+      drivePicture: ResourcePicture.fromJson(driveJson),
+    );
+  }
+
   @override
-  int get hashCode =>
-      Object.hash(subject, drive, kind, at, actor, name, className);
+  int get hashCode => Object.hash(subject, drive, kind, at, actor, name,
+      className, picture, actorPicture, driveName, drivePicture);
 
   @override
   bool operator ==(Object other) =>
@@ -190,7 +244,11 @@ class ActivityEntry {
           at == other.at &&
           actor == other.actor &&
           name == other.name &&
-          className == other.className;
+          className == other.className &&
+          picture == other.picture &&
+          actorPicture == other.actorPicture &&
+          driveName == other.driveName &&
+          drivePicture == other.drivePicture;
 }
 
 /// The identifier without its scheme: `did:ad:X` and `atomic:X` are one drive.

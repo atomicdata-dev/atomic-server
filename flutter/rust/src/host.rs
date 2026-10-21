@@ -59,6 +59,12 @@ impl AgentProfileFetcher for ServerProfileFetcher {
         }
         fetched.ok()
     }
+
+    async fn fetch_history_attribution(&self, subject: &str) -> Option<String> {
+        let origin = connected_server()?;
+        let agent = db().ok()?.get_default_agent().ok();
+        atomic_lib::host::fetch_history_attribution(&origin, subject, agent.as_ref()).await
+    }
 }
 
 /// The profiles of agents this device does not hold, fetched from the

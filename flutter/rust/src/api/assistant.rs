@@ -71,6 +71,27 @@ pub struct ActivityEntry {
     pub actor: Option<String>,
     pub name: String,
     pub class_name: String,
+    /// JSON `{emoji?, icon_file?, image_url?, actor: {subject, name?, emoji?,
+    /// icon_file?, image_url?}, drive: {subject, name?, emoji?, icon_file?,
+    /// image_url?}}`: the resource's own picture, the agent's and the
+    /// drive's, as the other rows carry theirs.
+    pub pictures: String,
+}
+
+fn activity_entry(a: lists::ActivityRow) -> ActivityEntry {
+    let mut pictures = a.picture.clone();
+    pictures.insert("actor".into(), a.actor_picture.clone());
+    pictures.insert("drive".into(), a.drive_picture.clone());
+    ActivityEntry {
+        subject: a.subject,
+        drive: a.drive,
+        kind: a.kind.as_str().to_string(),
+        at: a.at,
+        actor: Some(a.actor),
+        name: a.name,
+        class_name: a.class_name,
+        pictures: serde_json::Value::Object(pictures).to_string(),
+    }
 }
 
 /// What changed lately in every drive, newest first, by whom. Read from the
@@ -89,18 +110,7 @@ pub async fn list_activity(limit: u32, include_own: bool) -> Result<Vec<Activity
         include_own,
     )
     .await;
-    Ok(rows
-        .into_iter()
-        .map(|a| ActivityEntry {
-            subject: a.subject,
-            drive: a.drive,
-            kind: a.kind.as_str().to_string(),
-            at: a.at,
-            actor: Some(a.actor),
-            name: a.name,
-            class_name: a.class_name,
-        })
-        .collect())
+    Ok(rows.into_iter().map(activity_entry).collect())
 }
 
 /// One page of the full Activity feed, newest first: the entries after the
@@ -123,18 +133,7 @@ pub async fn list_activity_page(
         include_own,
     )
     .await;
-    Ok(rows
-        .into_iter()
-        .map(|a| ActivityEntry {
-            subject: a.subject,
-            drive: a.drive,
-            kind: a.kind.as_str().to_string(),
-            at: a.at,
-            actor: Some(a.actor),
-            name: a.name,
-            class_name: a.class_name,
-        })
-        .collect())
+    Ok(rows.into_iter().map(activity_entry).collect())
 }
 
 /// Record that this device opened `subject` in `drive`. Local to the device:

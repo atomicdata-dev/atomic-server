@@ -232,18 +232,11 @@ class AtomicClient {
       [
         for (final a in await assistant.listActivity(
             limit: limit, includeOwn: includeOwn))
-          ActivityEntry(
-            subject: a.subject,
-            drive: a.drive,
-            kind: a.kind,
-            at: a.at.toInt(),
-            actor: a.actor,
-            name: a.name,
-            className: a.className,
-          ),
+          _activityEntry(a),
       ];
 
-  static ActivityEntry _activityEntry(assistant.ActivityEntry a) => ActivityEntry(
+  static ActivityEntry _activityEntry(assistant.ActivityEntry a) =>
+      ActivityEntry.withPictures(
         subject: a.subject,
         drive: a.drive,
         kind: a.kind,
@@ -251,6 +244,7 @@ class AtomicClient {
         actor: a.actor,
         name: a.name,
         className: a.className,
+        pictures: a.pictures,
       );
 
   /// One page of the full Activity feed, newest first: the entries after
