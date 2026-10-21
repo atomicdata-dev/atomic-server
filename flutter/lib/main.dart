@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'src/rust/frb_generated.dart';
 import 'package:atomic_chat/atomic_chat.dart'
-    show AppShell, AppThemeMode, ChatsScreen, ToastController, ToastHost, defaultAttachmentPicker;
+    show AppShell, AppSidebarIcons, AppThemeMode, ChatsScreen, ToastController, ToastHost, defaultAttachmentPicker;
 import 'assistant/atomic_assistant_api.dart';
 import 'assistant/file_attachment_picker.dart';
 import 'bootstrap.dart';
@@ -27,7 +27,7 @@ void main() async {
   Perf.watchFrames();
   Perf.watchTaps();
   // Independent of the database, so read while it opens.
-  final theme = AppThemeMode.load();
+  final theme = Future.wait([AppThemeMode.load(), AppSidebarIcons.load()]);
   await bootstrap(
     initRust: RustLib.init,
     ready: () => theme,
