@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColors, AppColorsExt, Perf, SectionHeaderStyle;
+    show AppColors, AppColorsExt, AppScrollPhysics, Perf, SectionHeaderStyle;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderAbstractViewport;
@@ -861,20 +861,16 @@ class _ChatsScreenState extends State<ChatsScreen> {
           appBar: AppTopBar(
             titleWidget: const AtomicWordmark(),
           ),
-          // Clamped, with no stretch or glow at the edges: the Material 3
-          // stretch overscroll of Android 12+ pulls the whole page past the
-          // top and springs it back, which on a flick up reads as the list
-          // bouncing down again from the top.
+          // The app's mild rubber band, with no stretch or glow.
           body: ScrollConfiguration(
             behavior: ScrollConfiguration.of(context).copyWith(
-                overscroll: false, physics: const ClampingScrollPhysics()),
+                overscroll: false, physics: const AppScrollPhysics()),
             // Sideways the camera cutout is at a side: the rows (ListTiles)
             // keep out of it, and so do the headings.
             child: SafeArea(
               top: false,
               bottom: false,
               child: ListView(
-                physics: const ClampingScrollPhysics(),
                 children: [
                   // Next to the pages the activity is the detail pane's.
                   ..._shownSections(split),

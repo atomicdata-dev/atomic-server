@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:atomic_flutter/atomic_flutter.dart' show AppScrollPhysics;
 import 'package:flutter/material.dart';
 
 import 'chat_text_styles.dart';
@@ -371,8 +372,7 @@ class ChatWindow<T> extends ChangeNotifier {
 }
 
 /// The same scroll physics on every chat list.
-const chatScrollPhysics =
-    AlwaysScrollableScrollPhysics(parent: ClampingScrollPhysics());
+const chatScrollPhysics = AppScrollPhysics();
 
 /// Scroll behaviour of a chat list over a [ChatWindow]: a reversed list
 /// (newest at the bottom, offset 0). Loads older pages within [edge] items
