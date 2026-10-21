@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
@@ -5,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import 'chat_parts.dart';
 import 'models.dart';
+import 'web_tool_bridge.dart';
 
 /// What the model is told before the conversation. Not shown to the person.
 const _systemPrompt =
@@ -40,12 +42,33 @@ class AiTool {
   /// model as JSON. A thrown error goes back as the call's failure.
   final Future<Object?> Function(Map<String, dynamic> input) execute;
 
+  /// The result is text that goes to the model as it is (a web tool's), not
+  /// to be encoded as JSON.
+  final bool rawResult;
+
   const AiTool({
     required this.name,
     required this.description,
     required this.parameters,
     required this.execute,
+    this.rawResult = false,
   });
+
+  /// [def] (a tool of the web app), run by [bridge]: `{name, args}` goes to
+  /// the web page and its text comes back. A result of the form
+  /// `{"error": …}` is the call's failure.
+  factory AiTool.web(ToolDef def, WebToolBridge bridge) => AiTool(
+        name: def.name,
+        description: def.description,
+        parameters: def.parameters,
+        rawResult: true,
+        execute: (input) async {
+          final text = await bridge.run(def.name, input);
+          final error = _errorOf(text);
+          if (error != null) throw StateError(error);
+          return text;
+        },
+      );
 
   /// The definition the model is given.
   Map<String, dynamic> get definition => {
@@ -117,6 +140,14 @@ class HostedAi {
   /// chat).
   static const maxSteps = 8;
 
+  /// How long a tool call may take before it is given up (the model is told).
+  static Duration toolTimeout = const Duration(seconds: 60);
+
+  /// How long fetching the web app's tools and prompt may take at the start of
+  /// an answer (the page may still be loading) before the built-in ones are
+  /// used.
+  static Duration webSetupTimeout = const Duration(seconds: 30);
+
   /// The most of an attached text file sent to the model.
   static const maxFileChars = 20000;
 
@@ -155,18 +186,38 @@ class HostedAi {
   ///
   /// [context], when given, is sent as a second system message ahead of the
   /// history: resources the person attached. It is not part of the chat.
+  ///
+  /// With a [bridge], the tools and the system prompt are the web app's (its
+  /// tool list is read at the start of each answer; [tools] are then only
+  /// the ones the web app lacks, or all of them when the web app cannot be
+  /// reached).
   Stream<AiEvent> run(
     List<ChatEntry> history, {
     String? context,
     List<AiTool> tools = const [],
+    WebToolBridge? bridge,
   }) async* {
     final recent = _recent(history);
+    String? webPrompt;
+    if (bridge != null && _completions != null) {
+      final web = await _webSetup(bridge);
+      if (web != null) {
+        final names = {for (final t in web.tools) t.name};
+        tools = [
+          ...web.tools,
+          for (final t in tools)
+            if (!names.contains(t.name)) t,
+        ];
+        webPrompt = web.prompt;
+      }
+    }
     final system = [
       {
         'role': 'system',
-        'content': tools.isEmpty || _completions == null
-            ? _systemPrompt
-            : '$_systemPrompt$_toolsPrompt',
+        'content': webPrompt ??
+            (tools.isEmpty || _completions == null
+                ? _systemPrompt
+                : '$_systemPrompt$_toolsPrompt'),
       },
       if (context != null && context.isNotEmpty)
         {'role': 'system', 'content': context},
@@ -224,7 +275,9 @@ class HostedAi {
         ],
       });
       for (final c in calls) {
-        final input = _decodeArgs(c.args.toString());
+        final raw = c.args.toString();
+        final input = _decodeArgs(raw);
+        final badArgs = _argsError(raw);
         final part = ToolPart(
           toolCallId: c.id,
           toolName: c.name,
@@ -237,11 +290,18 @@ class HostedAi {
         final tool = tools.where((t) => t.name == c.name).firstOrNull;
         try {
           if (tool == null) throw StateError('Unknown tool ${c.name}');
-          final output = await tool.execute(input);
+          if (badArgs != null) throw StateError(badArgs);
+          final output = await tool.execute(input).timeout(toolTimeout);
           finished = AiToolFinished(part.done(output));
-          result = jsonEncode(output);
+          result =
+              tool.rawResult && output is String ? output : jsonEncode(output);
         } catch (e) {
-          final message = e is StateError ? e.message : '$e';
+          final message = e is StateError
+              ? e.message
+              : e is TimeoutException
+                  ? 'The tool took longer than ${toolTimeout.inSeconds} '
+                      'seconds and was stopped.'
+                  : '$e';
           finished = AiToolFinished(part.failed(message));
           result = 'Error: $message';
         }
@@ -252,6 +312,30 @@ class HostedAi {
           'content': result,
         });
       }
+    }
+  }
+
+  /// The web app's tools and prompt from [bridge]; null when it cannot be
+  /// reached or offers no tool (the built-in tools are then used).
+  Future<({List<AiTool> tools, String? prompt})?> _webSetup(
+      WebToolBridge bridge) async {
+    try {
+      final defs = await bridge.listTools().timeout(webSetupTimeout);
+      if (defs.isEmpty) return null;
+      String? prompt;
+      try {
+        final text = await bridge.systemPrompt().timeout(webSetupTimeout);
+        if (text.trim().isNotEmpty) prompt = text;
+      } catch (e) {
+        debugPrint('[ai] no system prompt from the web app: $e');
+      }
+      return (
+        tools: [for (final d in defs) AiTool.web(d, bridge)],
+        prompt: prompt,
+      );
+    } catch (e) {
+      debugPrint('[ai] web tools unavailable, using the built-in ones: $e');
+      return null;
     }
   }
 
@@ -365,7 +449,9 @@ class HostedAi {
           'tool_call_id': c.toolCallId,
           'content': c.state == ToolState.outputError
               ? 'Error: ${c.errorText ?? ''}'
-              : jsonEncode(c.output),
+              : c.output is String
+                  ? c.output as String
+                  : jsonEncode(c.output),
         });
       }
       calls.clear();
@@ -460,5 +546,27 @@ Map<String, dynamic> _decodeArgs(String raw) {
     return v is Map ? Map<String, dynamic>.from(v) : {'value': v};
   } catch (_) {
     return {'arguments': raw};
+  }
+}
+
+/// The `error` of a tool result that is `{"error": …}` alone; null otherwise.
+String? _errorOf(String text) {
+  if (!text.startsWith('{') || !text.contains('"error"')) return null;
+  try {
+    final v = jsonDecode(text);
+    if (v is Map && v.length == 1 && v['error'] != null) return '${v['error']}';
+  } catch (_) {}
+  return null;
+}
+
+/// Why the model's tool arguments cannot be used, or null when they can.
+String? _argsError(String raw) {
+  if (raw.trim().isEmpty) return null;
+  try {
+    if (jsonDecode(raw) is Map) return null;
+    return 'The arguments of the tool call must be a JSON object.';
+  } catch (e) {
+    return 'The arguments of the tool call are not valid JSON; call the tool '
+        'again with a valid JSON object.';
   }
 }

@@ -20,6 +20,7 @@ export 'src/chat_window.dart';
 export 'src/scroll_to_bottom_button.dart';
 export 'src/hosted_ai.dart';
 export 'src/ai_tools.dart';
+export 'src/web_tool_bridge.dart';
 
 // The shell: pages above a bottom bar that never moves.
 export 'src/app_shell.dart';

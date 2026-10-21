@@ -3,6 +3,8 @@ import 'package:atomic_flutter/atomic_flutter.dart'
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'dart:async';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:math' as math;
 
 import 'app_top_bar.dart';
@@ -13,6 +15,7 @@ import 'models.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'ai_tools.dart';
+import 'web_tool_bridge.dart';
 import 'attachments.dart';
 import 'resource_row.dart';
 import 'chat_parts.dart';
@@ -84,6 +87,19 @@ class ChatScreen extends StatefulWidget {
   /// them.
   final List<AiTool>? tools;
 
+  /// The web app's AI tools and system prompt (see [WebToolBridge]); the
+  /// device's [defaultToolBridge] when null and [tools] is not given.
+  final WebToolBridge? toolBridge;
+
+  /// The bridge for a device without one given: a hidden web view of the
+  /// embedded page on a phone or tablet, none elsewhere (tests, desktop).
+  /// `drive` gives the subject of the drive the tools work on.
+  static WebToolBridge? Function(
+          AssistantApi api, Future<String> Function() drive) defaultToolBridge =
+      (api, drive) => !kIsWeb && (Platform.isAndroid || Platform.isIOS)
+          ? WebViewToolBridge(api: api, drive: drive)
+          : null;
+
   const ChatScreen({
     super.key,
     required this.api,
@@ -95,6 +111,7 @@ class ChatScreen extends StatefulWidget {
     this.accountLanguageHints = hostedLanguageHintSupported,
     this.voiceMode = false,
     this.tools,
+    this.toolBridge,
     this.attachmentPicker,
   });
 
@@ -150,6 +167,29 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Object? get _loadError => _window.error;
   bool _noChatYet = false;
   bool get _loaded => _window.loaded || _noChatYet;
+
+  /// The bridge made by [ChatScreen.defaultToolBridge], kept for the screen.
+  WebToolBridge? _ownBridge;
+  bool _bridgeMade = false;
+
+  /// The web app's tools for this chat: the one given, else the device's own
+  /// (made once). None when [ChatScreen.tools] is given.
+  WebToolBridge? _toolBridge() {
+    if (widget.toolBridge != null) return widget.toolBridge;
+    if (widget.tools != null) return null;
+    if (!_bridgeMade) {
+      _bridgeMade = true;
+      _ownBridge = ChatScreen.defaultToolBridge(widget.api, () async {
+        try {
+          final drives = visibleDrives(await widget.api.drives());
+          return drives.isEmpty ? '' : drives.first.subject;
+        } catch (_) {
+          return '';
+        }
+      });
+    }
+    return _ownBridge;
+  }
 
   /// The AI of the linked account, once looked up; null when there is none.
   HostedAi? _ai;
@@ -275,6 +315,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void dispose() {
     _flush?.cancel();
     _sub?.cancel();
+    final own = _ownBridge;
+    if (own is WebViewToolBridge) own.close();
     _window.removeListener(_windowChanged);
     _window.dispose();
     _keeper.dispose();
@@ -949,7 +991,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final tools = ai.supportsTools
           ? (widget.tools ?? assistantTools(widget.api))
           : null;
-      _sub = ai.run(asked, context: context, tools: tools ?? const []).listen(
+      final bridge = ai.supportsTools ? _toolBridge() : null;
+      _sub = ai
+          .run(asked,
+              context: context, tools: tools ?? const [], bridge: bridge)
+          .listen(
         (event) {
           if (first) {
             first = false;
