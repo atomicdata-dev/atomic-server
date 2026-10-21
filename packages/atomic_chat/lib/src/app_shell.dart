@@ -183,6 +183,10 @@ class ShellController extends ChangeNotifier {
   /// Kept through resizes and rotation, not across starts.
   final ValueNotifier<bool> listCollapsed = ValueNotifier(false);
 
+  /// Whether the sidebar (the home) shows the drive list in place of its
+  /// usual content. Any navigation, Home included, closes it.
+  final ValueNotifier<bool> driveSwitcher = ValueNotifier(false);
+
   /// The list pane's width the person dragged it to; null: one that suits
   /// the window. Remembered per device ([listWidthKey]).
   final ValueNotifier<double?> listWidth = ValueNotifier(null);
@@ -385,10 +389,12 @@ class ShellController extends ChangeNotifier {
   /// ([overList]) opened from a section's full list ([ShellPage.isList])
   /// goes over it, and back returns to the list.
   Future<T?> _show<T>(NavigatorState navigator, Route<T> route,
-          {bool overList = false}) =>
-      split && !(overList && ShellPage.isList(topKind))
-          ? navigator.pushAndRemoveUntil(route, (r) => r.isFirst)
-          : navigator.push(route);
+          {bool overList = false}) {
+    driveSwitcher.value = false;
+    return split && !(overList && ShellPage.isList(topKind))
+        ? navigator.pushAndRemoveUntil(route, (r) => r.isFirst)
+        : navigator.push(route);
+  }
 
   /// Opens the page of a resource picked from a list (the home, search):
   /// pushed on a phone, in the detail pane next to the list. [subject] marks
@@ -414,6 +420,7 @@ class ShellController extends ChangeNotifier {
   /// Shows [kind] in the list pane ([ShellPage.home] or a search); only in
   /// the split layout. A folded list pane comes back.
   void showList(String kind) {
+    driveSwitcher.value = false;
     setListCollapsed(false);
     if (list.value == kind) return;
     if (ShellPage.isSearch(kind)) {
@@ -441,8 +448,10 @@ class ShellController extends ChangeNotifier {
           builder: builder, settings: settings, instant: split));
 
   /// Back to the first page.
-  void goHome() =>
-      navigatorKey.currentState?.popUntil((route) => route.isFirst);
+  void goHome() {
+    driveSwitcher.value = false;
+    navigatorKey.currentState?.popUntil((route) => route.isFirst);
+  }
 
   /// The menu action of the page on top, if that page has one.
   ShellMenu? get topMenu => _top == null ? null : _menus[_top];
@@ -531,6 +540,7 @@ class ShellController extends ChangeNotifier {
     activity.dispose();
     searching.dispose();
     listCollapsed.dispose();
+    driveSwitcher.dispose();
     listWidth.dispose();
     selected.dispose();
     searchReset.dispose();

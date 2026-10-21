@@ -194,6 +194,12 @@ class RowLeading extends StatefulWidget {
   /// (people) instead of the generic icon.
   final bool showInitial;
 
+  /// Draw a bare glyph or emoji (one without a circle behind it) at the
+  /// slot's left edge instead of its middle, so its left edge is where a
+  /// picture or an avatar in the same column starts, and where the panel
+  /// headings' titles start.
+  final bool alignGlyphStart;
+
   /// How long the row stays built before its picture is read.
   final Duration debounce;
 
@@ -207,6 +213,7 @@ class RowLeading extends StatefulWidget {
     this.cornerRadius = 8,
     this.shape = RowShape.square,
     this.showInitial = false,
+    this.alignGlyphStart = false,
     this.debounce = const Duration(milliseconds: 120),
   });
 
@@ -318,7 +325,11 @@ class _RowLeadingState extends State<RowLeading> {
             fit: StackFit.expand,
             alignment: Alignment.center,
             children: [
-              Center(child: base),
+              Align(
+                  alignment: widget.alignGlyphStart && background == null
+                      ? Alignment.centerLeft
+                      : Alignment.center,
+                  child: base),
               if (provider != null)
                 Image(
                   key: const Key('row-picture'),

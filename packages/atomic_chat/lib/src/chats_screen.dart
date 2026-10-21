@@ -429,6 +429,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     _shell?.activity.value = null;
     if (_shell?.onUser == _settings) _shell?.onUser = null;
     _feedChanged.dispose();
+    _ownSwitcher.dispose();
     super.dispose();
   }
 
@@ -1062,16 +1063,37 @@ class _ChatsScreenState extends State<ChatsScreen> {
     return null;
   }
 
-  void _openSwitcher(BuildContext headerContext) {
+  /// Whether the sidebar shows the drive list in place of its content. The
+  /// shell holds it (so Home can close it); without a shell it is ours.
+  final ValueNotifier<bool> _ownSwitcher = ValueNotifier(false);
+  ValueNotifier<bool> get _switcher => _shell?.driveSwitcher ?? _ownSwitcher;
+
+  void _toggleSwitcher() => _switcher.value = !_switcher.value;
+
+  /// The drive list, filling the sidebar. Whatever it does closes it first.
+  Widget _switcherBody() {
     final shell = _shell;
-    showDriveSwitcher(
-      headerContext,
-      drives: _driveList,
-      current: _drive,
-      onSelect: _selectDrive,
-      onOpen: _openDrivePage,
-      onManage: () => _openSectionPage(HomeSection.drives),
-      onNew: shell == null ? null : ShellActions(widget.api, shell).newDrive,
+    void closing(VoidCallback f) {
+      _switcher.value = false;
+      f();
+    }
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _switcher.value = false;
+      },
+      child: DriveSwitcherContent(
+        fill: true,
+        drives: _driveList,
+        current: _drive,
+        onSelect: (d) => closing(() => _selectDrive(d)),
+        onOpen: (d) => closing(() => _openDrivePage(d)),
+        onManage: () => closing(() => _openSectionPage(HomeSection.drives)),
+        onNew: shell == null
+            ? null
+            : () => closing(ShellActions(widget.api, shell).newDrive),
+      ),
     );
   }
 
@@ -1095,13 +1117,17 @@ class _ChatsScreenState extends State<ChatsScreen> {
                 alignment: Alignment.centerLeft,
                 child: CurrentDriveHeader(
                   drive: _currentDrive,
-                  onTap: () => _openSwitcher(headerContext),
+                  onTap: _toggleSwitcher,
                 ),
               ),
             ),
           ),
           // The app's overscroll stretch.
-          body: ScrollConfiguration(
+          body: ValueListenableBuilder<bool>(
+            valueListenable: _switcher,
+            builder: (context, switching, _) => switching
+                ? _switcherBody()
+                : ScrollConfiguration(
             behavior: ScrollConfiguration.of(context)
                 .copyWith(physics: const AppScrollPhysics()),
             // Sideways the camera cutout is at a side: the rows (ListTiles)
@@ -1176,6 +1202,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
               }),
             ),
           ),
+        ),
         );
       },
     )));

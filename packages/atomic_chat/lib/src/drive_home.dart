@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColorsExt, ErrorText, SectionHeaderStyle;
@@ -13,10 +12,6 @@ import 'app_sidebar_icons.dart';
 import 'resource_row.dart';
 import 'row_leading.dart';
 import 'sidebar_metrics.dart';
-
-/// Below this width the drive switcher is a bottom sheet, from it a popover
-/// under the header.
-const driveSwitcherPopoverWidth = 600.0;
 
 String driveTitle(DriveInfo d) => d.name.isEmpty ? 'Untitled drive' : d.name;
 
@@ -110,6 +105,10 @@ class CurrentDriveHeader extends StatelessWidget {
 /// row (the left part opens the drive's page, a "Switch" button on the right
 /// makes it the current drive, the current one shows a "Current" chip) and
 /// "Manage drives…" and "New drive" at the bottom.
+///
+/// It is a state of the sidebar, not a layer over it: with [fill] it takes
+/// all the room it is given (the list scrolls, the actions stay at the
+/// bottom).
 class DriveSwitcherContent extends StatefulWidget {
   final List<DriveInfo> drives;
   final String current;
@@ -120,8 +119,12 @@ class DriveSwitcherContent extends StatefulWidget {
   final VoidCallback? onManage;
   final VoidCallback? onNew;
 
+  /// Take all the height there is instead of only what the rows need.
+  final bool fill;
+
   const DriveSwitcherContent({
     super.key,
+    this.fill = false,
     required this.drives,
     required this.current,
     required this.onSelect,
@@ -179,7 +182,7 @@ class _DriveSwitcherContentState extends State<DriveSwitcherContent> {
     final currentKey = driveKeyOf(widget.current);
     return Column(
       key: const Key('drive-switcher'),
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: widget.fill ? MainAxisSize.max : MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
@@ -203,6 +206,7 @@ class _DriveSwitcherContentState extends State<DriveSwitcherContent> {
           ),
         ),
         Flexible(
+          fit: widget.fill ? FlexFit.tight : FlexFit.loose,
           child: shown.isEmpty
               ? Padding(
                   padding: const EdgeInsets.all(24),
@@ -213,7 +217,7 @@ class _DriveSwitcherContentState extends State<DriveSwitcherContent> {
                   ),
                 )
               : ListView.builder(
-                  shrinkWrap: true,
+                  shrinkWrap: !widget.fill,
                   itemCount: shown.length,
                   itemBuilder: (context, i) {
                     final d = shown[i];
@@ -388,95 +392,6 @@ class _DriveSwitcherRowState extends State<_DriveSwitcherRow> {
 String driveKeyOf(String subject) =>
     subject.replaceFirst(RegExp(r'^(did:ad:|atomic:)'), '').split('?').first;
 
-/// Opens the drive switcher from the header whose [context] is given: a
-/// popover under it from [driveSwitcherPopoverWidth] on, else a bottom sheet.
-/// Both close it first: the "Switch" button then calls [onSelect], the row's
-/// left part [onOpen] (the drive's page; the active drive stays).
-Future<void> showDriveSwitcher(
-  BuildContext context, {
-  required List<DriveInfo> drives,
-  required String current,
-  required ValueChanged<DriveInfo> onSelect,
-  required ValueChanged<DriveInfo> onOpen,
-  VoidCallback? onManage,
-  VoidCallback? onNew,
-}) {
-  final media = MediaQuery.of(context);
-  final wide = media.size.width >= driveSwitcherPopoverWidth;
-  Widget content(BuildContext inner) => DriveSwitcherContent(
-        drives: drives,
-        current: current,
-        onSelect: (d) {
-          Navigator.of(inner).pop();
-          onSelect(d);
-        },
-        onOpen: (d) {
-          Navigator.of(inner).pop();
-          onOpen(d);
-        },
-        onManage: onManage == null
-            ? null
-            : () {
-                Navigator.of(inner).pop();
-                onManage();
-              },
-        onNew: onNew == null
-            ? null
-            : () {
-                Navigator.of(inner).pop();
-                onNew();
-              },
-      );
-  if (!wide) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      constraints: BoxConstraints(maxHeight: media.size.height * 0.85),
-      builder: (inner) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(inner).bottom),
-        child: SafeArea(child: content(inner)),
-      ),
-    );
-  }
-  final box = context.findRenderObject() as RenderBox;
-  final origin = box.localToGlobal(Offset.zero);
-  final top = origin.dy + box.size.height + 4;
-  const width = 340.0;
-  final left = origin.dx
-      .clamp(8.0, math.max(8.0, media.size.width - width - 8))
-      .toDouble();
-  return showGeneralDialog<void>(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: 'Close drives',
-    barrierColor: Colors.transparent,
-    transitionDuration: const Duration(milliseconds: 90),
-    pageBuilder: (inner, _, __) {
-      final c = inner.appColors;
-      return Stack(children: [
-        Positioned(
-          left: left,
-          top: top,
-          width: width,
-          child: Material(
-            key: const Key('drive-switcher-popover'),
-            color: c.bgBody,
-            elevation: 8,
-            borderRadius: BorderRadius.circular(12),
-            clipBehavior: Clip.antiAlias,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                  maxHeight: math.max(160, media.size.height - top - 16)),
-              child: content(inner),
-            ),
-          ),
-        ),
-      ]);
-    },
-  );
-}
-
 /// SharedPreferences key: the folders open in the tree of [drive].
 String driveTreeOpenKey(String drive) => 'drive_tree_open_${driveKeyOf(drive)}';
 
@@ -650,6 +565,36 @@ class DriveTreeState extends State<DriveTree> {
     return out;
   }
 
+  /// The fold chevron at the row's end. Its icon ends where a panel
+  /// heading's chevron does ([SidebarMetrics.hPad] from the right edge): the
+  /// touch rows' trailing box ends there itself, so the icon is pushed out to
+  /// the edge by half of what the box has to spare.
+  Widget _chevron(DriveChild child, bool open, SidebarMetrics m) {
+    final c = context.appColors;
+    final button = IconButton(
+      key: ValueKey('drive-tree-toggle-${child.subject}'),
+      mouseCursor: WidgetStateMouseCursor.clickable,
+      tooltip: open ? 'Collapse' : 'Expand',
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      iconSize: m.chevronSize,
+      constraints:
+          BoxConstraints.tightFor(width: m.chevronSlot, height: m.chevronSlot),
+      style: IconButton.styleFrom(
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+      icon: AnimatedRotation(
+        turns: open ? 0 : -0.25,
+        duration: const Duration(milliseconds: 120),
+        child: Icon(Icons.expand_more,
+            size: m.chevronSize, color: c.textSecondary),
+      ),
+      onPressed: () => _toggle(child.subject),
+    );
+    if (m.compact) return button;
+    return Transform.translate(
+        offset: Offset((m.chevronSlot - m.chevronSize) / 2, 0), child: button);
+  }
+
   Widget _row(_ChildItem item) {
     final c = context.appColors;
     final child = item.child;
@@ -669,30 +614,7 @@ class DriveTreeState extends State<DriveTree> {
         showInitial: lead.initial,
         title: child.title.isEmpty ? 'Untitled' : child.title,
         trailing: child.expandable && _canHaveChildren(child)
-            ? IconButton(
-                key: ValueKey('drive-tree-toggle-${child.subject}'),
-                mouseCursor: WidgetStateMouseCursor.clickable,
-                tooltip: open ? 'Collapse' : 'Expand',
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                iconSize: m.compact ? m.chevronSize : 24,
-                constraints: m.compact
-                    ? BoxConstraints.tightFor(
-                        width: m.chevronSlot, height: m.chevronSlot)
-                    : null,
-                style: m.compact
-                    ? IconButton.styleFrom(
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap)
-                    : null,
-                icon: AnimatedRotation(
-                  turns: open ? 0 : -0.25,
-                  duration: const Duration(milliseconds: 120),
-                  child: Icon(Icons.expand_more,
-                      size: m.compact ? m.chevronSize : 22,
-                      color: c.textSecondary),
-                ),
-                onPressed: () => _toggle(child.subject),
-              )
+            ? _chevron(child, open, m)
             : null,
         onTap: () => widget.onOpen(child),
       ),

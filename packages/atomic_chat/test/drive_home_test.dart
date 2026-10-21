@@ -157,51 +157,69 @@ void main() {
   });
 
   group('the quick drive switcher', () {
-    testWidgets('a bottom sheet on a phone, with every drive and a check',
-        (tester) async {
-      _size(tester, const Size(393, 851));
+    for (final size in [const Size(393, 851), const Size(1000, 800)]) {
+      testWidgets('replaces the sidebar in place at $size: no sheet, no popover',
+          (tester) async {
+        _size(tester, size);
+        await _home(tester, _api());
+        expect(find.byKey(const Key('drive-tree-row-did:ad:z')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('current-drive-header')));
+        await tester.pumpAndSettle();
+        // Nothing on top: no sheet, no dialog, no popover, no barrier.
+        expect(find.byType(BottomSheet), findsNothing);
+        expect(find.byType(Dialog), findsNothing);
+        expect(find.byKey(const Key('drive-switcher-popover')), findsNothing);
+        expect(find.byKey(const Key('drive-switcher')), findsOneWidget);
+        expect(find.byKey(const Key('drive-switcher-search')), findsOneWidget);
+        // The sidebar's content is the drive list: the tree is gone.
+        expect(find.byKey(const Key('drive-tree-row-did:ad:z')), findsNothing);
+        // It fills the body: the sidebar's width, from under the header down.
+        final box = tester.getRect(find.byKey(const Key('drive-switcher')));
+        final header =
+            tester.getRect(find.byKey(const Key('current-drive-header')));
+        final body = tester.getRect(find.byType(Scaffold).first);
+        expect(box.left, body.left);
+        expect(box.right, body.right);
+        expect(box.top, greaterThanOrEqualTo(header.bottom - 1));
+        expect(box.bottom, body.bottom);
+        for (final d in [_alpha, _beta, _gamma]) {
+          expect(find.byKey(ValueKey('drive-switcher-row-${d.subject}')),
+              findsOneWidget);
+        }
+        // The current one is checked, the others are not.
+        expect(
+            find.descendant(
+                of: find.byKey(const ValueKey('drive-switcher-row-did:ad:a')),
+                matching: find.byKey(const Key('drive-switcher-current'))),
+            findsOneWidget);
+        expect(
+            find.byKey(const Key('drive-switcher-current')), findsOneWidget);
+        expect(find.byKey(const Key('drive-switcher-manage')), findsOneWidget);
+      });
+    }
+
+    testWidgets('the header toggles it back to the sidebar', (tester) async {
       await _home(tester, _api());
       await tester.tap(find.byKey(const Key('current-drive-header')));
       await tester.pumpAndSettle();
-      expect(find.byType(BottomSheet), findsOneWidget);
-      expect(find.byKey(const Key('drive-switcher-popover')), findsNothing);
       expect(find.byKey(const Key('drive-switcher')), findsOneWidget);
-      expect(find.byKey(const Key('drive-switcher-search')), findsOneWidget);
-      for (final d in [_alpha, _beta, _gamma]) {
-        expect(find.byKey(ValueKey('drive-switcher-row-${d.subject}')),
-            findsOneWidget);
-      }
-      // The current one is checked, the others are not.
-      expect(
-          find.descendant(
-              of: find.byKey(const ValueKey('drive-switcher-row-did:ad:a')),
-              matching: find.byKey(const Key('drive-switcher-current'))),
-          findsOneWidget);
-      expect(find.byKey(const Key('drive-switcher-current')), findsOneWidget);
-      expect(find.byKey(const Key('drive-switcher-manage')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('current-drive-header')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('drive-switcher')), findsNothing);
+      expect(find.byKey(const Key('drive-tree-row-did:ad:z')), findsOneWidget);
     });
 
-    testWidgets('a popover under the header from tablet width on',
-        (tester) async {
-      _size(tester, const Size(1000, 800));
+    testWidgets('system back closes it', (tester) async {
       await _home(tester, _api());
       await tester.tap(find.byKey(const Key('current-drive-header')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('drive-switcher-popover')), findsOneWidget);
-      expect(find.byType(BottomSheet), findsNothing);
-      final header =
-          tester.getRect(find.byKey(const Key('current-drive-header')));
-      final pop =
-          tester.getRect(find.byKey(const Key('drive-switcher-popover')));
-      expect(pop.top, greaterThanOrEqualTo(header.bottom));
-      expect(pop.left, lessThanOrEqualTo(header.left + 1));
-      // Tapping outside closes it.
-      await tester.tapAt(const Offset(900, 700));
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('drive-switcher')), findsNothing);
     });
 
     testWidgets('searching filters as you type', (tester) async {
+      expect(find.byKey(const Key('drive-tree-row-did:ad:z')), findsOneWidget);
       await _home(tester, _api());
       await tester.tap(find.byKey(const Key('current-drive-header')));
       await tester.pumpAndSettle();
@@ -303,8 +321,7 @@ void main() {
         await _home(tester, _api());
         await tester.tap(find.byKey(const Key('current-drive-header')));
         await tester.pumpAndSettle();
-        final box = tester.getRect(find.byKey(
-            Key(width < 600 ? 'drive-switcher' : 'drive-switcher-popover')));
+        final box = tester.getRect(find.byKey(const Key('drive-switcher')));
         for (final d in [_alpha, _beta, _gamma]) {
           final row = tester
               .getRect(find.byKey(ValueKey('drive-switcher-row-${d.subject}')));
@@ -836,3 +853,106 @@ void main() {
     }
   });
 }
+  group('alignment', () {
+    tearDown(() => SidebarMetrics.debugOverride = null);
+
+    FakeApi api() => FakeApi(
+          driveList: const [_alpha, _beta, _gamma],
+          childrenOf: {
+            'did:ad:a': [
+              _child('did:ad:m', 'Mango plan'),
+              _child('did:ad:f', 'Apple folder', className: 'folder'),
+            ],
+            'did:ad:f': [_child('did:ad:f1', 'Inside the folder')],
+          },
+          favoriteList: [_res('did:ad:fav', 'Starred doc')],
+          conversationList: [_res('did:ad:dm', 'Alice, Bob')],
+          chatList: const [
+            (
+              subject: 'did:ad:chat',
+              name: 'A chat',
+              lastActivity: 0,
+              emoji: null
+            ),
+          ],
+        );
+
+    Finder rowOf(String title) =>
+        find.ancestor(of: find.text(title), matching: find.byType(ResourceRow));
+
+    testWidgets(
+        'every icon column starts at the headings\' x: Messages, AI chats, '
+        'Favorites and the tree', (tester) async {
+      _size(tester, const Size(393, 851));
+      await _home(tester, api());
+
+      Future<void> open(String panel) async {
+        await tester.tap(_panel(panel));
+        await tester.pumpAndSettle();
+      }
+
+      double titleLeft(String panel, String title) => tester
+          .getTopLeft(find.descendant(
+              of: _panel(panel), matching: find.text(title)))
+          .dx;
+
+      // What shows of a row's leading: a bare glyph's own box, else the slot
+      // (an avatar or a circle fills it).
+      double leadingLeft(String title) {
+        final row = rowOf(title).first;
+        final glyph = find.descendant(
+            of: find.descendant(of: row, matching: find.byType(RowLeading)),
+            matching: find.byType(Icon));
+        final lead = find.descendant(of: row, matching: find.byType(RowLeading));
+        final circle = find.descendant(
+            of: lead,
+            matching: find.byWidgetPredicate((w) =>
+                w is DecoratedBox &&
+                (w.decoration as BoxDecoration).color != null));
+        return circle.evaluate().isNotEmpty || glyph.evaluate().isEmpty
+            ? tester.getRect(lead.first).left
+            : tester.getRect(glyph.first).left;
+      }
+
+      final lefts = <String, double>{
+        'Mango plan (tree)': leadingLeft('Mango plan'),
+        'Messages heading': titleLeft('messages', 'Messages'),
+      };
+      await open('messages');
+      lefts['Messages row'] = leadingLeft('Alice, Bob');
+      await open('chats');
+      lefts['AI chats row'] = leadingLeft('A chat');
+      lefts['AI chats heading'] = titleLeft('chats', 'AI chats');
+      await open('favorites');
+      lefts['Favorites row'] = leadingLeft('Starred doc');
+      lefts['Favorites heading'] = titleLeft('favorites', 'Favorites');
+      for (final e in lefts.entries) {
+        expect(e.value, closeTo(16, 0.5), reason: '${e.key}: $lefts');
+      }
+    });
+
+    for (final compact in [false, true]) {
+      testWidgets(
+          'tree chevrons end where the panel toggles do '
+          '(${compact ? 'desktop' : 'touch'})', (tester) async {
+        final width = compact ? 1000.0 : 393.0;
+        _size(tester, Size(width, 851));
+        if (compact) SidebarMetrics.debugOverride = SidebarMetrics.desktop;
+        await _home(tester, api());
+        final tree = tester.getRect(find.descendant(
+            of: find.byKey(const ValueKey('drive-tree-toggle-did:ad:f')),
+            matching: find.byIcon(Icons.expand_more)));
+        final panel = tester.getRect(find.descendant(
+            of: _panel('favorites'), matching: find.byIcon(Icons.expand_more)));
+        expect(tree.right, closeTo(panel.right, 0.5));
+        expect(tree.size, panel.size);
+        // And that is the sidebar's inset from the right edge.
+        final inset = compact ? 16.0 : 16.0;
+        expect(panel.right, closeTo(tester.getSize(find.byType(Scaffold).first).width - inset, 0.5));
+        // The toggle still hits where it is drawn.
+        await tester.tapAt(tree.center);
+        await tester.pumpAndSettle();
+        expect(find.text('Inside the folder'), findsOneWidget);
+      });
+    }
+  });

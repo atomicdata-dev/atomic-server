@@ -175,7 +175,8 @@ void main() {
   testWidgets('a tap on Home goes home', (tester) async {
     await tester.pumpWidget(_shell(api));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Settings'));
+    _controller(tester).openPage<void>(
+        ShellPage.settings, (_) => const Scaffold(body: Text('a page')));
     await tester.pump(const Duration(milliseconds: 600));
     expect(_controller(tester).atHome, isFalse);
     await tester.tap(find.byTooltip('Home'));
@@ -189,7 +190,8 @@ void main() {
     await tester.pumpWidget(_shell(api));
     await tester.pumpAndSettle();
     // Away from the home first: the pick brings it back.
-    await tester.tap(find.byTooltip('Settings'));
+    _controller(tester).openPage<void>(
+        ShellPage.settings, (_) => const Scaffold(body: Text('a page')));
     await tester.pump(const Duration(milliseconds: 600));
     final gesture = await _holdHome(tester);
     await gesture.moveTo(tester.getCenter(find.text('Favorites').last));

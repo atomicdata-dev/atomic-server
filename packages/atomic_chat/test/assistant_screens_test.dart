@@ -1053,17 +1053,17 @@ void main() {
     });
 
     testWidgets(
-        'the bottom bar is one row: search, new chat, profile, settings',
+        'the bottom bar is one row: search, new chat, profile',
         (tester) async {
       await tester.pumpWidget(
           shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
       await tester.pumpAndSettle();
       expect(find.byType(TextField), findsNothing);
-      final tips = ['Search', 'New', 'Profile', 'Settings'];
+      final tips = ['Search', 'New', 'Profile'];
       for (final t in tips) {
         expect(find.byTooltip(t), findsOneWidget);
       }
-      for (final t in ['Notifications', 'Sync', 'Back', 'More']) {
+      for (final t in ['Notifications', 'Sync', 'Back', 'More', 'Settings']) {
         expect(find.byTooltip(t), findsNothing);
       }
       final ys = [for (final t in tips) tester.getCenter(find.byTooltip(t)).dy];
@@ -1092,19 +1092,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen), findsOneWidget);
     });
-
-    testWidgets('Settings opens the settings page', (tester) async {
-      ResourceView.serverFactory = () async => throw 'no server in a test';
-      await tester.pumpWidget(
-          shellApp(ChatsScreen(drive: 'did:ad:drive', api: FakeApi())));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Settings'));
-      await tester.pumpAndSettle();
-      expect(find.byType(ResourceView), findsOneWidget);
-      expect(tester.widget<ResourceView>(find.byType(ResourceView)).path,
-          '/app/settings');
-    });
-
   });
 
   group('resource icons', () {
@@ -2531,12 +2518,11 @@ void main() {
       expect(tester.element(bar), same(element));
     });
 
-    testWidgets('buttons keep their order: search, new chat, profile, last',
+    testWidgets('buttons keep their order: search, new chat, profile, more',
         (tester) async {
       await pumpHome(tester);
       expect(x(tester, 'Search'), lessThan(x(tester, 'New')));
       expect(x(tester, 'New'), lessThan(x(tester, 'Profile')));
-      expect(x(tester, 'Profile'), lessThan(x(tester, 'Settings')));
       final xs = [
         for (final t in ['Search', 'New', 'Profile']) x(tester, t)
       ];
@@ -2549,46 +2535,34 @@ void main() {
       ], xs);
     });
 
-    testWidgets('the last button follows the page on top', (tester) async {
+    testWidgets('the last button is the page on top\'s menu, else none',
+        (tester) async {
       await pumpHome(tester);
-      expect(find.byTooltip('Settings'), findsOneWidget);
+      expect(find.byTooltip('Settings'), findsNothing);
       expect(find.byTooltip('More'), findsNothing);
 
       await tester.tap(find.text('A doc'));
       await tester.pumpAndSettle();
       expect(find.byType(ResourceView), findsOneWidget);
       expect(find.byTooltip('More'), findsOneWidget);
-      expect(find.byTooltip('Settings'), findsNothing);
 
-      // Another page over the resource: no menu of its own, so Settings.
+      // Another page over the resource: no menu of its own.
       await tapNewChat(tester);
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen), findsOneWidget);
-      expect(find.byTooltip('Settings'), findsOneWidget);
       expect(find.byTooltip('More'), findsNothing);
 
       // Back to the resource: its menu is the active one again.
       tester.state<NavigatorState>(find.byType(Navigator).last).pop();
       await tester.pumpAndSettle();
       expect(find.byTooltip('More'), findsOneWidget);
-      expect(find.byTooltip('Settings'), findsNothing);
 
       // And back to the home.
       tester.state<NavigatorState>(find.byType(Navigator).last).pop();
       await tester.pumpAndSettle();
       expect(find.byType(ResourceView), findsNothing);
-      expect(find.byTooltip('Settings'), findsOneWidget);
       expect(find.byTooltip('More'), findsNothing);
-    });
-
-    testWidgets('a settings page has no menu: the bar keeps Settings',
-        (tester) async {
-      await pumpHome(tester);
-      await tester.tap(find.byTooltip('Settings'));
-      await tester.pumpAndSettle();
-      expect(find.byType(ResourceView), findsOneWidget);
-      expect(find.byTooltip('Settings'), findsOneWidget);
-      expect(find.byTooltip('More'), findsNothing);
+      expect(find.byTooltip('Settings'), findsNothing);
     });
 
     testWidgets('there is no Back button anywhere', (tester) async {

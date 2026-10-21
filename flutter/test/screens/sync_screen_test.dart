@@ -216,8 +216,11 @@ void main() {
     expect(find.text('Team'), findsNothing);
     expect(find.text('Account'), findsNothing);
     expect(find.text('Link your account'), findsNothing);
-    // No page title; a button to the web app's settings instead.
+    // The page is titled "User"; the Settings button sits next to it.
     expect(find.text('Sync'), findsNothing);
+    expect(
+        find.descendant(of: find.byType(AppBar), matching: find.text('User')),
+        findsOneWidget);
     expect(find.byKey(const ValueKey('sync-open-settings')), findsOneWidget);
   });
 

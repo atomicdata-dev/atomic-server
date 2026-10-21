@@ -195,7 +195,7 @@ void main() {
       expect(api.opened, ['did:ad:plans']);
 
       // A page of the bar in its place: no row is marked.
-      await tester.tap(find.byTooltip('Settings'));
+      await tester.tap(find.byTooltip('Profile'));
       await _settle(tester);
       expect(tile('Notes').selected, isFalse);
       await tester.tap(find.text('Notes'));
@@ -244,7 +244,7 @@ void main() {
     (304.0, 1.3),
     (568.0, 1.3), // the rubber band's overshoot
   ]) {
-    testWidgets('the bar: six evenly spread buttons at $width dp, text $scale',
+    testWidgets('the bar: five evenly spread buttons at $width dp, text $scale',
         (tester) async {
       SharedPreferences.setMockInitialValues({listWidthKey: width});
       _size(tester, _landscape);
@@ -259,7 +259,6 @@ void main() {
               'Search',
               'New',
               'Profile',
-              'Settings',
               'Close sidebar',
             ])
               tester.getRect(find.descendant(
@@ -337,7 +336,7 @@ void main() {
     await _done(tester);
   });
 
-  testWidgets('the bar opens Settings, Profile and a new chat in the detail',
+  testWidgets('the bar opens Profile and a new chat in the detail',
       (tester) async {
     _size(tester, _portrait);
     await tester.pumpWidget(app(AppShell(
@@ -348,14 +347,11 @@ void main() {
       home: ChatsScreen(drive: 'did:ad:drive', api: _api()),
     )));
     await _settle(tester);
-    await tester.tap(find.byTooltip('Settings'));
-    await _settle(tester);
-    expect(_controller(tester).topKind, ShellPage.settings);
-    expect(find.byType(ChatsScreen), findsOneWidget);
+    expect(find.byTooltip('Settings'), findsNothing);
     await tester.tap(find.byTooltip('Profile'));
     await _settle(tester);
     expect(find.text('the profile'), findsOneWidget);
-    // In place of Settings, not over it.
+    expect(find.byType(ChatsScreen), findsOneWidget);
     expect(_controller(tester).pages, hasLength(1));
     await tapNewChat(tester);
     await _settle(tester);
@@ -392,7 +388,7 @@ void main() {
     }
     // On the phone the resource is the whole screen, over the home.
     expect(find.byType(AppBottomBar), findsOneWidget);
-    // The phone's bar: the menu in Settings' place, not next to it.
+    // The phone's bar: the menu is the last slot, not next to a Settings button.
     expect(find.byTooltip('More'), findsOneWidget);
     expect(find.byTooltip('Settings'), findsNothing);
     expect(tester.getSize(find.byType(ResourceView)).width, _phone.width);
@@ -461,7 +457,7 @@ void main() {
     await _settle(tester);
     expect(tester.takeException(), isNull);
     // Every button is a full 48 dp target.
-    for (final tip in ['Profile', 'Settings']) {
+    for (final tip in ['Profile']) {
       final button = find.ancestor(
           of: find.byTooltip(tip), matching: find.byType(IconButton));
       expect(tester.getSize(button.first).height, greaterThanOrEqualTo(48),

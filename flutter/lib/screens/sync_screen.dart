@@ -469,10 +469,10 @@ class _SyncScreenState extends State<SyncScreen> {
     final c = shared.syncColors(context);
     return Scaffold(
       backgroundColor: c.bgBody,
-      // No title: the page is about you and your devices; the web app's
-      // settings are one tap away.
+      // The user panel: the page is about you and your devices; the web
+      // app's settings are one tap away (and nowhere else in the app).
       appBar: AppTopBar(
-        titleWidget: const SizedBox.shrink(),
+        title: 'User',
         actions: [
           TextButton.icon(
             key: const ValueKey('sync-open-settings'),

@@ -29,7 +29,7 @@ const _listDrives = 3;
 
 /// The one row at the bottom of the app, within the thumb's reach, the same on
 /// every page and never moving with them: home (the atomic.place mark), search, new (a list), the user (agent,
-/// sync and account) and, last, settings, or (on a phone) the "more" menu of
+/// sync, account and settings) and, on a phone, last the "more" menu of
 /// the resource the page on top shows. Back is the system back and the swipe from the left
 /// edge.
 ///
@@ -44,8 +44,8 @@ const _listDrives = 3;
 ///
 /// On a tablet ([ShellLayout.split]) the bar is the foot of the sidebar (the
 /// list pane). Home and Search show what the sidebar holds (Home on the home
-/// closes the detail page), the others open in the detail pane; Settings
-/// stays and Close sidebar comes last: six equal slots. The resource's "more"
+/// closes the detail page), the others open in the detail pane; Close sidebar
+/// comes last: five equal slots. The resource's "more"
 /// menu is not in the bar there; the resource's pane shows it.
 class AppBottomBar extends StatelessWidget {
   final AssistantApi api;
@@ -99,7 +99,8 @@ class AppBottomBar extends StatelessWidget {
                       shell.list,
                       shell.listCollapsed,
                       shell.searching,
-                      shell.homeSections
+                      shell.homeSections,
+                      shell.driveSwitcher
                     ]),
                     builder: (context, _) {
                       final onMore = shell.topMenu;
@@ -113,13 +114,21 @@ class AppBottomBar extends StatelessWidget {
                           ? shell.searching.value ||
                               (ShellPage.isSearch(list) && !folded)
                           : ShellPage.isSearch(top);
-                      final homeCurrent = split
-                          ? list == ShellPage.home && !folded && !searchCurrent
-                          : top == ShellPage.home;
+                      // The drive list replaces the home in the sidebar: Home
+                      // is then not where you are, and brings the home back.
+                      final switching = shell.driveSwitcher.value;
+                      final homeCurrent = !switching &&
+                          (split
+                              ? list == ShellPage.home &&
+                                  !folded &&
+                                  !searchCurrent
+                              : top == ShellPage.home);
                       // Next to the pages Home shows the home in the list pane (and
                       // brings it back when folded); on the home it closes what the
                       // detail pane shows.
-                      final VoidCallback? onHome = split
+                      final VoidCallback? onHome = switching
+                          ? shell.goHome
+                          : split
                           ? (folded || list != ShellPage.home
                               ? () => shell.showList(ShellPage.home)
                               : (shell.atHome ? null : shell.goHome))
@@ -141,18 +150,6 @@ class AppBottomBar extends StatelessWidget {
                                 icon: const Icon(Icons.more_vert),
                               ),
                             );
-                      final settings = _Current(
-                        key: const ValueKey('settings'),
-                        current: top == ShellPage.settings,
-                        label: 'Settings',
-                        child: IconButton(
-                          tooltip: 'Settings',
-                          onPressed: top == ShellPage.settings
-                              ? null
-                              : _actions.settings,
-                          icon: const Icon(Icons.settings_outlined),
-                        ),
-                      );
                       final buttons = <Widget>[
                         _Current(
                           current: homeCurrent,
@@ -218,23 +215,26 @@ class AppBottomBar extends StatelessWidget {
                             onPressed: onUser,
                           ),
                         ),
-                        if (split) ...[
-                          settings,
+                        if (split)
                           // Under the thumb, where the button that opens
                           // it again is when it is folded.
                           IconButton(
                             tooltip: 'Close sidebar',
                             onPressed: () => shell.setListCollapsed(true),
                             icon: const Icon(Icons.menu_open),
-                          ),
-                        ] else
+                          )
+                        else
                           // The only button that changes with the page.
                           AnimatedSwitcher(
                             duration: const Duration(milliseconds: 200),
-                            child: more ?? settings,
+                            child: more ??
+                                const SizedBox(
+                                    key: ValueKey('no-more'),
+                                    width: 48,
+                                    height: 48),
                           ),
                       ];
-                      // Next to the pages: six equal slots (the five pages and
+                      // Next to the pages: five equal slots (the four pages and
                       // Close sidebar) across the sidebar, which fit its
                       // narrowest width too; the same whatever is open.
                       if (split) {
@@ -366,14 +366,6 @@ class ShellActions {
             kind: of,
             settings: settings));
   }
-
-  void settings() => shell.openPage<void>(
-      ShellPage.settings,
-      (_) => ResourceView(
-          api: api,
-          drive: shell.drive.value,
-          title: 'Settings',
-          path: '/app/settings'));
 
   VoidCallback? get onUser =>
       shell.onUser ??

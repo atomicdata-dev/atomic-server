@@ -170,6 +170,10 @@ class ResourceRow extends StatelessWidget {
       fallbackIcon: icon ?? Icons.description_outlined,
       shape: shape,
       showInitial: showInitial,
+      // The touch rows' icons start where avatars and pictures do (and the
+      // panel headings' titles); the compact rows centre them in a slot
+      // that is as wide as they are.
+      alignGlyphStart: !m.compact,
     );
   }
 

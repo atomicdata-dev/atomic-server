@@ -101,31 +101,38 @@ void main() {
   });
 
   testWidgets('the Home button is a house, filled on the home', (tester) async {
-    await tester.pumpWidget(_shell(_BarApi()));
+    await tester.pumpWidget(_shell(_BarApi(), profile: (_) => const Scaffold(body: Text('Me'))));
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.home), findsOneWidget);
     expect(find.byIcon(Icons.home_outlined), findsNothing);
-    await tester.tap(find.byTooltip('Settings'));
+    await tester.tap(find.byTooltip('Profile'));
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.byIcon(Icons.home_outlined), findsOneWidget);
   });
 
-  testWidgets('Settings has the top bar with a back arrow that pops it',
+  testWidgets('Home works while the drive list fills the sidebar',
       (tester) async {
     await tester.pumpWidget(_shell(_BarApi()));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Settings'));
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(
-        find.descendant(
-            of: find.byType(AppBar), matching: find.text('Settings')),
-        findsOneWidget);
-    expect(_controller(tester).topKind, ShellPage.settings);
-    await tester.pump(const Duration(seconds: 1));
-    await tester.tap(find.byType(BackButton).last);
-    await tester.pump(const Duration(milliseconds: 100));
-    await tester.pump(const Duration(milliseconds: 600));
-    expect(_controller(tester).topKind, ShellPage.home);
+    expect(_current('Home'), isTrue);
+    await tester.tap(find.byKey(const Key('current-drive-header')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('drive-switcher')), findsOneWidget);
+    // The list is not the home: Home is not "current" and goes back to it.
+    expect(_current('Home'), isFalse);
+    await tester.tap(find.byTooltip('Home'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('drive-switcher')), findsNothing);
+    expect(_current('Home'), isTrue);
+    expect(_controller(tester).driveSwitcher.value, isFalse);
+  });
+
+  testWidgets('the bar has no Settings button: the user panel holds it',
+      (tester) async {
+    await tester.pumpWidget(_shell(_BarApi()));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('Settings'), findsNothing);
+    expect(find.byTooltip('Profile'), findsOneWidget);
   });
 
   group('wide screen', () {
@@ -135,7 +142,7 @@ void main() {
       addTearDown(tester.view.reset);
     }
 
-    testWidgets('the bar next to the list has no More button, only six',
+    testWidgets('the bar next to the list has no More button, only five',
         (tester) async {
       wide(tester);
       await tester.pumpWidget(_shell(_BarApi()));
@@ -226,9 +233,9 @@ void main() {
     });
 
     testWidgets('back closes the list and keeps the page', (tester) async {
-      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpWidget(_shell(_BarApi(), profile: (_) => const Scaffold(body: Text('Me'))));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Settings'));
+      await tester.tap(find.byTooltip('Profile'));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('New'));
       await tester.pump();
@@ -236,7 +243,7 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.text('AI chat'), findsNothing);
-      expect(_controller(tester).topKind, ShellPage.settings);
+      expect(_controller(tester).topKind, ShellPage.profile);
     });
 
     testWidgets(
@@ -640,10 +647,6 @@ void main() {
       expect(_current('Profile'), isTrue);
       expect(_controller(tester).topKind, ShellPage.profile);
 
-      await tester.tap(find.byTooltip('Settings'));
-      await tester.pumpAndSettle();
-      expect(_current('Settings'), isTrue);
-
       await tester.tap(find.byTooltip('Home'));
       await tester.pumpAndSettle();
       expect(_current('Home'), isTrue);
@@ -651,13 +654,13 @@ void main() {
     });
 
     testWidgets('tapping the current button does nothing', (tester) async {
-      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpWidget(_shell(_BarApi(), profile: (_) => const Scaffold(body: Text('Me'))));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Settings'));
+      await tester.tap(find.byTooltip('Profile'));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Settings'));
+      await tester.tap(find.byTooltip('Profile'));
       await tester.pumpAndSettle();
-      expect(find.byType(ResourceView), findsOneWidget);
+      expect(find.text('Me'), findsOneWidget);
       // Choosing AI chat from the list while a new chat is on top: the same.
       await tapNewChat(tester);
       await tester.pumpAndSettle();
@@ -667,26 +670,27 @@ void main() {
 
     testWidgets('a page further down is popped back to, not pushed again',
         (tester) async {
-      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpWidget(_shell(_BarApi(), profile: (_) => const Scaffold(body: Text('Me'))));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Settings'));
+      await tester.tap(find.byTooltip('Profile'));
       await tester.pumpAndSettle();
       final shell = _controller(tester);
       shell.navigatorKey.currentState!.push(MaterialPageRoute<void>(
           builder: (_) => const Scaffold(body: Text('Deeper'))));
       await tester.pumpAndSettle();
-      expect(_current('Settings'), isFalse);
+      expect(_current('Profile'), isFalse);
 
-      await tester.tap(find.byTooltip('Settings'));
+      await tester.tap(find.byTooltip('Profile'));
       await tester.pumpAndSettle();
       expect(find.text('Deeper'), findsNothing);
-      expect(_current('Settings'), isTrue);
-      expect(find.byType(ResourceView, skipOffstage: false), findsOneWidget);
-      expect(shell.topKind, ShellPage.settings);
+      expect(_current('Profile'), isTrue);
+      expect(find.text('Me', skipOffstage: false), findsOneWidget);
+      expect(shell.topKind, ShellPage.profile);
     });
 
     testWidgets('a double tap pushes once', (tester) async {
-      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpWidget(_shell(_BarApi(),
+          profile: (_) => const Scaffold(body: Text('Me'))));
       await tester.pumpAndSettle();
       await tapNewChat(tester);
       await tester.pump(const Duration(milliseconds: 50));
@@ -696,7 +700,7 @@ void main() {
       // And a quick tap on another button right after a push is ignored too.
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Settings'));
+      await tester.tap(find.byTooltip('Profile'));
       await tester.pump(const Duration(milliseconds: 50));
       await tester.tap(find.byTooltip('Search'), warnIfMissed: false);
       await tester.pumpAndSettle();
