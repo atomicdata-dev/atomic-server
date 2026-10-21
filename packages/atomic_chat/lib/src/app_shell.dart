@@ -1246,6 +1246,20 @@ class _PaneHandle extends StatefulWidget {
 
   static const _strip = 16.0;
 
+  /// A mouse platform: the line is the handle, there is no tab.
+  static bool get isDesktop => switch (defaultTargetPlatform) {
+        TargetPlatform.macOS ||
+        TargetPlatform.linux ||
+        TargetPlatform.windows =>
+          true,
+        _ => false,
+      };
+
+  /// The transparent resize strip on the line, and the one at the window's
+  /// edge that opens a folded list.
+  static const desktopStrip = 8.0;
+  static const desktopEdge = 6.0;
+
   /// The width of the edge strip that opens a folded list.
   static const edgeStrip = 24.0;
   static const _tab = Size(24, 48);
@@ -1275,6 +1289,7 @@ class _PaneHandleState extends State<_PaneHandle> {
     const tab = _PaneHandle._tab;
     const target = _PaneHandle._target;
     final x = at;
+    final desktop = _PaneHandle.isDesktop;
     Widget drag(Widget child) => GestureDetector(
           behavior: HitTestBehavior.translucent,
           onHorizontalDragStart: (_) => onDragStart(),
@@ -1287,7 +1302,54 @@ class _PaneHandleState extends State<_PaneHandle> {
       child: LayoutBuilder(builder: (context, box) {
         final middle = box.maxHeight / 2;
         return Stack(children: [
-          if (!collapsed)
+          // Desktop (a mouse): the line itself is the handle along its whole
+          // height, an 8 dp transparent strip centred on it. It lights up on
+          // hover, takes the accent while dragged, and a double click folds
+          // or unfolds the list. No tab: that is for touch.
+          if (!collapsed && desktop) ...[
+            Positioned(
+              left: at,
+              top: 0,
+              bottom: 0,
+              width: 1,
+              child: IgnorePointer(
+                child: AnimatedContainer(
+                  key: const Key('pane-line-highlight'),
+                  duration: const Duration(milliseconds: 120),
+                  color: widget.dragging
+                      ? c.main.withValues(alpha: 0.6)
+                      : (_hover
+                          ? (c.bgBody.computeLuminance() < 0.5
+                                  ? Colors.white
+                                  : Colors.black)
+                              .withValues(alpha: 0.2)
+                          : Colors.transparent),
+                ),
+              ),
+            ),
+            Positioned(
+              left: at + 0.5 - _PaneHandle.desktopStrip / 2,
+              top: 0,
+              bottom: 0,
+              width: _PaneHandle.desktopStrip,
+              child: MouseRegion(
+                key: const Key('pane-resize-strip'),
+                cursor: SystemMouseCursors.resizeColumn,
+                onEnter: (_) => setState(() => _hover = true),
+                onExit: (_) => setState(() => _hover = false),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onDoubleTap: onTap,
+                  onHorizontalDragStart: (_) => onDragStart(),
+                  onHorizontalDragUpdate: onDragUpdate,
+                  onHorizontalDragEnd: (d) => onDragEnd(d.primaryVelocity ?? 0),
+                  onHorizontalDragCancel: () => onDragEnd(0),
+                  child: const SizedBox.expand(),
+                ),
+              ),
+            ),
+          ],
+          if (!collapsed && !desktop)
             Positioned(
               left: at - strip / 2,
               top: 0,
@@ -1306,7 +1368,26 @@ class _PaneHandleState extends State<_PaneHandle> {
           // own horizontal scrolling is not touched elsewhere.
           // Opaque: the web view under it (which claims a touch at once)
           // never sees the swipe.
-          if (collapsed)
+          if (collapsed && desktop)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: _PaneHandle.desktopEdge,
+              child: MouseRegion(
+                key: const Key('pane-reveal-strip'),
+                cursor: SystemMouseCursors.resizeColumn,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onTap,
+                  onHorizontalDragStart: (_) => onDragStart(),
+                  onHorizontalDragUpdate: onDragUpdate,
+                  onHorizontalDragEnd: (d) => onDragEnd(d.primaryVelocity ?? 0),
+                  onHorizontalDragCancel: () => onDragEnd(0),
+                ),
+              ),
+            ),
+          if (collapsed && !desktop)
             Positioned(
               left: MediaQuery.systemGestureInsetsOf(context).left,
               top: 0,
@@ -1321,7 +1402,7 @@ class _PaneHandleState extends State<_PaneHandle> {
               ),
             ),
           // Folded: a button at the bottom left, where the bar was, opens it.
-          if (collapsed)
+          if (collapsed && !desktop)
             Positioned(
               left: 8 + MediaQuery.paddingOf(context).left,
               bottom: 8 + MediaQuery.viewPaddingOf(context).bottom,
@@ -1337,7 +1418,7 @@ class _PaneHandleState extends State<_PaneHandle> {
                 ),
               ),
             ),
-          if (!collapsed)
+          if (!collapsed && !desktop)
             Positioned(
               left: x - target.width / 2,
               top: middle - target.height / 2,
