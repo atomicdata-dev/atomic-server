@@ -400,6 +400,96 @@ void main() {
   });
 
   group('Search hold', () {
+    List<String> menu(WidgetTester tester) => [
+          for (var i = 0;
+              find.byKey(ValueKey('hold-fan-item-$i')).evaluate().isNotEmpty;
+              i++)
+            tester
+                .widgetList<Text>(find.descendant(
+                    of: find.byKey(ValueKey('hold-fan-item-$i')),
+                    matching: find.byType(Text)))
+                .map((t) => t.data)
+                .whereType<String>()
+                .join(' ')
+        ];
+
+    FakeApi drivesApi(int n) => FakeApi(driveList: [
+          for (var i = 0; i < n; i++)
+            (
+              subject: 'did:ad:d$i',
+              name: 'Drive $i',
+              emoji: null,
+              picture: null
+            )
+        ]);
+
+    testWidgets('the 3 latest drives, then AI chats and Messages',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      resetDriveVisits();
+      await noteDriveVisited('did:ad:d1', at: 100);
+      await noteDriveVisited('did:ad:d3', at: 400);
+      await noteDriveVisited('did:ad:d0', at: 200);
+      await noteDriveVisited('did:ad:d2', at: 300);
+      await tester.pumpWidget(_shell(drivesApi(4)));
+      await tester.pumpAndSettle();
+      final gesture = await _hold(tester, 'Search');
+      expect(menu(tester), [
+        'All drives',
+        'Drive 3',
+        'Drive 2',
+        'Drive 0',
+        'AI chats',
+        'Messages',
+      ]);
+      final heights = [
+        for (var i = 0; i < 6; i++)
+          tester.getSize(find.byKey(ValueKey('hold-fan-item-$i'))).height
+      ];
+      expect(heights.toSet(), hasLength(1));
+      await gesture.up();
+      await tester.pumpAndSettle();
+      resetDriveVisits();
+    });
+
+    testWidgets('one drive, and none', (tester) async {
+      for (final n in [1, 0]) {
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpWidget(_shell(drivesApi(n)));
+        await tester.pumpAndSettle();
+        final gesture = await _hold(tester, 'Search');
+        expect(menu(tester), [
+          'All drives',
+          if (n == 1) 'Drive 0',
+          'AI chats',
+          'Messages',
+        ]);
+        await gesture.up();
+        await tester.pumpAndSettle();
+      }
+    });
+
+    testWidgets('AI chats and Messages open the search on that kind',
+        (tester) async {
+      for (final (item, kind) in [
+        ('AI chats', SearchKind.chats),
+        ('Messages', SearchKind.messages),
+      ]) {
+        await tester.pumpWidget(_shell(_BarApi()));
+        await tester.pumpAndSettle();
+        await _pick(tester, await _hold(tester, 'Search'), item);
+        final screen = tester.widget<SearchScreen>(find.byType(SearchScreen));
+        expect(screen.kind, kind);
+        expect(screen.scopeDrive, isNull);
+        expect(find.byKey(const Key('search-kind')), findsOneWidget);
+        expect(
+            find.descendant(
+                of: find.byKey(const Key('search-kind')),
+                matching: find.text(kind.label)),
+            findsOneWidget);
+      }
+    });
+
     testWidgets('a drive from the list scopes the search, and x clears it',
         (tester) async {
       final api = _BarApi();

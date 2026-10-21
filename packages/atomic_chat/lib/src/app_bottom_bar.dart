@@ -24,7 +24,7 @@ String newResourcePath(String? drive) => drive == null || drive.isEmpty
         .toString();
 
 /// Most drives the Search button's list names.
-const _listDrives = 4;
+const _listDrives = 3;
 
 /// The one row at the bottom of the app, within the thumb's reach, the same on
 /// every page and never moving with them: home (the atomic.place mark), search, new (a list), the user (agent,
@@ -62,7 +62,8 @@ class AppBottomBar extends StatelessWidget {
 
   void _new(BuildContext context, NewChoice choice) =>
       _actions.newOf(context, choice);
-  Future<void> _openSearch({String? scope}) => _actions.search(scope: scope);
+  Future<void> _openSearch({String? scope, SearchKind of = SearchKind.any}) =>
+      _actions.search(scope: scope, of: of);
 
   @override
   Widget build(BuildContext context) {
@@ -546,12 +547,12 @@ class _ProfileButton extends StatelessWidget {
   }
 }
 
-/// Search: a tap searches every drive; holding lists the drives used last
-/// (and the rest in a sheet) to search only one.
+/// Search: a tap searches every drive; holding lists the three drives used
+/// last, to search only one, and the kinds AI chats and Messages.
 class _SearchButton extends StatefulWidget {
   final AssistantApi api;
   final bool current;
-  final Future<void> Function({String? scope}) onSearch;
+  final Future<void> Function({String? scope, SearchKind of}) onSearch;
 
   const _SearchButton({
     required this.api,
@@ -563,9 +564,10 @@ class _SearchButton extends StatefulWidget {
   State<_SearchButton> createState() => _SearchButtonState();
 }
 
-/// The list's value for "every drive" and for the list of the rest.
+/// The list's values for "every drive" and for the two kinds.
 const _allDrives = '';
-const _moreDrives = '\u0000more';
+const _aiChats = '\u0000chats';
+const _messages = '\u0000messages';
 
 class _SearchButtonState extends State<_SearchButton> {
   List<DriveInfo> _drives = const [];
@@ -581,40 +583,16 @@ class _SearchButtonState extends State<_SearchButton> {
       final drives = await drivesByRecent(widget.api);
       if (mounted) setState(() => _drives = drives);
     } catch (_) {
-      // The list offers every drive only.
+      // The list offers the kinds only.
     }
   }
 
-  Future<void> _pick(String value) async {
-    if (value == _allDrives) return widget.onSearch();
-    if (value != _moreDrives) return widget.onSearch(scope: value);
-    final picked = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => SafeArea(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(context).height * 0.7),
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                child: Text('Search in',
-                    style: Theme.of(context).textTheme.titleMedium),
-              ),
-              for (final d in _drives)
-                ListTile(
-                  title: Text(driveLabel(d)),
-                  onTap: () => Navigator.of(context).pop(d.subject),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (picked != null) await widget.onSearch(scope: picked);
-  }
+  Future<void> _pick(String value) => switch (value) {
+        _allDrives => widget.onSearch(),
+        _aiChats => widget.onSearch(of: SearchKind.chats),
+        _messages => widget.onSearch(of: SearchKind.messages),
+        _ => widget.onSearch(scope: value),
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -631,9 +609,10 @@ class _SearchButtonState extends State<_SearchButton> {
         const HoldFanItem('All drives', _allDrives, icon: Icons.search),
         for (final d in drives.take(_listDrives))
           HoldFanItem(d.name.isEmpty ? 'Untitled drive' : d.name, d.subject,
-              emoji: d.emoji),
-        if (drives.length > _listDrives)
-          const HoldFanItem('More…', _moreDrives, icon: Icons.more_horiz),
+              emoji: d.emoji, icon: d.emoji == null ? Icons.folder_outlined : null),
+        const HoldFanItem('AI chats', _aiChats,
+            icon: Icons.chat_bubble_outline),
+        const HoldFanItem('Messages', _messages, icon: Icons.forum_outlined),
       ],
       onSelected: _pick,
       child: _barIcon(context, Icons.search, widget.current),
