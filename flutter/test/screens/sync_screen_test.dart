@@ -62,6 +62,7 @@ class _Backend extends shared.AtomicSettingsBackend {
   Future<shared.StoreStats?> Function()? stats;
   shared.DeviceInfo? info;
   List<Map<String, String>> peers = [];
+  List<Map<String, String>> unsaved = [];
 
   _Backend({shared.AtomicServerBackend? servers, this.editable = false})
       : _servers = servers;
@@ -137,6 +138,8 @@ class _Backend extends shared.AtomicSettingsBackend {
   @override
   Future<Set<String>> livePeerIds() async => {};
   @override
+  Future<List<Map<String, String>>> liveUnsavedPeers() async => unsaved;
+  @override
   Future<void> removeKnownPeer(String nodeId) async {}
   @override
   Future<void> pair(BuildContext context) async {}
@@ -153,6 +156,37 @@ Widget _app(Widget home) => MaterialApp(
     );
 
 void main() {
+  testWidgets('lists unpaired connected devices, display only', (tester) async {
+    await tester.pumpWidget(_app(SyncScreen(
+      backend: _Backend()
+        ..unsaved = [
+          {'node_id': 'abcdef0123456789abcdef', 'name': 'Visitor phone'},
+          {'node_id': '0011223344556677889900', 'name': ''},
+        ],
+      loadAccount: (_) async => null,
+    )));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Connected now'), findsOneWidget);
+    expect(find.text('Visitor phone'), findsOneWidget);
+    // Nameless: the short node id is the title.
+    expect(find.text('001122334455…'), findsOneWidget);
+    expect(find.textContaining('Connected to you · not saved'),
+        findsNWidgets(2));
+    expect(find.byTooltip('Remove'), findsNothing);
+  });
+
+  testWidgets('hides Connected now when nobody unpaired is connected',
+      (tester) async {
+    await tester.pumpWidget(_app(SyncScreen(
+      backend: _Backend(),
+      loadAccount: (_) async => null,
+    )));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Connected now'), findsNothing);
+  });
+
   testWidgets('shows the agent, this device and the workspaces; no account',
       (tester) async {
     await tester.pumpWidget(_app(SyncScreen(

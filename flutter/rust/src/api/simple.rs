@@ -1605,3 +1605,15 @@ pub async fn store_stats() -> Result<String, String> {
         .map_err(err)?;
     Ok(stats.to_string())
 }
+
+/// Devices connected to us right now that are not paired, as JSON
+/// `[{"node_id":"...","name":"..."}]` (name empty when unknown). Display only.
+#[frb(sync)]
+pub fn live_unsaved_peers_json() -> String {
+    let Ok(store) = db() else { return "[]".into() };
+    let list: Vec<serde_json::Value> = atomic_lib::sync::peer::live_unsaved_peers(store.as_ref())
+        .into_iter()
+        .map(|(id, name)| serde_json::json!({"node_id": id, "name": name.unwrap_or_default()}))
+        .collect();
+    serde_json::to_string(&list).unwrap_or_else(|_| "[]".into())
+}

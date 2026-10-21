@@ -10,5 +10,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 /// as JSON. The page's `NativeClientDb` is the other end
 /// (`browser/lib/src/client-db.native.ts`).
 Future<String> embedCall({required String method, required String argsJson}) =>
-    RustLib.instance.api
-        .crateApiEmbedEmbedCall(method: method, argsJson: argsJson);
+    RustLib.instance.api.crateApiEmbedEmbedCall(
+      method: method,
+      argsJson: argsJson,
+    );

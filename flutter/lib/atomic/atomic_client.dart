@@ -579,6 +579,21 @@ class AtomicClient {
 
   // ── 8. Known peers ──────────────────────────────────────────────────────
 
+  /// Devices connected now that are not paired: [{node_id, name}]. Display
+  /// only; the name is what they said in HELLO, '' if nothing.
+  static Future<List<Map<String, String>>> liveUnsavedPeers() async {
+    try {
+      return (jsonDecode(ffi.liveUnsavedPeersJson()) as List)
+          .map((e) => {
+                'node_id': (e['node_id'] ?? '') as String,
+                'name': (e['name'] ?? '') as String,
+              })
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   /// Get all known peers (persisted in DB).
   /// Returns list of {node_id: String, name: String, last_synced: String}.
   /// `last_synced` is unix millis as a string, or '' if never synced.

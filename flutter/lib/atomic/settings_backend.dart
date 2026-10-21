@@ -102,6 +102,9 @@ class AppSettingsBackend extends shared.AtomicSettingsBackend {
   @override
   Future<Set<String>> livePeerIds() async => AtomicClient.livePeerIds();
   @override
+  Future<List<Map<String, String>>> liveUnsavedPeers() async =>
+      AtomicClient.liveUnsavedPeers();
+  @override
   Future<void> removeKnownPeer(String nodeId) =>
       AtomicClient.removeKnownPeer(nodeId);
   @override

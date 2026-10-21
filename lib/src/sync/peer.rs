@@ -414,6 +414,30 @@ pub fn live_peer_ids() -> Vec<String> {
     live_peers().keys().cloned().collect()
 }
 
+/// Live peers that are not in the known (paired) list, with the name each gave
+/// over HELLO: devices that dialed us, e.g. by scanning our QR. For display
+/// only. Nothing is saved, so the connection is the whole relationship.
+pub fn live_unsaved_peers(store: &Db) -> Vec<(String, Option<String>)> {
+    unsaved_peers(live_peer_ids(), &get_known_peers(store))
+}
+
+fn unsaved_peers(live: Vec<String>, known: &[KnownPeer]) -> Vec<(String, Option<String>)> {
+    let known: std::collections::HashSet<String> = known
+        .iter()
+        .map(|p| normalize_node_id(&p.node_id))
+        .collect();
+    let mut out: Vec<(String, Option<String>)> = live
+        .into_iter()
+        .filter(|id| !known.contains(&normalize_node_id(id)))
+        .map(|id| {
+            let name = live_peer_name(&id);
+            (id, name)
+        })
+        .collect();
+    out.sort();
+    out
+}
+
 type CommitWaiter =
     tokio::sync::oneshot::Sender<Result<String, crate::sync::outbox::CommitRefused>>;
 
@@ -4144,4 +4168,27 @@ fn same_drive(store: &Db, a: &str, b: &str) -> bool {
     let base = store.get_base_domain();
     crate::Subject::from_raw(a, base.as_deref()).pure_id()
         == crate::Subject::from_raw(b, base.as_deref()).pure_id()
+}
+
+#[cfg(test)]
+mod unsaved_peers_tests {
+    use super::*;
+
+    #[test]
+    fn lists_only_live_peers_missing_from_known() {
+        let known: Vec<KnownPeer> =
+            serde_json::from_str(r#"[{"node_id":"aaaa","name":"Paired"}]"#).unwrap();
+        set_live_peer_name("bbbb_unsaved_test", "Visitor");
+        let got = unsaved_peers(
+            vec!["aaaa".into(), "bbbb_unsaved_test".into(), "cccc_unsaved_test".into()],
+            &known,
+        );
+        assert_eq!(
+            got,
+            vec![
+                ("bbbb_unsaved_test".to_string(), Some("Visitor".to_string())),
+                ("cccc_unsaved_test".to_string(), None),
+            ]
+        );
+    }
 }

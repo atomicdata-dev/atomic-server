@@ -9,7 +9,10 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 /// Readable text for the resource `subject` from the local store: title, class,
 /// description, simple properties, the titles of the children of a folder or
 /// drive, and the text of a document. At most `max_chars` characters.
-Future<String> readResourceText(
-        {required String subject, required int maxChars}) =>
-    RustLib.instance.api
-        .crateApiContextReadResourceText(subject: subject, maxChars: maxChars);
+Future<String> readResourceText({
+  required String subject,
+  required int maxChars,
+}) => RustLib.instance.api.crateApiContextReadResourceText(
+  subject: subject,
+  maxChars: maxChars,
+);

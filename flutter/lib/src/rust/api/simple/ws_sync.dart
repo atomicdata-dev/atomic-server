@@ -10,9 +10,10 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 // These functions are ignored (category: IgnoreBecauseExplicitAttribute): `drain_outbox`
 
 /// `http://host:9883` → `ws://host:9883/ws`
-Future<String> serverOriginToWsUrl({required String origin}) =>
-    RustLib.instance.api
-        .crateApiSimpleWsSyncServerOriginToWsUrl(origin: origin);
+Future<String> serverOriginToWsUrl({required String origin}) => RustLib
+    .instance
+    .api
+    .crateApiSimpleWsSyncServerOriginToWsUrl(origin: origin);
 
 Future<void> closeWsSync() =>
     RustLib.instance.api.crateApiSimpleWsSyncCloseWsSync();
@@ -21,6 +22,7 @@ Future<void> openWsSync({required String serverOrigin}) => RustLib.instance.api
     .crateApiSimpleWsSyncOpenWsSync(serverOrigin: serverOrigin);
 
 /// Post a commit JSON-AD over the open WS session (falls back to error if closed).
-Future<String> postCommitOverWs({required String commitJson}) =>
-    RustLib.instance.api
-        .crateApiSimpleWsSyncPostCommitOverWs(commitJson: commitJson);
+Future<String> postCommitOverWs({required String commitJson}) => RustLib
+    .instance
+    .api
+    .crateApiSimpleWsSyncPostCommitOverWs(commitJson: commitJson);

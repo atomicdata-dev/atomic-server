@@ -43,6 +43,7 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
   // server is just an always-on device, and the browser lists them together.
   List<Map<String, String>> _peers = [];
   Set<String> _livePeerIds = {};
+  List<Map<String, String>> _unsaved = [];
   bool _loading = true;
   bool _busy = false;
   bool _showAdd = false;
@@ -70,7 +71,11 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
         final liveChanged = next?.connected != _search?.connected;
         setState(() => _search = next);
         // A device came or went: its card's Connected / Paired badge too.
-        if (liveChanged) _refreshPeers();
+        if (liveChanged) {
+          _refreshPeers();
+        } else {
+          _refreshUnsaved();
+        }
       });
     }
     _load();
@@ -83,14 +88,31 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
     super.dispose();
   }
 
+  /// Unpaired visitors come and go without the search state changing.
+  Future<void> _refreshUnsaved() async {
+    try {
+      final unsaved = await widget.backend.liveUnsavedPeers();
+      if (!mounted) return;
+      final same = unsaved.length == _unsaved.length &&
+          [
+            for (var i = 0; i < unsaved.length; i++)
+              unsaved[i]['node_id'] == _unsaved[i]['node_id'] &&
+                  unsaved[i]['name'] == _unsaved[i]['name']
+          ].every((b) => b);
+      if (!same) setState(() => _unsaved = unsaved);
+    } catch (_) {}
+  }
+
   Future<void> _refreshPeers() async {
     try {
       final peers = await widget.backend.getKnownPeers();
       final live = await widget.backend.livePeerIds();
+      final unsaved = await widget.backend.liveUnsavedPeers();
       if (mounted) {
         setState(() {
           _peers = peers;
           _livePeerIds = live;
+          _unsaved = unsaved;
         });
       }
     } catch (_) {}
@@ -137,9 +159,11 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
       // failing the whole list.
       List<Map<String, String>> peers = [];
       Set<String> livePeerIds = {};
+      List<Map<String, String>> unsaved = [];
       try {
         peers = await widget.backend.getKnownPeers();
         livePeerIds = await widget.backend.livePeerIds();
+        unsaved = await widget.backend.liveUnsavedPeers();
       } catch (_) {
         // no peers available
       }
@@ -151,6 +175,7 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
         _active = active;
         _peers = peers;
         _livePeerIds = livePeerIds;
+        _unsaved = unsaved;
         _loading = false;
       });
 
@@ -349,6 +374,11 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
         for (final server in _servers) _serverCard(c, server),
         for (final peer in _peers)
           if (!_servers.any((s) => _isServerPeer(s, peer))) _peerCard(c, peer),
+        if (_unsaved.isNotEmpty) ...[
+          const SizedBox(height: SyncGap.s),
+          const SyncHeader('Connected now'),
+          for (final peer in _unsaved) _unsavedCard(c, peer),
+        ],
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(bottom: SyncGap.s),
@@ -583,6 +613,36 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
           ),
       ],
     ];
+  }
+
+  /// A device that is connected to us but not paired (it scanned our QR).
+  /// Display only: no actions, and nothing is saved about it.
+  Widget _unsavedCard(AppColors c, Map<String, String> peer) {
+    final nodeId = peer['node_id'] ?? '';
+    final shortId = '${nodeId.substring(0, nodeId.length.clamp(0, 12))}…';
+    final name = (peer['name'] ?? '').trim();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: SyncGap.s),
+      child: SyncCard(
+        padding: const EdgeInsets.all(SyncGap.l),
+        children: [
+          Row(
+            children: [
+              Icon(Icons.phone_android, size: 24, color: c.textSecondary),
+              const SizedBox(width: SyncGap.m),
+              Expanded(
+                child: Text(name.isNotEmpty ? name : shortId,
+                    style: SyncText.body(c), overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+          Text('$shortId · Connected to you · not saved',
+              key: const ValueKey('unsaved-peer-caption'),
+              style: SyncText.caption(c)),
+        ],
+      ),
+    );
   }
 
   /// A paired device (Iroh peer), shown alongside the always-on ones. Live

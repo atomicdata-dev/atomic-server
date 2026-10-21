@@ -55,6 +55,10 @@ abstract class AtomicSettingsBackend {
   Future<void> setDeviceName(String name);
   Future<List<Map<String, String>>> getKnownPeers();
   Future<Set<String>> livePeerIds();
+
+  /// Devices connected right now that are not paired (they dialed us). Shown
+  /// only; nothing about them is saved. Maps with `node_id` and `name`.
+  Future<List<Map<String, String>>> liveUnsavedPeers() async => const [];
   Future<void> removeKnownPeer(String nodeId);
   Future<void> pair(BuildContext context);
 
