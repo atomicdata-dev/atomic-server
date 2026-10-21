@@ -10,7 +10,9 @@ import '../atomic/atomic_client.dart';
 import '../atomic/session.dart';
 import '../theme.dart';
 import 'account_link_dialog.dart';
+import 'needs_sync_view.dart';
 import 'pair_screen.dart';
+import '../atomic/sync_failure.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLoggedIn;
@@ -427,6 +429,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _scaffold(AppColors c) {
+    if (_step == _Step.needsSync) return _buildNeedsSync(c);
     return Scaffold(
       backgroundColor: c.pageBg,
       body: SafeArea(
@@ -778,67 +781,17 @@ class _LoginScreenState extends State<LoginScreen> {
       _peerSyncAttempted = true;
       WidgetsBinding.instance.addPostFrameCallback((_) => _retryPeerSync());
     }
-    return Column(
-      key: const ValueKey('needsSync'),
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Icon(Icons.sync_problem, size: 48, color: Colors.orange),
-        const SizedBox(height: 16),
-        const Text(
-          'Sync your drive',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'This device does not have your drive yet. '
-          'We look for other devices on the network, or you can pair with QR or a node ID.',
-          style: TextStyle(fontSize: 14, color: c.iconDisabled),
-          textAlign: TextAlign.center,
-        ),
-        if (_error != null) ...[
-          const SizedBox(height: 12),
-          Text(_error!,
-              style: TextStyle(fontSize: 13, color: c.alert),
-              textAlign: TextAlign.center),
-        ],
-        const SizedBox(height: 24),
-        ElevatedButton.icon(
-          icon: _busy
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2))
-              : const Icon(Icons.sync),
-          label: Text(
-              _busy ? (_status ?? 'Looking for your devices…') : 'Try again'),
-          style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14)),
-          onPressed: _busy ? null : _retryPeerSync,
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          icon: const Icon(Icons.qr_code_scanner),
-          label: const Text('Pair with QR'),
-          style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14)),
-          onPressed: () => _pairThenCheck(null),
-        ),
-        const SizedBox(height: 4),
-        TextButton.icon(
-          icon: const Icon(Icons.content_paste),
-          label: const Text('Paste node ID'),
-          onPressed: _pasteNodeId,
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton(
-          onPressed: () => setState(() {
-            _step = _Step.welcome;
-          }),
-          child: const Text('Back'),
-        ),
-      ],
+    return NeedsSyncView(
+      searching: _busy,
+      status: _status,
+      failure: _error == null ? null : SyncFailure.parse(_error!),
+      onRetry: _retryPeerSync,
+      onPair: () => _pairThenCheck(null),
+      onPaste: _pasteNodeId,
+      onBack: () => setState(() {
+        _step = _Step.welcome;
+        _error = null;
+      }),
     );
   }
 
