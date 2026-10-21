@@ -139,13 +139,26 @@ async fn assistant_search_filters_the_class_and_pages_the_chats() {
     assert_eq!(only_chats.len(), 1, "{only_chats:?}");
     assert_eq!(only_chats[0]["subject"], chat.as_str());
 
-    // Pages of one chat each add up to the whole list.
+    // Pages of one chat each add up to the whole list. Other tests add chats
+    // to the same store in parallel, so the pages only count when the whole
+    // list read before and after them is the same.
     let mut rx = db().unwrap().subscribe_events();
     pump(&mut rx).await;
-    let all: Vec<Json> = serde_json::from_str(&list_ai_chats(1000, 0).await.unwrap()).unwrap();
-    let first: Vec<Json> = serde_json::from_str(&list_ai_chats(1, 0).await.unwrap()).unwrap();
-    let rest: Vec<Json> = serde_json::from_str(&list_ai_chats(1000, 1).await.unwrap()).unwrap();
-    assert_eq!([first, rest].concat(), all);
+    let read = |limit, offset| async move {
+        serde_json::from_str::<Vec<Json>>(&list_ai_chats(limit, offset).await.unwrap()).unwrap()
+    };
+    let mut stable = false;
+    for _ in 0..20 {
+        let all = read(1000, 0).await;
+        let pages = [read(1, 0).await, read(1000, 1).await].concat();
+        if read(1000, 0).await == all {
+            assert_eq!(pages, all);
+            stable = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    assert!(stable, "the chat list kept changing while it was paged");
 
     warm_search().await.unwrap();
 }
