@@ -212,10 +212,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
       final split = shell.split;
       final list = [
         for (final s in _layout.visible)
-          if (s != HomeSection.notifications &&
-              !(split && s == HomeSection.activity) &&
-              (_counts[s] ?? 0) > 0)
-            s
+          if (!(split && s == HomeSection.activity) && (_counts[s] ?? 0) > 0) s
       ];
       if (!listEquals(list, shell.homeSections.value)) {
         shell.homeSections.value = list;
@@ -683,6 +680,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
           future: _notifications,
           empty: 'No notifications',
           hideEmpty: true,
+          badge: (list) => list.where((n) => !n.read).length,
           rows: (list) => [for (final n in list) _notificationRow(n)],
           onShowAll: (list) =>
               _openAll(id, list.length, (i) => _notificationRow(list[i])),
@@ -844,6 +842,10 @@ class _Section<T> extends StatefulWidget {
   /// it is still being read, and when the data cannot be read.
   final bool hideEmpty;
 
+  /// A count shown as a pill before the chevron (unread notifications);
+  /// nothing at 0.
+  final int Function(List<T>)? badge;
+
   const _Section({
     super.key,
     required this.title,
@@ -854,6 +856,7 @@ class _Section<T> extends StatefulWidget {
     required this.onShowAll,
     this.total,
     this.hideEmpty = false,
+    this.badge,
   });
 
   @override
@@ -906,10 +909,11 @@ class _SectionState<T> extends State<_Section<T>>
   /// title is at the rows' 16 dp inset, the chevron at the right turns
   /// instead of changing.
   Widget _foldHeading(BuildContext context) {
+    final unread = _list == null ? 0 : (widget.badge?.call(_list!) ?? 0);
     final c = context.appColors;
     final fold = widget.fold;
-    final label =
-        '${widget.title}, ${fold.collapsed ? 'collapsed' : 'expanded'}';
+    final label = '${widget.title}${unread > 0 ? ', $unread unread' : ''}, '
+        '${fold.collapsed ? 'collapsed' : 'expanded'}';
     return Semantics(
       container: true,
       button: true,
@@ -941,6 +945,25 @@ class _SectionState<T> extends State<_Section<T>>
                             fontSize: 15,
                             fontWeight: FontWeight.w600)),
                   ),
+                  if (unread > 0) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      key: const Key('notifications-badge'),
+                      constraints:
+                          const BoxConstraints(minWidth: 20, minHeight: 20),
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                          color: c.main,
+                          borderRadius: BorderRadius.circular(10)),
+                      child: Text(unread > 99 ? '99+' : '$unread',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              height: 1.1,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                  ],
                   const SizedBox(width: 4),
                   AnimatedRotation(
                     turns: fold.collapsed ? -0.25 : 0,

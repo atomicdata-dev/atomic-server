@@ -9,12 +9,14 @@ void main() {
   });
 
   test(
-      'notifications come first by default, and a stored layout without '
-      'them gets them on top', () {
-    expect(HomeSection.values.first, HomeSection.notifications);
+      'notifications come after Drives by default, and a stored layout '
+      'without them gets them there', () {
+    expect(HomeSection.values.take(2),
+        [HomeSection.drives, HomeSection.notifications]);
     final layout = HomeLayout.fromNames(
         order: ['chats', 'drives', 'recents', 'activity', 'favorites']);
-    expect(layout.order.first, HomeSection.notifications);
+    expect(layout.order.indexOf(HomeSection.notifications),
+        layout.order.indexOf(HomeSection.drives) + 1);
     expect(layout.order.indexOf(HomeSection.messages), layout.order.length - 1);
   });
 
@@ -34,7 +36,7 @@ void main() {
       order: ['chats', 'bogus', 'drives', 'chats'],
       hidden: ['drives', 'bogus'],
     );
-    expect(layout.order[1], HomeSection.chats);
+    expect(layout.order[0], HomeSection.chats);
     expect(layout.order.toSet(), HomeSection.values.toSet());
     expect(layout.order.length, HomeSection.values.length);
     expect(layout.hidden, {HomeSection.drives});

@@ -421,7 +421,7 @@ void main() {
     });
 
     testWidgets(
-        'notifications sit on top, unread first marked; a tap opens '
+        'notifications sit after Drives, unread marked and counted; a tap opens '
         'the subject and reads it; hidden when empty', (tester) async {
       final now = DateTime.now().millisecondsSinceEpoch;
       final api = FakeApi(
@@ -451,7 +451,8 @@ void main() {
           .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
       double y(String t) => tester.getTopLeft(find.text(t)).dy;
-      expect(y('Notifications'), lessThan(y('Drives')));
+      expect(y('Notifications'), greaterThan(y('Drives')));
+      expect(find.text('1'), findsOneWidget); // the unread badge
       expect(find.text('Polle in Team chat'), findsOneWidget);
       expect(find.text('See you at ten'), findsOneWidget);
       expect(find.text('5 min ago'), findsOneWidget);
