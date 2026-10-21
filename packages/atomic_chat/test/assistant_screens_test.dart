@@ -524,7 +524,7 @@ void main() {
       expect(find.text('No notifications'), findsNothing);
     });
 
-    testWidgets('pulling or flicking down at the top gives a mild rubber band',
+    testWidgets('pulling or flicking down at the top stretches, never moves',
         (tester) async {
       // The binding checks this variable before tearDowns run, so reset it
       // in a finally: a failing assertion must not cascade into later tests.
@@ -545,39 +545,30 @@ void main() {
                 find.descendant(of: list, matching: find.byType(Scrollable)))
             .position;
         double offset() => position().pixels;
-        final view = position().viewportDimension;
         expect(offset(), 0);
-        expect(find.byType(StretchingOverscrollIndicator), findsNothing);
+        expect(find.byType(StretchingOverscrollIndicator), findsWidgets);
 
-        // A long drag down overscrolls a little, then settles without
-        // swinging past the edge.
+        // A long drag down never scrolls past the edge: the content stays
+        // pinned and stretches instead.
         final g = await tester.startGesture(tester.getCenter(list));
         for (var i = 0; i < 30; i++) {
           await g.moveBy(const Offset(0, 10));
+          expect(offset(), 0);
         }
         await tester.pump();
-        expect(offset(), lessThan(0));
-        expect(-offset(), lessThanOrEqualTo(0.3 * view));
+        expect(offset(), 0);
         await g.up();
-        for (var i = 0; i < 150; i++) {
-          await tester.pump(const Duration(milliseconds: 16));
-          expect(offset(), lessThanOrEqualTo(0.01));
-        }
         await tester.pumpAndSettle();
         expect(offset(), 0);
 
-        // A flick travels further, still mild, and also comes to rest at 0.
+        // A flick at the top also stays at 0, and a flick up to the bottom
+        // ends there.
         await tester.fling(list, const Offset(0, 600), 3000);
-        await tester.pump(const Duration(milliseconds: 100));
-        expect(offset(), lessThanOrEqualTo(0));
-        expect(-offset(), lessThanOrEqualTo(0.4 * view));
-        for (var i = 0; i < 150; i++) {
+        for (var i = 0; i < 30; i++) {
           await tester.pump(const Duration(milliseconds: 16));
-          expect(offset(), lessThanOrEqualTo(0.01));
+          expect(offset(), 0);
         }
         await tester.pumpAndSettle();
-        expect(offset(), 0);
-        // And a flick up to the bottom ends there, not back above it.
         await tester.fling(list, const Offset(0, -2000), 3000);
         await tester.pumpAndSettle();
         expect(offset(), position().maxScrollExtent);

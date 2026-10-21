@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   testWidgets(
-      'bouncing at the bottom of a reversed chat list keeps "at bottom"',
+      'pulling past the bottom of a reversed chat list stretches and keeps "at bottom"',
       (tester) async {
     final window = ChatWindow<int>(
         readPage: (before, size) async => ChatPage.empty<int>(),
@@ -29,7 +29,8 @@ void main() {
       await g.moveBy(const Offset(0, -10));
     }
     await tester.pump();
-    expect(keeper.controller.position.pixels, lessThan(0));
+    expect(keeper.controller.position.pixels, 0);
+    expect(find.byType(StretchingOverscrollIndicator), findsOneWidget);
     expect(keeper.atBottom, isTrue);
     expect(keeper.farFromBottom, isFalse);
     await g.up();

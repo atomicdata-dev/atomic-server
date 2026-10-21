@@ -948,10 +948,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
                   onTap: _profile == null ? null : _settings),
             ],
           ),
-          // The app's mild rubber band, with no stretch or glow.
+          // The app's overscroll stretch.
           body: ScrollConfiguration(
             behavior: ScrollConfiguration.of(context)
-                .copyWith(overscroll: false, physics: const AppScrollPhysics()),
+                .copyWith(physics: const AppScrollPhysics()),
             // Sideways the camera cutout is at a side: the rows (ListTiles)
             // keep out of it, and so do the headings.
             child: SafeArea(
