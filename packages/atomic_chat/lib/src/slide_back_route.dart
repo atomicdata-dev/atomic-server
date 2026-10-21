@@ -51,6 +51,44 @@ class SlideBackRoute<T> extends PageRouteBuilder<T> {
   /// through a curve that starts fast and settles slowly.
   bool _byHand = false;
 
+  /// The page-wide swipe, when this route has one (not in the split layout).
+  _SwipeBackState? _swipe;
+
+  /// Drives the same slide from outside the page's own gesture detector:
+  /// a web view eats the touches, so its owner reads them itself and passes
+  /// the drag on. False when the route does not take a swipe now.
+  bool beginHandDrag() {
+    final swipe = _swipe;
+    // Already moved by the page's own drag (over a Flutter widget): that one
+    // keeps it.
+    if (swipe == null || swipe._dragging) return false;
+    swipe._start(DragStartDetails());
+    swipe._hand = swipe._dragging;
+    return swipe._hand;
+  }
+
+  void updateHandDrag(double dx) {
+    if (_swipe?._hand != true) return;
+    _swipe!._update(DragUpdateDetails(
+        globalPosition: Offset.zero, delta: Offset(dx, 0), primaryDelta: dx));
+  }
+
+  void endHandDrag(double velocityX) {
+    final swipe = _swipe;
+    if (swipe == null || !swipe._hand) return;
+    swipe._hand = false;
+    swipe._end(DragEndDetails(
+        velocity: Velocity(pixelsPerSecond: Offset(velocityX, 0)),
+        primaryVelocity: velocityX));
+  }
+
+  void cancelHandDrag() {
+    final swipe = _swipe;
+    if (swipe == null || !swipe._hand) return;
+    swipe._hand = false;
+    swipe._cancel();
+  }
+
   @override
   Widget buildTransitions(BuildContext context, Animation<double> animation,
       Animation<double> secondaryAnimation, Widget child) {
@@ -96,6 +134,22 @@ class _SwipeBack extends StatefulWidget {
 
 class _SwipeBackState extends State<_SwipeBack> {
   bool _dragging = false;
+
+  /// The drag is passed in by [SlideBackRoute.beginHandDrag], not by the
+  /// detector below.
+  bool _hand = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.route._swipe = this;
+  }
+
+  @override
+  void dispose() {
+    if (widget.route._swipe == this) widget.route._swipe = null;
+    super.dispose();
+  }
 
   AnimationController? get _controller =>
       // ignore: invalid_use_of_protected_member
@@ -185,10 +239,10 @@ class _SwipeBackState extends State<_SwipeBack> {
 
   Widget _swipe() => GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onHorizontalDragStart: _start,
-        onHorizontalDragUpdate: _update,
-        onHorizontalDragEnd: _end,
-        onHorizontalDragCancel: _cancel,
+        onHorizontalDragStart: (d) => _hand ? null : _start(d),
+        onHorizontalDragUpdate: (d) => _hand ? null : _update(d),
+        onHorizontalDragEnd: (d) => _hand ? null : _end(d),
+        onHorizontalDragCancel: () => _hand ? null : _cancel(),
         child: widget.child,
       );
 }

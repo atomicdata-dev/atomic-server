@@ -55,6 +55,7 @@ import {
   createEmbedStore,
   registerEmbedActions,
 } from './embedStore';
+import { installTouchGestures, setGestures } from './gestures';
 import { closeTopOverlay } from './overlayBack';
 import {
   reportShown,
@@ -144,6 +145,8 @@ declare global {
       flush(leaving?: boolean): Promise<void>;
       setColorScheme(scheme: HostColorScheme | undefined): void;
       setSidebarIcons(show: boolean): void;
+      /** Swipe-back needs of the page; the host hears changes. */
+      setGestures(mode: 'default' | 'horizontal'): void;
     };
   }
 }
@@ -371,6 +374,7 @@ window.atomicEmbed = {
   setSidebarIcons(show) {
     applyHostSidebarIcons(!!show);
   },
+  setGestures,
   openMenu(anchor) {
     window.dispatchEvent(
       new CustomEvent('atomic-embed-menu', { detail: anchor }),
@@ -382,6 +386,8 @@ window.atomicEmbed = {
     return flush({ leaving });
   },
 };
+
+installTouchGestures();
 
 // Documents, tables and canvases are Loro CRDTs; the module loads lazily.
 enableLoro().catch(e => console.warn('Loro failed to load', e));

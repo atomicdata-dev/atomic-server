@@ -13,6 +13,7 @@ import 'app_theme.dart';
 import 'assistant_api.dart';
 import 'embed_server.dart';
 import 'native_views.dart';
+import 'page_swipe.dart';
 import 'warm_resource_web_view.dart';
 
 /// A resource as the web app draws it, without the web app around it: the
@@ -221,6 +222,9 @@ class _ResourceViewState extends State<ResourceView>
   }
 
   bool _revealWatched = false;
+
+  /// The page claimed horizontal drags ([PageSwipe] leaves them alone).
+  bool _horizontal = false;
 
   /// Shows the web view: the placeholder fades out.
   void _reveal() {
@@ -452,6 +456,12 @@ class _ResourceViewState extends State<ResourceView>
     if (request['method'] == 'flushed') {
       final done = _flushed[request['flush']];
       if (done != null && !done.isCompleted) done.complete();
+      return;
+    }
+    if (request['method'] == 'gestures') {
+      // The page needs horizontal drags itself (a touch on a canvas, a
+      // scrolling table, or a whole page of drawing): no swipe back.
+      _horizontal = request['mode'] == 'horizontal';
       return;
     }
     if (request['method'] == 'revealed') {
@@ -695,13 +705,9 @@ class _ResourceViewState extends State<ResourceView>
                           },
                         ),
                       ),
-                    // Swipe back starts at the left edge.
-                    const Positioned(
-                      left: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: 24,
-                      child: _EdgeStrip(),
+                    // The swipe back over the web view, which takes the touches.
+                    Positioned.fill(
+                      child: PageSwipe(blocked: () => _horizontal),
                     ),
                   ]),
           ),
@@ -755,14 +761,4 @@ class ResourceSkeleton extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Catches touches at the screen's left edge so the swipe back works over the
-/// page.
-class _EdgeStrip extends StatelessWidget {
-  const _EdgeStrip();
-
-  @override
-  Widget build(BuildContext context) => const Listener(
-      behavior: HitTestBehavior.opaque, child: SizedBox.expand());
 }
