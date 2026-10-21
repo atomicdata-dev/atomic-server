@@ -506,7 +506,10 @@ mod tests {
             .unwrap();
         let agent = d.store.get_default_agent().unwrap().subject;
 
-        assert_eq!(ask(&h, "opened", json!([folder, d.drive])).await, json!(true));
+        assert_eq!(
+            ask(&h, "opened", json!([folder, d.drive])).await,
+            json!(true)
+        );
         // Not resources for Recents: a profile, the drive itself, something
         // this device does not have, a page without a drive.
         for (subject, drive) in [
@@ -530,7 +533,10 @@ mod tests {
         assert_eq!(opened, [folder]);
 
         // Without an index (an older host) the call is answered, not failed.
-        assert_eq!(ask(&host(&d), "opened", json!(["x", d.drive])).await, json!(false));
+        assert_eq!(
+            ask(&host(&d), "opened", json!(["x", d.drive])).await,
+            json!(false)
+        );
     }
 
     #[tokio::test]

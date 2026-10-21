@@ -182,7 +182,10 @@ pub async fn list_activity_with(
         .into_iter()
         .map(|a| {
             let actor_subject = a.actor.unwrap_or_default();
-            let actor = if own.as_deref().is_some_and(|own| same_agent(own, &actor_subject)) {
+            let actor = if own
+                .as_deref()
+                .is_some_and(|own| same_agent(own, &actor_subject))
+            {
                 "You".to_string()
             } else {
                 names

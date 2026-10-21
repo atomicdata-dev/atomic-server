@@ -225,7 +225,12 @@ mod tests {
         };
         let file = d
             .store
-            .create_resource(urls::FILE, &d.drive, "me.png", blob(hash.to_hex().to_string()))
+            .create_resource(
+                urls::FILE,
+                &d.drive,
+                "me.png",
+                blob(hash.to_hex().to_string()),
+            )
             .await
             .unwrap();
         assert!(file_bytes(&d.store, "https://example.test/none")
