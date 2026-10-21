@@ -41,6 +41,13 @@ pub struct AppState {
     /// Short-lived capabilities that let a null-origin plugin iframe read the
     /// one plugin's source it was opened for. See `plugins::view_token`.
     pub view_tokens: Arc<crate::plugins::view_token::ViewTokens>,
+    /// Apps loaded on the host ABI (`plugins::host_abi`), by drive.
+    #[cfg(feature = "wasm-plugins")]
+    pub host_abi: Arc<crate::plugins::host_abi::HostAbiRegistry>,
+    /// Which Installations' background work this node may run
+    /// (`plugins::lease`).
+    #[cfg(feature = "wasm-plugins")]
+    pub leases: Arc<crate::plugins::lease::Leases>,
     /// Per-agent and per-peer budgets for the write endpoints; see
     /// `crate::rate_limit`. Sized from `--write-rate-limit` and
     /// `--anonymous-write-rate-limit`.
@@ -108,18 +115,30 @@ impl AppState {
         }
 
         // Register all built-in class extenders
-        store.add_class_extender(plugins::chatroom::build_chatroom_extender())?;
         store.add_class_extender(plugins::chatroom::build_message_extender())?;
         store.add_endpoint(plugins::invite::invite_endpoint())?;
         store.add_endpoint(plugins::conversations::conversations_endpoint())?;
+        // One registry for every runtime: modules loaded below and by an
+        // Installation's activation reach the same apps as `/host/call`.
+        #[cfg(feature = "wasm-plugins")]
+        let host_abi: Arc<plugins::host_abi::HostAbiRegistry> = Arc::default();
         store.add_class_extender(plugins::plugin::build_installation_extender(
             config.plugin_path.clone(),
             config.plugin_cache_path.clone(),
+            #[cfg(feature = "wasm-plugins")]
+            host_abi.clone(),
         ))?;
         store.add_class_extender(plugins::files::build_file_extender(
             config.uploads_path.clone(),
         ))?;
         store.add_class_extender(plugins::form::build_form_extender())?;
+        // A built-in app: the same hooks and imports as an installed module,
+        // compiled in.
+        #[cfg(feature = "wasm-plugins")]
+        store.add_class_extender(plugins::chatroom::build_chatroom_extender(
+            &store,
+            host_abi.clone(),
+        ))?;
 
         // Owned here rather than in the AppState literal below, because the
         // `/server` endpoint closes over them to report this node's status.
@@ -165,6 +184,7 @@ impl AppState {
                 &config.plugin_path,
                 &config.plugin_cache_path,
                 &store,
+                &host_abi,
             )
             .await?;
 
@@ -291,6 +311,10 @@ impl AppState {
             managed: server_info.managed,
             managed_dashboard_url: server_info.managed_dashboard_url,
             view_tokens: Arc::new(Default::default()),
+            #[cfg(feature = "wasm-plugins")]
+            host_abi,
+            #[cfg(feature = "wasm-plugins")]
+            leases: Arc::new(crate::plugins::lease::Leases::system()),
         })
     }
 

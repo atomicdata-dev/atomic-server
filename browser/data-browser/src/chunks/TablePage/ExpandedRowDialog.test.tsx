@@ -119,7 +119,7 @@ function TableRowDialog({
 }
 
 async function setup(values: Record<string, JSONValue>) {
-  const store = new Store({ serverUrl: 'https://example.com' });
+  const store = new Store({ serverUrl: 'https://example.com', connect: false });
   vi.spyOn(store, 'getProperty').mockImplementation(async subject =>
     subject === DAY ? dayProperty : recurrenceProperty,
   );

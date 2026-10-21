@@ -4164,6 +4164,14 @@ export class Resource<C extends OptionalClass = any> {
   ): Promise<void> {
     prop = canonicalPropKey(prop) as Prop;
 
+    if (value === undefined) {
+      // Removal is not a value to validate or a reason to fetch Property metadata.
+      // `remove` emits the `LocalChange` for this property.
+      this.remove(prop);
+
+      return;
+    }
+
     if (value instanceof Uint8Array) {
       throw new Error('Binary values (Uint8Array) cannot be set via set().');
     }
@@ -4207,13 +4215,6 @@ export class Resource<C extends OptionalClass = any> {
           throw e;
         }
       }
-    }
-
-    if (value === undefined) {
-      // `remove` emits the `LocalChange` for this property.
-      this.remove(prop);
-
-      return;
     }
 
     // Write to Loro only — cache is rebuilt lazily on next get()

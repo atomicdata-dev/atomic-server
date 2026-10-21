@@ -129,6 +129,8 @@ logged and dropped, not answered.
 | `0x40` | `EPHEMERAL` | Iroh peers; WS client and server, both ways | Iroh live loop; WS handler (`require_auth`, then the broadcaster). The server relays between the two transports. |
 | `0x41` | `KEEPALIVE` | both sides, on their own schedule | WS server **echoes** it; Iroh **never** echoes it. |
 | `0x42` | `CHALLENGE` | WS server, as its first frame | client only. Never sent on an Iroh stream. |
+| `0x50` | `CALL` | Iroh dialer, after `AUTH` | `atomic_lib::sync::call`, answered by the server's host ABI. Iroh only; the WS server answers it with an `ERROR`. |
+| `0x51` | `CALL_RESULT` | Iroh responder | the dialer of the `CALL`. |
 
 ## Frame layouts
 
@@ -276,6 +278,45 @@ name is **rejected**, not truncated. Control characters are stripped on
 decode so a peer cannot smuggle line breaks into logs. Display only:
 authorization uses the authenticated agent and the Iroh NodeId, never this. A
 decoder that predates capabilities ignores the trailing bytes.
+
+### CALL (0x50) and CALL_RESULT (0x51)
+
+```
+[0x50] [request_id: u16] [json]     // CALL
+[0x51] [request_id: u16] [json]     // CALL_RESULT
+```
+
+Run an app export (`atomic:host/calls`, see `docs/src/plugins/host-abi.md`) on
+the responding node. Iroh only. `CALL` is accepted after `AUTH` and only for
+the drive the `AUTH` was signed for, like `SYNC`; any other drive is answered
+as a `SYNC` for the wrong drive is.
+
+```json
+// CALL
+{ "drive": "did:ad:…", "interface": "atomic:example/counter@1",
+  "function": "increment", "args": "{\"subject\":\"…\"}",
+  "caller": "did:ad:agent:…", "depth": 1,
+  "budget": { "calls": 60, "fuel": 15000000000,
+              "effects": ["read"], "secrets": false } }
+// CALL_RESULT: exactly one of result and error
+{ "result": "{\"count\":1}", "callsLeft": 55, "fuelLeft": 14000000000 }
+{ "error": { "code": "forbidden", "message": "…" }, "callsLeft": 0, "fuelLeft": 0 }
+```
+
+`args` and `result` are JSON text, as in `calls.call`. `error.code` is one of
+the host ABI's stable codes. `budget` is what the whole call chain may still
+spend; `effects: null` is any effect. The responder never widens it: counts are
+capped at its own limits, an effect it does not know is dropped, and
+`secrets: false` stays false. `callsLeft` and `fuelLeft` hand back what was not
+spent. `depth` is the number of hops so far, this one included. A node answering
+a `CALL` does not forward it again.
+
+The `AUTH` on the stream is the dialing *node's* agent, as for a sync. `caller`
+is the agent the call is for: the node vouches for it, because the caller's own
+key never reaches it. The responder runs the call for `caller` (all the usual
+checks), and in addition needs the node's agent to be able to read the drive,
+and to write it wherever a hop writes. A `caller` of `sudo` or the public agent
+is refused.
 
 ### EPHEMERAL (0x40)
 
@@ -743,6 +784,9 @@ identity the peer proved, exactly as the accept side's `SYNC_DIFF` is. Dialing
 a peer never establishes that peer's rights. A peer the local user
 deliberately paired with is additionally served whatever *this node* may
 read, never more.
+
+A stream authenticated for a drive may also carry `CALL` frames instead of (or
+after) the sync; see [CALL](#call-0x50-and-call_result-0x51).
 
 ## SYNC_PUSH chunking and acknowledgement
 

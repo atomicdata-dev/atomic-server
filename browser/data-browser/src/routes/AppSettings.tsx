@@ -17,7 +17,8 @@ import AISettings from '@components/AI/AISettings';
 import { VirtualDriveSettings } from '@components/Settings/VirtualDriveSettings';
 import { NotificationSettings } from '@components/Settings/NotificationSettings';
 import { isVirtualDriveAvailable } from '../helpers/virtualDrive';
-import { SUPPORTED_LOCALES, useLocale } from '@components/LocaleContext';
+import { useLocale } from '@components/LocaleContext';
+import { SUPPORTED_LOCALES } from '@helpers/preloadLocale';
 import { BasicSelect } from '@components/forms/BasicSelect';
 import { styled } from 'styled-components';
 import {

@@ -121,7 +121,7 @@ function Harness({
 }
 
 async function setup(views: Array<[string, string]>) {
-  const store = new Store({ serverUrl: 'https://example.com' });
+  const store = new Store({ serverUrl: 'https://example.com', connect: false });
   const subjects: string[] = [];
 
   for (const [name, kind] of views) {

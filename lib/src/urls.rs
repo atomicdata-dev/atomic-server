@@ -310,11 +310,21 @@ pub const PREVIOUS_RELEASE: &str = "https://atomicdata.dev/properties/previousRe
 pub const PUBLISHER: &str = "https://atomicdata.dev/properties/publisher";
 pub const RELEASE_PROP: &str = "https://atomicdata.dev/properties/release";
 pub const GRANTS: &str = "https://atomicdata.dev/properties/grants";
+pub const READ_SCOPE: &str = "https://atomicdata.dev/properties/readScope";
+pub const WRITE_SCOPE: &str = "https://atomicdata.dev/properties/writeScope";
+pub const CALL_SCOPE: &str = "https://atomicdata.dev/properties/callScope";
 pub const INSTALLATION_STATUS: &str = "https://atomicdata.dev/properties/installationStatus";
 pub const DOMAINS: &str = "https://atomicdata.dev/properties/domains";
 pub const STANDARDS: &str = "https://atomicdata.dev/properties/standards";
 pub const EVIDENCE: &str = "https://atomicdata.dev/properties/evidence";
 pub const SUPPORT_TIER: &str = "https://atomicdata.dev/properties/supportTier";
+// ... for Lease (background work placement)
+pub const LEASE: &str = "https://atomicdata.dev/classes/Lease";
+pub const LEASE_OF: &str = "https://atomicdata.dev/properties/leaseOf";
+pub const LEASE_HOLDER: &str = "https://atomicdata.dev/properties/leaseHolder";
+pub const LEASE_EXPIRES_AT: &str = "https://atomicdata.dev/properties/leaseExpiresAt";
+pub const LEASE_GENERATION: &str = "https://atomicdata.dev/properties/leaseGeneration";
+pub const PREVIOUS_LEASE: &str = "https://atomicdata.dev/properties/previousLease";
 pub const EMOJI: &str = "https://atomicdata.dev/properties/emoji";
 // AI
 pub const TEXT_PART: &str = "https://atomicdata.dev/01jtjxtsa9syxmfca2zx5gcnmj/class/text-part";

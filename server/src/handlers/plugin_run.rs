@@ -13,7 +13,7 @@ use atomic_lib::{hierarchy::check_write, Storelike};
 use crate::{
     appstate::AppState,
     errors::{AtomicServerError, AtomicServerResult},
-    plugins::js_runtime,
+    plugins::{host_abi::JsAbi, js_runtime},
 };
 
 #[derive(serde::Deserialize, Debug)]
@@ -62,6 +62,7 @@ pub async fn handle_plugin_run(
     let host =
         js_runtime::StoreHost::bound(store, &body.drive, &body.plugin, agent, manifest).await?;
 
+    let host = JsAbi::new(host, appstate.host_abi.clone());
     let outcome = runtime.run(&body.source, &body.input, host).await?;
 
     // A plugin that failed is a result to render, not a 500: the browser shows

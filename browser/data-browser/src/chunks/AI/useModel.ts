@@ -26,8 +26,12 @@ const createOllamaProvider = (ollamaUrl: string) => {
 export function useGetModel(): (
   identifier: AIModelIdentifier,
 ) => LanguageModel | undefined {
-  const { openRouterApiKey, ollamaUrl, isProviderAvailable, openRouterZdr } =
-    useAISettings();
+  const {
+    openRouterApiKey,
+    ollamaEndpoint,
+    isProviderAvailable,
+    openRouterZdr,
+  } = useAISettings();
 
   return (identifier: AIModelIdentifier): LanguageModel | undefined => {
     if (!isProviderAvailable(identifier.provider)) {
@@ -49,11 +53,11 @@ export function useGetModel(): (
     }
 
     if (identifier.provider === AIProvider.Ollama) {
-      if (!ollamaUrl) {
+      if (!ollamaEndpoint) {
         return undefined;
       }
 
-      return createOllamaProvider(ollamaUrl)(identifier.id);
+      return createOllamaProvider(ollamaEndpoint)(identifier.id);
     }
   };
 }

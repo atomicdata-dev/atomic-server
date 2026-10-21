@@ -88,7 +88,7 @@ export function recallOriginProbe(origin: string): boolean {
   return true;
 }
 
-/** Only in tests. Boot sets this through {@link probeOriginForNode}. */
+/** Records an origin known not to be a node. Called at boot by {@link recallOriginProbe}, and by tests. */
 export function rememberOriginWithoutNode(origin: string | undefined): void {
   originWithoutNode = origin ? originOf(origin) : undefined;
 }

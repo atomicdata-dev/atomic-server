@@ -1,4 +1,5 @@
 import type { Intent } from '@tomic/lib';
+import { HostError, toHostErrorCode } from './hostAbi';
 import { viewRequest, type ViewOperation } from './viewProtocol';
 
 /**
@@ -339,6 +340,20 @@ export class ViewStore {
       this.call('environment', {}),
   };
 
+  /**
+   * Calls a function another app in this drive exports, as the signed-in
+   * person: `store.callExport('atomic:example/counter@1', 'increment', { ... })`.
+   * Resolves to the parsed result; rejects with a `HostError` carrying the
+   * host's `code` (`not-found`, `forbidden`, `invalid-argument`, ...).
+   */
+  public callExport<T = unknown>(
+    iface: string,
+    fn: string,
+    args: Record<string, unknown> = {},
+  ): Promise<T> {
+    return this.call<T>('call', { interface: iface, function: fn, args });
+  }
+
   /** One request to the host. The transport under every method above. */
   public call<T = never>(
     op: ViewOperation,
@@ -403,7 +418,12 @@ export class ViewStore {
       this.pending.delete(message.id);
       clearTimeout(settle.timer);
 
-      if (message.error !== undefined) settle.reject(new Error(message.error));
+      if (message.error !== undefined)
+        settle.reject(
+          message.code
+            ? new HostError(toHostErrorCode(message.code), message.error)
+            : new Error(message.error),
+        );
       else settle.resolve(message.result);
     });
   }

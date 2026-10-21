@@ -312,6 +312,7 @@ msgstr "Ollama"
 
 #: src/chunks/AI/AISetupPanel.tsx
 #: src/chunks/Templates/DriveTemplateSetup.tsx
+#: src/components/AI/LocalNetworkNotice.tsx
 msgid "Continue"
 msgstr "Continue"
 
@@ -4575,7 +4576,6 @@ msgstr "Remove icon"
 msgid "Pick an emoji or image shown next to this resource wherever it appears."
 msgstr "Pick an emoji or image shown next to this resource wherever it appears."
 
-#: src/chunks/EmojiInput/EmojiInput.tsx
 #: src/components/ResourceDecorations.tsx
 msgid "<0/> Upload image"
 msgstr "<0/> Upload image"
@@ -4585,7 +4585,6 @@ msgstr "<0/> Upload image"
 msgid "Could not display \"{0}\" — it may not be a supported image format"
 msgstr "Could not display \"{0}\" — it may not be a supported image format"
 
-#: src/chunks/EmojiInput/EmojiInput.tsx
 #: src/components/ResourceDecorations.tsx
 msgid "<0/> Pick existing"
 msgstr "<0/> Pick existing"
@@ -11185,6 +11184,7 @@ msgid "Change history"
 msgstr "Change history"
 
 #: src/components/Vault/VaultStorage.tsx
+#: src/components/Vault/VaultStorage.tsx
 msgid "Snapshots"
 msgstr "Snapshots"
 
@@ -11490,10 +11490,6 @@ msgstr "{0} earlier messages were omitted to fit the report. The most recent mes
 #: src/chunks/AI/RealAIChat.tsx
 msgid "Tokens used:{0} {1} input,{2} {3} output"
 msgstr "Tokens used:{0} {1} input,{2} {3} output"
-
-#: src/chunks/EmojiInput/EmojiInput.tsx
-msgid "<0/> Remove"
-msgstr "<0/> Remove"
 
 #. 0: review.author
 #: src/chunks/Plugins/InstallationReviewDialog.tsx
@@ -12573,6 +12569,8 @@ msgid "Discard history"
 msgstr "Discard history"
 
 #: src/components/Vault/VaultStorage.tsx
+#: src/components/Vault/VaultStorage.tsx
+#: src/components/Vault/VaultStorage.tsx
 msgid "This cannot be undone."
 msgstr "This cannot be undone."
 
@@ -12826,14 +12824,6 @@ msgid "{0} files"
 msgstr "{0} files"
 
 #: src/components/Vault/VaultStorage.tsx
-msgid "Newest changes of 1 device"
-msgstr "Newest changes of 1 device"
-
-#. 0: h.lanes
-#: src/components/Vault/VaultStorage.tsx
-msgid "Newest changes of each of {0} devices"
-msgstr "Newest changes of each of {0} devices"
-
 #: src/components/Vault/VaultStorage.tsx
 msgid "Always kept"
 msgstr "Always kept"
@@ -12841,10 +12831,6 @@ msgstr "Always kept"
 #: src/components/Vault/VaultStorage.tsx
 msgid "Changes not in a snapshot yet"
 msgstr "Changes not in a snapshot yet"
-
-#: src/components/Vault/VaultStorage.tsx
-msgid "A backup from that device adds them"
-msgstr "A backup from that device adds them"
 
 #: src/components/Vault/VaultStorage.tsx
 msgid "Kept so deleted items can be recovered"
@@ -13111,10 +13097,6 @@ msgstr "Row menu"
 msgid "Commented"
 msgstr "Commented"
 
-#: src/components/Cloud/CloudServerDetails.tsx
-msgid "This drive is on Cloud Server, managed by another account. Only that account can change the plan or the web address."
-msgstr "This drive is on Cloud Server, managed by another account. Only that account can change the plan or the web address."
-
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "Live duration"
 msgstr "Live duration"
@@ -13156,6 +13138,107 @@ msgstr "Formula"
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "Combine columns with + - * / and functions: now(), coalesce(a, b), days(ms), addDays(date, n), daysUntilAnniversary(date), min, max, if(test, a, b). Dates are milliseconds, a missing value leaves the cell empty, and 1/2 is 0 (write 1.0/2). Columns you can use: {0}."
 msgstr "Combine columns with + - * / and functions: now(), coalesce(a, b), days(ms), addDays(date, n), daysUntilAnniversary(date), min, max, if(test, a, b). Dates are milliseconds, a missing value leaves the cell empty, and 1/2 is 0 (write 1.0/2). Columns you can use: {0}."
+
+#. 0: managedBy
+#: src/components/Cloud/CloudServerDetails.tsx
+msgid "This drive is on Cloud Server (managed by {0}). Only that account can change the plan or the web address."
+msgstr "This drive is on Cloud Server (managed by {0}). Only that account can change the plan or the web address."
+
+#: src/components/Cloud/CloudServerDetails.tsx
+msgid "This drive is on Cloud Server (managed by another account). Only that account can change the plan or the web address."
+msgstr "This drive is on Cloud Server (managed by another account). Only that account can change the plan or the web address."
+
+#: src/components/AI/LocalNetworkNotice.tsx
+msgid "Ollama runs on your own computer. Your browser will ask whether this site may access other apps and services on this device. That is only used to talk to Ollama; nothing else on your network is scanned."
+msgstr "Ollama runs on your own computer. Your browser will ask whether this site may access other apps and services on this device. That is only used to talk to Ollama; nothing else on your network is scanned."
+
+#: src/components/AI/ProviderStatus.tsx
+#: src/components/AI/ProviderStatus.tsx
+msgid "Waiting for permission"
+msgstr "Waiting for permission"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Each browser or app's share is listed below, where you can remove it."
+msgstr "Each browser or app's share is listed below, where you can remove it."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Delete"
+msgstr "Delete"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Older snapshots are removed automatically."
+msgstr "Older snapshots are removed automatically."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "· This browser"
+msgstr "· This browser"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Remove its history…"
+msgstr "Remove its history…"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Browsers and apps backing up here"
+msgstr "Browsers and apps backing up here"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Every browser or app you signed in on sends its own changes to this backup. Old or unused ones can pile up."
+msgstr "Every browser or app you signed in on sends its own changes to this backup. Old or unused ones can pile up."
+
+#. 0: formatBytes(removeDevice.pack_bytes); 1: deviceLabel(removeDevice.device_pubkey)
+#: src/components/Vault/VaultStorage.tsx
+msgid "About {0} of saved history from {1} will be removed."
+msgstr "About {0} of saved history from {1} will be removed."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "This deletes the changes it sent to your backup. Edits made only there, and never synced anywhere else, are lost. Your workspace and your other browsers are not touched."
+msgstr "This deletes the changes it sent to your backup. Edits made only there, and never synced anywhere else, are lost. Your workspace and your other browsers are not touched."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Remove the saved history of this browser or app?"
+msgstr "Remove the saved history of this browser or app?"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Remove history"
+msgstr "Remove history"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Could not remove the history."
+msgstr "Could not remove the history."
+
+#. 0: formatBytes(deleteSnapshot.bytes)
+#: src/components/Vault/VaultStorage.tsx
+msgid "This snapshot uses {0}. The newest snapshot and your workspace are not touched."
+msgstr "This snapshot uses {0}. The newest snapshot and your workspace are not touched."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Delete this snapshot?"
+msgstr "Delete this snapshot?"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Delete snapshot"
+msgstr "Delete snapshot"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Could not delete the snapshot."
+msgstr "Could not delete the snapshot."
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "Latest changes from 1 browser or app"
+msgstr "Latest changes from 1 browser or app"
+
+#. 0: h.lanes
+#: src/components/Vault/VaultStorage.tsx
+msgid "Latest changes from each of {0} browsers and apps"
+msgstr "Latest changes from each of {0} browsers and apps"
+
+#: src/components/Vault/VaultStorage.tsx
+msgid "The next backup from that browser or app adds them"
+msgstr "The next backup from that browser or app adds them"
+
+#: src/components/ConnectDrivePicker.tsx
+msgid "All drives"
+msgstr "All drives"
 
 #: src/embed/MeetingChatOverlay.tsx
 msgid "Close chat"

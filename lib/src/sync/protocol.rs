@@ -76,6 +76,12 @@ pub mod tag {
     /// probe itself was the text `SYNC_VV`; both transports now speak the
     /// binary form.
     pub const SYNC_RESEND: u8 = 0x38;
+    /// Iroh only, dialer → responder: run an app export on the responder's
+    /// node. `[0x50] [request_id: u16] [json CallRequest]`. Answered by
+    /// `CALL_RESULT` (or `ERROR` when it cannot be read). See [`super::CallRequest`].
+    pub const CALL: u8 = 0x50;
+    /// Responder → dialer: `[0x51] [request_id: u16] [json CallResponse]`.
+    pub const CALL_RESULT: u8 = 0x51;
 }
 
 /// Feature names a responder advertises in the `AUTH_OK` payload and both
@@ -458,6 +464,98 @@ pub const IROH_FRAME_MAX_BYTES: usize = 50_000_000;
 /// (planning/unified-sync.md) — can't force a 50MB allocation before proving
 /// who they are.
 pub const IROH_PREAUTH_FRAME_MAX_BYTES: usize = 10_000_000;
+
+// ---- Host ABI calls between nodes (CALL / CALL_RESULT) ----
+
+/// What a forwarded call may still spend, carried in the `CALL` frame. The
+/// responder never widens it: counts are capped at its own chain limits,
+/// effects it does not know are dropped, and `secrets: false` stays false.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CallBudgetWire {
+    /// `calls.call` hops still allowed.
+    pub calls: u64,
+    pub fuel: u64,
+    /// The effects any export in the chain may have; `None` is any.
+    #[serde(default)]
+    pub effects: Option<Vec<String>>,
+    /// Whether an app that declares secrets may run anywhere in the chain.
+    pub secrets: bool,
+}
+
+/// `CALL` payload: `calls.call(interface, function, args)` in `drive`, for
+/// `caller`, with the rest of the chain's budget.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CallRequest {
+    pub drive: String,
+    pub interface: String,
+    pub function: String,
+    /// The arguments, JSON text.
+    pub args: String,
+    /// The agent the entry call came from. The dialer vouches for it: the
+    /// connection's AUTH is the dialer's own agent, not this one.
+    pub caller: String,
+    /// `calls.call` hops so far, this hop included.
+    pub depth: u32,
+    pub budget: CallBudgetWire,
+}
+
+/// An ABI error (`code` is one of `atomic:host`'s stable error codes).
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CallFailure {
+    pub code: String,
+    pub message: String,
+}
+
+/// `CALL_RESULT` payload: exactly one of `result` (JSON text) and `error`.
+/// `callsLeft` and `fuelLeft` hand back what the responder did not spend.
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CallResponse {
+    #[serde(default)]
+    pub result: Option<String>,
+    #[serde(default)]
+    pub error: Option<CallFailure>,
+    #[serde(default)]
+    pub calls_left: u64,
+    #[serde(default)]
+    pub fuel_left: u64,
+}
+
+fn encode_call_frame<T: serde::Serialize>(tag: u8, request_id: u16, body: &T) -> Vec<u8> {
+    let json = serde_json::to_vec(body).unwrap_or_default();
+    let mut buf = Vec::with_capacity(3 + json.len());
+    buf.push(tag);
+    buf.extend_from_slice(&request_id.to_be_bytes());
+    buf.extend_from_slice(&json);
+    buf
+}
+
+/// Encode CALL: `[0x50] [request_id: u16] [json CallRequest]`.
+pub fn encode_call(request_id: u16, request: &CallRequest) -> Vec<u8> {
+    encode_call_frame(tag::CALL, request_id, request)
+}
+
+/// Encode CALL_RESULT: `[0x51] [request_id: u16] [json CallResponse]`.
+pub fn encode_call_result(request_id: u16, response: &CallResponse) -> Vec<u8> {
+    encode_call_frame(tag::CALL_RESULT, request_id, response)
+}
+
+fn decode_call_frame<T: serde::de::DeserializeOwned>(data: &[u8]) -> Option<(u16, T)> {
+    let id = u16::from_be_bytes([*data.first()?, *data.get(1)?]);
+    Some((id, serde_json::from_slice(&data[2..]).ok()?))
+}
+
+/// Decode CALL (after the tag).
+pub fn decode_call(data: &[u8]) -> Option<(u16, CallRequest)> {
+    decode_call_frame(data)
+}
+
+/// Decode CALL_RESULT (after the tag).
+pub fn decode_call_result(data: &[u8]) -> Option<(u16, CallResponse)> {
+    decode_call_frame(data)
+}
 
 // ---- Encoding ----
 

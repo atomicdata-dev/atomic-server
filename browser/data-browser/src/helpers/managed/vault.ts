@@ -402,21 +402,6 @@ export async function putVaultKeyEnvelope(
   });
 }
 
-/**
- * Fetch this drive's wrapped vault key, or null if none was ever stored.
- *
- * `204` rather than `404` when absent, so a caller can tell "no key yet" from
- * "no such drive" — the first is a drive that has never been backed up, the
- * second is a mistake.
- */
-export async function getVaultKeyEnvelope(
-  drivePseudonym: string,
-): Promise<string | null> {
-  const record = await getVaultKeyEnvelopeRecord(drivePseudonym);
-
-  return record?.envelope ?? null;
-}
-
 /** A drive key in hand, and the epoch its envelope wrapped it at. */
 export type DriveKeyHandle = {
   driveKey: Uint8Array;
@@ -554,6 +539,26 @@ export type VaultUsage = {
    * it. The pack categories below are disjoint.
    */
   history?: VaultHistoryUsage;
+  /** Stored snapshots, newest first. Optional: older control planes omit it. */
+  snapshots?: VaultSnapshotUsage[];
+};
+
+/** One stored snapshot. The latest is never deletable. */
+export type VaultSnapshotUsage = {
+  id: string;
+  created_at: number;
+  bytes: number;
+  is_latest: boolean;
+};
+
+/** One device's share of the change history. */
+export type VaultDeviceUsage = {
+  device_pubkey: string;
+  pack_objects: number;
+  pack_bytes: number;
+  /** Bytes no snapshot includes yet: lost if this device's history is removed. */
+  uncovered_bytes: number;
+  last_activity_at: number | null;
 };
 
 export type VaultHistoryUsage = {
@@ -575,6 +580,8 @@ export type VaultHistoryUsage = {
   freeable_bytes: number;
   checkpoint_objects: number;
   anchor_covers_lanes: number;
+  /** Per device, biggest first. Optional: older control planes omit it. */
+  devices?: VaultDeviceUsage[];
 };
 
 export type VaultFreeUpResult = {
@@ -608,6 +615,31 @@ export async function freeUpVaultStorage(
       method: 'POST',
       body: JSON.stringify({ include_undo_window: includeUndoWindow }),
     },
+  );
+}
+
+/**
+ * Remove one device's change history from the backup. Edits only that device
+ * made and never synced elsewhere are lost; the workspace is not touched.
+ */
+export async function removeVaultDeviceHistory(
+  drivePseudonym: string,
+  devicePubkey: string,
+): Promise<VaultFreeUpResult> {
+  return storageApi<VaultFreeUpResult>(
+    `/cloud-vault/${drivePseudonym}/devices/${encodeURIComponent(devicePubkey)}/remove-history`,
+    { method: 'POST' },
+  );
+}
+
+/** Delete one older snapshot. The control plane refuses the latest. */
+export async function deleteVaultSnapshot(
+  drivePseudonym: string,
+  snapshotId: string,
+): Promise<VaultFreeUpResult> {
+  return storageApi<VaultFreeUpResult>(
+    `/cloud-vault/${drivePseudonym}/snapshots/${encodeURIComponent(snapshotId)}/delete`,
+    { method: 'POST' },
   );
 }
 

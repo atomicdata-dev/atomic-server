@@ -16,6 +16,7 @@ import React, { FormEvent, useEffect, useRef, useState } from 'react';
 import { styled, keyframes } from 'styled-components';
 import { useStore } from '@tomic/react';
 import { Agent, decodeSecret } from '@tomic/lib';
+import { parseReturnPath } from '../../helpers/returnPath';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 import { useWelcomeLayoutEffect } from '../../hooks/useWelcomeLayoutEffect';
 import { useSettings } from '../../helpers/AppSettings';
@@ -231,14 +232,15 @@ export function GettingStartedFlow({
     new URLSearchParams(window.location.search).get('drive') ||
     new URLSearchParams(window.location.search).get('subject') ||
     undefined;
-  // Only this named, internal destination is accepted; never navigate to an
-  // arbitrary return URL supplied by a link. Adding a passkey needs the local
-  // identity unlocked before the account settings can edit its backup.
-  const returnToAgent =
-    !fromManaged &&
-    !inviteToken &&
-    !nextDrive &&
-    new URLSearchParams(window.location.search).get('return_to') === 'agent';
+  // Only `agent` and connect-an-app links are accepted (see parseReturnPath);
+  // never navigate to an arbitrary return URL supplied by a link. Both need the
+  // key, not a restored drive (adding a passkey needs the local identity unlocked).
+  const returnPath =
+    !fromManaged && !inviteToken && !nextDrive
+      ? parseReturnPath(
+          new URLSearchParams(window.location.search).get('return_to'),
+        )
+      : undefined;
   const signInRequested =
     new URLSearchParams(window.location.search).get('step') === 'signin';
   const [step, setStep] = useState<Step>(
@@ -247,7 +249,7 @@ export function GettingStartedFlow({
       : inviteToken
         ? 'restore'
         : nextDrive ||
-            returnToAgent ||
+            returnPath ||
             signInRequested ||
             // Hosted builds have no Create/Sign-in/Demo choice: creating an
             // account happens in the portal, so signed-out people get the
@@ -697,7 +699,7 @@ export function GettingStartedFlow({
       // "your data is on another device" hides which one this is.
       let vaultReason: string | undefined;
 
-      if (!hasData && target && !returnToAgent) {
+      if (!hasData && target && !returnPath) {
         setWorkspaceStage('backup');
         const restored = await withDeadline(
           restoreFromVault(store, target),
@@ -731,7 +733,7 @@ export function GettingStartedFlow({
       // Recover first, but connecting a device is optional for the identity's
       // own home. A foreign requested workspace must never be synthesized.
       const home =
-        !hasData && target && !returnToAgent
+        !hasData && target && !returnPath
           ? await openPrivateHome(store, target, true)
           : undefined;
 
@@ -764,12 +766,10 @@ export function GettingStartedFlow({
         // the whole drive, and sign-in should not wait on an upload.
         void ensureVaultBackup(store, target!);
 
-        navigate(
-          returnToAgent ? paths.agentSettings : constructOpenURL(target!),
-        );
-      } else if (returnToAgent) {
+        navigate(returnPath ?? constructOpenURL(target!));
+      } else if (returnPath) {
         // Passkey management needs the key, not a downloaded copy of the drive.
-        navigate(paths.agentSettings);
+        navigate(returnPath);
       } else {
         setMissingDrive(target);
         setMissingDriveVaultReason(vaultReason);

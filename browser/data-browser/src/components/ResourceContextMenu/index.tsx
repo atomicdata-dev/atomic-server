@@ -26,7 +26,7 @@ import { runAction } from '../../actions/runAction';
 import type { ActionDefinition } from '../../actions/types';
 import { usePluginClass } from '@chunks/PluginRuns/useDriveClass';
 import { useCustomContextItemsContext } from './CustomContextItemsContext';
-import { CoverPickerDialog, EmojiPickerDialog } from '../ResourceDecorations';
+import { CoverPickerDialog, IconPickerDialog } from '../ResourceDecorations';
 import { ResourceInline } from '../../views/ResourceInline';
 import { ResourceUsage } from '../ResourceUsage';
 import { getDeleteDialog } from './deleteDialogRegistry';
@@ -427,7 +427,7 @@ export function ResourceContextMenu({
       />
       {/* Mounted lazily on first use — most menus never open these. */}
       {emojiPickerOpen !== undefined && (
-        <EmojiPickerDialog
+        <IconPickerDialog
           resource={ctx.resource}
           show={emojiPickerOpen}
           onShowChange={setEmojiPickerOpen}

@@ -32,6 +32,11 @@ const recents: Record<string, string[]> = {
 };
 
 let commentTimes = new Map<string, { at: number; by?: string }>();
+let editors: Record<string, string> = {};
+vi.mock('@hooks/useLastEditor', () => ({
+  useLastEditor: (subject: string, _at: number, enabled: boolean) =>
+    enabled ? editors[subject] : undefined,
+}));
 vi.mock('@components/RightPanel/RightPanelContext', () => ({
   useRightPanel: () => ({ setPanelOpen: () => {} }),
 }));
@@ -54,6 +59,10 @@ vi.mock('@tomic/react', () => ({
   isNotFound: () => false,
   isUnauthorized: () => false,
   useDrivePresence: () => [],
+  useResource: (s: string) => ({ subject: s }),
+  useTitle: (r: { subject: string }) => [
+    r.subject === 'did:ad:agent:me' ? 'Joep Meindertsma' : '',
+  ],
   useStore: () => store,
   useResources: (subjects: string[]) =>
     new Map(
@@ -157,6 +166,7 @@ describe('ActivityFeed', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     commentTimes = new Map();
+    editors = {};
   });
 
   it('adds a resource that was only commented on, as Commented', () => {
@@ -179,6 +189,15 @@ describe('ActivityFeed', () => {
     expect(html).toContain('>1m ago<');
     expect(html).toContain('data-avatar="did:ad:agent:me"');
     expect(html).not.toContain('hidden-doc');
+  });
+
+  it('shows the editor of an edited row, with a name', () => {
+    editors['did:ad:a-doc'] = 'did:ad:agent:me';
+
+    const html = render('did:ad:drive-a', ['did:ad:a-doc']);
+
+    expect(html).toContain('data-avatar="did:ad:agent:me"');
+    expect(html).toContain('Joep Meindertsma');
   });
 
   it('shows no Commented caption without comments', () => {

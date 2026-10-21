@@ -1,4 +1,5 @@
 import { createContext, ReactNode, useContext, useMemo, type JSX } from 'react';
+import { useLocalNetworkBlocked } from '@helpers/localNetworkAccess';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { AIProvider } from './aiContstants';
 import type { AIModelIdentifier, MCPServer } from '@chunks/AI/types';
@@ -48,8 +49,16 @@ interface AISettingsContextType {
   /** The OpenRouter API key for making requests to OpenRouter */
   openRouterApiKey: string | undefined;
   setOpenRouterApiKey: (key: string | undefined) => void;
-  /** The URL of the Ollama server */
+  /** The Ollama URL as configured. Only for settings inputs and notices. */
   ollamaUrl: string | undefined;
+  /**
+   * The Ollama URL that is safe to contact: `ollamaUrl`, or undefined while the
+   * browser would ask for local network access before the user was told why.
+   * Everything that talks to Ollama uses this.
+   */
+  ollamaEndpoint: string | undefined;
+  /** `ollamaUrl` is configured but held back by the local network gate. */
+  ollamaBlocked: boolean;
   setOllamaUrl: (url: string | undefined) => void;
   shouldGenerateTitles: boolean;
   setShouldGenerateTitles: (b: boolean) => void;
@@ -88,6 +97,8 @@ const initialState: AISettingsContextType = {
   // Unset until the user asks for local AI — see the note on the real default
   // in `AISettingsContextProvider` below.
   ollamaUrl: undefined,
+  ollamaEndpoint: undefined,
+  ollamaBlocked: false,
   setOllamaUrl: () => undefined,
   shouldGenerateTitles: true,
   setShouldGenerateTitles: () => undefined,
@@ -194,6 +205,8 @@ export const AISettingsContextProvider = (
         : undefined,
     [hostedAvailable, hostedModelId],
   );
+  const ollamaBlocked = useLocalNetworkBlocked(ollamaUrl);
+  const ollamaEndpoint = ollamaBlocked ? undefined : ollamaUrl;
   const defaultChatModel =
     hostedAvailable && hostedModel && !openRouterApiKey && !ollamaUrl
       ? hostedModel
@@ -215,7 +228,11 @@ export const AISettingsContextProvider = (
     ollamaAvailable,
     isProviderAvailable,
     availableProviders,
-  } = useProviderAvailability(openRouterApiKey, ollamaUrl, hostedAvailable);
+  } = useProviderAvailability(
+    openRouterApiKey,
+    ollamaEndpoint,
+    hostedAvailable,
+  );
 
   const mcpServers = mergeDefaultMCPServers(storedMcpServers);
   const setMcpServers = (servers: MCPServer[]) =>
@@ -241,6 +258,8 @@ export const AISettingsContextProvider = (
     showTokenUsage,
     setShowTokenUsage,
     ollamaUrl,
+    ollamaEndpoint,
+    ollamaBlocked,
     setOllamaUrl,
     defaultChatModel,
     setDefaultChatModel,

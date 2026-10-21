@@ -20,6 +20,9 @@ pub enum AppErrorType {
     /// The node is over its hard commit limit; rendered as `503` with
     /// `Retry-After`. See `crate::write_load`.
     Busy,
+    /// A host we fetched for the caller (the `/path` proxy) did not answer;
+    /// rendered as `502`. Not a fault here, so `trace::init_sentry` drops it.
+    BadGateway,
     Other,
 }
 
@@ -82,6 +85,7 @@ impl ResponseError for AtomicServerError {
             AppErrorType::Unauthorized => StatusCode::UNAUTHORIZED,
             AppErrorType::TooManyRequests => StatusCode::TOO_MANY_REQUESTS,
             AppErrorType::Busy => StatusCode::SERVICE_UNAVAILABLE,
+            AppErrorType::BadGateway => StatusCode::BAD_GATEWAY,
         }
     }
     fn error_response(&self) -> HttpResponse {
@@ -152,6 +156,7 @@ impl From<atomic_lib::errors::AtomicError> for AtomicServerError {
             // nor reaches Sentry as one.
             atomic_lib::AtomicErrorType::ParseError => AppErrorType::BadRequest,
             atomic_lib::AtomicErrorType::OtherError => AppErrorType::Other,
+            atomic_lib::AtomicErrorType::UpstreamUnreachable => AppErrorType::BadGateway,
         };
         let subject = error
             .subject

@@ -1,20 +1,23 @@
 //! Running a plugin because the data changed.
 //!
-//! The store already decides when a resource enters or leaves a watched query
-//! — that is how `SUBSCRIBE_QUERY` pushes live updates. This listens to the
-//! same events on behalf of plugins.
+//! A trigger is a consumer of the drive's event stream
+//! (`atomic_lib::db::drive_events`). A commit that moves a resource into or out
+//! of a trigger's query carries that edge in its event row, written in the
+//! commit's own batch. The trigger keeps a cursor like an app's checkpoint and
+//! moves it past an edge only once that edge is handled, so a restart neither
+//! repeats an edge nor loses one.
 //!
-//! Two things make that safe to leave running. A plugin does not re-trigger
-//! itself: the resources its own run wrote are remembered and skipped, or an
-//! importer that creates a row matching its own query would run forever. And
-//! a plugin that manages to fire in a tight loop anyway is stopped by a cap
+//! One thing keeps a running trigger safe that the stream does not: a plugin
+//! does not re-trigger itself. The resources its own run wrote are remembered
+//! and skipped, or an importer that creates a row matching its own query would
+//! run forever. A plugin that fires in a tight loop anyway is stopped by a cap
 //! and says so, rather than quietly eating the server.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
 use atomic_lib::agents::ForAgent;
-use atomic_lib::db::plugin_trigger::{Edge, PluginTrigger, PluginTriggerKey};
+use atomic_lib::db::plugin_trigger::{PluginTrigger, PluginTriggerKey};
 use tokio::sync::Mutex;
 
 use crate::appstate::AppState;
@@ -33,18 +36,8 @@ use crate::plugins::store_host::StoreApplyHost;
 const RATE_LIMIT: usize = 30;
 const RATE_WINDOW_MS: i64 = 60_000;
 
-/// How long the same edge on the same subject is treated as already handled.
-///
-/// Covers a duplicate event within one run of the server — the same commit
-/// applied twice, say. It is deliberately not durable: after a restart there
-/// are no events to replay either, so there is nothing to be idempotent
-/// against.
-const DEDUP_WINDOW_MS: i64 = 30_000;
-
 #[derive(Default)]
 struct Guard {
-    /// `(plugin, subject, edge)` to when it last fired.
-    recent: HashMap<(String, String, &'static str), i64>,
     /// Subjects a plugin's own run wrote, so it does not answer its own echo.
     written: HashSet<(String, String)>,
     /// When each plugin fired, for the cap.
@@ -52,21 +45,14 @@ struct Guard {
 }
 
 impl Guard {
-    /// Whether this edge should run, recording it when it should.
-    fn admit(&mut self, plugin: &str, subject: &str, edge: Edge, now: i64) -> Result<(), String> {
+    /// Whether this edge should run, recording it when it should. A repeat of
+    /// the same edge is not possible here: the cursor passes each one once.
+    fn admit(&mut self, plugin: &str, subject: &str, now: i64) -> Result<(), String> {
         if self
             .written
             .remove(&(plugin.to_string(), subject.to_string()))
         {
             return Err("this plugin wrote it itself".to_string());
-        }
-
-        let key = (plugin.to_string(), subject.to_string(), edge.as_str());
-
-        if let Some(last) = self.recent.get(&key) {
-            if now - last < DEDUP_WINDOW_MS {
-                return Err("already handled".to_string());
-            }
         }
 
         let fires = self.fires.entry(plugin.to_string()).or_default();
@@ -83,14 +69,8 @@ impl Guard {
         }
 
         fires.push_back(now);
-        self.recent.insert(key, now);
-        self.prune(now);
 
         Ok(())
-    }
-
-    fn prune(&mut self, now: i64) {
-        self.recent.retain(|_, at| now - *at < DEDUP_WINDOW_MS);
     }
 
     fn remember_writes(&mut self, plugin: &str, subjects: impl Iterator<Item = String>) {
@@ -111,6 +91,10 @@ pub fn spawn(appstate: AppState) {
         Err(e) => tracing::warn!("could not re-watch plugin trigger queries: {e}"),
     }
 
+    if let Err(e) = appstate.store.drop_orphaned_trigger_verdicts() {
+        tracing::warn!("could not clear proposals of the old trigger queue: {e}");
+    }
+
     let guard = Arc::new(Mutex::new(Guard::default()));
     let mut events = appstate.store.subscribe_events();
 
@@ -129,130 +113,161 @@ pub fn spawn(appstate: AppState) {
     });
 }
 
+/// Handles each trigger's pending edges in order, until every trigger is
+/// caught up or blocked.
 async fn drain(appstate: &AppState, guard: &Arc<Mutex<Guard>>) {
     let _worker = appstate.store.lock_plugin("trigger-delivery").await;
-    let events = match appstate.store.queued_plugin_events() {
-        Ok(events) => events,
-        Err(e) => {
-            tracing::error!("cannot read plugin event queue: {e}");
-            return;
-        }
-    };
     let mut attempted = 0;
-    for mut event in events {
-        if attempted >= 100 {
-            break;
-        }
-        let key = event.key.clone();
-        let trigger = match appstate.store.get_plugin_trigger(&key) {
-            Ok(Some(trigger)) => trigger,
-            Ok(None) => {
-                let _ = appstate.store.acknowledge_plugin_event(&event);
-                continue;
-            }
-            Err(_) => continue,
-        };
-        let journal = super::journal::Journal::new(
-            &appstate.store,
-            &key.drive,
-            &key.plugin,
-            &format!("query:{}", event.id),
-        );
-        match journal.terminal() {
-            Ok(Some(_)) => {
-                let mut stored = trigger.clone();
-                if stored.pending_verdict == event.verdict {
-                    stored.pending_verdict = None;
-                    stored.last_error = None;
-                    if let Err(e) = appstate.store.set_plugin_trigger(&key, &stored) {
-                        record_error(appstate, &key, &trigger, e.to_string());
-                        continue;
-                    }
-                }
-                if let Err(e) = appstate.store.acknowledge_plugin_event(&event) {
-                    record_error(appstate, &key, &trigger, e.to_string());
-                }
-                continue;
-            }
+    loop {
+        let triggers = match appstate.store.plugin_triggers() {
+            Ok(triggers) => triggers,
             Err(e) => {
-                record_error(appstate, &key, &trigger, e);
-                continue;
+                tracing::error!("cannot read plugin triggers: {e}");
+                return;
             }
-            Ok(None) => {}
-        }
-        let mut resuming_action = false;
-        if let Some(waits) = event.verdict.as_deref().and_then(super::actions::waits) {
-            let actor = trigger
-                .run_as
-                .as_deref()
-                .or_else(|| trigger.auto_apply.as_ref().map(|g| g.agent.as_str()))
-                .unwrap_or_default();
-            match super::actions::waits_ready(
-                Arc::new(appstate.store.clone()),
-                &key.drive,
-                actor,
-                &waits,
-            )
-            .await
-            {
-                Ok(false) => continue,
+        };
+        let mut progressed = false;
+        for (key, trigger) in triggers {
+            if attempted >= 100 {
+                return;
+            }
+            let mut event = match appstate.store.next_trigger_event(&key, &trigger) {
+                Ok(Some(event)) => event,
+                Ok(None) => continue,
                 Err(e) => {
-                    record_error(appstate, &key, &trigger, e);
+                    tracing::error!("cannot read the event stream of a trigger: {e}");
                     continue;
                 }
-                Ok(true) => {
-                    event.verdict = None;
-                    event.waiting_for_review = false;
-                    resuming_action = true;
-                }
-            }
-        }
-        if event.waiting_for_review {
-            if trigger.pending_verdict.is_none() {
-                let _ = appstate.store.acknowledge_plugin_event(&event);
-                continue;
-            }
-            if trigger.auto_apply.is_none() {
-                continue;
-            }
-            event.waiting_for_review = false;
-        }
-        if trigger.last_error.is_some()
-            || (trigger.pending_verdict.is_some() && event.verdict.is_none() && !resuming_action)
-        {
-            continue;
-        }
-        if event.verdict.is_none() && !resuming_action {
-            let mut protection = guard.lock().await;
-            if protection
-                .written
-                .remove(&(key.plugin.clone(), event.subject.clone()))
+            };
+            // Another node holds the lease: leave the edge where it is.
+            if !appstate
+                .leases
+                .holds(&appstate.store, &key.drive, &key.plugin)
+                .await
             {
-                let _ = appstate.store.acknowledge_plugin_event(&event);
                 continue;
             }
-            // Queue identities, unlike a subject/time window, distinguish two
-            // genuine arrivals and survive slow or paused delivery.
-            if let Err(reason) =
-                protection.admit(&key.plugin, &event.id, event.edge, atomic_lib::utils::now())
-            {
-                if reason.starts_with("stopped after") {
-                    record_error(appstate, &key, &trigger, reason);
-                }
-                continue;
-            }
+            let seq = event.seq;
+            attempted += deliver(appstate, guard, &key, &trigger, &mut event).await;
+            // Acknowledged (the cursor passed it) means the next edge may go.
+            let done = appstate
+                .store
+                .event_checkpoint(&key.drive, &format!("trigger/{}", key.plugin));
+            progressed |= done >= seq;
         }
-        attempted += 1;
-        match run(appstate, guard, &key, &trigger, &mut event).await {
-            Ok(_) if !event.waiting_for_review => {
-                if let Err(e) = appstate.store.acknowledge_plugin_event(&event) {
-                    record_error(appstate, &key, &trigger, e.to_string());
-                }
-            }
-            Ok(_) => {}
-            Err(e) => record_error(appstate, &key, &trigger, e),
+        if !progressed {
+            return;
         }
     }
+}
+
+/// One edge of one trigger. Returns 1 when a run was attempted. Returning
+/// without acknowledging leaves the edge where it is for the next round.
+async fn deliver(
+    appstate: &AppState,
+    guard: &Arc<Mutex<Guard>>,
+    key: &PluginTriggerKey,
+    trigger: &PluginTrigger,
+    event: &mut atomic_lib::db::plugin_trigger::QueuedEvent,
+) -> usize {
+    let journal = super::journal::Journal::new(
+        &appstate.store,
+        &key.drive,
+        &key.plugin,
+        &format!("query:{}", event.id),
+    );
+    match journal.terminal() {
+        Ok(Some(_)) => {
+            let mut stored = trigger.clone();
+            if stored.pending_verdict == event.verdict {
+                stored.pending_verdict = None;
+                stored.last_error = None;
+                if let Err(e) = appstate.store.set_plugin_trigger(key, &stored) {
+                    record_error(appstate, key, trigger, e.to_string());
+                    return 0;
+                }
+            }
+            if let Err(e) = appstate.store.acknowledge_plugin_event(event) {
+                record_error(appstate, key, trigger, e.to_string());
+            }
+            return 0;
+        }
+        Err(e) => {
+            record_error(appstate, key, trigger, e);
+            return 0;
+        }
+        Ok(None) => {}
+    }
+    let mut resuming_action = false;
+    if let Some(waits) = event.verdict.as_deref().and_then(super::actions::waits) {
+        let actor = trigger
+            .run_as
+            .as_deref()
+            .or_else(|| trigger.auto_apply.as_ref().map(|g| g.agent.as_str()))
+            .unwrap_or_default();
+        match super::actions::waits_ready(
+            Arc::new(appstate.store.clone()),
+            &key.drive,
+            actor,
+            &waits,
+        )
+        .await
+        {
+            Ok(false) => return 0,
+            Err(e) => {
+                record_error(appstate, key, trigger, e);
+                return 0;
+            }
+            Ok(true) => {
+                event.verdict = None;
+                event.waiting_for_review = false;
+                resuming_action = true;
+            }
+        }
+    }
+    if event.waiting_for_review {
+        if trigger.pending_verdict.is_none() {
+            let _ = appstate.store.acknowledge_plugin_event(event);
+            return 0;
+        }
+        if trigger.auto_apply.is_none() {
+            return 0;
+        }
+        event.waiting_for_review = false;
+    }
+    if trigger.last_error.is_some()
+        || (trigger.pending_verdict.is_some() && event.verdict.is_none() && !resuming_action)
+    {
+        return 0;
+    }
+    if event.verdict.is_none() && !resuming_action {
+        let admitted =
+            guard
+                .lock()
+                .await
+                .admit(&key.plugin, &event.subject, atomic_lib::utils::now());
+        match admitted {
+            Ok(()) => {}
+            Err(reason) if reason.starts_with("stopped after") => {
+                record_error(appstate, key, trigger, reason);
+                return 0;
+            }
+            Err(_) => {
+                let _ = appstate.store.acknowledge_plugin_event(event);
+                return 0;
+            }
+        }
+    }
+    match run(appstate, guard, key, trigger, event).await {
+        Ok(_) if !event.waiting_for_review => {
+            if let Err(e) = appstate.store.acknowledge_plugin_event(event) {
+                record_error(appstate, key, trigger, e.to_string());
+            }
+        }
+        Ok(_) => {}
+        Err(e) => record_error(appstate, key, trigger, e),
+    }
+    1
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -337,7 +352,11 @@ async fn run(
     let verdict = match &event.verdict {
         Some(verdict) => verdict.clone(),
         None => runtime
-            .run_triggered(&source, &input, host)
+            .run_triggered(
+                &source,
+                &input,
+                super::host_abi::JsAbi::new(host, appstate.host_abi.clone()),
+            )
             .await
             .map_err(|e| e.to_string())??,
     };
@@ -534,6 +553,28 @@ mod tests {
         key
     }
 
+    /// Edges the trigger has not finished.
+    fn pending(f: &Fixture, key: &PluginTriggerKey) -> usize {
+        let trigger = f.appstate.store.get_plugin_trigger(key).unwrap().unwrap();
+        f.appstate
+            .store
+            .pending_trigger_events(key, &trigger)
+            .unwrap()
+    }
+
+    /// The edge the trigger is at.
+    fn next_event(
+        f: &Fixture,
+        key: &PluginTriggerKey,
+    ) -> atomic_lib::db::plugin_trigger::QueuedEvent {
+        let trigger = f.appstate.store.get_plugin_trigger(key).unwrap().unwrap();
+        f.appstate
+            .store
+            .next_trigger_event(key, &trigger)
+            .unwrap()
+            .unwrap()
+    }
+
     /// Writes a resource that enters the watched query.
     async fn add_watched(fixture: &Fixture, name: &str) -> String {
         let mut resource = Resource::new("did:ad:placeholder".into());
@@ -583,7 +624,7 @@ mod tests {
         let key = arm(&f, false).await;
         add_watched(&f, "Arrival").await;
         drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
-        let event = f.appstate.store.queued_plugin_events().unwrap().remove(0);
+        let event = next_event(&f, &key);
         let journal = super::super::journal::Journal::new(
             &f.appstate.store,
             &key.drive,
@@ -592,7 +633,7 @@ mod tests {
         );
         journal.abandon("operator", "No longer needed").unwrap();
         drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
-        assert!(f.appstate.store.queued_plugin_events().unwrap().is_empty());
+        assert_eq!(pending(&f, &key), 0);
         assert!(journal.finished().unwrap().is_none());
         assert_eq!(children_named(&f, &f.drive, "Must stay absent").await, 0);
     }
@@ -603,7 +644,7 @@ mod tests {
         write_plugin(&mut f, "Finished event once").await;
         let key = arm(&f, true).await;
         add_watched(&f, "Arrival").await;
-        let mut event = f.appstate.store.queued_plugin_events().unwrap().remove(0);
+        let mut event = next_event(&f, &key);
         drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
         let journal = super::super::journal::Journal::new(
             &f.appstate.store,
@@ -619,7 +660,7 @@ mod tests {
         trigger.pending_verdict = event.verdict.clone();
         f.appstate.store.set_plugin_trigger(&key, &trigger).unwrap();
         drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
-        assert!(f.appstate.store.queued_plugin_events().unwrap().is_empty());
+        assert_eq!(pending(&f, &key), 0);
         assert!(f
             .appstate
             .store
@@ -694,12 +735,13 @@ mod tests {
             drive,
             plugin: meta["plugin"].as_str().unwrap().into(),
         };
-        assert_eq!(f.appstate.store.queued_plugin_events().unwrap().len(), 1);
+        let key = PluginTriggerKey::new(&f.drive, &f.plugin);
+        assert_eq!(pending(&f, &key), 1);
         drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
         assert_eq!(children_named(&f, &f.drive, "After hard restart").await, 1);
         drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
         assert_eq!(children_named(&f, &f.drive, "After hard restart").await, 1);
-        assert!(f.appstate.store.queued_plugin_events().unwrap().is_empty());
+        assert_eq!(pending(&f, &key), 0);
         std::fs::remove_file(report).unwrap();
     }
 
@@ -731,11 +773,9 @@ mod tests {
             .await
             .unwrap();
         plugin.save(&f.appstate.store).await.unwrap();
-        arm(&f, true).await;
+        let key = arm(&f, true).await;
         add_watched(&f, "arrived").await;
-        let id = f.appstate.store.queued_plugin_events().unwrap()[0]
-            .id
-            .clone();
+        let id = next_event(&f, &key).id;
         drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
         assert_eq!(children_named(&f, &f.drive, &id).await, 1);
     }
@@ -754,7 +794,7 @@ mod tests {
         f.appstate.store.set_plugin_trigger(&key, &updated).unwrap();
         drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
         assert_eq!(children_named(&f, &f.drive, "Kept waiting event").await, 1);
-        assert!(f.appstate.store.queued_plugin_events().unwrap().is_empty());
+        assert_eq!(pending(&f, &key), 0);
     }
 
     #[actix_rt::test]
@@ -764,11 +804,11 @@ mod tests {
         let key = arm(&f, false).await;
         add_watched(&f, "first").await;
         add_watched(&f, "second").await;
-        assert_eq!(f.appstate.store.queued_plugin_events().unwrap().len(), 2);
+        assert_eq!(pending(&f, &key), 2);
         let guard = Arc::new(Mutex::new(Guard::default()));
         drain(&f.appstate, &guard).await;
         drain(&f.appstate, &guard).await;
-        assert_eq!(f.appstate.store.queued_plugin_events().unwrap().len(), 2);
+        assert_eq!(pending(&f, &key), 2);
         // Resolve the first review, then approve future execution. A fresh
         // worker has no in-memory state from the previous delivery attempt.
         arm(&f, true).await;
@@ -777,7 +817,7 @@ mod tests {
             children_named(&f, &f.drive, "Durable notification").await,
             1
         );
-        assert!(f.appstate.store.queued_plugin_events().unwrap().is_empty());
+        assert_eq!(pending(&f, &key), 0);
         drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
         assert_eq!(
             children_named(&f, &f.drive, "Durable notification").await,
@@ -842,11 +882,11 @@ mod tests {
             )
             .unwrap();
         plugin.save(&f.appstate.store).await.unwrap();
-        arm(&f, true).await;
+        let key = arm(&f, true).await;
         add_watched(&f, "Arrival").await;
         drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
         assert_eq!(children_named(&f, &f.drive, "After approval").await, 0);
-        assert_eq!(f.appstate.store.queued_plugin_events().unwrap().len(), 1);
+        assert_eq!(pending(&f, &key), 1);
         let host = js_runtime::StoreHost {
             db: Arc::new(f.appstate.store.clone()),
             drive: f.drive.clone(),
@@ -893,7 +933,7 @@ mod tests {
         drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
         drain(&f.appstate, &Arc::new(Mutex::new(Guard::default()))).await;
         assert_eq!(provider.0, 1);
-        assert!(f.appstate.store.queued_plugin_events().unwrap().is_empty());
+        assert_eq!(pending(&f, &key), 0);
         assert_eq!(children_named(&f, &f.drive, "After approval").await, 1);
     }
 
@@ -936,27 +976,9 @@ mod tests {
         let mut guard = Guard::default();
         guard.remember_writes("p", ["did:ad:written".to_string()].into_iter());
 
-        assert!(guard
-            .admit("p", "did:ad:written", Edge::Enter, 1_000)
-            .is_err());
+        assert!(guard.admit("p", "did:ad:written", 1_000).is_err());
         // Only the once: the next genuine change to that resource must run.
-        assert!(guard
-            .admit("p", "did:ad:written", Edge::Enter, 100_000)
-            .is_ok());
-    }
-
-    #[test]
-    fn the_same_edge_twice_runs_once() {
-        let mut guard = Guard::default();
-
-        assert!(guard.admit("p", "s", Edge::Enter, 1_000).is_ok());
-        assert!(guard.admit("p", "s", Edge::Enter, 1_100).is_err());
-        // The other edge is a different thing that happened.
-        assert!(guard.admit("p", "s", Edge::Leave, 1_100).is_ok());
-        // And once the window passes, so is the same edge again.
-        assert!(guard
-            .admit("p", "s", Edge::Enter, 1_000 + DEDUP_WINDOW_MS)
-            .is_ok());
+        assert!(guard.admit("p", "did:ad:written", 100_000).is_ok());
     }
 
     #[test]
@@ -965,18 +987,143 @@ mod tests {
 
         for i in 0..RATE_LIMIT {
             assert!(
-                guard
-                    .admit("p", &format!("s{i}"), Edge::Enter, 1_000)
-                    .is_ok(),
+                guard.admit("p", &format!("s{i}"), 1_000).is_ok(),
                 "run {i} should be allowed",
             );
         }
 
-        let stopped = guard.admit("p", "one-too-many", Edge::Enter, 1_000);
+        let stopped = guard.admit("p", "one-too-many", 1_000);
 
         assert!(stopped.is_err());
         assert!(stopped.unwrap_err().contains("its own query"));
         // Another plugin is unaffected; the cap is per plugin, not per server.
-        assert!(guard.admit("other", "s", Edge::Enter, 1_000).is_ok());
+        assert!(guard.admit("other", "s", 1_000).is_ok());
+    }
+
+    // -- Leases: several nodes, one drive. The nodes share one db here (their
+    // sync is instant); each has its own node id and clock.
+
+    use crate::plugins::lease::{head, Lease, Leases, ManualClock, TTL_MS};
+
+    fn node(f: &Fixture, id: &str, clock: &Arc<ManualClock>) -> AppState {
+        let mut appstate = f.appstate.clone();
+        appstate.leases = Arc::new(Leases::with(id, clock.clone()));
+        appstate
+    }
+
+    async fn drained(appstate: &AppState) {
+        drain(appstate, &Arc::new(Mutex::new(Guard::default()))).await;
+    }
+
+    async fn lease_head(f: &Fixture) -> Lease {
+        let found = f
+            .appstate
+            .store
+            .query(&atomic_lib::storelike::Query::new_prop_val(
+                urls::LEASE_OF,
+                &f.plugin,
+            ))
+            .await
+            .unwrap();
+        head(found.resources.iter().filter_map(Lease::read)).expect("a lease exists")
+    }
+
+    /// A drive that has a peer, so leases are in play.
+    async fn shared_drive(name: &str, creates: &str) -> Fixture {
+        let mut f = fixture(name).await;
+        write_plugin(&mut f, creates).await;
+        arm(&f, true).await;
+        atomic_lib::sync::peer::add_known_peer_for_drive(
+            &f.appstate.store,
+            "peer-b",
+            "b",
+            &f.drive,
+        );
+        f
+    }
+
+    #[actix_rt::test]
+    async fn a_single_node_takes_the_lease_and_runs_triggers() {
+        let f = shared_drive("lease_single", "Ran once").await;
+        let clock = Arc::new(ManualClock::new(1_000_000));
+        let a = node(&f, "node-a", &clock);
+
+        add_watched(&f, "Arrived").await;
+        drained(&a).await;
+
+        assert_eq!(children_named(&f, &f.drive.clone(), "Ran once").await, 1);
+        let lease = lease_head(&f).await;
+        assert_eq!(lease.holder, "node-a");
+        assert_eq!(lease.generation, 0);
+        assert_eq!(lease.expires_at, 1_000_000 + TTL_MS);
+    }
+
+    #[actix_rt::test]
+    async fn a_second_node_leaves_the_work_while_the_lease_is_valid() {
+        let f = shared_drive("lease_second", "Ran by holder").await;
+        let clock = Arc::new(ManualClock::new(1_000_000));
+        let (a, b) = (node(&f, "node-a", &clock), node(&f, "node-b", &clock));
+        add_watched(&f, "First").await;
+        drained(&a).await;
+
+        clock.advance(TTL_MS - 1);
+        add_watched(&f, "Second").await;
+        drained(&b).await;
+
+        assert_eq!(
+            children_named(&f, &f.drive.clone(), "Ran by holder").await,
+            1
+        );
+        assert_eq!(lease_head(&f).await.holder, "node-a");
+        // The edge stays pending, for whoever holds the lease next.
+        next_event(&f, &PluginTriggerKey::new(&f.drive, &f.plugin));
+    }
+
+    #[actix_rt::test]
+    async fn after_expiry_the_second_node_takes_over_and_resumes() {
+        let f = shared_drive("lease_takeover", "Ran after takeover").await;
+        let clock = Arc::new(ManualClock::new(1_000_000));
+        let (a, b) = (node(&f, "node-a", &clock), node(&f, "node-b", &clock));
+        add_watched(&f, "First").await;
+        drained(&a).await;
+        let first = lease_head(&f).await;
+
+        add_watched(&f, "Second").await;
+        clock.advance(TTL_MS + 1);
+        drained(&b).await;
+
+        assert_eq!(
+            children_named(&f, &f.drive.clone(), "Ran after takeover").await,
+            2
+        );
+        let lease = lease_head(&f).await;
+        assert_eq!(lease.holder, "node-b");
+        assert_eq!(lease.generation, 1);
+        assert_eq!(lease.previous.as_deref(), Some(first.subject.as_str()));
+
+        // The old holder comes back, sees the new lease and stays out.
+        add_watched(&f, "Third").await;
+        drained(&a).await;
+        assert_eq!(
+            children_named(&f, &f.drive.clone(), "Ran after takeover").await,
+            2
+        );
+    }
+
+    #[actix_rt::test]
+    async fn the_holder_renews_before_the_lease_runs_out() {
+        let f = shared_drive("lease_renew", "Ran renewed").await;
+        let clock = Arc::new(ManualClock::new(1_000_000));
+        let a = node(&f, "node-a", &clock);
+        add_watched(&f, "First").await;
+        drained(&a).await;
+
+        clock.advance(TTL_MS - 1_000);
+        add_watched(&f, "Second").await;
+        drained(&a).await;
+
+        let lease = lease_head(&f).await;
+        assert_eq!(lease.generation, 0, "renewed in place, not taken over");
+        assert_eq!(lease.expires_at, 1_000_000 + TTL_MS - 1_000 + TTL_MS);
     }
 }

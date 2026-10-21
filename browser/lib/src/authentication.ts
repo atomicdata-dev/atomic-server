@@ -4,6 +4,7 @@ import { getTimestampNow } from './commit.js';
 import { decodeB64, encodeB64 } from './base64.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from './value.js';
+import { toLegacyScheme } from './subject.js';
 
 /** The old identity is only used at the origin named by the imported secret. */
 export function legacyAgentForRequest(
@@ -26,8 +27,32 @@ export function legacyAgentForRequest(
   }
 }
 
-/** Returns a JSON-AD resource of an Authentication */
-export async function createAuthentication(subject: string, agent: Agent) {
+/**
+ * The agent subject as it goes into an auth proof: the `did:ad:agent:` spelling.
+ *
+ * A proof is sent before the server has said what it understands (the
+ * capabilities arrive with `AUTH_OK`), and a node that predates the `atomic:`
+ * scheme reads `atomic:agent:{key}` as an external URL and refuses it with
+ * "hosted elsewhere". Servers accept both spellings forever and compare them
+ * canonically; the signed message never includes the agent field.
+ */
+export function agentSubjectForAuth(agentSubject: string): string {
+  return toLegacyScheme(agentSubject);
+}
+
+/**
+ * Returns a JSON-AD resource of an Authentication.
+ *
+ * `options.agentSubject` overrides the spelling of the `auth/agent` field (the
+ * default is {@link agentSubjectForAuth}). Browser peers pass the canonical
+ * `agent.subject`: both ends are current, and the Rust peer session compares
+ * the field to the pinned issuer and to ephemeral frames by string.
+ */
+export async function createAuthentication(
+  subject: string,
+  agent: Agent,
+  options: { agentSubject?: string } = {},
+) {
   const timestamp = getTimestampNow();
 
   if (!agent.subject) {
@@ -35,7 +60,8 @@ export async function createAuthentication(subject: string, agent: Agent) {
   }
 
   const object = {
-    'https://atomicdata.dev/properties/auth/agent': agent.subject,
+    'https://atomicdata.dev/properties/auth/agent':
+      options.agentSubject ?? agentSubjectForAuth(agent.subject),
     'https://atomicdata.dev/properties/auth/requestedSubject': subject,
     'https://atomicdata.dev/properties/auth/publicKey':
       await agent.getPublicKey(),
@@ -194,9 +220,10 @@ export async function signRequest(
     );
     newHeaders['x-atomic-timestamp'] = timestamp.toString();
 
-    if (options.agentSubject ?? agent.subject) {
-      newHeaders['x-atomic-agent'] = options.agentSubject ?? agent.subject;
-    }
+    // Version 1 is what a node of any age understands; version 2 needs a
+    // current server, which reads either spelling, so it keeps `atomic:`.
+    newHeaders['x-atomic-agent'] =
+      options.agentSubject ?? agentSubjectForAuth(agent.subject);
 
     if (legacySubject) {
       newHeaders['x-atomic-agent'] = legacySubject;

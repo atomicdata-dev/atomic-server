@@ -2,6 +2,7 @@ use super::connection_state;
 use super::sync_session::*;
 use super::{
     external::{ExternalHost, ExternalIntent, Receipt},
+    host_abi::{code, error, HostError},
     js_runtime::{PluginHost, StoreHost},
     store_host::StoreApplyHost,
     test_fixture::{fixture, genesis},
@@ -30,10 +31,15 @@ struct Host {
 }
 #[async_trait::async_trait]
 impl PluginHost for Host {
-    async fn fetch(&mut self, request: String) -> Result<String, String> {
-        let intent: ExternalIntent = serde_json::from_str(&request).unwrap();
+    async fn abi(&mut self, function: &str, args: &str) -> Result<String, HostError> {
+        if function != "net.fetch" {
+            return self.atomic.abi(function, args).await;
+        }
+        let intent: ExternalIntent =
+            serde_json::from_value(serde_json::from_str::<Vec<Value>>(args).unwrap().remove(0))
+                .unwrap();
         if intent.method != "GET" {
-            return Err("read-only sandbox".into());
+            return Err(error(code::FORBIDDEN, "read-only sandbox"));
         }
         let p = self.provider.lock().unwrap();
         let url = url::Url::parse(&intent.url).unwrap();
@@ -70,12 +76,6 @@ impl PluginHost for Host {
             }
         };
         Ok(json!({"status":status,"body":body.to_string()}).to_string())
-    }
-    async fn get_resource(&mut self, subject: String) -> Result<String, String> {
-        self.atomic.get_resource(subject).await
-    }
-    async fn query(&mut self, property: String, value: String) -> Result<String, String> {
-        self.atomic.query(property, value).await
     }
 }
 #[async_trait::async_trait]

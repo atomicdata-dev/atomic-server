@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { keyframes, styled } from 'styled-components';
 import { ContainerWide } from './Containers';
 import { Main } from './Main';
+import { formatBytes } from '../helpers/formatBytes';
 import {
   squarify,
   tileKind,
@@ -271,20 +272,6 @@ function pathTo(root: StorageNode, target: string): string[] {
 /** Folders open the map one level deeper; everything else opens the resource. */
 function hasInside(item: StorageNode): boolean {
   return item.children.length > 0 && item.name !== 'This item itself';
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ['KB', 'MB', 'GB', 'TB'];
-  let value = bytes / 1024;
-  let unit = 0;
-
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit++;
-  }
-
-  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
 }
 
 const Legend = styled.ul`

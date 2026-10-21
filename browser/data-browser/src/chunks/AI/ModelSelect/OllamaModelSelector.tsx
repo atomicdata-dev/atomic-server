@@ -35,7 +35,7 @@ export const OllamaModelSelector: React.FC<OllamaModelSelectorProps> = ({
   onSelect,
   selectedModel,
 }) => {
-  const { ollamaUrl, isProviderAvailable } = useAISettings();
+  const { ollamaEndpoint, isProviderAvailable } = useAISettings();
 
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(modelCache.length === 0);
@@ -50,7 +50,9 @@ export const OllamaModelSelector: React.FC<OllamaModelSelectorProps> = ({
   }));
 
   useEffect(() => {
-    return effectFetch(`${ollamaUrl}/api/tags`, {
+    if (!ollamaEndpoint) return;
+
+    return effectFetch(`${ollamaEndpoint}/api/tags`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -69,7 +71,7 @@ export const OllamaModelSelector: React.FC<OllamaModelSelectorProps> = ({
         );
       },
     );
-  }, [ollamaUrl]);
+  }, [ollamaEndpoint]);
 
   if (error) {
     return <ErrorLook className={TAB_PANEL_HAS_ERROR_CLASS}>{error}</ErrorLook>;

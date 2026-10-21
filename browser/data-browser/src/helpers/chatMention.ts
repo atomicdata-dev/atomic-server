@@ -37,16 +37,58 @@ export const formatMention = (id: string, label: string): string => {
   return `[@ id="${clean(id)}" label="${clean(label)}"]`;
 };
 
-/** Replaces the trigger token with the mention (plus a trailing space).
- * Returns the new text and where the caret goes. */
+export interface RecordedMention {
+  id: string;
+  label: string;
+}
+
+/** The label as shown in the composer: one line, no brackets. */
+const plainLabel = (label: string) => label.replaceAll(/[\][\n\r]+/g, ' ');
+
+/** Replaces the trigger token with `@Label ` (the stored markup is made by
+ * `serializeMentions` on send). Returns the new text and the caret. */
 export const insertMention = (
   text: string,
   trigger: MentionTrigger,
-  id: string,
   label: string,
 ): { text: string; caret: number } => {
-  const mention = `${formatMention(id, label)} `;
+  const mention = `@${plainLabel(label)} `;
   const next = text.slice(0, trigger.start) + mention + text.slice(trigger.end);
 
   return { text: next, caret: trigger.start + mention.length };
+};
+
+/**
+ * Turns the recorded `@Label` mentions in `text` into stored markup. An `@`
+ * must start the text or follow whitespace and the label must end at the end,
+ * whitespace or punctuation. Each recording is used once; mentions the user
+ * edited or deleted stay plain text.
+ */
+export const serializeMentions = (
+  text: string,
+  mentions: RecordedMention[],
+): string => {
+  const queues = new Map<string, RecordedMention[]>();
+
+  for (const m of mentions) {
+    const label = plainLabel(m.label);
+
+    if (label) queues.set(label, [...(queues.get(label) ?? []), m]);
+  }
+
+  if (queues.size === 0) return text;
+
+  const labels = [...queues.keys()]
+    .sort((a, b) => b.length - a.length)
+    .map(l => l.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const re = new RegExp(
+    `(?<!\\S)@(${labels.join('|')})(?=$|[\\s.,;:!?)])`,
+    'g',
+  );
+
+  return text.replace(re, (match, label: string) => {
+    const m = queues.get(label)?.shift();
+
+    return m ? formatMention(m.id, m.label) : match;
+  });
 };

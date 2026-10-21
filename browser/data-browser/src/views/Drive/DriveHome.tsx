@@ -3,6 +3,8 @@ import {
   isNotFound,
   isUnauthorized,
   useDrivePresence,
+  useResource,
+  useTitle,
   useResources,
   useStore,
   type Store,
@@ -24,6 +26,7 @@ import { Row } from '@components/Row';
 import { ResourceRow, ResourceRowDescription } from '@views/ResourceRow';
 import { PresenceAvatarMenu } from '@components/Presence/PresenceAvatarMenu';
 import { AgentAvatar } from '@components/Presence/AgentAvatar';
+import { useLastEditor } from '@hooks/useLastEditor';
 import { useRightPanel } from '@components/RightPanel/RightPanelContext';
 import { useNewResourceUI } from '@components/forms/NewForm/useNewResourceUI';
 import { getRecentResources } from '@helpers/recentResources';
@@ -142,17 +145,13 @@ function ResourceLines({ items }: { items: ActivityRow[] }): JSX.Element {
               subject={subject}
               trailing={
                 at ? (
-                  <Row center gap='0.4rem'>
-                    {by && <AgentAvatar agentSubject={by} size='1.2rem' />}
-                    <ResourceRowDescription
-                      as='time'
-                      dateTime={new Date(at).toISOString()}
-                      title={label}
-                      aria-label={label}
-                    >
-                      {toShortRelativeTime(new Date(at))}
-                    </ResourceRowDescription>
-                  </Row>
+                  <ActivityWho
+                    subject={subject}
+                    at={at}
+                    kind={kind}
+                    by={by}
+                    label={label}
+                  />
                 ) : undefined
               }
             />
@@ -162,6 +161,64 @@ function ResourceLines({ items }: { items: ActivityRow[] }): JSX.Element {
     </Lines>
   );
 }
+
+/**
+ * Who did it and when, at the right end of an Activity row: avatar, a short
+ * name and the short time. The comment author is known from the comment; an
+ * edit's author comes from the history attribution, so the avatar appears a
+ * moment later. The full name and "Edited ..." text are in the tooltip.
+ */
+function ActivityWho({
+  subject,
+  at,
+  kind,
+  by,
+  label,
+}: {
+  subject: string;
+  at: number;
+  kind: ActivityRow['kind'];
+  by?: string;
+  label?: string;
+}): JSX.Element {
+  const editor = useLastEditor(subject, at, kind !== 'commented' && !by);
+  const agent = by ?? editor;
+  const agentResource = useResource(agent);
+  const [name] = useTitle(agentResource);
+
+  return (
+    <Who center gap='0.4rem'>
+      {agent && <AgentAvatar agentSubject={agent} size='1.2rem' />}
+      {agent && name && <WhoName title={name}>{name}</WhoName>}
+      <ResourceRowDescription
+        as='time'
+        dateTime={new Date(at).toISOString()}
+        title={label}
+        aria-label={label}
+      >
+        {toShortRelativeTime(new Date(at))}
+      </ResourceRowDescription>
+    </Who>
+  );
+}
+
+const Who = styled(Row)`
+  flex-shrink: 0;
+  font-size: 0.85em;
+  color: ${p => p.theme.colors.textLight};
+`;
+
+/** Only the first part of a long name, so the title keeps its room. */
+const WhoName = styled.span`
+  max-width: 9ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @media (max-width: 480px) {
+    max-width: 6ch;
+  }
+`;
 
 export function ResourceList({
   subjects,

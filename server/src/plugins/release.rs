@@ -529,10 +529,13 @@ pub fn expect_world(manifest: &Manifest, claimed: Option<&str>) -> AtomicResult<
 
 /// The release record's spelling of a manifest world.
 pub fn world_name(world: World) -> &'static str {
-    use atomic_lib::db::plugin_release::{WORLD_EXTENSION, WORLD_SERVER_EXTENSION};
+    use atomic_lib::db::plugin_release::{
+        WORLD_EXTENSION, WORLD_SANDBOXED_APP, WORLD_SERVER_EXTENSION,
+    };
     match world {
         World::Extension => WORLD_EXTENSION,
         World::ServerExtension => WORLD_SERVER_EXTENSION,
+        World::SandboxedApp => WORLD_SANDBOXED_APP,
     }
 }
 

@@ -14,7 +14,8 @@ mod chat_migration_test;
 #[cfg(all(feature = "db", not(target_arch = "wasm32")))]
 pub mod compaction;
 mod compressed_kv;
-mod encoding;
+pub mod drive_events;
+pub(crate) mod encoding;
 pub mod encrypted_backend;
 mod index_keys;
 pub mod kv_store;
@@ -309,6 +310,12 @@ const MANAGED_ALIAS_HOSTS_KEY: &[u8] = b"managed_drive_alias_hosts";
 /// looking up lowercased is what makes `ACME.example.com` resolve the Drive
 /// that `acme.example.com` was bound to, instead of silently missing the
 /// mapping and falling through to the store root.
+/// What a replicated resource says changed: it arrives whole, so every
+/// property it holds.
+fn replicated_props(resource: &Resource) -> std::collections::BTreeSet<String> {
+    resource.get_propvals().keys().cloned().collect()
+}
+
 fn drive_mapping_key(host: &str) -> String {
     host.trim().trim_end_matches('.').to_ascii_lowercase()
 }
@@ -469,6 +476,11 @@ pub struct Db {
     /// store, not global — see [`crate::subject_lock`].
     pub(crate) subject_locks: crate::subject_lock::SubjectLocks,
     plugin_locks: crate::subject_lock::SubjectLocks,
+    /// Last sequence number given per drive, held while a commit's batch
+    /// lands so the stream stays in order. See [`drive_events`].
+    drive_event_seq: Arc<std::sync::Mutex<HashMap<String, u64>>>,
+    /// Drives that log events (they have an app). See [`drive_events`].
+    drive_events_on: Arc<RwLock<std::collections::HashSet<String>>>,
     /// Where the DB is stored on disk.
     #[allow(dead_code)]
     path: std::path::PathBuf,
@@ -584,6 +596,8 @@ impl Db {
             filter_drive_roots: Arc::new(RwLock::new(HashMap::new())),
             subject_locks: Default::default(),
             plugin_locks: Default::default(),
+            drive_event_seq: Default::default(),
+            drive_events_on: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
             envelope_retention: Arc::new(RwLock::new(Default::default())),
@@ -759,7 +773,7 @@ impl Db {
             let built = self
                 .build_projection_tx(&resource, false, true, true, snapshot, &mut transaction)
                 .await;
-            match built.and_then(|()| self.apply_transaction(&mut transaction)) {
+            match built.and_then(|_| self.apply_transaction(&mut transaction)) {
                 Ok(()) => {}
                 Err(e) => {
                     tracing::warn!(%subject, error = %e, "Could not backfill lens");
@@ -818,6 +832,7 @@ impl Db {
         }
         let mut transaction = Transaction::new();
         let mut batched: Vec<&Resource> = Vec::new();
+        let mut events = Vec::new();
         for (i, (resource, snapshot)) in entries.iter().enumerate() {
             let key = self.normalize_subject(resource.get_subject()).pure_id();
             if last.get(&key) != Some(&i) {
@@ -828,27 +843,32 @@ impl Db {
                 continue;
             }
             let before = transaction.len();
-            self.build_projection_tx(
-                resource,
-                false,
-                true,
-                true,
-                snapshot.clone(),
-                &mut transaction,
-            )
-            .await?;
+            let changed = self
+                .build_projection_tx(
+                    resource,
+                    false,
+                    true,
+                    true,
+                    snapshot.clone(),
+                    &mut transaction,
+                )
+                .await?;
             if defer_search {
                 let mut added = transaction.split_off(before);
                 added.retain(|op| !crate::search::is_search_op(op));
                 transaction.extend(added);
                 transaction.push(crate::search::pending_marker(&key));
             }
+            if let Some(changed) = changed {
+                events
+                    .extend(drive_events::PendingEvent::new(self, resource, false, changed).await);
+            }
             batched.push(resource);
         }
         if batched.is_empty() {
             return Ok(());
         }
-        self.apply_transaction(&mut transaction)?;
+        self.apply_transaction_with_source(&mut transaction, None, events)?;
         for resource in batched {
             self.note_lens_related(resource).await;
             let _ = self.db_events.send(DbEvent::Changed {
@@ -895,16 +915,21 @@ impl Db {
         snapshot: Option<Vec<u8>>,
     ) -> AtomicResult<()> {
         let mut transaction = Transaction::new();
-        self.build_projection_tx(
-            resource,
-            check_required_props,
-            update_index,
-            overwrite_existing,
-            snapshot,
-            &mut transaction,
-        )
-        .await?;
-        self.apply_transaction(&mut transaction)?;
+        let changed = self
+            .build_projection_tx(
+                resource,
+                check_required_props,
+                update_index,
+                overwrite_existing,
+                snapshot,
+                &mut transaction,
+            )
+            .await?;
+        let event = match changed {
+            Some(changed) => drive_events::PendingEvent::new(self, resource, false, changed).await,
+            None => None,
+        };
+        self.apply_transaction_with_source(&mut transaction, None, event.into_iter().collect())?;
         if crate::import_identity::identity(resource).is_some() {
             self.flush()?;
         }
@@ -933,7 +958,7 @@ impl Db {
         overwrite_existing: bool,
         snapshot: Option<Vec<u8>>,
         transaction: &mut Transaction,
-    ) -> AtomicResult<()> {
+    ) -> AtomicResult<Option<std::collections::BTreeSet<String>>> {
         // This only works if no external functions rely on using add_resource for atom-like operations!
         // However, add_atom uses set_propvals, which skips the validation.
         let subject = self.normalize_subject(resource.get_subject());
@@ -967,6 +992,51 @@ impl Db {
             )
             .into());
         }
+        // What this write changes, for the drive's event stream. Whether it
+        // changed anything is decided from the CRDT: the incoming state's
+        // version against the stored one, so an edit that leaves the
+        // projected properties alone (rich text, say) still counts, and a
+        // peer pushing again what we hold does not. A resource with no CRDT
+        // state of its own (it would be seeded from its properties, with a
+        // fresh peer id each time) is compared by its properties instead.
+        // Which properties differ is listed either way, as extra information.
+        let differing: std::collections::BTreeSet<String> = match &existing {
+            None => replicated_props(resource),
+            Some(old) => {
+                let new = resource.get_propvals();
+                new.iter()
+                    .filter(|(prop, value)| {
+                        // `Value` has no equality; its debug form names the
+                        // variant and the content.
+                        old.get(*prop).map(|v| format!("{v:?}")) != Some(format!("{value:?}"))
+                    })
+                    .map(|(prop, _)| prop.clone())
+                    .chain(old.keys().filter(|prop| !new.contains_key(*prop)).cloned())
+                    .collect()
+            }
+        };
+        let incoming = snapshot.clone().or_else(|| resource.materialized_state());
+        let changed = match (&existing, incoming) {
+            (None, _) => Some(differing),
+            (Some(_), Some(incoming)) => {
+                let stored = self.get_loro_snapshot_bytes(&subject_str);
+                let same = match &stored {
+                    None => false,
+                    Some(stored) if *stored == incoming => true,
+                    Some(stored) => {
+                        match (
+                            crate::loro::AtomicLoroDoc::from_snapshot(stored),
+                            crate::loro::AtomicLoroDoc::from_snapshot(&incoming),
+                        ) {
+                            (Ok(old), Ok(new)) => old.oplog_vv() == new.oplog_vv(),
+                            _ => false,
+                        }
+                    }
+                };
+                (!same).then_some(differing)
+            }
+            (Some(_), None) => (!differing.is_empty()).then_some(differing),
+        };
         if check_required_props {
             resource.check_required_props(self).await?;
         }
@@ -1014,7 +1084,7 @@ impl Db {
         // and the removal of other identifier spellings: the same write a
         // commit makes.
         self.add_resource_tx(resource, transaction)?;
-        Ok(())
+        Ok(changed)
     }
 
     /// Install a sync admission/quota policy (managed nodes). The default is
@@ -2797,9 +2867,16 @@ impl Db {
     async fn remove_applied(&self, subject: &Subject) -> AtomicResult<Vec<RemovedSubject>> {
         let mut transaction = Transaction::new();
         let mut removed = Vec::new();
-        self.recursive_remove(subject, &mut transaction, &mut removed, None)
-            .await?;
-        self.apply_transaction(&mut transaction)?;
+        let mut events = Vec::new();
+        self.recursive_remove(
+            subject,
+            &mut transaction,
+            &mut removed,
+            None,
+            Some(&mut events),
+        )
+        .await?;
+        self.apply_transaction_with_source(&mut transaction, None, events)?;
         // Tombstone every removed subject so bulk sync (Iroh / WS `SYNC`)
         // does not resurrect them from a peer that still holds a stale copy.
         // Only after the apply succeeded: a tombstone for a resource that is
@@ -3150,6 +3227,24 @@ impl Db {
         })
     }
 
+    /// The agents every app installed on `drive` signs as, revoked ones
+    /// included: a name that was an Installation's agent stays one. The drive
+    /// is compared by its canonical form, whichever spelling (`did:ad:` or
+    /// `atomic:`, with or without a drive hint) the key was stored under.
+    pub fn app_agents_in_drive(&self, drive: &str) -> Vec<String> {
+        let canonical = |drive: &str| Subject::from(drive.to_string()).pure_id();
+        let want = canonical(drive);
+        self.kv
+            .scan_prefix(Tree::AppAgent, b"")
+            .flatten()
+            .filter(|(key, _)| {
+                let drive_part = key.split(|b| *b == 0).next().unwrap_or_default();
+                std::str::from_utf8(drive_part).is_ok_and(|d| canonical(d) == want)
+            })
+            .filter_map(|(_, bin)| Some(AppAgent::from_bytes(&bin).ok()?.agent))
+            .collect()
+    }
+
     /// Read identity and lifecycle atomically, so revocation cannot look legacy
     /// between separate existence and status probes.
     pub fn get_app_agent_state(&self, key: &AppAgentKey) -> AtomicResult<AppAgentState> {
@@ -3329,8 +3424,12 @@ impl Db {
         // would sit there looking armed and never fire.
         trigger.query.watch(self)?;
 
+        let is_new = self.kv.get(Tree::PluginTrigger, &key.encode()?)?.is_none();
         self.kv
             .insert(Tree::PluginTrigger, &key.encode()?, &trigger.encode()?)?;
+        if is_new {
+            self.start_trigger_cursor(key)?;
+        }
         Ok(())
     }
 
@@ -3350,31 +3449,16 @@ impl Db {
         // — may be watching the same filter, and unwatching one that is still
         // in use would silently stop delivering to it.
         self.kv.remove(Tree::PluginTrigger, &key.encode()?)?;
+        self.forget_trigger_cursor(key)?;
         Ok(())
     }
 
-    /// Every trigger whose query is the one that just changed.
-    ///
-    /// A whole-tree scan, for the same reason `due_plugin_schedules` is one:
-    /// there is one entry per triggered plugin, which is a very small set. An
-    /// index keyed by query id would be another thing to keep in step for no
-    /// gain at this size.
-    pub fn plugin_triggers_for_query(
-        &self,
-        query_id: &[u8],
-    ) -> AtomicResult<Vec<(PluginTriggerKey, PluginTrigger)>> {
-        let mut found = Vec::new();
-
-        for entry in self.kv.iter_tree(Tree::PluginTrigger) {
-            let (key, value) = entry?;
-            let trigger = PluginTrigger::from_bytes(&value)?;
-
-            if crate::db::query_index::query_id(&trigger.query)?.as_slice() == query_id {
-                found.push((PluginTriggerKey::from_bytes(&key)?, trigger));
-            }
-        }
-
-        Ok(found)
+    /// The ids of the queries plugin triggers watch.
+    fn trigger_query_ids(&self) -> AtomicResult<std::collections::HashSet<Vec<u8>>> {
+        self.plugin_triggers()?
+            .iter()
+            .map(|(_, t)| Ok(crate::db::query_index::query_id(&t.query)?.to_vec()))
+            .collect()
     }
 
     /// Re-registers every stored trigger's query as watched.
@@ -3389,6 +3473,9 @@ impl Db {
             let (_, value) = entry?;
             PluginTrigger::from_bytes(&value)?.query.watch(self)?;
             watched += 1;
+        }
+        for (key, _) in self.plugin_triggers()? {
+            self.enable_drive_events(&key.drive)?;
         }
 
         Ok(watched)
@@ -3731,64 +3818,71 @@ impl Db {
     /// membership from the raw atom stream.
     #[instrument(level = "trace", skip_all)]
     pub(crate) fn apply_transaction(&self, transaction: &mut Transaction) -> AtomicResult<()> {
-        self.apply_transaction_with_source(transaction, None)
+        self.apply_transaction_with_source(transaction, None, Vec::new())
     }
 
     fn apply_transaction_with_source(
         &self,
         transaction: &mut Transaction,
         source_id: Option<&str>,
+        events: Vec<drive_events::PendingEvent>,
     ) -> AtomicResult<()> {
-        // Persist delivery before publishing the wake-up. A crashed or lagging
-        // subscriber can replay the queue; it is never the owner of the event.
-        // A sorted member moving positions has a delete and insert in this
-        // batch, which is not a membership edge.
-        let mut edges = std::collections::BTreeMap::new();
-        for op in transaction
-            .iter()
-            .filter(|op| op.tree == Tree::QueryMembers)
-        {
-            if let Some((query, subject)) = query_index::parse_members_key_id_subject(&op.key) {
-                let delta = edges.entry((query, subject)).or_insert(0i32);
-                *delta += if matches!(op.method, Method::Insert) {
-                    1
-                } else {
-                    -1
-                };
-            }
-        }
-        for ((query, subject), delta) in edges {
-            if delta == 0 {
-                continue;
-            }
-            let edge = plugin_trigger::Edge::of(delta > 0);
-            for (key, trigger) in self.plugin_triggers_for_query(&query)? {
-                if !trigger.wants(edge) {
-                    continue;
+        // A change's query edges ride in its drive event, in the same batch, so
+        // a trigger that was down or lagging replays them from its cursor. A
+        // sorted member moving positions has a delete and insert in this
+        // batch, which is not a membership edge. With several events in one
+        // batch (a replicated page, a recursive removal) an edge goes to the
+        // event of the subject it is about; the rest go to the first.
+        let events = if events.is_empty() {
+            events
+        } else {
+            let mut edges = vec![std::collections::BTreeMap::<Vec<u8>, i32>::new(); events.len()];
+            for op in transaction
+                .iter()
+                .filter(|op| op.tree == Tree::QueryMembers)
+            {
+                if let Some((query, member)) = query_index::parse_members_key_id_subject(&op.key) {
+                    let member = drive_events::pure(&member);
+                    let at = events
+                        .iter()
+                        .position(|e| e.subject_id() == member)
+                        .unwrap_or(0);
+                    *edges[at].entry(query).or_insert(0i32) +=
+                        if matches!(op.method, Method::Insert) {
+                            1
+                        } else {
+                            -1
+                        };
                 }
-                let event = plugin_trigger::QueuedEvent {
-                    id: format!(
-                        "{:020}-{}",
-                        crate::utils::now(),
-                        crate::utils::random_string(24)
-                    ),
-                    key,
-                    subject: subject.clone(),
-                    edge,
-                    at: crate::utils::now(),
-                    verdict: None,
-                    waiting_for_review: false,
-                    authorization: None,
-                };
-                transaction.push(Operation {
-                    tree: Tree::PluginMeta,
-                    method: Method::Insert,
-                    key: format!("plugin-event/v1/{}", event.id).into_bytes(),
-                    val: Some(serde_json::to_vec(&event)?),
-                });
             }
+            let mut watched = None;
+            let mut with_edges = Vec::with_capacity(events.len());
+            for (event, edges) in events.into_iter().zip(edges) {
+                let mut found = Vec::new();
+                for (query, delta) in edges.into_iter().filter(|(_, d)| *d != 0) {
+                    let ids = match &watched {
+                        Some(ids) => ids,
+                        None => watched.insert(self.trigger_query_ids()?),
+                    };
+                    if ids.contains(&query) {
+                        found.push((hex::encode(query), delta > 0));
+                    }
+                }
+                with_edges.push(event.with_edges(found));
+            }
+            with_edges
+        };
+        // The drive's event joins the same batch. The sequence lock is held
+        // until the batch has landed, so rows appear in sequence order.
+        let mut sequence = self
+            .drive_event_seq
+            .lock()
+            .map_err(|_| "drive event lock poisoned")?;
+        for event in events {
+            self.queue_drive_event(event, &mut sequence, transaction)?;
         }
         self.kv.apply_batch(transaction)?;
+        drop(sequence);
 
         for op in transaction.iter() {
             if op.tree != Tree::QueryMembers {
@@ -4431,6 +4525,7 @@ impl Db {
         transaction: &mut Transaction,
         removed: &mut Vec<RemovedSubject>,
         inherited_drive: Option<Subject>,
+        mut events: Option<&mut Vec<drive_events::PendingEvent>>,
     ) -> AtomicResult<()> {
         // Key by `pure_id()` — that is how resources and Loro snapshots are
         // stored (`add_resource_tx`, `apply_commit`). Looking up by the raw
@@ -4444,6 +4539,13 @@ impl Db {
             // Read the drive now, while the resource still exists: a listener
             // reacting to the removal cannot look it up any more.
             let drive = resource.get_drive().or(inherited_drive);
+            if let Some(events) = events.as_deref_mut() {
+                // Still stored, so its parent chain can be read.
+                events.extend(
+                    drive_events::PendingEvent::new(self, &resource, true, Default::default())
+                        .await,
+                );
+            }
             removed.push(RemovedSubject {
                 subject: subject.without_params(),
                 drive: drive.clone(),
@@ -4456,6 +4558,7 @@ impl Db {
                     transaction,
                     removed,
                     drive.clone(),
+                    events.as_deref_mut(),
                 ))
                 .await?;
             }
@@ -4876,6 +4979,9 @@ impl Storelike for Db {
         // cascade-deleted children). Tombstoned and announced once the
         // transaction has landed; empty for anything but a destroy.
         let mut removed: Vec<RemovedSubject> = Vec::new();
+        // The destroyed resource's drive event and one per cascade-deleted
+        // child, each with its own query edges.
+        let mut destroy_events: Vec<drive_events::PendingEvent> = Vec::new();
 
         match (&commit_response.resource_old, &commit_response.resource_new) {
             (None, None) if !commit_response.commit.destroy.unwrap_or(false) => {
@@ -4907,8 +5013,14 @@ impl Storelike for Db {
                 // destroy — what `SYNC_DIFF.removeCommits` carries — lands
                 // with the deletion it signs, or not at all. Tombstones and
                 // the children's `Destroyed` events follow the apply below.
-                self.recursive_remove(&subject, &mut transaction, &mut removed, None)
-                    .await?;
+                self.recursive_remove(
+                    &subject,
+                    &mut transaction,
+                    &mut removed,
+                    None,
+                    Some(&mut destroy_events),
+                )
+                .await?;
             }
             _ => {}
         };
@@ -4976,9 +5088,32 @@ impl Storelike for Db {
             }
         }
 
+        let drive_events_for_commit: Vec<drive_events::PendingEvent> = if !removed.is_empty() {
+            // A destroy: the cascade already built the event of every subject
+            // it removes, the destroyed one first.
+            destroy_events
+        } else {
+            match commit_response
+                .resource_new
+                .as_ref()
+                .or(commit_response.resource_old.as_ref())
+            {
+                Some(resource) => drive_events::PendingEvent::new(
+                    store,
+                    resource,
+                    commit_response.commit.destroy.unwrap_or(false),
+                    commit_response.changed_props.iter().cloned().collect(),
+                )
+                .await
+                .into_iter()
+                .collect(),
+                None => Vec::new(),
+            }
+        };
         store.apply_transaction_with_source(
             &mut transaction,
             commit_response.source_id.as_deref(),
+            drive_events_for_commit,
         )?;
 
         // An import receipt may be the only evidence available when retrying
