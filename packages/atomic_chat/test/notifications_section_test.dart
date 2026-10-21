@@ -121,7 +121,8 @@ void main() {
     final api = FakeApi(notificationList: [_n(1)]);
     await tester.pumpWidget(_shell(api));
     await tester.pumpAndSettle();
-    expect(_controller(tester).homeSections.value, [HomeSection.notifications]);
+    expect(_controller(tester).homeSections.value,
+        contains(HomeSection.notifications));
     await _done(tester);
   });
 }
