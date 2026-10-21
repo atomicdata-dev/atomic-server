@@ -103,6 +103,40 @@ pub async fn list_activity(limit: u32, include_own: bool) -> Result<Vec<Activity
         .collect())
 }
 
+/// One page of the full Activity feed, newest first: the entries after the
+/// one at `before_at` (unix ms) with subject `before_subject` (the last entry
+/// of the previous page; both `None` for the first page). A page shorter than
+/// `limit` is the end of the feed.
+pub async fn list_activity_page(
+    before_at: Option<i64>,
+    before_subject: Option<String>,
+    limit: u32,
+    include_own: bool,
+) -> Result<Vec<ActivityEntry>, String> {
+    let before = before_at.map(|at| (at, before_subject.unwrap_or_default()));
+    let rows = lists::list_activity_page(
+        db()?,
+        recents(),
+        &profiles(),
+        before.as_ref().map(|(at, s)| (*at, s.as_str())),
+        limit as usize,
+        include_own,
+    )
+    .await;
+    Ok(rows
+        .into_iter()
+        .map(|a| ActivityEntry {
+            subject: a.subject,
+            drive: a.drive,
+            kind: a.kind.as_str().to_string(),
+            at: a.at,
+            actor: Some(a.actor),
+            name: a.name,
+            class_name: a.class_name,
+        })
+        .collect())
+}
+
 /// Record that this device opened `subject` in `drive`. Local to the device:
 /// nothing is committed or synced.
 #[frb(sync)]

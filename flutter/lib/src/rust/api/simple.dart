@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'simple/types.dart';
 
-// These functions are ignored because they are not marked as `pub`: `catch_up_search_index`, `db_event_to_json`, `describe_file`, `drive_resource_exists`, `drives_by_use`, `ensure_sync_connectivity`, `fetch_other_drive`, `follow_listed_drives`, `is_unreachable_hub_url`, `node_apply_local`, `nudge_peers_after_local_change`, `open_native_store`, `open_store_catching`, `peer_ids_to_try`, `push_local_write`, `save_and_push`, `short_id`, `sync_connectivity_inner`, `try_auto_peer_sync`
+// These functions are ignored because they are not marked as `pub`: `catch_up_listed_drives`, `catch_up_search_index`, `db_event_to_json`, `describe_file`, `drive_resource_exists`, `drives_by_use`, `ensure_sync_connectivity`, `fetch_other_drive`, `follow_listed_drives`, `is_unreachable_hub_url`, `node_apply_local`, `nudge_peers_after_local_change`, `open_native_store`, `open_store_catching`, `peer_ids_to_try`, `push_local_write`, `same_drive`, `save_and_push`, `short_id`, `sync_connectivity_inner`, `try_auto_peer_sync`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `PeerSyncReport`, `SyncConnectivityReport`
 
 /// Local-first Atomic Data SDK for Flutter.

@@ -1114,7 +1114,53 @@ async fn follow_listed_drives(home: String) {
         "[home] other drives: {followed} followed, {} not available here",
         wanted.len() - followed
     );
+    catch_up_listed_drives(&home).await;
     OTHER_DRIVES_RUNNING.store(false, Ordering::SeqCst);
+}
+
+/// Every drive the person lists, the one in use included: subscribed to, and
+/// asked (`SYNC`) for what this device lacks of it. A subscription only
+/// brings what happens from then on, and fetching a drive brings its root
+/// only, so without this the Activity feed (and everything else under such a
+/// drive) had nothing from before the subscription. One drive at a time; the
+/// server answers each with just the resources newer than the device's
+/// version vectors, so a drive already up to date costs one small frame.
+/// Without an open session nothing happens (the next `open_ws_sync` runs it).
+async fn catch_up_listed_drives(home: &str) {
+    let Ok(store) = db() else { return };
+    let Ok(drives) = store.list_drives().await else {
+        return;
+    };
+    let mut subjects: Vec<String> = vec![home.to_string()];
+    for d in drives {
+        if !subjects.iter().any(|s| same_drive(s, &d.subject)) {
+            subjects.push(d.subject);
+        }
+    }
+    let mut caught_up = 0;
+    for subject in &subjects {
+        if !store.has_resource_locally(subject) {
+            continue;
+        }
+        if ws_sync::follow_drive(subject).await.is_ok()
+            && ws_sync::catch_up_drive(subject).await.is_ok()
+        {
+            caught_up += 1;
+        }
+    }
+    tracing::info!("[home] caught up on {caught_up} of {} drives", subjects.len());
+}
+
+fn same_drive(a: &str, b: &str) -> bool {
+    let key = |s: &str| {
+        s.trim_start_matches("did:ad:")
+            .trim_start_matches("atomic:")
+            .split('?')
+            .next()
+            .unwrap_or("")
+            .to_string()
+    };
+    key(a) == key(b)
 }
 
 const OTHER_DRIVES_PARALLEL: usize = 4;

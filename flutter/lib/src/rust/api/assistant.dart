@@ -44,6 +44,21 @@ Future<List<ActivityEntry>> listActivity(
     RustLib.instance.api
         .crateApiAssistantListActivity(limit: limit, includeOwn: includeOwn);
 
+/// One page of the full Activity feed, newest first: the entries after the
+/// one at `before_at` (unix ms) with subject `before_subject` (the last entry
+/// of the previous page; both `None` for the first page). A page shorter than
+/// `limit` is the end of the feed.
+Future<List<ActivityEntry>> listActivityPage(
+        {PlatformInt64? beforeAt,
+        String? beforeSubject,
+        required int limit,
+        required bool includeOwn}) =>
+    RustLib.instance.api.crateApiAssistantListActivityPage(
+        beforeAt: beforeAt,
+        beforeSubject: beforeSubject,
+        limit: limit,
+        includeOwn: includeOwn);
+
 /// Record that this device opened `subject` in `drive`. Local to the device:
 /// nothing is committed or synced.
 void noteResourceOpened({required String drive, required String subject}) =>
