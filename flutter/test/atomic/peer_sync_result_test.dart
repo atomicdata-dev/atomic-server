@@ -50,7 +50,8 @@ void main() {
     test('falls back to a name the caller knows from an earlier HELLO', () {
       const result = PeerSyncResult(imported: 0, pushed: 0, inSync: true);
 
-      expect(result.describe('Alice’s Laptop'), 'Already in sync with Alice’s Laptop');
+      expect(result.describe('Alice’s Laptop'),
+          'Already in sync with Alice’s Laptop');
     });
 
     test('one resource is not "1 resources"', () {
@@ -85,5 +86,16 @@ void main() {
       expect(result.inSync, isFalse);
       expect(result.peerName, isNull);
     });
+  });
+
+  test('counts say what moved, for under a "Paired with …" title', () {
+    PeerSyncResult r(int i, int p, [bool s = false]) =>
+        PeerSyncResult(imported: i, pushed: p, inSync: s);
+    expect(r(7, 0).counts(), '7 resources received');
+    expect(r(1, 0).counts(), '1 resource received');
+    expect(r(0, 3).counts(), '3 resources sent');
+    expect(r(7, 3).counts(), 'Received 7, sent 3');
+    expect(r(0, 0, true).counts(), 'Already in sync');
+    expect(r(0, 0).counts(), 'Nothing to sync');
   });
 }

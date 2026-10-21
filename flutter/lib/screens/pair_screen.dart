@@ -523,9 +523,14 @@ class _PairScreenState extends State<PairScreen> {
         );
 
       case _Step.done:
+        // The name the code carried, else the one the device introduced
+        // itself by when it answered.
+        final helloName = _syncResult?.peerName ?? '';
         final label = (_scannedName != null && _scannedName!.isNotEmpty)
             ? _scannedName!
-            : 'device';
+            : helloName.isNotEmpty
+                ? helloName
+                : 'device';
         return Column(
           key: const ValueKey('done'),
           mainAxisSize: MainAxisSize.min,
@@ -539,7 +544,8 @@ class _PairScreenState extends State<PairScreen> {
             // a workspace sent somewhere that had none, and of two devices
             // already holding the same thing — and read as failure for both.
             Text(
-              _syncResult?.describe() ?? 'Nothing to sync',
+              _syncResult?.counts() ?? 'Nothing to sync',
+              key: const ValueKey('pair-result-counts'),
               style: SyncText.caption(c),
             ),
           ],

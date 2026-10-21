@@ -580,8 +580,8 @@ class AtomicClient {
   /// a fresh one.
   static Future<http.Response> _sendWithRetry(
       http.Client c, http.Request request, Duration timeout) async {
-    Future<http.Response> once() async => http.Response.fromStream(
-        await c.send(_copy(request)).timeout(timeout));
+    Future<http.Response> once() async =>
+        http.Response.fromStream(await c.send(_copy(request)).timeout(timeout));
     try {
       return await once();
     } on http.ClientException {
@@ -633,13 +633,21 @@ class AtomicClient {
   static Future<List<Map<String, String>>> getKnownPeers() async {
     final json = ffi.getKnownPeersJson();
     try {
+      String text(dynamic value) => value == null ? '' : '$value';
       return (jsonDecode(json) as List)
           .map((e) => {
-                'node_id': (e['node_id'] ?? '') as String,
-                'name': (e['name'] ?? '') as String,
-                'last_synced':
-                    e['last_synced'] == null ? '' : '${e['last_synced']}',
-                'relay_url': (e['relay_url'] ?? '') as String,
+                'node_id': text(e['node_id']),
+                'name': text(e['name']),
+                'last_synced': text(e['last_synced']),
+                'last_sent': text(e['last_sent']),
+                'last_received': text(e['last_received']),
+                'relay_url': text(e['relay_url']),
+                'drives': '${(e['drives'] as List?)?.length ?? 0}',
+                // Recorded by newer hosts (planning/flutter-pairing-other-agents.md):
+                // whose device it is. Empty when the host does not say.
+                'agent': text(e['agent']),
+                'agent_name': text(e['agent_name']),
+                'relation': text(e['relation']),
               })
           .toList();
     } catch (_) {
@@ -920,6 +928,15 @@ class PeerSyncResult {
         inSync: json['in_sync'] == true,
         peerName: json['peer_name'] as String?,
       );
+
+  /// What moved, without who: under a "Paired with Polle's iPhone" title.
+  String counts() {
+    String n(int count) => '$count ${count == 1 ? 'resource' : 'resources'}';
+    if (imported > 0 && pushed > 0) return 'Received $imported, sent $pushed';
+    if (imported > 0) return '${n(imported)} received';
+    if (pushed > 0) return '${n(pushed)} sent';
+    return inSync ? 'Already in sync' : 'Nothing to sync';
+  }
 
   /// What happened, as a person would say it.
   String describe([String? fallbackName]) {

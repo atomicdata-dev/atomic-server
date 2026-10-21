@@ -112,6 +112,17 @@ class AppSettingsBackend extends shared.AtomicSettingsBackend {
     await PairScreen.show(context);
   }
 
+  /// The active workspace, with that device; the same sync a scan runs.
+  @override
+  Future<String> Function(String nodeId) get syncPeer => (nodeId) async {
+        if (await AtomicClient.getPeerId() == null) {
+          await AtomicClient.startPeer();
+        }
+        final result = await AtomicClient.peerSync(nodeId)
+            .timeout(const Duration(seconds: 30));
+        return result.describe();
+      };
+
   @override
   shared.PeerSearchInfo? peerSearchStatus() =>
       shared.PeerSearchInfo.fromJson(AtomicClient.peerSearchStatus());
