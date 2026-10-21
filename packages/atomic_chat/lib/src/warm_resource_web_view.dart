@@ -12,6 +12,7 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import 'assistant_api.dart';
 import 'resource_view.dart';
+import 'app_sidebar_icons.dart';
 import 'app_theme.dart';
 
 /// A page that can be released once nobody needs it any more (its web view
@@ -290,9 +291,10 @@ class WarmResourceWebView with WidgetsBindingObserver, ChangeNotifier {
     final server = await ResourceView.serverFactory();
     final scheme = _scheme;
     return WebViewEmbedPage.create(
-        scheme == null
-            ? server.page
-            : server.page.replace(queryParameters: {'scheme': scheme}),
+        server.page.replace(queryParameters: {
+          if (scheme != null) 'scheme': scheme,
+          'sidebarIcons': AppSidebarIcons.queryValue,
+        }),
         onMessage: onMessage,
         pollReady: true);
   }
@@ -550,11 +552,15 @@ class WarmResourceWebView with WidgetsBindingObserver, ChangeNotifier {
         return;
       }
       // The page reports the saved theme as it boots, before anyone holds it.
-      final answer = method == 'theme'
-          ? await AppThemeMode.choose(
-                  args is List && args.isNotEmpty ? '${args.first}' : '')
-              .then((_) => 'true')
-          : await api.embedCall(method, jsonEncode(args ?? const []));
+      final icons =
+          method == 'sidebarIcons' ? AppSidebarIcons.parse(args) : null;
+      final answer = icons != null
+          ? await AppSidebarIcons.choose(icons).then((_) => 'true')
+          : method == 'theme'
+              ? await AppThemeMode.choose(
+                      args is List && args.isNotEmpty ? '${args.first}' : '')
+                  .then((_) => 'true')
+              : await api.embedCall(method, jsonEncode(args ?? const []));
       reply = 'true,${jsonEncode(answer)}';
     } catch (e) {
       reply = 'false,${jsonEncode('$e')}';

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'app_top_bar.dart';
 import 'slide_back_route.dart';
 import 'app_shell.dart';
+import 'app_sidebar_icons.dart';
 import 'app_theme.dart';
 import 'assistant_api.dart';
 import 'embed_server.dart';
@@ -130,6 +131,7 @@ class _ResourceViewState extends State<ResourceView>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    AppSidebarIcons.show.addListener(_tellSidebarIcons);
     // A resource page in a real web view starts covered; a page of the app's
     // own (settings) and a test's page do not.
     if (widget.path == null) {
@@ -181,6 +183,7 @@ class _ResourceViewState extends State<ResourceView>
             'subject': widget.subject,
           // The page's first paint is in the app's light or dark mode.
           'scheme': scheme,
+          'sidebarIcons': AppSidebarIcons.queryValue,
         }),
         onMessage: _onMessage,
         onLoaded: _pageLoaded,
@@ -305,6 +308,7 @@ class _ResourceViewState extends State<ResourceView>
     debugPrint('[embed] page loaded after ${_clock.elapsedMilliseconds} ms');
     // The page follows the app's light/dark mode for its own 'auto'.
     _scheme = null;
+    _icons = null;
     if (mounted) _tellColorScheme();
   }
 
@@ -337,7 +341,19 @@ class _ResourceViewState extends State<ResourceView>
   /// The app's light/dark mode as the page last heard it.
   String? _scheme;
 
+  /// "Show icons in the sidebar" as the page last heard it.
+  bool? _icons;
+
+  void _tellSidebarIcons() {
+    final show = AppSidebarIcons.show.value;
+    if (show == _icons || _page == null) return;
+    _icons = show;
+    unawaited(
+        _page!.runJavaScript('window.atomicEmbed?.setSidebarIcons?.($show)'));
+  }
+
   void _tellColorScheme() {
+    _tellSidebarIcons();
     final scheme =
         Theme.of(context).brightness == Brightness.dark ? 'dark' : 'light';
     if (scheme == _scheme || _page == null) return;
@@ -370,6 +386,7 @@ class _ResourceViewState extends State<ResourceView>
   void dispose() {
     _revealCap?.cancel();
     WidgetsBinding.instance.removeObserver(this);
+    AppSidebarIcons.show.removeListener(_tellSidebarIcons);
     final route = _route;
     if (route != null) _shell?.unregisterMenu(route);
     if (route is SlideBackRoute && route.beforeSwipeLeave == _flushLeaving) {
@@ -452,6 +469,20 @@ class _ResourceViewState extends State<ResourceView>
     final method = request['method'] as String;
     if (method == 'openNative') {
       await _answerOpenNative(id, request['args']);
+      return;
+    }
+    if (method == 'sidebarIcons') {
+      // "Show icons in the sidebar", switched on the settings page: the app's
+      // Home follows.
+      final show = AppSidebarIcons.parse(request['args']);
+      if (show != null) {
+        _icons = show;
+        unawaited(AppSidebarIcons.choose(show));
+      }
+      try {
+        await _page?.runJavaScript(
+            'window.__atomicReply($id,true,${jsonEncode('true')})');
+      } catch (_) {}
       return;
     }
     if (method == 'theme') {
@@ -646,10 +677,10 @@ class _ResourceViewState extends State<ResourceView>
                                 style: IconButton.styleFrom(
                                   tapTargetSize:
                                       MaterialTapTargetSize.shrinkWrap,
-                                  fixedSize: const Size.square(
-                                      kEmbedNavBarHeight),
-                                  minimumSize: const Size.square(
-                                      kEmbedNavBarHeight),
+                                  fixedSize:
+                                      const Size.square(kEmbedNavBarHeight),
+                                  minimumSize:
+                                      const Size.square(kEmbedNavBarHeight),
                                 ),
                                 tooltip: 'More',
                                 onPressed: () {

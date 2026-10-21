@@ -132,6 +132,50 @@ void main() {
     await tester.pump(const Duration(seconds: 6));
   });
 
+  testWidgets(
+      '"Show icons in the sidebar" switched on the page becomes the app\'s',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    addTearDown(() => AppSidebarIcons.show.value = true);
+    await open(tester);
+    expect(AppSidebarIcons.show.value, isTrue);
+    page.scripts.clear();
+
+    page.send(jsonEncode({
+      'id': 11,
+      'method': 'sidebarIcons',
+      'args': [false],
+    }));
+    await tester.pumpAndSettle();
+    expect(AppSidebarIcons.show.value, isFalse);
+    expect(page.scripts, contains('window.__atomicReply(11,true,"true")'));
+    final saved = await SharedPreferences.getInstance();
+    expect(saved.getBool(AppSidebarIcons.key), isFalse);
+    // The page that said it is not told back what it said.
+    expect(page.scripts.where((s) => s.contains('setSidebarIcons')), isEmpty);
+
+    // A change from elsewhere (the app) is passed on to the page.
+    AppSidebarIcons.show.value = true;
+    await tester.pumpAndSettle();
+    expect(
+        page.scripts, contains('window.atomicEmbed?.setSidebarIcons?.(true)'));
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 6));
+  });
+
+  test('the choice is saved and loaded, on by default', () async {
+    SharedPreferences.setMockInitialValues({});
+    addTearDown(() => AppSidebarIcons.show.value = true);
+    await AppSidebarIcons.load();
+    expect(AppSidebarIcons.show.value, isTrue);
+    await AppSidebarIcons.choose(false);
+    AppSidebarIcons.show.value = true;
+    await AppSidebarIcons.load();
+    expect(AppSidebarIcons.show.value, isFalse);
+    expect(AppSidebarIcons.parse(['x']), isNull);
+    expect(AppSidebarIcons.parse([true]), isTrue);
+  });
+
   testWidgets('openNative for a kind the app has no view for says false',
       (tester) async {
     await open(tester);
