@@ -17,9 +17,20 @@ class HoldFanItem<T> {
   final IconData? icon;
   final T value;
 
-  const HoldFanItem(this.label, this.value, {this.emoji, this.icon});
+  /// Drawn quieter (the choice is there but has nothing behind it, or is
+  /// switched off), still selectable.
+  final bool muted;
+
+  /// A short note after the label ("hidden", "0"), in the muted tone.
+  final String? hint;
+
+  const HoldFanItem(this.label, this.value,
+      {this.emoji, this.icon, this.muted = false, this.hint});
 
   String get text => emoji == null ? label : '$emoji $label';
+
+  /// What assistive technology reads.
+  String get semanticLabel => hint == null ? label : '$label, $hint';
 }
 
 /// How a [HoldFan] arranges its choices. Always one straight column.
@@ -440,7 +451,9 @@ class _HoldFanState<T> extends State<HoldFan<T>>
   Size _rowSize(
       HoldFanItem<T> item, TextScaler scaler, TextStyle style, double max) {
     final painter = TextPainter(
-      text: TextSpan(text: item.label, style: style),
+      text: TextSpan(
+          text: item.hint == null ? item.label : '${item.label}   ${item.hint}',
+          style: style),
       textDirection: Directionality.of(context),
       textScaler: scaler,
       maxLines: 1,
@@ -864,10 +877,14 @@ class _MenuRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    final color = hovered ? c.main : c.textPrimary;
+    final color = hovered
+        ? c.main
+        : item.muted
+            ? c.textSecondary
+            : c.textPrimary;
     return Semantics(
       button: true,
-      label: item.label,
+      label: item.semanticLabel,
       onTap: onTap,
       excludeSemantics: true,
       child: DecoratedBox(
@@ -898,6 +915,15 @@ class _MenuRow extends StatelessWidget {
                 style: style.copyWith(color: color),
               ),
             ),
+            if (item.hint != null) ...[
+              const SizedBox(width: 8),
+              Text(item.hint!,
+                  key: const Key('hold-fan-hint'),
+                  maxLines: 1,
+                  style: style.copyWith(
+                      color: c.textSecondary,
+                      fontSize: (style.fontSize ?? 16) * 0.8)),
+            ],
           ]),
         ),
       ),

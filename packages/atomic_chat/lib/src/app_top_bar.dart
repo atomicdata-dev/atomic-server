@@ -86,7 +86,8 @@ class SectionBack extends StatelessWidget {
   /// The section's full list; the first page (the activity) when the section
   /// has nothing to list.
   static void _go(ShellController shell, HomeSection section) =>
-      shell.homeSections.value.contains(section)
+      shell.homeSections.value
+              .any((e) => e.section == section && (e.count ?? 0) > 0)
           ? shell.openHomeSection(section)
           : shell.goHome();
 

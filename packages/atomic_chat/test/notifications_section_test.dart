@@ -117,13 +117,15 @@ void main() {
     await _done(tester);
   });
 
-  testWidgets('the Home hold menu lists Notifications when it has rows',
+  testWidgets('the Home hold menu lists Notifications with its count',
       (tester) async {
     final api = FakeApi(notificationList: [_n(1)]);
     await tester.pumpWidget(_shell(api));
     await tester.pumpAndSettle();
-    expect(_controller(tester).homeSections.value,
-        contains(HomeSection.notifications));
+    expect(
+        _controller(tester).homeSections.value.where(
+            (e) => e.section == HomeSection.notifications && e.count == 1),
+        hasLength(1));
     await _done(tester);
   });
 }

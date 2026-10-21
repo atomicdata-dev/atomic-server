@@ -20,6 +20,10 @@ enum HomeSection {
   }
 }
 
+/// A section as the Home button's menu lists it: whether the person hid it
+/// from the home, and how many rows it has (null until known).
+typedef HomeSectionEntry = ({HomeSection section, bool hidden, int? count});
+
 /// SharedPreferences keys of the Home layout (per device).
 const homeOrderKey = 'home_sections_order';
 const homeHiddenKey = 'home_sections_hidden';

@@ -19,7 +19,7 @@ import 'new_document_sheet.dart' show warmDriveVisits;
 import 'native_views.dart';
 import 'warm_resource_web_view.dart';
 import 'slide_back_route.dart';
-import 'home_sections.dart' show HomeSection;
+import 'home_sections.dart' show HomeSection, HomeSectionEntry;
 
 /// The route names of the pages the bottom bar opens: a page's kind. The bar
 /// shows which of its pages is on top and never stacks a second one of a
@@ -134,11 +134,14 @@ class ShellController extends ChangeNotifier {
   /// [ShellPage.searchIn]).
   final ValueNotifier<String> list = ValueNotifier(ShellPage.home);
 
-  /// The home sections the Home button's hold menu offers (the home
-  /// publishes the ones that have something).
-  final ValueNotifier<List<HomeSection>> homeSections = ValueNotifier(const []);
+  /// The home sections the Home button's hold menu offers: every section, in
+  /// the home's saved order, those hidden from the home and those with
+  /// nothing to list included (the home publishes them).
+  final ValueNotifier<List<HomeSectionEntry>> homeSections =
+      ValueNotifier(const []);
 
-  /// The last section picked from the Home button's menu; the home opens it.
+  /// The last section picked from the Home button's menu; the home opens its
+  /// full list.
   final ValueNotifier<({HomeSection section, int n})?> sectionRequest =
       ValueNotifier(null);
 

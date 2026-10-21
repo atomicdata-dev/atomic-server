@@ -215,17 +215,20 @@ class _ChatsScreenState extends State<ChatsScreen> {
     _publishSections();
   }
 
-  /// Hands the Home button the sections it can jump to: the visible ones
-  /// that have something, in the home's order. Next to the detail pane the
-  /// activity is not a section of the home.
+  /// Hands the Home button every section, in the home's order (hidden ones
+  /// at their saved places), with whether it is hidden and how many rows it
+  /// has once known.
   void _publishSections() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final shell = _shell;
       if (!mounted || shell == null) return;
-      final split = shell.split;
-      final list = [
-        for (final s in _layout.visible)
-          if (!(split && s == HomeSection.activity) && (_counts[s] ?? 0) > 0) s
+      final list = <HomeSectionEntry>[
+        for (final s in _layout.order)
+          (
+            section: s,
+            hidden: _layout.hidden.contains(s),
+            count: _counts[s],
+          ),
       ];
       if (!listEquals(list, shell.homeSections.value)) {
         shell.homeSections.value = list;
@@ -235,17 +238,60 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   int _handledRequest = 0;
 
-  /// The Home button's menu picked a section: unfold it, scroll it into
-  /// view and open its full list.
+  /// The Home button's menu picked a section: its full list opens. A section
+  /// on the home that has rows is unfolded and scrolled into view first; one
+  /// that is empty, hidden from the home or not on it (the activity next to
+  /// the detail pane) just opens its page, and stays as it is.
   void _onSectionRequest() {
     final req = _shell?.sectionRequest.value;
     if (req == null || req.n == _handledRequest) return;
     _handledRequest = req.n;
     final id = req.section;
-    if (_layout.collapsed.contains(id)) {
-      _setLayout(_layout.toggleCollapsed(id));
+    final onHome = _layout.visible.contains(id) &&
+        !(_shell?.split == true && id == HomeSection.activity);
+    final state = _sectionKeys[id]?.currentState;
+    if (onHome && state != null && state.hasRows) {
+      if (_layout.collapsed.contains(id)) {
+        _setLayout(_layout.toggleCollapsed(id));
+      }
+      _revealSection(id, thenShowAll: true);
+    } else {
+      _openSectionPage(id);
     }
-    _revealSection(id, thenShowAll: true);
+  }
+
+  /// The section's full list, read from the home's own lists (they load
+  /// whether or not the section shows), opened as "Show all" opens it.
+  Future<void> _openSectionPage(HomeSection id) async {
+    final c = context.appColors;
+    try {
+      switch (id) {
+        case HomeSection.drives:
+          final list = await _drives;
+          _openAll(id, list.length, (i) => _driveRow(list[i]),
+              empty: 'No drives yet');
+        case HomeSection.notifications:
+          final list = await _notifications;
+          _openAll(id, list.length, (i) => _notificationRow(list[i]),
+              empty: 'No notifications');
+        case HomeSection.favorites:
+          final list = await _favorites;
+          _openAll(id, list.length, (i) => _homeRow(list[i]),
+              empty: 'No favorites yet');
+        case HomeSection.messages:
+          final list = await _conversations;
+          _openAll(id, list.length, (i) => _conversationRow(list[i]),
+              empty: 'No messages yet');
+        case HomeSection.chats:
+          _openAllChats(id, await _chats, c);
+        case HomeSection.activity:
+          _openActivityPage(id);
+      }
+    } catch (e) {
+      // A list that cannot be read opens as an empty one.
+      debugPrint('Home section $id not opened with its rows: $e');
+      if (mounted) _openAll(id, 0, (_) => const SizedBox.shrink());
+    }
   }
 
   /// Scrolls the home so the section [id], just unfolded, can be seen: as
@@ -471,9 +517,24 @@ class _ChatsScreenState extends State<ChatsScreen> {
   /// A section's full list: in the detail pane next to the home (where the
   /// resources open), a page of its own on a phone. Opened once. The rows are
   /// built when they scroll into view, from [item].
-  void _openAll(HomeSection id, int count, Widget Function(int) item) =>
+  void _openAll(HomeSection id, int count, Widget Function(int) item,
+          {String empty = 'Nothing here yet'}) =>
       _openPage(
-          id, (_) => _ListPage(title: id.title, count: count, item: item));
+          id,
+          (_) => _ListPage(
+              title: id.title, count: count, item: item, empty: empty));
+
+  /// The activity's full page.
+  void _openActivityPage(HomeSection id) => _openPage(
+      id,
+      (_) => _ActivityPage(
+            title: id.title,
+            changed: _feedChanged,
+            mine: () => _mine,
+            onMine: _setMine,
+            feed: () => _activity,
+            row: _activityRow,
+          ));
 
   /// The AI chats' full list: pages of chats from the host, the next one
   /// read when the list is scrolled near its end, so every chat is reachable.
@@ -733,16 +794,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
           empty: _mine ? 'Nothing changed yet' : 'No activity from others yet',
           rows: (list) => [for (final a in list) _activityRow(a)],
           total: (list) => list.length.clamp(0, _maxActivity),
-          onShowAll: (_) => _openPage(
-              id,
-              (_) => _ActivityPage(
-                    title: id.title,
-                    changed: _feedChanged,
-                    mine: () => _mine,
-                    onMine: _setMine,
-                    feed: () => _activity,
-                    row: _activityRow,
-                  )),
+          onShowAll: (_) => _openActivityPage(id),
         );
       case HomeSection.chats:
         return _Section<ChatSummary>(
@@ -949,6 +1001,9 @@ class _SectionState<T> extends State<_Section<T>>
     });
   }
 
+  /// Whether the section has rows to list.
+  bool get hasRows => _list?.isNotEmpty ?? false;
+
   /// Opens the section's full list (the "Show all" row), if it has rows.
   void showAll() {
     final list = _list;
@@ -1123,8 +1178,14 @@ class _ListPage extends StatelessWidget {
   final int count;
   final Widget Function(int index) item;
 
+  /// What an empty list says.
+  final String empty;
+
   const _ListPage(
-      {required this.title, required this.count, required this.item});
+      {required this.title,
+      required this.count,
+      required this.item,
+      this.empty = 'Nothing here yet'});
 
   @override
   Widget build(BuildContext context) {
@@ -1135,8 +1196,12 @@ class _ListPage extends StatelessWidget {
       body: SafeArea(
           top: false,
           bottom: false,
-          child: ListView.builder(
-              itemCount: count, itemBuilder: (_, i) => item(i))),
+          child: count == 0
+              ? Align(
+                  alignment: Alignment.topLeft,
+                  child: _Empty(empty, c, key: const Key('list-empty')))
+              : ListView.builder(
+                  itemCount: count, itemBuilder: (_, i) => item(i))),
     );
   }
 }
@@ -1304,7 +1369,12 @@ class _ChatsPageState extends State<_ChatsPage> {
       body: SafeArea(
         top: false,
         bottom: false,
-        child: ListView.builder(
+        child: _entries.isEmpty && _done
+            ? Align(
+                alignment: Alignment.topLeft,
+                child: _Empty('No chats yet', widget.colors,
+                    key: const Key('list-empty')))
+            : ListView.builder(
           key: const Key('chats-all-list'),
           itemCount: count,
           findChildIndexCallback: (key) {
@@ -1366,7 +1436,7 @@ class _Empty extends StatelessWidget {
   final String text;
   final AppColors c;
 
-  const _Empty(this.text, this.c);
+  const _Empty(this.text, this.c, {super.key});
 
   /// One quiet line under the heading, where the first row would start: a
   /// centred block with 32 px around it made an empty section taller than a

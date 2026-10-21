@@ -160,9 +160,15 @@ class AppBottomBar extends StatelessWidget {
                             defaultIndex: null,
                             onTap: onHome,
                             items: [
-                              for (final s in shell.homeSections.value)
-                                HoldFanItem(s.title, s,
-                                    icon: homeSectionIcon(s)),
+                              for (final e in shell.homeSections.value)
+                                HoldFanItem(e.section.title, e.section,
+                                    icon: homeSectionIcon(e.section),
+                                    muted: e.hidden || e.count == 0,
+                                    hint: e.hidden
+                                        ? 'hidden'
+                                        : e.count == 0
+                                            ? '0'
+                                            : null),
                             ],
                             onSelected: shell.openHomeSection,
                             child: _barIcon(

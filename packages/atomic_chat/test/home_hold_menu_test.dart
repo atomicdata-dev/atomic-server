@@ -10,7 +10,8 @@ RecentResource _r(String subject, String title) => (
       title: title,
       className: 'document-v2',
       openedAt: 1,
-      emoji: null, picture: null,
+      emoji: null,
+      picture: null,
     );
 
 Widget _shell(FakeApi api) => app(AppShell(
@@ -45,29 +46,116 @@ void main() {
     );
   });
 
-  testWidgets('the Home menu lists only the sections that have rows',
+  testWidgets('the Home menu lists every section, empty ones muted',
       (tester) async {
     await tester.pumpWidget(_shell(api));
     await tester.pumpAndSettle();
     final gesture = await _holdHome(tester);
-    expect(_controller(tester).homeSections.value,
-        [HomeSection.drives, HomeSection.favorites]);
-    expect(find.text('Drives'), findsWidgets);
-    expect(find.text('Favorites'), findsWidgets);
-    expect(find.text('Messages'), findsNothing);
+    final entries = _controller(tester).homeSections.value;
+    expect([for (final e in entries) e.section], HomeSection.values);
+    expect([for (final e in entries) e.hidden], everyElement(isFalse));
+    expect(entries.firstWhere((e) => e.section == HomeSection.drives).count, 2);
+    expect(
+        entries.firstWhere((e) => e.section == HomeSection.favorites).count, 1);
+    expect(
+        entries.firstWhere((e) => e.section == HomeSection.messages).count, 0);
+    for (final s in HomeSection.values) {
+      expect(find.text(s.title), findsWidgets, reason: s.title);
+    }
+    // The empty ones say 0, the others nothing.
+    expect(find.byKey(const Key('hold-fan-hint')), findsWidgets);
+    expect(find.text('0'), findsWidgets);
     await gesture.up();
     await tester.pumpAndSettle();
   });
 
-  testWidgets('the Home menu leaves out hidden sections and follows the order',
+  testWidgets(
+      'the Home menu keeps hidden sections at their saved places, marked',
       (tester) async {
     SharedPreferences.setMockInitialValues({
-      homeOrderKey: ['favorites'],
+      homeOrderKey: ['messages', 'favorites', 'drives'],
       homeHiddenKey: ['drives'],
     });
     await tester.pumpWidget(_shell(api));
     await tester.pumpAndSettle();
-    expect(_controller(tester).homeSections.value, [HomeSection.favorites]);
+    final entries = _controller(tester).homeSections.value;
+    expect([for (final e in entries.take(3)) e.section],
+        [HomeSection.messages, HomeSection.favorites, HomeSection.drives]);
+    expect(entries.length, HomeSection.values.length);
+    final drives = entries.firstWhere((e) => e.section == HomeSection.drives);
+    expect(drives.hidden, isTrue);
+    expect(entries.where((e) => e.hidden).length, 1);
+    final gesture = await _holdHome(tester);
+    expect(find.text('hidden'), findsOneWidget);
+    await gesture.up();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('picking an empty section opens its page with the empty state',
+      (tester) async {
+    await tester.pumpWidget(_shell(api));
+    await tester.pumpAndSettle();
+    final gesture = await _holdHome(tester);
+    await gesture.moveTo(tester.getCenter(find.text('Messages').last));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(_controller(tester).topKind, ShellPage.listOf('messages'));
+    expect(find.byKey(const Key('list-empty')), findsOneWidget);
+    expect(find.text('No messages yet'), findsWidgets);
+  });
+
+  testWidgets('every empty section opens a page that says so', (tester) async {
+    const expected = {
+      HomeSection.notifications: 'No notifications',
+      HomeSection.chats: 'No chats yet',
+      HomeSection.messages: 'No messages yet',
+    };
+    for (final e in expected.entries) {
+      await tester.pumpWidget(_shell(api));
+      await tester.pumpAndSettle();
+      _controller(tester).openHomeSection(e.key);
+      await tester.pumpAndSettle();
+      expect(_controller(tester).topKind, ShellPage.listOf(e.key.name));
+      expect(find.byKey(const Key('list-empty')), findsOneWidget,
+          reason: e.key.name);
+      expect(find.text(e.value), findsWidgets, reason: e.key.name);
+      await tester.pumpWidget(const SizedBox());
+    }
+  });
+
+  testWidgets('picking a hidden section opens its page and keeps it hidden',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({
+      homeHiddenKey: ['drives'],
+    });
+    await tester.pumpWidget(_shell(api));
+    await tester.pumpAndSettle();
+    expect(find.text('Work'), findsNothing);
+    _controller(tester).openHomeSection(HomeSection.drives);
+    await tester.pumpAndSettle();
+    expect(_controller(tester).topKind, ShellPage.listOf('drives'));
+    expect(find.text('Work'), findsOneWidget);
+    expect((await SharedPreferences.getInstance()).getStringList(homeHiddenKey),
+        ['drives'],
+        reason: 'only the dialog writes the layout');
+    // Still not on the home.
+    _controller(tester).goHome();
+    await tester.pumpAndSettle();
+    expect(find.text('Work'), findsNothing);
+  });
+
+  testWidgets('on a tablet the Activity is in the menu too', (tester) async {
+    tester.view.devicePixelRatio = 2;
+    tester.view.physicalSize = const Size(1280, 800) * 2;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_shell(api));
+    await tester.pumpAndSettle();
+    final entries = _controller(tester).homeSections.value;
+    expect(entries.map((e) => e.section), contains(HomeSection.activity));
+    _controller(tester).openHomeSection(HomeSection.activity);
+    await tester.pumpAndSettle();
+    expect(_controller(tester).topKind, ShellPage.listOf('activity'));
   });
 
   testWidgets('a tablet gets the sections dialog centred, at most 420 wide',
