@@ -20,7 +20,12 @@ void _size(WidgetTester tester, Size size) {
 FakeApi _api() => FakeApi(
       chatList: [
         for (var i = 0; i < 30; i++)
-          (subject: 'did:ad:chat-$i', name: 'Chat $i', lastActivity: 100 - i),
+          (
+            subject: 'did:ad:chat-$i',
+            name: 'Chat $i',
+            lastActivity: 100 - i,
+            emoji: null
+          ),
       ],
       favoriteList: [
         for (var i = 0; i < 30; i++)
@@ -29,7 +34,8 @@ FakeApi _api() => FakeApi(
             title: 'Fav $i',
             className: 'document-v2',
             openedAt: 1,
-            emoji: null, picture: null,
+            emoji: null,
+            picture: null,
           ),
       ],
       conversationList: [
@@ -39,7 +45,8 @@ FakeApi _api() => FakeApi(
             title: 'Talk $i',
             className: 'chatroom',
             openedAt: 100 - i,
-            emoji: null, picture: null,
+            emoji: null,
+            picture: null,
           ),
       ],
       lastMessages: {

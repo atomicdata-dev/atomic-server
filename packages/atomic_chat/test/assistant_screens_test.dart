@@ -344,7 +344,12 @@ void main() {
         activityList: [for (var i = 0; i < 6; i++) _activity('a$i', 'A $i')],
         chatList: [
           for (var i = 0; i < 6; i++)
-            (subject: 'chat$i', name: 'Chat $i', lastActivity: now),
+            (
+              subject: 'chat$i',
+              name: 'Chat $i',
+              lastActivity: now,
+              emoji: null
+            ),
         ],
         notificationList: [
           for (var i = 0; i < 6; i++)
@@ -406,8 +411,13 @@ void main() {
       final now = DateTime.now().millisecondsSinceEpoch;
       final api = FakeApi(
         chatList: [
-          (subject: 'did:ad:1', name: 'Trip plan', lastActivity: now),
-          (subject: 'did:ad:2', name: '', lastActivity: 0),
+          (
+            subject: 'did:ad:1',
+            name: 'Trip plan',
+            lastActivity: now,
+            emoji: null
+          ),
+          (subject: 'did:ad:2', name: '', lastActivity: 0, emoji: null),
         ],
         messageList: [
           (id: 'p#1', role: 'user', text: 'Where to?', createdAt: 1),
@@ -433,7 +443,9 @@ void main() {
         'the subject and reads it; hidden when empty', (tester) async {
       final now = DateTime.now().millisecondsSinceEpoch;
       final api = FakeApi(
-        chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
+        chatList: [
+          (subject: 'c1', name: 'A chat', lastActivity: 0, emoji: null)
+        ],
         notificationList: [
           (
             subject: 'n1',
@@ -521,7 +533,7 @@ void main() {
         final api = FakeApi(
           chatList: [
             for (var i = 0; i < 6; i++)
-              (subject: 'c$i', name: 'Chat $i', lastActivity: 0),
+              (subject: 'c$i', name: 'Chat $i', lastActivity: 0, emoji: null),
           ],
         );
         await tester
@@ -576,7 +588,9 @@ void main() {
 
     testWidgets('a tap on a heading folds its section', (tester) async {
       final api = FakeApi(
-        chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
+        chatList: [
+          (subject: 'c1', name: 'A chat', lastActivity: 0, emoji: null)
+        ],
       );
       await tester
           .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
@@ -596,7 +610,9 @@ void main() {
 
       Future<void> pumpHome(WidgetTester tester) async {
         final api = FakeApi(
-          chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
+          chatList: [
+            (subject: 'c1', name: 'A chat', lastActivity: 0, emoji: null)
+          ],
           favoriteList: [
             (
               subject: 'f1',
@@ -719,7 +735,9 @@ void main() {
 
     testWidgets('keeps the old rows while a reload is pending', (tester) async {
       final api = _SlowChatsApi(
-        chatList: [(subject: 'did:ad:1', name: 'Trip plan', lastActivity: 5)],
+        chatList: [
+          (subject: 'did:ad:1', name: 'Trip plan', lastActivity: 5, emoji: null)
+        ],
         messageList: [
           (id: 'p#1', role: 'user', text: 'Where to?', createdAt: 1),
         ],
@@ -747,8 +765,8 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsNothing);
 
       api.pending.removeAt(0).complete([
-        (subject: 'did:ad:1', name: 'Trip plan', lastActivity: 5),
-        (subject: 'did:ad:3', name: 'New idea', lastActivity: 9),
+        (subject: 'did:ad:1', name: 'Trip plan', lastActivity: 5, emoji: null),
+        (subject: 'did:ad:3', name: 'New idea', lastActivity: 9, emoji: null),
       ]);
       await tester.pumpAndSettle();
       expect(find.text('New idea'), findsOneWidget);
@@ -756,7 +774,9 @@ void main() {
 
     testWidgets('keeps the old rows when a reload fails', (tester) async {
       final api = _SlowChatsApi(
-        chatList: [(subject: 'did:ad:1', name: 'Trip plan', lastActivity: 5)],
+        chatList: [
+          (subject: 'did:ad:1', name: 'Trip plan', lastActivity: 5, emoji: null)
+        ],
       );
       await tester
           .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
@@ -818,7 +838,9 @@ void main() {
     testWidgets('sections come in order: Drives, AI chats, Favorites',
         (tester) async {
       final api = FakeApi(
-        chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
+        chatList: [
+          (subject: 'c1', name: 'A chat', lastActivity: 0, emoji: null)
+        ],
         favoriteList: [
           (
             subject: 'r1',
@@ -857,7 +879,9 @@ void main() {
       expect(find.text('Messages'), findsNothing);
 
       final api = FakeApi(
-        chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
+        chatList: [
+          (subject: 'c1', name: 'A chat', lastActivity: 0, emoji: null)
+        ],
         favoriteList: [
           (
             subject: 'f1',
@@ -949,7 +973,7 @@ void main() {
       final now = DateTime.now().millisecondsSinceEpoch;
       final api = FakeApi(chatList: [
         for (var i = 0; i < 6; i++)
-          (subject: 'c$i', name: 'Chat $i', lastActivity: now),
+          (subject: 'c$i', name: 'Chat $i', lastActivity: now, emoji: null),
       ]);
       await tester
           .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
@@ -966,7 +990,9 @@ void main() {
 
     testWidgets('Activity sits between Drives and AI chats', (tester) async {
       final api = FakeApi(
-        chatList: [(subject: 'c1', name: 'A chat', lastActivity: 0)],
+        chatList: [
+          (subject: 'c1', name: 'A chat', lastActivity: 0, emoji: null)
+        ],
         favoriteList: [
           (
             subject: 'r1',
@@ -1029,7 +1055,7 @@ void main() {
       final api = FakeApi(
         chatList: [
           for (var i = 0; i < 6; i++)
-            (subject: 'c$i', name: 'Chat $i', lastActivity: now),
+            (subject: 'c$i', name: 'Chat $i', lastActivity: now, emoji: null),
         ],
         activityList: [_activity('a1', 'Plan')],
       );
@@ -2651,7 +2677,7 @@ void main() {
     final now = DateTime(2026, 10, 19, 15);
     int ago(Duration d) => now.subtract(d).millisecondsSinceEpoch;
     ChatSummary chat(String name, int at) =>
-        (subject: name, name: name, lastActivity: at);
+        (subject: name, name: name, lastActivity: at, emoji: null);
 
     test('groups by day, keeps the order, skips empty groups', () {
       final groups = groupChatsByAge([

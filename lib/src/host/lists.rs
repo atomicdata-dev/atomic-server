@@ -33,7 +33,7 @@ pub async fn resource_icons(store: &Db, subjects: Vec<String>) -> serde_json::Ma
 }
 
 /// The newest `limit` AI chats of the person (all drives), newest activity
-/// first, as `[{subject, name, last_activity}]` (`last_activity` in ms, 0 when
+/// first, as `[{subject, name, last_activity, emoji?}]` (`last_activity` in ms, 0 when
 /// empty). Read from the recents index, not rebuilt from the chats' pages.
 pub async fn list_ai_chats(
     store: &Db,
@@ -51,12 +51,20 @@ pub async fn list_ai_chats_page(
     offset: usize,
     limit: usize,
 ) -> AtomicResult<Vec<Json>> {
-    Ok(recents
-        .recent_chats_page(store, offset, limit)
-        .await?
-        .into_iter()
-        .map(|(subject, name, last)| json!({ "subject": subject, "name": name, "last_activity": last }))
-        .collect())
+    let page = recents.recent_chats_page(store, offset, limit).await?;
+    let mut out = Vec::with_capacity(page.len());
+    for (subject, name, last) in page {
+        let mut row = json!({ "subject": subject, "name": name, "last_activity": last });
+        // The chat's own emoji (the web app gives a chat one when it names it).
+        if let Some(resource) = row_resource(store, &Subject::from(subject.as_str())).await {
+            let emoji = emoji_of(&resource);
+            if !emoji.is_empty() {
+                row["emoji"] = json!(emoji);
+            }
+        }
+        out.push(row);
+    }
+    Ok(out)
 }
 
 /// One line of the activity feed.
@@ -1100,6 +1108,11 @@ mod tests {
         .await;
         assert_eq!(icons.len(), 1);
         assert_eq!(icons[&with], "🦊");
+
+        // The AI chats list carries it too.
+        let chats = list_ai_chats(&d.store, &d.recents, 50).await.unwrap();
+        assert_eq!(find(&chats, &with)["emoji"], "🦊");
+        assert!(find(&chats, &without).get("emoji").is_none());
     }
 
     /// Answers one profile for every agent.

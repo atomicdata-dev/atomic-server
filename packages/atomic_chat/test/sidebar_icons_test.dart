@@ -53,4 +53,34 @@ void main() {
     ]))));
     expect(find.byType(RowLeading), findsOneWidget);
   });
+
+  testWidgets(
+      'an AI chat row shows its emoji, the chat icon without one, '
+      'and nothing with icons off', (tester) async {
+    final chats = FakeApi(chatList: [
+      (subject: 'c1', name: 'Bakery site', lastActivity: 2, emoji: '🥐'),
+      (subject: 'c2', name: 'Plain chat', lastActivity: 1, emoji: null),
+    ]);
+    await tester
+        .pumpWidget(app(ChatsScreen(drive: 'did:ad:current', api: chats)));
+    await tester.pumpAndSettle();
+    Finder leadingOf(String title) => find.descendant(
+        of: find.widgetWithText(ListTile, title),
+        matching: find.byType(RowLeading));
+    expect(find.text('Bakery site'), findsOneWidget);
+    expect(
+        find.descendant(
+            of: leadingOf('Bakery site'), matching: find.text('🥐')),
+        findsOneWidget);
+    expect(leadingOf('Plain chat'), findsOneWidget);
+    expect(
+        find.descendant(
+            of: leadingOf('Plain chat'), matching: find.byType(Icon)),
+        findsOneWidget);
+
+    AppSidebarIcons.show.value = false;
+    await tester.pumpAndSettle();
+    expect(find.text('🥐'), findsNothing);
+    expect(leadingOf('Bakery site'), findsNothing);
+  });
 }

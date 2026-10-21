@@ -612,7 +612,7 @@ class _SearchScreenState extends State<SearchScreen> {
           subject: c.subject,
           title: c.name.isEmpty ? 'Untitled chat' : c.name,
           className: 'ai-chat',
-          emoji: null,
+          emoji: c.emoji,
           picture: null
         ));
       }

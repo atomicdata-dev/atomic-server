@@ -625,6 +625,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   Widget _chatRow(ChatSummary chat) => ResourceRow(
         subject: chat.subject,
         icon: iconForClass('ai-chat'),
+        emoji: chat.emoji,
         shape: RowShape.circle,
         title: chat.name.isEmpty ? 'Untitled chat' : chat.name,
         onTap: () => _openChat(chat),

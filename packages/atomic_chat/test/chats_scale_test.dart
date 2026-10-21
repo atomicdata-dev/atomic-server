@@ -15,8 +15,12 @@ class ThousandChatsApi extends UnimplementedApi {
   final List<String> plainSearches = [];
   int warmed = 0;
 
-  ChatSummary chat(int i) =>
-      (subject: 'did:ad:chat-$i', name: 'Chat $i', lastActivity: 1000 - i);
+  ChatSummary chat(int i) => (
+        subject: 'did:ad:chat-$i',
+        name: 'Chat $i',
+        lastActivity: 1000 - i,
+        emoji: null
+      );
 
   @override
   Future<List<ChatSummary>> chats() async => [
@@ -67,7 +71,8 @@ class ThousandChatsApi extends UnimplementedApi {
           className: 'Document',
           drive: 'did:ad:drive',
           score: 2.0,
-          emoji: null, picture: null
+          emoji: null,
+          picture: null
         ),
     ];
   }
@@ -83,7 +88,8 @@ class ThousandChatsApi extends UnimplementedApi {
         className: 'AiChat',
         drive: 'did:ad:drive',
         score: 0.1,
-        emoji: null, picture: null
+        emoji: null,
+        picture: null
       ),
     ];
   }

@@ -7,7 +7,13 @@ import 'chat_parts.dart';
 import 'chat_window.dart';
 
 /// An AI chat of the active drive; `lastActivity` is unix ms, 0 when empty.
-typedef ChatSummary = ({String subject, String name, int lastActivity});
+/// `emoji` is the chat's own (the web app picks one when it names the chat).
+typedef ChatSummary = ({
+  String subject,
+  String name,
+  int lastActivity,
+  String? emoji
+});
 
 /// One message of a chat: the text parts of an entry, `role` user or assistant.
 typedef ChatMessage = ({String id, String role, String text, int createdAt});
@@ -379,6 +385,7 @@ abstract final class AssistantJson {
             subject: e['subject'] as String,
             name: e['name'] as String? ?? '',
             lastActivity: (e['last_activity'] as num?)?.toInt() ?? 0,
+            emoji: e['emoji'] as String?,
           ),
       ];
 
