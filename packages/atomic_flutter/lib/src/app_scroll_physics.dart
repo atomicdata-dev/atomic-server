@@ -8,9 +8,17 @@ import 'package:flutter/services.dart' show HapticFeedback;
 /// embedded web views bounce the same way): firmer than
 /// [BouncingScrollPhysics] while dragging past an edge, and a quick,
 /// critically damped return with no wobble.
+///
+/// Only [frictionFactor] and [spring] differ from stock iOS; the fling
+/// (deceleration, velocities, drag threshold, momentum carry) is inherited
+/// unchanged, `ScrollDecelerationRate.normal`. The stock range-maintaining
+/// parent is kept so content growing above the viewport does not jump.
 class AppScrollPhysics extends BouncingScrollPhysics {
   const AppScrollPhysics({ScrollPhysics? parent})
-      : super(parent: parent ?? const AlwaysScrollableScrollPhysics());
+      : super(
+            parent: parent ??
+                const RangeMaintainingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics()));
 
   @override
   AppScrollPhysics applyTo(ScrollPhysics? ancestor) =>
@@ -83,6 +91,7 @@ class _OverscrollHapticState extends State<_OverscrollHaptic> {
   }
 
   @override
-  Widget build(BuildContext context) => NotificationListener<ScrollNotification>(
-      onNotification: _onScroll, child: widget.child);
+  Widget build(BuildContext context) =>
+      NotificationListener<ScrollNotification>(
+          onNotification: _onScroll, child: widget.child);
 }

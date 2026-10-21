@@ -22,9 +22,17 @@ Widget _shell(FakeApi api) => app(AppShell(
 
 Finder _heading(String name) => find.byKey(ValueKey('section-heading-$name'));
 
-/// The animated box around the favorites rows.
-Finder get _box =>
-    find.ancestor(of: find.text('Fav 0'), matching: find.byType(ClipRect));
+/// The animated box around the favorites rows: the clip while folding, the
+/// rows' own boundary at rest (no clip, fade or opacity layer then).
+Finder get _box {
+  final clip =
+      find.ancestor(of: find.text('Fav 0'), matching: find.byType(ClipRect));
+  if (clip.evaluate().isNotEmpty) return clip;
+  return find.ancestor(
+      of: find.text('Fav 0'),
+      matching: find.byWidgetPredicate(
+          (w) => w is RepaintBoundary && w.key is GlobalKey));
+}
 
 double _turns(WidgetTester tester) => tester
     .widget<RotationTransition>(find.descendant(
@@ -92,6 +100,24 @@ void main() {
     final full = tester.getSize(_box.first).height;
     expect(full, greaterThan(mid));
     expect(_turns(tester), 0);
+  });
+
+  testWidgets(
+      'an open section is not clipped or faded (no layer over its rows)',
+      (tester) async {
+    await boot(tester, {});
+    final section = find.ancestor(
+        of: find.text('Fav 0'),
+        matching: find.byWidgetPredicate(
+            (w) => w is RepaintBoundary && w.key is GlobalKey));
+    // Its direct parent is the section's builder, not a fade.
+    Widget? parent;
+    tester.element(section.first).visitAncestorElements((e) {
+      parent = e.widget;
+      return false;
+    });
+    expect(parent, isNot(isA<FadeTransition>()));
+    expect(parent, isNot(isA<Align>()));
   });
 
   testWidgets('reduced motion is instant', (tester) async {

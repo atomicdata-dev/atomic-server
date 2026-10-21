@@ -15,6 +15,33 @@ Widget _app(int items, ScrollController c) => MaterialApp(
     );
 
 void main() {
+  test('fling and drag feel are stock iOS; only overscroll differs', () {
+    const a = AppScrollPhysics();
+    const ios = BouncingScrollPhysics();
+    expect(a.decelerationRate, ScrollDecelerationRate.normal);
+    expect(a.minFlingVelocity, ios.minFlingVelocity);
+    expect(a.maxFlingVelocity, ios.maxFlingVelocity);
+    expect(a.dragStartDistanceMotionThreshold,
+        ios.dragStartDistanceMotionThreshold);
+    for (final v in [100.0, 800.0, 3000.0, 9000.0]) {
+      expect(a.carriedMomentum(v), ios.carriedMomentum(v));
+    }
+    final m = FixedScrollMetrics(
+        minScrollExtent: 0,
+        maxScrollExtent: 5000,
+        pixels: 1000,
+        viewportDimension: 800,
+        axisDirection: AxisDirection.down,
+        devicePixelRatio: 3);
+    for (final v in [1500.0, -900.0]) {
+      final x = a.createBallisticSimulation(m, v)!;
+      final y = ios.createBallisticSimulation(m, v)!;
+      for (final t in [0.1, 0.5, 1.0, 2.0]) {
+        expect(x.x(t), closeTo(y.x(t), 1e-6));
+      }
+    }
+  });
+
   test('friction is monotonic and milder than iOS', () {
     const a = AppScrollPhysics();
     const ios = BouncingScrollPhysics();

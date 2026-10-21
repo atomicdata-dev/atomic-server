@@ -10,6 +10,7 @@ import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_sidebar_icons.dart';
 import 'app_top_bar.dart';
+import 'background_activity.dart';
 import 'home_sections.dart';
 import 'home_sections_dialog.dart';
 
@@ -941,6 +942,11 @@ class _ChatsScreenState extends State<ChatsScreen> {
           backgroundColor: c.bgBody,
           appBar: AppTopBar(
             titleWidget: const AtomicWordmark(),
+            // What runs in the background; opens the Sync page.
+            actions: [
+              BackgroundActivityIndicator(
+                  onTap: _profile == null ? null : _settings),
+            ],
           ),
           // The app's mild rubber band, with no stretch or glow.
           body: ScrollConfiguration(
@@ -1236,19 +1242,28 @@ class _SectionState<T> extends State<_Section<T>>
           // Folded away: nothing is built, so the section costs its heading.
           builder: (context, _) => _open.isDismissed
               ? const SizedBox.shrink()
-              : ClipRect(
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    heightFactor: _shape.value,
-                    child: FadeTransition(
-                      opacity: _shape,
-                      child: RepaintBoundary(
-                        key: _bodyKey,
-                        child: _body(context, list, error),
+              // Fully open: the rows alone. The clip, the height factor and
+              // the fade only exist while folding, so a section at rest has
+              // no opacity layer (a repaint boundary with an alpha layer
+              // even at 1.0) over its rows while the list scrolls.
+              : _open.isCompleted
+                  ? RepaintBoundary(
+                      key: _bodyKey,
+                      child: _body(context, list, error),
+                    )
+                  : ClipRect(
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        heightFactor: _shape.value,
+                        child: FadeTransition(
+                          opacity: _shape,
+                          child: RepaintBoundary(
+                            key: _bodyKey,
+                            child: _body(context, list, error),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
         ),
       ],
     );
