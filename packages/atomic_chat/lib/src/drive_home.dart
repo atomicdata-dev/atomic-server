@@ -532,8 +532,9 @@ class DriveTreeState extends State<DriveTree> {
   /// in a page of its own as not expandable); a document has none.
   bool _canHaveChildren(DriveChild child) {
     final level = _levels[child.subject]?.data;
-    if (level != null)
+    if (level != null) {
       return level.children.isNotEmpty || _open.contains(child.subject);
+    }
     final key = child.className.split('/').last.toLowerCase();
     return key == 'folder' || key == 'drive' || key.isEmpty;
   }
