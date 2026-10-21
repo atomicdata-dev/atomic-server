@@ -5,7 +5,14 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'src/rust/frb_generated.dart';
 import 'package:atomic_chat/atomic_chat.dart'
-    show AppShell, AppSidebarIcons, AppThemeMode, ChatsScreen, ToastController, ToastHost, defaultAttachmentPicker;
+    show
+        AppShell,
+        AppSidebarIcons,
+        AppThemeMode,
+        ChatsScreen,
+        ToastController,
+        ToastHost,
+        defaultAttachmentPicker;
 import 'assistant/atomic_assistant_api.dart';
 import 'assistant/file_attachment_picker.dart';
 import 'bootstrap.dart';
@@ -15,7 +22,8 @@ import 'screens/pair_screen.dart';
 import 'screens/store_recovery_screen.dart';
 import 'screens/sync_screen.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:atomic_flutter/atomic_flutter.dart' show Perf;
+import 'package:atomic_flutter/atomic_flutter.dart'
+    show AppScrollBehavior, Perf;
 import 'theme.dart';
 import 'atomic/atomic_client.dart';
 import 'atomic/session.dart';
@@ -348,6 +356,7 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
       statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
     ));
     return MaterialApp(
+      scrollBehavior: const AppScrollBehavior(),
       navigatorKey: _navKey,
       builder: (context, child) =>
           ToastHost(controller: _toasts, child: child ?? const SizedBox()),
