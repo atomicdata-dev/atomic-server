@@ -223,8 +223,13 @@ void main() {
     final more = find.byTooltip('More');
     expect(more, findsOneWidget);
     final pane = tester.getRect(find.byType(ResourceView));
-    expect(tester.getRect(more).right, closeTo(pane.right, 8));
-    expect(tester.getRect(more).top, closeTo(pane.top, 8));
+    // As big as the web header it sits in, centred on its centre line.
+    final r = tester.getRect(more);
+    expect(r.width, lessThanOrEqualTo(kEmbedNavBarHeight));
+    expect(r.height, lessThanOrEqualTo(kEmbedNavBarHeight));
+    expect(r.center.dy, closeTo(pane.top + kEmbedNavBarHeight / 2, 0.5));
+    expect(r.right, closeTo(pane.right - kEmbedNavBarTrailingInset, 0.5));
+    expect(tester.getSize(find.byIcon(Icons.more_vert)).width, 20);
     await _done(tester);
   });
 

@@ -623,7 +623,7 @@ class _ResourceViewState extends State<ResourceView>
                         ShellScope.layoutOf(context) == ShellLayout.split)
                       Positioned(
                         top: 0,
-                        right: 0,
+                        right: kEmbedNavBarTrailingInset,
                         child: ListenableBuilder(
                           listenable: ShellScope.maybeOf(context)!,
                           builder: (context, _) {
@@ -634,6 +634,23 @@ class _ResourceViewState extends State<ResourceView>
                             return Builder(
                               key: const ValueKey('more'),
                               builder: (button) => IconButton(
+                                // As big as the web header it sits in
+                                // (36 dp), not the 48 dp default.
+                                iconSize: 20,
+                                padding: EdgeInsets.zero,
+                                visualDensity: VisualDensity.compact,
+                                color: c.textSecondary,
+                                constraints: const BoxConstraints(
+                                    minWidth: kEmbedNavBarHeight,
+                                    minHeight: kEmbedNavBarHeight),
+                                style: IconButton.styleFrom(
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  fixedSize: const Size.square(
+                                      kEmbedNavBarHeight),
+                                  minimumSize: const Size.square(
+                                      kEmbedNavBarHeight),
+                                ),
                                 tooltip: 'More',
                                 onPressed: () {
                                   final box =
@@ -661,6 +678,15 @@ class _ResourceViewState extends State<ResourceView>
   }
 }
 
+/// Height of the web page's header row (the embed's `HEADER_HEIGHT`), which
+/// the native "more" button on a tablet sits in and is centred on.
+const kEmbedNavBarHeight = 36.0;
+
+/// Gap between the native "more" button and the pane's right edge: with the
+/// button's 8 dp of inner space the icon sits 12 dp in, like the web header's
+/// own padding.
+const kEmbedNavBarTrailingInset = 4.0;
+
 /// What a resource page shows until its web view shows the resource: the
 /// page's background and its 36 px header row with the resource's title (as
 /// the row it was opened from called it), so the page is there at once and
@@ -670,7 +696,7 @@ class ResourceSkeleton extends StatelessWidget {
 
   const ResourceSkeleton({super.key, required this.title});
 
-  static const headerHeight = 36.0;
+  static const headerHeight = kEmbedNavBarHeight;
 
   @override
   Widget build(BuildContext context) {
