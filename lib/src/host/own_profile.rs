@@ -129,6 +129,7 @@ pub async fn fetch_file_bytes(store: &Db, file: &str, origins: &[String]) -> Ato
     if let Some(bytes) = file_bytes(store, file).await? {
         return Ok(bytes);
     }
+    let _busy = super::activity_status::begin(super::activity_status::Kind::Pictures);
     let (hash, download_url, mimetype) = file_facts(store, file, origins).await?;
     let agent = store.get_default_agent().ok();
 

@@ -10,6 +10,8 @@
 //! here so every host shares one copy and one set of tests. A host binds it to
 //! its own process state (a global store, an FFI or IPC layer) and stays thin.
 //!
+//! - [`activity_status`]: what runs in the background now (a count by kind
+//!   for a small "busy" mark in the UI).
 //! - [`rows`]: one resource as a list row (title, class name, emoji), read
 //!   from local propvals only.
 //! - [`lists`]: the home lists (AI chats, favorites, recently opened, activity),
@@ -42,6 +44,7 @@
 //!
 //! Native only: hosts run a tokio runtime; the browser has its own store.
 
+pub mod activity_status;
 pub mod chat_rooms;
 pub mod chats;
 pub mod context;

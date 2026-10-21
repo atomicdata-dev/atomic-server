@@ -229,6 +229,9 @@ pub(crate) fn follow_conversations_in_background() {
         return;
     }
     tokio::spawn(async {
+        let _busy = atomic_lib::host::activity_status::begin(
+            atomic_lib::host::activity_status::Kind::Drives,
+        );
         let followed = follow_conversations().await;
         tracing::info!("[conversations] followed {followed}");
         CONVERSATIONS_FOLLOWING.store(false, Ordering::SeqCst);

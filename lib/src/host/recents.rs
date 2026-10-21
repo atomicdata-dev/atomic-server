@@ -560,6 +560,7 @@ impl RecentsIndex {
         if self.with(|s| s.recents.activity_scanned) {
             return;
         }
+        let _busy = super::activity_status::begin(super::activity_status::Kind::Scan);
         let known: std::collections::HashSet<String> = self.with(|s| {
             s.recents
                 .activity

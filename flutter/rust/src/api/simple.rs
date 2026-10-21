@@ -17,6 +17,7 @@ pub mod ws_sync;
 pub use atomic_lib::{Commit, Db};
 
 use state::{db, err, node, set_db};
+use atomic_lib::host::activity_status::{self, begin as busy, Kind};
 pub use types::{AgentInfo, SetupResult, StoreRecovery, VersionMetadata};
 
 /// Save resource locally, record it in the durable outbox, and drain the
@@ -190,6 +191,31 @@ pub async fn open_db(path: String) -> Result<(), String> {
 #[frb(sync)]
 pub fn store_recovery() -> Option<StoreRecovery> {
     state::store_recovery()
+}
+
+/// What the host does in the background right now (sync runs, following and
+/// catching up on drives, picture downloads, activity lookups and scans,
+/// uploads), for a small "busy" mark. Cheap; poll it.
+pub struct BackgroundActivity {
+    pub total: u32,
+    /// Running tasks by kind: `sync`, `drives`, `pictures`, `history`, `scan`,
+    /// `upload`.
+    pub by_kind: std::collections::HashMap<String, u32>,
+    /// The last background failure, cleared by the next success.
+    pub last_error: Option<String>,
+    /// Unix ms of the last success.
+    pub last_ok_ms: Option<i64>,
+}
+
+#[frb(sync)]
+pub fn background_activity() -> BackgroundActivity {
+    let s = atomic_lib::host::activity_status::snapshot();
+    BackgroundActivity {
+        total: s.total,
+        by_kind: s.by_kind.into_iter().collect(),
+        last_error: s.last_error,
+        last_ok_ms: s.last_ok_ms,
+    }
 }
 
 /// Make every write so far durable now. The app calls it when it goes to
@@ -505,6 +531,7 @@ pub async fn upload_agent_picture(
         .get_active_drive()
         .ok_or("No workspace to keep the picture in")?;
     let origin = state::connected_server();
+    let _busy = busy(Kind::Upload);
     atomic_lib::host::own_profile::upload_own_picture(
         &node()?,
         crate::host::pusher().as_ref(),
@@ -765,8 +792,16 @@ pub async fn resume_app_session(
 
     let origin = server_url.trim();
     if !origin.is_empty() && !is_unreachable_hub_url(origin) {
-        if let Err(e) = ws_sync::open_ws_sync(origin).await {
-            tracing::warn!("[resume] WS sync failed: {e}");
+        // Bounded: a server that does not answer (offline, a captive portal)
+        // held sign-in and every cold start until the OS gave up on the TCP
+        // connect, a minute or more, on a spinner.
+        match tokio::time::timeout(RESUME_WS_TIMEOUT, ws_sync::open_ws_sync(origin)).await {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => tracing::warn!("[resume] WS sync failed: {e}"),
+            Err(_) => tracing::warn!(
+                "[resume] WS sync to {origin} gave no answer in {}s; going on without it",
+                RESUME_WS_TIMEOUT.as_secs()
+            ),
         }
     } else if !origin.is_empty() {
         tracing::info!(
@@ -810,6 +845,10 @@ async fn drive_resource_exists(store: &atomic_lib::Db) -> bool {
     store.get_resource(&subject).await.is_ok()
 }
 
+/// How long a cold start or sign-in waits for the session's server.
+const RESUME_WS_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+/// Connecting to a verified home server: the WS handshake, auth and the drive.
+const HOME_SERVER_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
 const PEER_SYNC_ATTEMPT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(22);
 const PKARR_RESOLVE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(12);
 /// How many of the NodeIDs a drive's pkarr record names are dialled at once.
@@ -856,6 +895,7 @@ pub struct SyncConnectivityReport {
 /// Start Iroh, sync known peers (then pkarr). Returns JSON [`SyncConnectivityReport`].
 pub async fn sync_connectivity_now() -> Result<String, String> {
     let store = db()?;
+    let _busy = busy(Kind::Sync);
     let report = tokio::time::timeout(
         std::time::Duration::from_secs(50),
         sync_connectivity_inner(store.as_ref()),
@@ -863,7 +903,14 @@ pub async fn sync_connectivity_now() -> Result<String, String> {
     .await
     .map_err(|_| {
         "Sync timed out. Check Wi‑Fi, keep the other device open, or pair with QR.".to_string()
-    })??;
+    })
+    .and_then(|r| r)
+    .inspect_err(|e| activity_status::record_error(e.clone()))?;
+    if report.live_peers > 0 || report.imported > 0 {
+        activity_status::record_ok();
+    } else if !report.message.starts_with("No other device found yet") {
+        activity_status::record_error(report.message.lines().next().unwrap_or("Sync failed"));
+    }
     serde_json::to_string(&report).map_err(|e| e.to_string())
 }
 
@@ -871,127 +918,53 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
     ensure_sync_connectivity(store).await?;
     let drive = store.get_active_drive().ok_or("No active drive")?;
 
+    // Known (paired) peers and the pkarr lookup run at the same time, and
+    // the known peers are dialled at once: one after the other, a few gone
+    // devices at 22 s each held the "Looking for your devices" screen for
+    // minutes.
+    let peers_json = get_known_peers();
+    let peers: Vec<serde_json::Value> = serde_json::from_str(&peers_json).unwrap_or_default();
+    let known_ids: Vec<String> = peers
+        .iter()
+        .filter_map(|p| p.get("node_id").and_then(|v| v.as_str()))
+        .filter(|id| !id.is_empty())
+        .map(str::to_string)
+        .collect();
+    let drive_ref = drive.as_str();
+    let known = dial_all(&known_ids, PEER_SYNC_ATTEMPT_TIMEOUT, |node_id| async move {
+        atomic_lib::sync::peer::sync_drive_with_peer_if_needed(&node_id, drive_ref, store)
+            .await
+            .map_err(|e| e.to_string())
+    });
+    let (known, announced) = tokio::join!(known, pkarr_peers(store, drive_ref));
+
     let mut imported: i32 = 0;
     let mut errors: Vec<String> = Vec::new();
     let mut peers_failed = false;
     let mut lookup_failed = false;
-
-    // Known peers first (fast path after QR pairing)
-    let peers_json = get_known_peers();
-    let peers: Vec<serde_json::Value> = serde_json::from_str(&peers_json).unwrap_or_default();
-    for peer in &peers {
-        let Some(node_id) = peer.get("node_id").and_then(|v| v.as_str()) else {
-            continue;
-        };
-        if node_id.is_empty() {
-            continue;
-        }
-        match tokio::time::timeout(
-            PEER_SYNC_ATTEMPT_TIMEOUT,
-            atomic_lib::sync::peer::sync_drive_with_peer_if_needed(node_id, &drive, store),
-        )
-        .await
-        {
-            Ok(Ok(count)) => {
+    for (node_id, result) in known {
+        match result {
+            Ok(count) => {
                 imported += count as i32;
-                tracing::info!("[sync_now] peer {}: {count} resources", node_id);
+                tracing::info!("[sync_now] peer {node_id}: {count} resources");
             }
-            Ok(Err(e)) => {
-                tracing::warn!("[sync_now] peer {} failed: {e}", node_id);
+            Err(e) => {
+                tracing::warn!("[sync_now] peer {node_id} failed: {e}");
                 peers_failed = true;
-                errors.push(format!("{}: {e}", &node_id[..node_id.len().min(12)]));
-            }
-            Err(_) => {
-                peers_failed = true;
-                errors.push(format!(
-                    "{}: timed out after {}s",
-                    &node_id[..node_id.len().min(12)],
-                    PEER_SYNC_ATTEMPT_TIMEOUT.as_secs()
-                ));
+                errors.push(format!("{}: {e}", short_id(&node_id)));
             }
         }
     }
-
-    // pkarr discover, also when some peer is live already: a live server
-    // used to stop this lookup, and then the account's other devices were
-    // never dialled. The record also names replicas that are gone (an
-    // uninstalled app, an old laptop), so several are dialled at once and
-    // the first that answers wins; live ones are skipped
-    // (`sync_drive_with_peer_if_needed`). The search loop keeps looking
-    // after this; wake it, too.
-    peer_search::PEER_SEARCH.search_again();
-    {
-        match tokio::time::timeout(PKARR_RESOLVE_TIMEOUT, async {
-            let my_node_id = atomic_lib::sync::peer::get_node_id()
-                .ok_or("Peer not started")?
-                .to_string();
-            // Only other devices: a drive on this device alone names none,
-            // which is nothing to report (it toasted "No peer on network:
-            // Found 1 NodeID(s) but all are ours (…)" on every start).
-            let mut others = Vec::new();
-            for search in peer_search::search_drives(store) {
-                for id in
-                    atomic_lib::discovery::resolve_other_node_ids(&search, Some(&my_node_id))
-                        .await?
-                {
-                    if !others.contains(&id) {
-                        others.push(id);
-                    }
-                }
-            }
-            Ok::<_, atomic_lib::AtomicError>(others)
-        })
-        .await
-        {
-            Ok(Ok(node_ids)) if node_ids.is_empty() => {}
-            Ok(Ok(node_ids)) => {
-                let tried = node_ids.len().min(PKARR_PEERS_TO_TRY);
-                let drive = drive.as_str();
-                let attempts = node_ids.iter().take(PKARR_PEERS_TO_TRY).map(|node_id| {
-                    Box::pin(async move {
-                        tokio::time::timeout(
-                            PEER_SYNC_ATTEMPT_TIMEOUT,
-                            atomic_lib::sync::peer::sync_drive_with_peer_if_needed(
-                                node_id, drive, store,
-                            ),
-                        )
-                        .await
-                        .map_err(|_| format!("{}: timed out", short_id(node_id)))?
-                        .map_err(|e| format!("{}: {e}", short_id(node_id)))
-                    })
-                });
-                // The first that answers wins; the failures before it are only
-                // kept when none does.
-                let mut pending: futures::stream::FuturesUnordered<_> = attempts.collect();
-                let mut failures: Vec<String> = Vec::new();
-                let mut won = false;
-                while let Some(result) = futures::StreamExt::next(&mut pending).await {
-                    match result {
-                        Ok(count) => {
-                            imported += count as i32;
-                            won = true;
-                            break;
-                        }
-                        Err(e) => failures.push(e),
-                    }
-                }
-                if !won {
-                    peers_failed = true;
-                    errors.push(format!(
-                        "{tried} device{} announced your drive; none answered",
-                        if tried == 1 { "" } else { "s" }
-                    ));
-                    errors.extend(failures);
-                }
-            }
-            Ok(Err(e)) => {
-                lookup_failed = true;
-                errors.push(format!("Could not look for devices: {e}"));
-            }
-            Err(_) => {
-                lookup_failed = true;
-                errors.push("Could not look for devices: the directory (pkarr) timed out".into());
-            }
+    match announced {
+        PkarrOutcome::NoneAnnounced => {}
+        PkarrOutcome::Synced(count) => imported += count as i32,
+        PkarrOutcome::NoneAnswered(lines) => {
+            peers_failed = true;
+            errors.extend(lines);
+        }
+        PkarrOutcome::LookupFailed(line) => {
+            lookup_failed = true;
+            errors.push(line);
         }
     }
 
@@ -1054,6 +1027,107 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
     })
 }
 
+/// Dials every node at once, each bounded by `per_attempt`, and returns each
+/// one's result (a timeout as `Err("timed out after Ns")`), in input order.
+async fn dial_all<F, Fut, T>(
+    node_ids: &[String],
+    per_attempt: std::time::Duration,
+    dial: F,
+) -> Vec<(String, Result<T, String>)>
+where
+    F: Fn(String) -> Fut,
+    Fut: std::future::Future<Output = Result<T, String>>,
+{
+    let attempts = node_ids.iter().map(|id| {
+        let attempt = dial(id.clone());
+        async move {
+            let result = tokio::time::timeout(per_attempt, attempt)
+                .await
+                .unwrap_or_else(|_| {
+                    Err(format!("timed out after {}s", per_attempt.as_secs()))
+                });
+            (id.clone(), result)
+        }
+    });
+    futures::future::join_all(attempts).await
+}
+
+/// What the drive's pkarr record led to.
+enum PkarrOutcome {
+    /// The lookup worked and named no other device: nothing to report.
+    NoneAnnounced,
+    Synced(u64),
+    /// Devices were named and none answered: the lines for "Details".
+    NoneAnswered(Vec<String>),
+    LookupFailed(String),
+}
+
+/// Looks the drive up in pkarr and dials up to [`PKARR_PEERS_TO_TRY`] of the
+/// devices it names at once; the first that answers wins. The record also
+/// names replicas that are gone (an uninstalled app, an old laptop), and live
+/// ones are skipped (`sync_drive_with_peer_if_needed`). The search loop keeps
+/// looking after this; it is woken, too.
+async fn pkarr_peers(store: &atomic_lib::Db, drive: &str) -> PkarrOutcome {
+    peer_search::PEER_SEARCH.search_again();
+    let lookup = tokio::time::timeout(PKARR_RESOLVE_TIMEOUT, async {
+        let my_node_id = atomic_lib::sync::peer::get_node_id()
+            .ok_or("Peer not started")?
+            .to_string();
+        // Only other devices: a drive on this device alone names none,
+        // which is nothing to report.
+        let mut others = Vec::new();
+        for search in peer_search::search_drives(store) {
+            for id in
+                atomic_lib::discovery::resolve_other_node_ids(&search, Some(&my_node_id)).await?
+            {
+                if !others.contains(&id) {
+                    others.push(id);
+                }
+            }
+        }
+        Ok::<_, atomic_lib::AtomicError>(others)
+    })
+    .await;
+    let node_ids = match lookup {
+        Ok(Ok(ids)) if ids.is_empty() => return PkarrOutcome::NoneAnnounced,
+        Ok(Ok(ids)) => ids,
+        Ok(Err(e)) => return PkarrOutcome::LookupFailed(format!("Could not look for devices: {e}")),
+        Err(_) => {
+            return PkarrOutcome::LookupFailed(
+                "Could not look for devices: the directory (pkarr) timed out".into(),
+            )
+        }
+    };
+    let tried = node_ids.len().min(PKARR_PEERS_TO_TRY);
+    let attempts = node_ids.iter().take(PKARR_PEERS_TO_TRY).map(|node_id| {
+        Box::pin(async move {
+            tokio::time::timeout(
+                PEER_SYNC_ATTEMPT_TIMEOUT,
+                atomic_lib::sync::peer::sync_drive_with_peer_if_needed(node_id, drive, store),
+            )
+            .await
+            .map_err(|_| format!("{}: timed out", short_id(node_id)))?
+            .map_err(|e| format!("{}: {e}", short_id(node_id)))
+        })
+    });
+    // The first that answers wins; the failures before it are only kept when
+    // none does.
+    let mut pending: futures::stream::FuturesUnordered<_> = attempts.collect();
+    let mut failures: Vec<String> = Vec::new();
+    while let Some(result) = futures::StreamExt::next(&mut pending).await {
+        match result {
+            Ok(count) => return PkarrOutcome::Synced(count as u64),
+            Err(e) => failures.push(e),
+        }
+    }
+    let mut lines = vec![format!(
+        "{tried} device{} announced your drive; none answered",
+        if tried == 1 { "" } else { "s" }
+    )];
+    lines.extend(failures);
+    PkarrOutcome::NoneAnswered(lines)
+}
+
 /// The https origins the drive's pkarr record names. The record is public and
 /// anyone may add to it, so none of them is trusted yet: the host fetches each
 /// one's `/genesis` and asks [`genesis_answer_verifies`]. (The fetch is the
@@ -1087,7 +1161,14 @@ pub fn genesis_answer_verifies(body: String, drive: String) -> bool {
 /// personal drive lists. Call it only for an origin whose genesis verified.
 pub async fn connect_home_server(origin: String) -> Result<(), String> {
     let store = db()?;
-    ws_sync::open_ws_sync(&origin).await?;
+    tokio::time::timeout(HOME_SERVER_CONNECT_TIMEOUT, ws_sync::open_ws_sync(&origin))
+        .await
+        .map_err(|_| {
+            format!(
+                "{origin} did not answer in {}s",
+                HOME_SERVER_CONNECT_TIMEOUT.as_secs()
+            )
+        })??;
     let Some(drive) = store.get_active_drive() else {
         return Err("No active drive".into());
     };
@@ -1126,6 +1207,7 @@ async fn follow_listed_drives(home: String) {
     if OTHER_DRIVES_RUNNING.swap(true, Ordering::SeqCst) {
         return;
     }
+    let _busy = busy(Kind::Drives);
     let Ok(store) = db() else {
         OTHER_DRIVES_RUNNING.store(false, Ordering::SeqCst);
         return;

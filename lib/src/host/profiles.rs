@@ -167,6 +167,7 @@ impl AgentProfiles {
                 return None;
             }
         }
+        let _busy = super::activity_status::begin(super::activity_status::Kind::History);
         let found = tokio::time::timeout(
             self.0.timeout,
             self.0.fetcher.fetch_history_attribution(subject),

@@ -26,6 +26,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   });
 
   @protected
+  Map<String, int> dco_decode_Map_String_u_32_None(dynamic raw);
+
+  @protected
   String dco_decode_String(dynamic raw);
 
   @protected
@@ -33,6 +36,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   AgentInfo dco_decode_agent_info(dynamic raw);
+
+  @protected
+  BackgroundActivity dco_decode_background_activity(dynamic raw);
 
   @protected
   bool dco_decode_bool(dynamic raw);
@@ -65,6 +71,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<(String, int)> dco_decode_list_record_string_u_32(dynamic raw);
+
+  @protected
   List<VersionMetadata> dco_decode_list_version_metadata(dynamic raw);
 
   @protected
@@ -81,6 +90,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List? dco_decode_opt_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  (String, int) dco_decode_record_string_u_32(dynamic raw);
 
   @protected
   SetupResult dco_decode_setup_result(dynamic raw);
@@ -104,6 +116,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   VersionMetadata dco_decode_version_metadata(dynamic raw);
 
   @protected
+  Map<String, int> sse_decode_Map_String_u_32_None(
+      SseDeserializer deserializer);
+
+  @protected
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
@@ -111,6 +127,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   AgentInfo sse_decode_agent_info(SseDeserializer deserializer);
+
+  @protected
+  BackgroundActivity sse_decode_background_activity(
+      SseDeserializer deserializer);
 
   @protected
   bool sse_decode_bool(SseDeserializer deserializer);
@@ -147,6 +167,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<(String, int)> sse_decode_list_record_string_u_32(
+      SseDeserializer deserializer);
+
+  @protected
   List<VersionMetadata> sse_decode_list_version_metadata(
     SseDeserializer deserializer,
   );
@@ -171,6 +195,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List? sse_decode_opt_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  (String, int) sse_decode_record_string_u_32(SseDeserializer deserializer);
+
+  @protected
   SetupResult sse_decode_setup_result(SseDeserializer deserializer);
 
   @protected
@@ -192,6 +219,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   VersionMetadata sse_decode_version_metadata(SseDeserializer deserializer);
 
   @protected
+  void sse_encode_Map_String_u_32_None(
+      Map<String, int> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
@@ -199,6 +230,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_agent_info(AgentInfo self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_background_activity(
+      BackgroundActivity self, SseSerializer serializer);
 
   @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
@@ -246,6 +281,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_record_string_u_32(
+      List<(String, int)> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_version_metadata(
     List<VersionMetadata> self,
     SseSerializer serializer,
@@ -277,6 +316,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     Uint8List? self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_record_string_u_32(
+      (String, int) self, SseSerializer serializer);
 
   @protected
   void sse_encode_setup_result(SetupResult self, SseSerializer serializer);
