@@ -193,8 +193,16 @@ impl WsClient {
             )),
         )
         .await;
+        // `connect_async` builds its TLS config from the process default
+        // provider, and rustls won't pick one itself when both ring and
+        // aws-lc-rs are compiled in: it panics. The server installs ring at
+        // boot; an embedding app (Flutter on macOS and iOS) may not have. An
+        // error only means a provider is already installed.
         #[cfg(not(target_os = "android"))]
-        let connected = connect_async(url).await;
+        let connected = {
+            let _ = rustls::crypto::ring::default_provider().install_default();
+            connect_async(url).await
+        };
         let (ws_stream, _response) =
             connected.map_err(|e| format!("WebSocket connection failed to {}: {}", url, e))?;
 
