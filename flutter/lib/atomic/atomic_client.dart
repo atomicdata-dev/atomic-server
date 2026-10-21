@@ -86,9 +86,25 @@ class AtomicClient {
   static Future<Uint8List?> readFileBytes(String file) =>
       ffi.readFileBytes(file: file);
 
+  /// The bytes of a File resource: from this device, else downloaded from the
+  /// connected server (signed, checked against the blob's hash, an image of at
+  /// most 16 MB) and kept. Throws with the reason (HTTP status included).
+  static Future<Uint8List> fetchFileBytes(String file) =>
+      ffi.fetchFileBytes(file: file);
+
   /// Save the active agent's name and description (a commit by the agent).
-  static Future<void> setAgentProfile(String name, String description) =>
-      ffi.setAgentProfile(name: name, description: description);
+  /// [icon] is the subject of the picture's File (empty removes the picture,
+  /// null leaves it).
+  static Future<void> setAgentProfile(String name, String description,
+          {String? icon}) =>
+      ffi.setAgentProfile(name: name, description: description, icon: icon);
+
+  /// Keeps a picked picture as a File in the active workspace; returns the
+  /// File's subject (for [setAgentProfile]'s `icon`).
+  static Future<String> uploadAgentPicture(
+          String filename, String mimetype, Uint8List bytes) =>
+      ffi.uploadAgentPicture(
+          filename: filename, mimetype: mimetype, bytes: bytes);
 
   static AgentInfo createAgent(String name) => ffi.createAgent(name: name);
 

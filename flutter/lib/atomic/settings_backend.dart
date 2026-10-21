@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
 import 'atomic_client.dart';
 import 'own_profile.dart';
+import 'profile_picture_picker.dart';
 import 'atomic_auth.dart';
 import 'server_info.dart';
 import 'session.dart';
@@ -33,9 +34,26 @@ class AppSettingsBackend extends shared.AtomicSettingsBackend {
   }
 
   @override
-  Future<void> Function({required String name, required String description})
-      get saveProfile => ({required name, required description}) =>
-          AtomicClient.setAgentProfile(name, description);
+  Future<void> Function(
+      {required String name,
+      required String description,
+      shared.ProfilePicture? picture,
+      bool? removePicture}) get saveProfile => (
+          {required name,
+          required description,
+          shared.ProfilePicture? picture,
+          bool? removePicture}) async {
+        // The picture first: the File must exist before the profile names it.
+        final icon = picture != null
+            ? await AtomicClient.uploadAgentPicture(
+                picture.name, picture.mimeType, picture.bytes)
+            : (removePicture == true ? '' : null);
+        await AtomicClient.setAgentProfile(name, description, icon: icon);
+      };
+
+  @override
+  Future<shared.ProfilePicture?> Function() get pickProfilePicture =>
+      pickProfileImage;
 
   @override
   Future<String> exportSecret() async {

@@ -290,7 +290,8 @@ class _SyncScreenState extends State<SyncScreen> {
     final save = _backend.saveProfile;
     if (save != null && widget.profilePage == null) {
       await Navigator.of(context).push(MaterialPageRoute<void>(
-        builder: (_) => EditProfileScreen(agent: agent, save: save),
+        builder: (_) => EditProfileScreen(
+            agent: agent, save: save, pickPicture: _backend.pickProfilePicture),
       ));
     } else {
       if (drive == null) return;
@@ -626,6 +627,12 @@ class _SyncScreenState extends State<SyncScreen> {
             spacing: shared.SyncGap.s,
             runSpacing: shared.SyncGap.s,
             children: [
+              if (agent != null)
+                shared.SyncActionButton(
+                  icon: Icons.edit_outlined,
+                  label: 'Edit profile',
+                  onPressed: _openProfile,
+                ),
               shared.SyncActionButton(
                 icon: Icons.key,
                 label: 'Copy secret key',

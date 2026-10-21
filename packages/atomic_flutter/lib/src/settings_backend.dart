@@ -28,6 +28,15 @@ class AtomicIdentity {
   final String? emoji;
 }
 
+/// A picture the person picked for their profile.
+class ProfilePicture {
+  const ProfilePicture(
+      {required this.name, required this.mimeType, required this.bytes});
+  final String name;
+  final String mimeType;
+  final Uint8List bytes;
+}
+
 /// Host-owned persistence, authentication and transport for the settings UI.
 /// Implementations must throw on failure; widgets only update after success.
 /// No database, native bridge, global singleton or audio thread is owned here.
@@ -60,8 +69,18 @@ abstract class AtomicSettingsBackend {
 
   /// Saves the agent's own profile (a commit by the agent, synced like any
   /// edit). Without it the profile is only shown, not edited natively.
-  Future<void> Function({required String name, required String description})?
-      get saveProfile => null;
+  ///
+  /// [picture] replaces the profile picture; [removePicture] takes it away.
+  /// With neither the picture stays as it is.
+  Future<void> Function(
+      {required String name,
+      required String description,
+      ProfilePicture? picture,
+      bool? removePicture})? get saveProfile => null;
+
+  /// Lets the person pick a picture (null when they cancel). Without it the
+  /// profile editor does not offer to change the picture.
+  Future<ProfilePicture?> Function()? get pickProfilePicture => null;
 
   /// What the search for this account's other devices is doing, or null when
   /// the host does not search (then nothing is shown).

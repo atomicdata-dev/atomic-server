@@ -4,17 +4,26 @@ import 'package:flutter/material.dart';
 
 import '../theme.dart';
 
-/// Edits the person's own profile: their name and description, saved as a
-/// commit by their agent (synced like any other edit). The picture is shown,
-/// not changed here: the app has no photo picker yet.
+/// Edits the person's own profile: picture, name and description, saved as a
+/// commit by their agent (synced like any other edit). The picture can be
+/// changed or removed when the host can pick one ([pickPicture]); without it
+/// the picture is only shown.
 ///
-/// Pops with true when saved.
+/// Pops with true when saved, with false (or nothing) on Cancel.
 class EditProfileScreen extends StatefulWidget {
   final shared.AtomicIdentity agent;
   final Future<void> Function(
-      {required String name, required String description}) save;
+      {required String name,
+      required String description,
+      shared.ProfilePicture? picture,
+      bool? removePicture}) save;
 
-  const EditProfileScreen({super.key, required this.agent, required this.save});
+  /// Lets the person pick a picture; null when they cancel. Null here: the
+  /// picture cannot be changed.
+  final Future<shared.ProfilePicture?> Function()? pickPicture;
+
+  const EditProfileScreen(
+      {super.key, required this.agent, required this.save, this.pickPicture});
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -26,6 +35,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       TextEditingController(text: widget.agent.description ?? '');
   bool _saving = false;
   String? _error;
+
+  /// The picture picked now (not saved yet), or the existing one taken away.
+  shared.ProfilePicture? _picked;
+  bool _removed = false;
+
+  bool get _hasPicture =>
+      _picked != null ||
+      (!_removed &&
+          (widget.agent.imageBytes != null || widget.agent.imageUrl != null));
+
+  Future<void> _pick() async {
+    final pick = widget.pickPicture;
+    if (pick == null || _saving) return;
+    try {
+      final picture = await pick();
+      if (picture == null || !mounted) return;
+      setState(() {
+        _picked = picture;
+        _removed = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = '$e'.replaceFirst('Bad state: ', ''));
+      }
+    }
+  }
+
+  void _remove() => setState(() {
+        _picked = null;
+        _removed = true;
+      });
 
   @override
   void initState() {
@@ -48,7 +89,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _error = null;
     });
     try {
-      await widget.save(name: name, description: _description.text.trim());
+      await widget.save(
+          name: name,
+          description: _description.text.trim(),
+          picture: _picked,
+          removePicture: _removed ? true : null);
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {
       if (mounted) {
@@ -82,14 +127,43 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         children: [
           Center(
             child: ProfileAvatar(
+              key: ValueKey(_picked ?? _removed),
               name: _name.text,
-              imageUrl: widget.agent.imageUrl,
-              imageBytes: widget.agent.imageBytes,
+              imageUrl:
+                  _picked != null || _removed ? null : widget.agent.imageUrl,
+              imageBytes: _picked != null
+                  ? _picked!.bytes
+                  : (_removed ? null : widget.agent.imageBytes),
               emoji: widget.agent.emoji,
               radius: 44,
             ),
           ),
-          const SizedBox(height: 24),
+          if (widget.pickPicture != null) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              children: [
+                TextButton.icon(
+                  key: const Key('profile-change-photo'),
+                  style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                  onPressed: _saving ? null : _pick,
+                  icon: const Icon(Icons.photo_outlined, size: 20),
+                  label: Text(_hasPicture ? 'Change photo' : 'Add photo'),
+                ),
+                if (_hasPicture)
+                  TextButton.icon(
+                    key: const Key('profile-remove-photo'),
+                    style:
+                        TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                    onPressed: _saving ? null : _remove,
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    label: const Text('Remove photo'),
+                  ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 16),
           TextField(
             key: const Key('profile-name'),
             controller: _name,
@@ -114,6 +188,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 12),
             Text(_error!, style: TextStyle(color: c.alert)),
           ],
+          const SizedBox(height: 16),
+          OutlinedButton(
+            key: const Key('profile-cancel'),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+            onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
           const SizedBox(height: 16),
           Text(
             'Others see this name and description wherever you show up: '

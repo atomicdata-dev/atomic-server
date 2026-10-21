@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
 import 'package:atomic_flutter/atomic_flutter.dart' show SyncCard;
@@ -11,6 +12,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// A 1x1 PNG.
+final _png = base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
 
 class _Servers extends shared.AtomicServerBackend {
   final bool managed;
@@ -51,6 +56,7 @@ class _Backend extends shared.AtomicSettingsBackend {
   String name = 'Joep';
   String description = '';
   String? emoji;
+  Uint8List? bytes;
 
   /// What the device card asks for; null leaves the card without it.
   Future<shared.StoreStats?> Function()? stats;
@@ -72,13 +78,35 @@ class _Backend extends shared.AtomicSettingsBackend {
           subject: 'did:ad:agent',
           name: name,
           description: description,
-          emoji: emoji);
+          emoji: emoji,
+          imageBytes: bytes);
+  shared.ProfilePicture? savedPicture;
+  bool? removedPicture;
+  shared.ProfilePicture? toPick;
+  int picks = 0;
+  int saves = 0;
   @override
-  Future<void> Function({required String name, required String description})?
+  Future<void> Function(
+          {required String name, required String description, shared.ProfilePicture? picture, bool? removePicture})?
       get saveProfile => editable
-          ? ({required name, required description}) async {
+          ? (
+              {required name,
+              required description,
+              picture,
+              removePicture}) async {
+              saves++;
               this.name = name;
               this.description = description;
+              savedPicture = picture;
+              removedPicture = removePicture;
+            }
+          : null;
+  @override
+  Future<shared.ProfilePicture?> Function()? get pickProfilePicture =>
+      editable && toPick != null
+          ? () async {
+              picks++;
+              return toPick;
             }
           : null;
   @override
@@ -209,6 +237,87 @@ void main() {
     expect(find.text('Profile'), findsNothing);
     expect(find.text('Pelican'), findsOneWidget);
     expect(find.text('P'), findsOneWidget);
+  });
+
+  testWidgets('Edit profile is a labelled button on the identity block',
+      (tester) async {
+    final backend = _Backend(editable: true);
+    await tester.pumpWidget(_app(SyncScreen(
+      backend: backend,
+      loadAccount: (_) async => null,
+    )));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(find.byType(OutlinedButton).first).height,
+        greaterThanOrEqualTo(48));
+    await tester.tap(find.text('Edit profile'));
+    await tester.pumpAndSettle();
+    // The fields are prefilled.
+    expect(find.widgetWithText(TextField, 'Joep'), findsOneWidget);
+    // No picker on this host: the picture is not offered.
+    expect(find.byKey(const Key('profile-change-photo')), findsNothing);
+  });
+
+  testWidgets('Cancel leaves the profile as it was', (tester) async {
+    final backend = _Backend(editable: true);
+    await tester.pumpWidget(_app(SyncScreen(
+      backend: backend,
+      loadAccount: (_) async => null,
+    )));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit profile'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('profile-name')), 'Pelican');
+    await tester.ensureVisible(find.byKey(const Key('profile-cancel')));
+    await tester.tap(find.byKey(const Key('profile-cancel')));
+    await tester.pumpAndSettle();
+    expect(backend.saves, 0);
+    expect(backend.name, 'Joep');
+    expect(find.text('Joep'), findsOneWidget);
+  });
+
+  testWidgets('a picked picture is previewed and saved with the profile',
+      (tester) async {
+    final backend = _Backend(editable: true)
+      ..toPick = shared.ProfilePicture(
+          name: 'me.png', mimeType: 'image/png', bytes: _png);
+    await tester.pumpWidget(_app(SyncScreen(
+      backend: backend,
+      loadAccount: (_) async => null,
+    )));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit profile'));
+    await tester.pumpAndSettle();
+    expect(find.text('Add photo'), findsOneWidget);
+    expect(find.byKey(const Key('profile-remove-photo')), findsNothing);
+    await tester.tap(find.byKey(const Key('profile-change-photo')));
+    await tester.pumpAndSettle();
+    expect(backend.picks, 1);
+    expect(find.text('Change photo'), findsOneWidget);
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(backend.savedPicture?.name, 'me.png');
+    expect(backend.removedPicture, isNull);
+  });
+
+  testWidgets('Remove photo is saved as removing the picture', (tester) async {
+    final backend = _Backend(editable: true)
+      ..toPick = shared.ProfilePicture(
+          name: 'me.png', mimeType: 'image/png', bytes: _png)
+      ..bytes = _png;
+    await tester.pumpWidget(_app(SyncScreen(
+      backend: backend,
+      loadAccount: (_) async => null,
+    )));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit profile'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('profile-remove-photo')));
+    await tester.pumpAndSettle();
+    expect(find.text('Add photo'), findsOneWidget);
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(backend.removedPicture, isTrue);
+    expect(backend.savedPicture, isNull);
   });
 
   testWidgets('an empty name cannot be saved', (tester) async {
