@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RendererBinding;
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'assistant_screens_test.dart' show FakeApi, app;
@@ -184,7 +185,7 @@ void main() {
         expect(shell.listCollapsed.value, isTrue);
         expect(find.byKey(const Key('pane-reveal-strip')), findsOneWidget);
         expect(tester.getRect(find.byKey(const Key('pane-reveal-strip'))).width,
-            6);
+            10);
         expect(find.byKey(const Key('list-toggle')), findsNothing);
         await tester.tapAt(const Offset(3, 400));
         await tester.pumpAndSettle();
@@ -194,6 +195,88 @@ void main() {
             tester.getRect(find.byKey(const Key('pane-divider'))).center.dx,
             400));
         expect(shell.listCollapsed.value, isTrue);
+        await done(tester);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.reset();
+      }
+    });
+
+    testWidgets('folded: the reopen button sits top-left of the pages',
+        (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      try {
+        final shell = await open(tester);
+        expect(find.byKey(const Key('reopen-sidebar')), findsNothing);
+        final before = listWidth(tester);
+        final line = tester.getRect(find.byKey(const Key('pane-divider')));
+        // Fold by dragging the divider far left.
+        await tester.dragFrom(
+            Offset(line.center.dx, 400), const Offset(-600, 0));
+        await tester.pumpAndSettle();
+        expect(shell.listCollapsed.value, isTrue);
+        final btn = find.byKey(const Key('reopen-sidebar'));
+        expect(btn, findsOneWidget);
+        final r = tester.getRect(btn);
+        expect(r.left, 8);
+        expect(r.top, 4);
+        expect(r.size, const Size(28, 28));
+        expect(find.byTooltip('Show sidebar (\u2318B)'), findsOneWidget);
+        await tester.tap(btn);
+        await tester.pumpAndSettle();
+        expect(shell.listCollapsed.value, isFalse);
+        expect(listWidth(tester), closeTo(before, 1));
+        expect(btn, findsNothing);
+        await done(tester);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.reset();
+      }
+    });
+
+    testWidgets('Cmd+B toggles on macOS, Ctrl+B on Linux', (tester) async {
+      for (final (platform, key) in [
+        (TargetPlatform.macOS, LogicalKeyboardKey.meta),
+        (TargetPlatform.linux, LogicalKeyboardKey.control),
+      ]) {
+        debugDefaultTargetPlatformOverride = platform;
+        try {
+          final shell = await open(tester);
+          Future<void> chord() async {
+            await tester.sendKeyDownEvent(key);
+            await tester.sendKeyDownEvent(LogicalKeyboardKey.keyB);
+            await tester.sendKeyUpEvent(LogicalKeyboardKey.keyB);
+            await tester.sendKeyUpEvent(key);
+            await tester.pumpAndSettle();
+          }
+
+          await chord();
+          expect(shell.listCollapsed.value, isTrue, reason: '$platform');
+          await chord();
+          expect(shell.listCollapsed.value, isFalse, reason: '$platform');
+          // A plain B does nothing.
+          await tester.sendKeyEvent(LogicalKeyboardKey.keyB);
+          expect(shell.listCollapsed.value, isFalse);
+          await done(tester);
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+          tester.view.reset();
+        }
+      }
+    });
+
+    testWidgets('touch: no reopen bar when folded, no Ctrl+B', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        final shell = await open(tester);
+        await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
+        await tester.sendKeyEvent(LogicalKeyboardKey.keyB);
+        await tester.sendKeyUpEvent(LogicalKeyboardKey.control);
+        expect(shell.listCollapsed.value, isFalse);
+        shell.setListCollapsed(true);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('reopen-sidebar')), findsNothing);
+        expect(find.byKey(const Key('list-toggle')), findsOneWidget);
         await done(tester);
       } finally {
         debugDefaultTargetPlatformOverride = null;

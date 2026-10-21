@@ -7,7 +7,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/physics.dart' show SpringDescription, SpringSimulation;
 import 'package:flutter/scheduler.dart';
-import 'package:flutter/services.dart' show HapticFeedback;
+import 'package:flutter/services.dart'
+    show
+        HapticFeedback,
+        HardwareKeyboard,
+        KeyEvent,
+        KeyDownEvent,
+        LogicalKeyboardKey;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'covered_insets_freeze.dart';
@@ -715,6 +721,27 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _shell.identityLoader = widget.api.ownIdentity;
     _shell.refreshIdentity();
     WidgetsBinding.instance.addObserver(this);
+    HardwareKeyboard.instance.addHandler(_onKey);
+  }
+
+  /// Cmd+B (macOS) or Ctrl+B (Linux, Windows) folds or unfolds the sidebar,
+  /// whatever has the focus. Desktop and the split layout only.
+  bool _onKey(KeyEvent event) {
+    if (event is! KeyDownEvent ||
+        event.logicalKey != LogicalKeyboardKey.keyB ||
+        !_PaneHandle.isDesktop ||
+        !_shell.split) {
+      return false;
+    }
+    final kb = HardwareKeyboard.instance;
+    final mac = defaultTargetPlatform == TargetPlatform.macOS;
+    if (!(mac ? kb.isMetaPressed : kb.isControlPressed) ||
+        kb.isShiftPressed ||
+        kb.isAltPressed) {
+      return false;
+    }
+    _shell.setListCollapsed(!_shell.listCollapsed.value);
+    return true;
   }
 
   @override
@@ -743,6 +770,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onKey);
     WidgetsBinding.instance.removeObserver(this);
     _shell.warm?.dispose();
     _shell.dispose();
@@ -1160,28 +1188,17 @@ class _SplitPanesState extends State<_SplitPanes>
                       ),
                       _PaneDivider(shown: !gone, active: dragging != null),
                       Expanded(
-                        // The whole height of the window, folded or not.
-                        // Laid out at the width it will have once the list
-                        // has moved, and clipped to what shows: its web view
-                        // is not resized on every frame (no blank strip); a
-                        // resize by the divider does resize it.
-                        child: LayoutBuilder(builder: (context, box) {
-                          final resizing =
-                              dragging != null && !shell.listCollapsed.value;
-                          final target = shell.listCollapsed.value
-                              ? room
-                              : room - full - 1;
-                          final w = resizing ? box.maxWidth : target;
-                          return ClipRect(
-                            child: OverflowBox(
-                              alignment: Alignment.centerLeft,
-                              minWidth: w,
-                              maxWidth: w,
-                              child: _Pane(
-                                  removeLeft: !gone, child: widget.detail),
-                            ),
-                          );
-                        }),
+                        child: Column(children: [
+                          // Folded on a desktop: the bar is folded away with
+                          // the list, so the pages get a slim top bar with
+                          // the button that brings it back.
+                          shell.listCollapsed.value && _PaneHandle.isDesktop
+                              ? _ReopenBar(onTap: _toggle)
+                              : const SizedBox.shrink(),
+                          Expanded(
+                              child:
+                                  _detail(shell, room, full, dragging, gone)),
+                        ]),
                       ),
                     ],
                   ),
@@ -1214,6 +1231,27 @@ class _SplitPanesState extends State<_SplitPanes>
             },
           );
         },
+      );
+    });
+  }
+
+  Widget _detail(ShellController shell, double room, double full,
+      double? dragging, bool gone) {
+    // The whole height of the window, folded or not. Laid out at the width it
+    // will have once the list has moved, and clipped to what shows: its web
+    // view is not resized on every frame (no blank strip); a resize by the
+    // divider does resize it.
+    return LayoutBuilder(builder: (context, box) {
+      final resizing = dragging != null && !shell.listCollapsed.value;
+      final target = shell.listCollapsed.value ? room : room - full - 1;
+      final w = resizing ? box.maxWidth : target;
+      return ClipRect(
+        child: OverflowBox(
+          alignment: Alignment.centerLeft,
+          minWidth: w,
+          maxWidth: w,
+          child: _Pane(removeLeft: !gone, child: widget.detail),
+        ),
       );
     });
   }
@@ -1258,7 +1296,7 @@ class _PaneHandle extends StatefulWidget {
   /// The transparent resize strip on the line, and the one at the window's
   /// edge that opens a folded list.
   static const desktopStrip = 8.0;
-  static const desktopEdge = 6.0;
+  static const desktopEdge = 10.0;
 
   /// The width of the edge strip that opens a folded list.
   static const edgeStrip = 24.0;
@@ -1275,6 +1313,7 @@ class _PaneHandle extends StatefulWidget {
 
 class _PaneHandleState extends State<_PaneHandle> {
   bool _hover = false;
+  bool _edgeHover = false;
 
   @override
   Widget build(BuildContext context) {
@@ -1376,7 +1415,9 @@ class _PaneHandleState extends State<_PaneHandle> {
               width: _PaneHandle.desktopEdge,
               child: MouseRegion(
                 key: const Key('pane-reveal-strip'),
-                cursor: SystemMouseCursors.resizeColumn,
+                cursor: SystemMouseCursors.click,
+                onEnter: (_) => setState(() => _edgeHover = true),
+                onExit: (_) => setState(() => _edgeHover = false),
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: onTap,
@@ -1384,6 +1425,13 @@ class _PaneHandleState extends State<_PaneHandle> {
                   onHorizontalDragUpdate: onDragUpdate,
                   onHorizontalDragEnd: (d) => onDragEnd(d.primaryVelocity ?? 0),
                   onHorizontalDragCancel: () => onDragEnd(0),
+                  child: AnimatedContainer(
+                    key: const Key('pane-reveal-highlight'),
+                    duration: const Duration(milliseconds: 120),
+                    color: _edgeHover
+                        ? c.main.withValues(alpha: 0.35)
+                        : Colors.transparent,
+                  ),
                 ),
               ),
             ),
@@ -1468,6 +1516,42 @@ class _PaneHandleState extends State<_PaneHandle> {
             ),
         ]);
       }),
+    );
+  }
+}
+
+/// Folded on a desktop, the list pane's bottom bar is gone with it: a slim
+/// bar on top of the pages with the button that shows the sidebar again.
+class _ReopenBar extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _ReopenBar({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    final mac = defaultTargetPlatform == TargetPlatform.macOS;
+    return Material(
+      color: c.bgBody,
+      child: Align(
+        alignment: Alignment.centerLeft,
+        heightFactor: 1,
+        child: Padding(
+          // 8 dp in. The window's own title bar holds the traffic lights
+          // (the macOS runner does not hide it), so nothing to clear.
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+          child: IconButton(
+            key: const Key('reopen-sidebar'),
+            tooltip: mac ? 'Show sidebar (\u2318B)' : 'Show sidebar (Ctrl+B)',
+            onPressed: onTap,
+            mouseCursor: SystemMouseCursors.click,
+            iconSize: 18,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+            icon: const Icon(Icons.menu),
+          ),
+        ),
+      ),
     );
   }
 }
