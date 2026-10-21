@@ -566,16 +566,15 @@ class DriveTreeState extends State<DriveTree> {
   }
 
   /// The fold chevron at the row's end. Its icon ends where a panel
-  /// heading's chevron does ([SidebarMetrics.hPad] from the right edge): the
-  /// touch rows' trailing box ends there itself, so the icon is pushed out to
-  /// the edge by half of what the box has to spare.
+  /// heading's chevron does: centred in a [SidebarMetrics.chevronSlot] box
+  /// that ends [SidebarMetrics.hPad] from the edge on desktop, and pushed out
+  /// to the edge on touch, where the ListTile keeps a wider end padding.
   Widget _chevron(DriveChild child, bool open, SidebarMetrics m) {
     final c = context.appColors;
     final button = IconButton(
       key: ValueKey('drive-tree-toggle-${child.subject}'),
       mouseCursor: WidgetStateMouseCursor.clickable,
       tooltip: open ? 'Collapse' : 'Expand',
-      visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
       iconSize: m.chevronSize,
       constraints:
@@ -591,8 +590,10 @@ class DriveTreeState extends State<DriveTree> {
       onPressed: () => _toggle(child.subject),
     );
     if (m.compact) return button;
+    // A touch ListTile ends its trailing box 24 from the edge, not hPad.
     return Transform.translate(
-        offset: Offset((m.chevronSlot - m.chevronSize) / 2, 0), child: button);
+        offset: Offset((m.chevronSlot - m.chevronSize) / 2 + 24 - m.hPad, 0),
+        child: button);
   }
 
   Widget _row(_ChildItem item) {
