@@ -61,8 +61,8 @@ while [ $# -gt 0 ]; do
 done
 
 here="$(cd "$(dirname "$0")/.." && pwd)"
-PKG=com.ontola.atomiccanvas_flutter
-ACT=$PKG/.MainActivity
+PKG=io.ontola.atomic
+ACT=$PKG/com.ontola.atomiccanvas_flutter.MainActivity
 ADB="${ADB:-$(command -v adb || echo "$HOME/Library/Android/sdk/platform-tools/adb")}"
 work="$(mktemp -d "${TMPDIR:-/tmp}/perf_android.XXXXXX")"
 data="$work/data.tsv"   # metric<TAB>value

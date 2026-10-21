@@ -19,7 +19,7 @@ BUILD=1
 if [ "${1:-}" = "--no-build" ]; then BUILD=0; shift; fi
 if [ $# -eq 0 ]; then sed -n 2,14p "$0"; exit 2; fi
 
-APP=com.ontola.atomiccanvas_flutter
+APP=io.ontola.atomic
 APK=build/app/outputs/flutter-apk/app-release.apk
 ADB=${ADB:-adb}
 
@@ -44,7 +44,7 @@ for s in "$@"; do
     continue
   fi
   $ADB -s "$s" shell am force-stop $APP
-  $ADB -s "$s" shell am start -n $APP/.MainActivity >/dev/null
+  $ADB -s "$s" shell am start -n $APP/com.ontola.atomiccanvas_flutter.MainActivity >/dev/null
   if $ADB -s "$s" shell dumpsys package $APP | grep -q 'flags=.*DEBUGGABLE'; then
     echo "   still DEBUGGABLE on $s" >&2
     status=1
