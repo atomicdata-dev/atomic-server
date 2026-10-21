@@ -62,6 +62,10 @@ abstract class AtomicSettingsBackend {
   Future<void> removeKnownPeer(String nodeId);
   Future<void> pair(BuildContext context);
 
+  /// Syncs with one paired device now and says what moved, in a line to show
+  /// ("Received 3 resources from Polle's iPhone"). Null: no "Sync now".
+  Future<String> Function(String nodeId)? get syncPeer => null;
+
   /// Optional capabilities; unavailable actions are not displayed.
   AtomicServerBackend? get servers => null;
   Future<void> Function(BuildContext context)? get signInWithAccount => null;

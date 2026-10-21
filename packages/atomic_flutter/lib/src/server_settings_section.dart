@@ -14,6 +14,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'paired_device.dart';
+import 'peer_details_sheet.dart';
 import 'settings_backend.dart';
 import 'server_info.dart';
 import 'server_url.dart';
@@ -44,6 +46,7 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
   List<Map<String, String>> _peers = [];
   Set<String> _livePeerIds = {};
   List<Map<String, String>> _unsaved = [];
+  String? _ownAgent;
   bool _loading = true;
   bool _busy = false;
   bool _showAdd = false;
@@ -167,6 +170,11 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
       } catch (_) {
         // no peers available
       }
+      // Whose device a peer is, when the host recorded its agent.
+      String? ownAgent;
+      try {
+        ownAgent = (await widget.backend.getActiveAgent())?.subject;
+      } catch (_) {}
 
       if (!mounted) return;
 
@@ -176,6 +184,7 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
         _peers = peers;
         _livePeerIds = livePeerIds;
         _unsaved = unsaved;
+        _ownAgent = ownAgent;
         _loading = false;
       });
 
@@ -650,76 +659,124 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
   /// last synced and, because no peer reports how much of the data it holds
   /// yet, say so rather than guess.
   Widget _peerCard(AppColors c, Map<String, String> peer) {
-    final nodeId = peer['node_id'] ?? '';
-    final name = (peer['name'] ?? '').trim();
-    final label = name.isNotEmpty
-        ? name
-        : '${nodeId.substring(0, nodeId.length.clamp(0, 12))}…';
+    final device = PairedDevice.fromRow(peer, ownAgent: _ownAgent);
+    final nodeId = device.nodeId;
     final isLive = isLiveAtomicPeer(nodeId, _livePeerIds);
-    final lastSynced = int.tryParse(peer['last_synced'] ?? '');
+    final lastSynced = device.lastSynced;
     final isServer = _looksLikeServer(peer);
-    final relay = Uri.tryParse(peer['relay_url'] ?? '')?.host ?? '';
+    final relay = Uri.tryParse(device.relayUrl ?? '')?.host ?? '';
+    final relation = device.relationLabel;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: SyncGap.s),
-      child: SyncCard(
-        padding: const EdgeInsets.all(SyncGap.l),
-        children: [
-          Row(
-            children: [
-              Icon(isServer ? Icons.cloud_outlined : Icons.phone_android,
-                  size: 24, color: c.textSecondary),
-              const SizedBox(width: SyncGap.m),
-              Expanded(
-                child: Text(label,
-                    style: SyncText.body(c), overflow: TextOverflow.ellipsis),
-              ),
-              StatusChip(isLive ? 'Connected' : 'Paired',
-                  tone: isLive ? SyncTone.success : SyncTone.neutral),
-              IconButton(
-                icon: const Icon(Icons.close, size: 20),
-                color: c.textSecondary,
-                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-                tooltip: 'Remove',
-                onPressed: _busy
-                    ? null
-                    : () => _runAction(() async {
-                          await widget.backend.removeKnownPeer(nodeId);
-                          if (!mounted) return;
-                          setState(() => _peers
-                              .removeWhere((p) => p['node_id'] == nodeId));
-                        }),
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  [
-                    if (isServer) 'Server, address unknown',
-                    lastSynced != null
-                        ? 'Last synced ${_relativeTime(lastSynced)}'
-                        : 'Not synced yet',
-                    if (relay.isNotEmpty)
-                      'via ${relay.replaceAll(RegExp(r'\.$'), '')}',
-                  ].join(' · '),
-                  style: SyncText.caption(c),
+      child: InkWell(
+        key: ValueKey('peer-card-$nodeId'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _openPeer(device),
+        child: SyncCard(
+          padding: const EdgeInsets.all(SyncGap.l),
+          children: [
+            Row(
+              children: [
+                _peerAvatar(c, device, isServer: isServer),
+                const SizedBox(width: SyncGap.m),
+                Expanded(
+                  child: Text(device.label,
+                      style: SyncText.body(c), overflow: TextOverflow.ellipsis),
+                ),
+                StatusChip(isLive ? 'Connected' : 'Paired',
+                    tone: isLive ? SyncTone.success : SyncTone.neutral),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  color: c.textSecondary,
+                  constraints:
+                      const BoxConstraints(minWidth: 48, minHeight: 48),
+                  tooltip: 'Remove',
+                  onPressed: _busy ? null : () => _forgetPeer(nodeId),
+                ),
+              ],
+            ),
+            if (relation != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: SyncGap.xs),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: StatusChip(relation,
+                      icon: device.isOtherPerson
+                          ? Icons.people_outline
+                          : Icons.devices_outlined),
                 ),
               ),
-              if (nodeId.isNotEmpty) _copyIdButton(nodeId, 'Device ID'),
-            ],
-          ),
-          if (!isServer)
-            Padding(
-              padding: const EdgeInsets.only(bottom: SyncGap.xs),
-              child: Text('Data size unknown',
-                  key: const ValueKey('peer-data-size-unknown'),
-                  style: SyncText.caption(c)),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    [
+                      if (isServer) 'Server, address unknown',
+                      lastSynced != null
+                          ? 'Last synced ${_relativeTime(lastSynced)}'
+                          : 'Not synced yet',
+                      if (relay.isNotEmpty)
+                        'via ${relay.replaceAll(RegExp(r'\.$'), '')}',
+                    ].join(' · '),
+                    style: SyncText.caption(c),
+                  ),
+                ),
+                if (nodeId.isNotEmpty) _copyIdButton(nodeId, 'Device ID'),
+              ],
             ),
-        ],
+            if (!isServer)
+              Padding(
+                padding: const EdgeInsets.only(bottom: SyncGap.xs),
+                child: Text('Data size unknown',
+                    key: const ValueKey('peer-data-size-unknown'),
+                    style: SyncText.caption(c)),
+              ),
+          ],
+        ),
       ),
     );
+  }
+
+  /// A person's initials for someone else's device; a device icon for yours.
+  Widget _peerAvatar(AppColors c, PairedDevice device,
+      {required bool isServer}) {
+    if (device.isOtherPerson) {
+      return CircleAvatar(
+        key: const ValueKey('peer-person-avatar'),
+        radius: 14,
+        backgroundColor: c.bg2,
+        child: Text(device.initials,
+            style: SyncText.chip(c.textPrimary).copyWith(fontSize: 11)),
+      );
+    }
+    return Icon(isServer ? Icons.cloud_outlined : Icons.phone_android,
+        size: 24, color: c.textSecondary);
+  }
+
+  Future<void> _forgetPeer(String nodeId) => _runAction(() async {
+        await widget.backend.removeKnownPeer(nodeId);
+        if (!mounted) return;
+        setState(() => _peers.removeWhere((p) => p['node_id'] == nodeId));
+      });
+
+  /// The device's details: who, its id, the last sync, and what to do.
+  Future<void> _openPeer(PairedDevice device) async {
+    final forget = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => PeerDetailsSheet(
+        device: device,
+        live: isLiveAtomicPeer(device.nodeId, _livePeerIds),
+        syncPeer: widget.backend.syncPeer,
+      ),
+    );
+    if (forget == true) {
+      await _forgetPeer(device.nodeId);
+    } else {
+      await _refreshPeers();
+    }
   }
 
   /// Coarse "2m ago" / "3h ago" / "5d ago" for a unix-millis timestamp — enough

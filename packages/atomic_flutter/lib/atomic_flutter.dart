@@ -18,4 +18,6 @@ export 'src/error_snack.dart';
 export 'src/perf.dart';
 
 export 'src/device_stats.dart';
+export 'src/paired_device.dart';
+export 'src/peer_details_sheet.dart';
 export 'src/sync_widgets.dart';
