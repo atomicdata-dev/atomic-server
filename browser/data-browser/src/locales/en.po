@@ -1370,6 +1370,7 @@ msgstr "Alt text"
 msgid "Save"
 msgstr "Save"
 
+#: src/routes/AppSettings.tsx
 #: src/routes/NewResource/NewRoute.tsx
 msgid "Templates"
 msgstr "Templates"
@@ -2246,6 +2247,7 @@ msgstr "Accept Changes"
 msgid "Share"
 msgstr "Share"
 
+#: src/components/BreadCrumbs.tsx
 #: src/components/NavBar.tsx
 msgid "Breadcrumbs"
 msgstr "Breadcrumbs"
@@ -12122,6 +12124,7 @@ msgid "Add a device"
 msgstr "Add a device"
 
 #: src/components/Spinner.tsx
+#: src/components/Spinner.tsx
 msgid "Loading"
 msgstr "Loading"
 
@@ -13141,3 +13144,31 @@ msgstr "Formula"
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "Combine columns with + - * / and functions: now(), coalesce(a, b), days(ms), addDays(date, n), daysUntilAnniversary(date), min, max, if(test, a, b). Dates are milliseconds, a missing value leaves the cell empty, and 1/2 is 0 (write 1.0/2). Columns you can use: {0}."
 msgstr "Combine columns with + - * / and functions: now(), coalesce(a, b), days(ms), addDays(date, n), daysUntilAnniversary(date), min, max, if(test, a, b). Dates are milliseconds, a missing value leaves the cell empty, and 1/2 is 0 (write 1.0/2). Columns you can use: {0}."
+
+#: src/embed/MeetingChatOverlay.tsx
+msgid "Close chat"
+msgstr "Close chat"
+
+#: src/embed/mockHost.ts
+msgid "Mock drive"
+msgstr "Mock drive"
+
+#: src/embed/mockHost.ts
+msgid "A drive that only exists in this page."
+msgstr "A drive that only exists in this page."
+
+#: src/embed/mockHost.ts
+msgid "A folder"
+msgstr "A folder"
+
+#: src/embed/mockHost.ts
+msgid "A resource inside the folder"
+msgstr "A resource inside the folder"
+
+#: src/embed/mockHost.ts
+msgid "Rendered by ResourcePage, with nothing around it."
+msgstr "Rendered by ResourcePage, with nothing around it."
+
+#: src/routes/AppSettings.tsx
+msgid "Show icons in the sidebar <0>Show icons and pictures next to items in the sidebar</0>"
+msgstr "Show icons in the sidebar <0>Show icons and pictures next to items in the sidebar</0>"

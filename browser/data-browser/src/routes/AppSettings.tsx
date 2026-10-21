@@ -35,9 +35,6 @@ import {
 } from '../embed/settings';
 
 /** Touch screens: focusing a field there raises the keyboard. */
-const SIDEBAR_ICONS_DESCRIPTION =
-  'Show icons and pictures next to items in the sidebar';
-
 const isTouchDevice = () =>
   typeof window !== 'undefined' &&
   window.matchMedia?.('(pointer: coarse)').matches;
@@ -207,14 +204,16 @@ const AppSettings: React.FunctionComponent = () => {
                     </CheckboxLabel>
                   )}
                   {show('sidebarIcons') && (
-                    <CheckboxLabel title={SIDEBAR_ICONS_DESCRIPTION}>
+                    <CheckboxLabel>
                       <Checkbox
                         checked={showSidebarIcons}
                         onChange={setShowSidebarIcons}
                       />{' '}
                       <span>
                         Show icons in the sidebar
-                        <SettingHint>{SIDEBAR_ICONS_DESCRIPTION}</SettingHint>
+                        <SettingHint>
+                          Show icons and pictures next to items in the sidebar
+                        </SettingHint>
                       </span>
                     </CheckboxLabel>
                   )}

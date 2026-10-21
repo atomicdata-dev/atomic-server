@@ -1370,6 +1370,7 @@ msgstr "Texto alternativo"
 msgid "Save"
 msgstr "Guardar"
 
+#: src/routes/AppSettings.tsx
 #: src/routes/NewResource/NewRoute.tsx
 msgid "Templates"
 msgstr "Plantillas"
@@ -2246,6 +2247,7 @@ msgstr "Aceptar cambios"
 msgid "Share"
 msgstr "Compartir"
 
+#: src/components/BreadCrumbs.tsx
 #: src/components/NavBar.tsx
 msgid "Breadcrumbs"
 msgstr "Ruta de navegación"
@@ -12109,6 +12111,7 @@ msgid "Add a device"
 msgstr ""
 
 #: src/components/Spinner.tsx
+#: src/components/Spinner.tsx
 msgid "Loading"
 msgstr ""
 
@@ -13127,4 +13130,32 @@ msgstr ""
 #. 0: Object.keys(slugs).join(', ') || 'none yet'
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "Combine columns with + - * / and functions: now(), coalesce(a, b), days(ms), addDays(date, n), daysUntilAnniversary(date), min, max, if(test, a, b). Dates are milliseconds, a missing value leaves the cell empty, and 1/2 is 0 (write 1.0/2). Columns you can use: {0}."
+msgstr ""
+
+#: src/embed/MeetingChatOverlay.tsx
+msgid "Close chat"
+msgstr ""
+
+#: src/embed/mockHost.ts
+msgid "Mock drive"
+msgstr ""
+
+#: src/embed/mockHost.ts
+msgid "A drive that only exists in this page."
+msgstr ""
+
+#: src/embed/mockHost.ts
+msgid "A folder"
+msgstr ""
+
+#: src/embed/mockHost.ts
+msgid "A resource inside the folder"
+msgstr ""
+
+#: src/embed/mockHost.ts
+msgid "Rendered by ResourcePage, with nothing around it."
+msgstr ""
+
+#: src/routes/AppSettings.tsx
+msgid "Show icons in the sidebar <0>Show icons and pictures next to items in the sidebar</0>"
 msgstr ""
