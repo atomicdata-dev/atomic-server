@@ -65,6 +65,8 @@ import {
 import { setLocalStorageValue } from '../hooks/useLocalStorage';
 import { useNativeChatRoom } from './useNativeChatRoom';
 import { embedTouchCss } from './touchStyle';
+import { aiCall } from './aiTools';
+import { AiToolsHost } from './AiToolsHost';
 
 enableEmbedMode();
 registerEmbedActions();
@@ -147,6 +149,13 @@ declare global {
       setSidebarIcons(show: boolean): void;
       /** Swipe-back needs of the page; the host hears changes. */
       setGestures(mode: 'default' | 'horizontal'): void;
+      /** The app's AI chat (`?ai=1`): `aiCall(id, 'tools' | 'prompt' |
+       * 'run', args)` answers with an `aiResult` message (`aiTools.ts`). */
+      aiCall(
+        id: number,
+        method: 'tools' | 'prompt' | 'run',
+        args?: unknown[],
+      ): void;
     };
   }
 }
@@ -171,9 +180,15 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('pagehide', () => void flush());
 
+// The app's AI chat loads this page without a screen to use the web chat's
+// tools (`?ai=1&drive=<subject>`).
+const aiParams = new URLSearchParams(location.search);
+const aiMode = aiParams.get('ai') === '1';
+
 const rootRoute = createRootRoute({
   component: () => (
     <Providers>
+      {aiMode && <AiToolsHost drive={aiParams.get('drive') ?? undefined} />}
       <Outlet />
     </Providers>
   ),
@@ -375,6 +390,9 @@ window.atomicEmbed = {
     applyHostSidebarIcons(!!show);
   },
   setGestures,
+  aiCall(id, method, args) {
+    void aiCall(m => window.AtomicFlutter?.postMessage(m), id, method, args);
+  },
   openMenu(anchor) {
     window.dispatchEvent(
       new CustomEvent('atomic-embed-menu', { detail: anchor }),
