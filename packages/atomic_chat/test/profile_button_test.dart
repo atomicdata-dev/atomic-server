@@ -132,4 +132,42 @@ void main() {
             of: find.byType(AppBottomBar), matching: find.text('Joep')),
         findsNothing);
   });
+
+  testWidgets('the sync mark sits on the avatar, in the button, and the label '
+      'says what runs', (tester) async {
+    _size(tester, const Size(360, 800));
+    var host = const BackgroundState();
+    final activity = BackgroundActivity.instance;
+    activity.hostPoller = () => host;
+    addTearDown(() => activity.hostPoller = null);
+    final handle = tester.ensureSemantics();
+    await tester.pumpWidget(_shell(_Api(const ProfileIdentity(name: 'Joep'))));
+    await tester.pump();
+    await tester.pump();
+    final bar = find.byType(AppBottomBar);
+    final badge = find.descendant(
+        of: bar, matching: find.byKey(const Key('background-activity')));
+    expect(badge, findsOneWidget);
+    expect(activity.polling, isTrue);
+
+    host = const BackgroundState(total: 1, byKind: {'drives': 1});
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 50));
+    final button = tester.getRect(find.byTooltip('Joep'));
+    final avatar = tester.getRect(find.byType(ProfileAvatar));
+    final mark = tester.getRect(badge);
+    expect(button.overlaps(mark), isTrue);
+    expect(button.contains(mark.topLeft) && button.contains(mark.bottomRight),
+        isTrue);
+    expect(mark.center.dx, greaterThan(avatar.center.dx));
+    expect(mark.center.dy, greaterThan(avatar.center.dy));
+    expect(find.bySemanticsLabel('Joep, syncing'), findsOneWidget);
+
+    host = const BackgroundState(lastError: 'Offline');
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.bySemanticsLabel('Joep, sync problem'), findsOneWidget);
+    handle.dispose();
+  });
 }

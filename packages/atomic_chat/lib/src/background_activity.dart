@@ -216,35 +216,50 @@ class BackgroundActivity extends ValueNotifier<BackgroundState> {
   }
 }
 
-/// The small spinning sync mark of the home bar: shown while something runs
-/// in the background (after 400 ms, so a quick fetch does not flicker, and for
-/// at least 800 ms once shown), a static amber icon when the last background
-/// run failed and nothing runs. Tapping opens the Sync page ([onTap]); a long
-/// press shows what runs.
-class BackgroundActivityIndicator extends StatefulWidget {
+/// The sync mark on the corner of the avatar: a small ringed circle with a
+/// rotating sync icon while something runs in the background (shown after
+/// 400 ms, so a quick fetch does not flicker, and for at least 800 ms once
+/// shown), a static amber icon when the last background run failed and nothing
+/// runs, nothing otherwise. It is not a button: it ignores touches, so the
+/// avatar button under it takes them. Mounting it starts the host polling
+/// (while the app is in the foreground).
+///
+/// Put it in a [Stack] over the avatar, e.g. in a `Positioned(right: -4,
+/// bottom: -4)`.
+class BackgroundActivityBadge extends StatefulWidget {
   final BackgroundActivity? activity;
-  final VoidCallback? onTap;
 
   /// How long activity must last before the mark shows, and how long it stays
   /// once shown.
   final Duration showAfter;
   final Duration minShown;
 
-  const BackgroundActivityIndicator({
+  /// The ring's colour (the surface the avatar sits on).
+  final Color? ring;
+
+  /// The size of the circle, ring included.
+  static const size = 16.0;
+
+  const BackgroundActivityBadge({
     super.key,
     this.activity,
-    this.onTap,
+    this.ring,
     this.showAfter = const Duration(milliseconds: 400),
     this.minShown = const Duration(milliseconds: 800),
   });
 
+  /// What to append to the avatar button's label: `, syncing`,
+  /// `, sync problem` or nothing.
+  static String labelSuffix(BackgroundState s) =>
+      s.busy ? ', syncing' : (s.problem ? ', sync problem' : '');
+
   @override
-  State<BackgroundActivityIndicator> createState() =>
-      _BackgroundActivityIndicatorState();
+  State<BackgroundActivityBadge> createState() =>
+      _BackgroundActivityBadgeState();
 }
 
-class _BackgroundActivityIndicatorState
-    extends State<BackgroundActivityIndicator>
+class _BackgroundActivityBadgeState
+    extends State<BackgroundActivityBadge>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _turn = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 1200));
@@ -290,7 +305,7 @@ class _BackgroundActivityIndicatorState
   }
 
   @override
-  void didUpdateWidget(BackgroundActivityIndicator old) {
+  void didUpdateWidget(BackgroundActivityBadge old) {
     super.didUpdateWidget(old);
     if (old.activity != widget.activity) {
       _detach();
@@ -372,13 +387,11 @@ class _BackgroundActivityIndicatorState
     }
 
     final Widget icon;
-    final String label;
     if (problem) {
       icon = Icon(Icons.sync_problem,
           key: const Key('background-activity-problem'),
-          size: 20,
+          size: 11,
           color: SyncTone.warning.color(c));
-      label = 'Sync problem';
     } else if (reduced) {
       icon = Container(
           key: const Key('background-activity-dot'),
@@ -386,42 +399,33 @@ class _BackgroundActivityIndicatorState
           height: 6,
           decoration:
               BoxDecoration(color: c.textSecondary, shape: BoxShape.circle));
-      label = 'Syncing…';
     } else {
       icon = RotationTransition(
         turns: _turn,
         child: Icon(Icons.sync,
             key: const Key('background-activity-spinner'),
-            size: 20,
+            size: 11,
             color: c.textSecondary),
       );
-      label = 'Syncing…';
     }
-    final caption = problem ? state.lastError! : state.caption;
 
     return AnimatedOpacity(
       key: const Key('background-activity'),
       opacity: visible ? 1 : 0,
       duration: const Duration(milliseconds: 150),
       child: IgnorePointer(
-        ignoring: !visible,
-        child: Semantics(
-          label: label,
-          value: caption,
-          button: true,
-          excludeSemantics: true,
-          onTap: widget.onTap,
-          child: Tooltip(
-            message: caption,
-            child: InkResponse(
-              mouseCursor: WidgetStateMouseCursor.clickable,
-              onTap: widget.onTap,
-              radius: 22,
-              child: SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: visible ? Center(child: icon) : null),
+        child: ExcludeSemantics(
+          child: Container(
+            width: BackgroundActivityBadge.size,
+            height: BackgroundActivityBadge.size,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: c.barSurface,
+              border: Border.all(
+                  color: widget.ring ?? c.barSurface, width: 2),
             ),
+            child: visible ? icon : null,
           ),
         ),
       ),

@@ -10,7 +10,6 @@ import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_sidebar_icons.dart';
 import 'app_top_bar.dart';
-import 'background_activity.dart';
 import 'home_sections.dart';
 import 'home_sections_dialog.dart';
 
@@ -942,11 +941,6 @@ class _ChatsScreenState extends State<ChatsScreen> {
           backgroundColor: c.bgBody,
           appBar: AppTopBar(
             titleWidget: const AtomicWordmark(),
-            // What runs in the background; opens the Sync page.
-            actions: [
-              BackgroundActivityIndicator(
-                  onTap: _profile == null ? null : _settings),
-            ],
           ),
           // The app's overscroll stretch.
           body: ScrollConfiguration(

@@ -6,6 +6,8 @@ BackgroundState _busy([Map<String, int> kinds = const {'drives': 1}]) =>
     BackgroundState(
         total: kinds.values.fold(0, (a, b) => a + b), byKind: kinds);
 
+/// A stand-in for the avatar button: a 48 dp tappable box, a 24 dp avatar in
+/// the middle, the badge on its bottom-right corner.
 Widget _app(BackgroundActivity activity,
         {VoidCallback? onTap, bool reduced = false}) =>
     MaterialApp(
@@ -13,9 +15,29 @@ Widget _app(BackgroundActivity activity,
       home: MediaQuery(
         data: MediaQueryData(disableAnimations: reduced),
         child: Scaffold(
-          appBar: AppBar(actions: [
-            BackgroundActivityIndicator(activity: activity, onTap: onTap),
-          ]),
+          body: Center(
+            child: InkResponse(
+              key: const Key('avatar-button'),
+              onTap: onTap,
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: Center(
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      const SizedBox(key: Key('avatar'), width: 24, height: 24),
+                      Positioned(
+                        right: -5,
+                        bottom: -5,
+                        child: BackgroundActivityBadge(activity: activity),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -54,15 +76,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 200));
     expect(_opacity(tester), 1);
     expect(_spinner, findsOneWidget);
-    final before = tester
-        .widget<RotationTransition>(_spinner)
-        .turns
-        .value;
+    final before = tester.widget<RotationTransition>(_spinner).turns.value;
     await tester.pump(const Duration(milliseconds: 300));
-    final after = tester
-        .widget<RotationTransition>(_spinner)
-        .turns
-        .value;
+    final after = tester.widget<RotationTransition>(_spinner).turns.value;
     expect(after, isNot(before));
 
     // Idle again: stays for at least 800 ms from when it showed, then goes.
@@ -104,23 +120,43 @@ void main() {
     expect(_opacity(tester), 1);
     expect(find.byIcon(Icons.sync_problem), findsOneWidget);
     expect(_spinner, findsNothing);
-    expect(find.bySemanticsLabel('Sync problem'), findsOneWidget);
+    expect(
+        BackgroundActivityBadge.labelSuffix(activity.value), ', sync problem');
   });
 
-  testWidgets('tap opens the Sync page; the label says what runs',
-      (tester) async {
+  testWidgets(
+      'a tap on the badge goes to the avatar button, not a target of '
+      'its own; the badge sits in its lower right', (tester) async {
     var taps = 0;
     await tester.pumpWidget(_app(activity, onTap: () => taps++));
     host = _busy({'drives': 2, 'pictures': 1});
     await tester.pump(const Duration(seconds: 1));
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pump(const Duration(milliseconds: 50));
-    expect(find.bySemanticsLabel('Syncing…'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('background-activity-spinner')));
+    expect(_opacity(tester), 1);
+    expect(BackgroundActivityBadge.labelSuffix(activity.value), ', syncing');
+
+    final button = tester.getRect(find.byKey(const Key('avatar-button')));
+    final avatar = tester.getRect(find.byKey(const Key('avatar')));
+    final badge = tester.getRect(find.byKey(const Key('background-activity')));
+    expect(button.contains(badge.topLeft) && button.contains(badge.bottomRight),
+        isTrue);
+    expect(badge.center.dx, greaterThan(avatar.center.dx));
+    expect(badge.center.dy, greaterThan(avatar.center.dy));
+    expect(badge.size, const Size(16, 16));
+
+    await tester.tap(find.byKey(const Key('background-activity-spinner')),
+        warnIfMissed: false);
     expect(taps, 1);
+    // The badge ignores touches and has no semantics of its own.
+    expect(
+        find.descendant(
+            of: find.byKey(const Key('background-activity')),
+            matching: find.byType(InkResponse)),
+        findsNothing);
     expect(activity.value.caption, 'Syncing drives · Loading pictures');
-    expect(activity.value.summary,
-        'Syncing drives · Loading pictures · 3 tasks');
+    expect(
+        activity.value.summary, 'Syncing drives · Loading pictures · 3 tasks');
   });
 
   testWidgets('reduced motion: a still dot, no rotation', (tester) async {

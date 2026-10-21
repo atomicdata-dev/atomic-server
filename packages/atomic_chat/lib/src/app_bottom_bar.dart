@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'app_shell.dart';
 import 'assistant_api.dart';
+import 'background_activity.dart';
 import 'chat_screen.dart';
 import 'home_sections.dart';
 import 'home_sections_dialog.dart' show homeSectionIcon;
@@ -50,13 +51,17 @@ class AppBottomBar extends StatelessWidget {
   final AssistantApi api;
   final ShellController shell;
 
+  /// What the sync mark on the avatar shows; the app-wide one by default.
+  final BackgroundActivity? activity;
+
   /// The widest the row of buttons gets on a wide window.
   static const maxButtonsWidth = 560.0;
 
   /// The height of the row of buttons, above the system inset.
   static const rowHeight = 56.0;
 
-  const AppBottomBar({super.key, required this.api, required this.shell});
+  const AppBottomBar(
+      {super.key, required this.api, required this.shell, this.activity});
 
   ShellActions get _actions => ShellActions(api, shell);
 
@@ -206,6 +211,7 @@ class AppBottomBar extends StatelessWidget {
                           label: 'Profile',
                           child: _ProfileButton(
                             shell: shell,
+                            activity: activity,
                             current: top == ShellPage.profile,
                             // Next to the pages every slot is the same.
                             wide: roomy && !split,
@@ -453,12 +459,14 @@ const _profileNameWidth = 96.0;
 /// the identity is loaded. The name is the tooltip and the semantics label.
 class _ProfileButton extends StatelessWidget {
   final ShellController shell;
+  final BackgroundActivity? activity;
   final bool current;
   final bool wide;
   final VoidCallback? onPressed;
 
   const _ProfileButton({
     required this.shell,
+    required this.activity,
     required this.current,
     required this.wide,
     required this.onPressed,
@@ -467,21 +475,33 @@ class _ProfileButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final main = context.appColors.main;
+    final act = activity ?? BackgroundActivity.instance;
     return ValueListenableBuilder<ProfileIdentity?>(
       valueListenable: shell.identity,
       builder: (context, who, _) {
         if (who == null) {
-          return IconButton(
-            tooltip: 'Profile',
-            onPressed: current ? null : onPressed,
-            icon: const Icon(Icons.person_outline),
+          return Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                tooltip: 'Profile',
+                onPressed: current ? null : onPressed,
+                icon: const Icon(Icons.person_outline),
+              ),
+              Positioned(
+                right: 8,
+                bottom: 8,
+                child: BackgroundActivityBadge(activity: act),
+              ),
+            ],
           );
         }
         final name = who.name?.trim() ?? '';
         final label = name.isEmpty ? 'Profile' : name;
         final showName = wide && name.isNotEmpty;
         // As big as the bar's icons (24 dp); its page on top rings it.
-        final avatar = Container(
+        final ring = Container(
           foregroundDecoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
@@ -498,13 +518,30 @@ class _ProfileButton extends StatelessWidget {
                   ? null
                   : Theme.of(context).colorScheme.onSurfaceVariant),
         );
+        // The sync mark sits on the avatar's bottom-right corner, inside the
+        // button's box; it takes no touches.
+        final avatar = Stack(
+          clipBehavior: Clip.none,
+          children: [
+            ring,
+            Positioned(
+              right: -5,
+              bottom: -5,
+              child: BackgroundActivityBadge(activity: act),
+            ),
+          ],
+        );
         return Tooltip(
           message: label,
-          child: Semantics(
-            button: true,
-            label: label,
-            excludeSemantics: true,
-            onTap: current ? null : onPressed,
+          child: ValueListenableBuilder<BackgroundState>(
+            valueListenable: act,
+            builder: (context, sync, child) => Semantics(
+              button: true,
+              label: label + BackgroundActivityBadge.labelSuffix(sync),
+              excludeSemantics: true,
+              onTap: current ? null : onPressed,
+              child: child,
+            ),
             child: InkResponse(
               mouseCursor: WidgetStateMouseCursor.clickable,
               onTap: current ? null : onPressed,
