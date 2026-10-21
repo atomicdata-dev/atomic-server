@@ -29,6 +29,13 @@ const _homeItems = 4;
 /// Most entries the activity feed holds.
 const _maxActivity = 100;
 
+/// How long a section's rows take to unfold and to fold (quick, so the home
+/// never waits on it), and the curves: out when they appear, in when they go.
+const _sectionExpand = Duration(milliseconds: 160);
+const _sectionCollapse = Duration(milliseconds: 120);
+const _sectionExpandCurve = Curves.easeOutCubic;
+const _sectionCollapseCurve = Curves.easeInCubic;
+
 /// How a section folds and what holding its heading does.
 typedef _Fold = ({
   bool collapsed,
@@ -299,19 +306,27 @@ class _ChatsScreenState extends State<ChatsScreen> {
   /// little as needed when heading and rows fit in the room above the bottom
   /// bar (none when they already do), and with the heading at the top when
   /// the section is taller than that. Runs after the frame that lays out the
-  /// rows. The hold menu and a tap on a heading both use it.
+  /// rows. The hold menu and a tap on a heading both use it. The rows are
+  /// still growing then, so the scroll aims at the section's full height
+  /// ([growth] more than it has now) and takes as long as the unfolding
+  /// ([duration]), so both end together.
   void _revealSection(HomeSection id, {bool thenShowAll = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final state = _sectionKeys[id]?.currentState;
       final ctx = _sectionKeys[id]?.currentContext;
-      if (ctx != null) _scrollToSection(ctx);
+      if (ctx != null) {
+        _scrollToSection(ctx,
+            growth: state?.growth ?? 0,
+            duration: state?.expandDuration ?? _sectionExpand);
+      }
       if (thenShowAll) state?.showAll();
     });
     WidgetsBinding.instance.scheduleFrame();
   }
 
-  void _scrollToSection(BuildContext ctx) {
+  void _scrollToSection(BuildContext ctx,
+      {double growth = 0, Duration duration = _sectionExpand}) {
     final ro = ctx.findRenderObject();
     final scrollable = Scrollable.maybeOf(ctx);
     if (ro is! RenderBox || !ro.attached || scrollable == null) return;
@@ -321,18 +336,16 @@ class _ChatsScreenState extends State<ChatsScreen> {
     // The list is padded by the bottom bar, but its viewport runs under it.
     final inset = MediaQuery.paddingOf(ctx).bottom;
     final top = viewport.getOffsetToReveal(ro, 0.0).offset;
-    final bottom = viewport.getOffsetToReveal(ro, 1.0).offset + inset;
+    final bottom = viewport.getOffsetToReveal(ro, 1.0).offset + inset + growth;
     // `bottom` shows the section's end, `top` its heading at the very top;
     // a section taller than the room gets `top`.
     final lo = bottom < top ? bottom : top;
     final target = position.pixels
         .clamp(lo, top)
-        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .clamp(position.minScrollExtent, position.maxScrollExtent + growth)
         .toDouble();
     if ((target - position.pixels).abs() < 0.5) return;
-    position.animateTo(target,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic);
+    position.animateTo(target, duration: duration, curve: _sectionExpandCurve);
   }
 
   ShellController? _shell;
@@ -1030,8 +1043,33 @@ class _Section<T> extends StatefulWidget {
 }
 
 class _SectionState<T> extends State<_Section<T>>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, SingleTickerProviderStateMixin {
   List<T>? _list;
+
+  /// 0 folded, 1 unfolded; [_shape] is it with the expand/collapse curves.
+  /// The rows live in one clipped, faded box of this height factor (one
+  /// animated thing, not one per row) and are not built at all once folded.
+  late final AnimationController _open;
+  late final Animation<double> _shape;
+  final GlobalKey _bodyKey = GlobalKey();
+
+  /// How long unfolding takes now (none with reduced motion).
+  Duration get expandDuration => _reduced ? Duration.zero : _sectionExpand;
+
+  bool get _reduced => MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+
+  /// How much taller the rows will get before the unfolding is done.
+  double get growth {
+    final box = _bodyKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return 0;
+    return box.size.height * (1 - _shape.value);
+  }
+
+  @override
+  void dispose() {
+    _open.dispose();
+    super.dispose();
+  }
 
   @override
   bool get wantKeepAlive => true;
@@ -1040,6 +1078,12 @@ class _SectionState<T> extends State<_Section<T>>
   @override
   void initState() {
     super.initState();
+    _open =
+        AnimationController(vsync: this, value: widget.fold.collapsed ? 0 : 1);
+    _shape = CurvedAnimation(
+        parent: _open,
+        curve: _sectionExpandCurve,
+        reverseCurve: _sectionCollapseCurve);
     _follow(widget.future);
   }
 
@@ -1047,6 +1091,18 @@ class _SectionState<T> extends State<_Section<T>>
   void didUpdateWidget(_Section<T> old) {
     super.didUpdateWidget(old);
     if (old.future != widget.future) _follow(widget.future);
+    if (old.fold.collapsed != widget.fold.collapsed) {
+      final reduced = _reduced;
+      if (widget.fold.collapsed) {
+        _open.animateBack(0,
+            duration: reduced ? Duration.zero : _sectionCollapse,
+            curve: Curves.linear);
+      } else {
+        _open.animateTo(1,
+            duration: reduced ? Duration.zero : _sectionExpand,
+            curve: Curves.linear);
+      }
+    }
   }
 
   void _follow(Future<List<T>> future) {
@@ -1131,9 +1187,8 @@ class _SectionState<T> extends State<_Section<T>>
                     ),
                   ],
                   const SizedBox(width: 4),
-                  AnimatedRotation(
-                    turns: fold.collapsed ? -0.25 : 0,
-                    duration: const Duration(milliseconds: 150),
+                  RotationTransition(
+                    turns: Tween<double>(begin: -0.25, end: 0).animate(_shape),
                     child: Icon(Icons.expand_more,
                         size: 22, color: c.textSecondary),
                   ),
@@ -1163,7 +1218,6 @@ class _SectionState<T> extends State<_Section<T>>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final c = context.appColors;
     final list = _list;
     final error = list == null ? _error : null;
     // A section that is left out when empty is also left out until it is
@@ -1176,9 +1230,36 @@ class _SectionState<T> extends State<_Section<T>>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _headingRow(context),
-        if (widget.fold.collapsed)
-          const SizedBox.shrink()
-        else if (error != null)
+        AnimatedBuilder(
+          animation: _open,
+          // Folded away: nothing is built, so the section costs its heading.
+          builder: (context, _) => _open.isDismissed
+              ? const SizedBox.shrink()
+              : ClipRect(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    heightFactor: _shape.value,
+                    child: FadeTransition(
+                      opacity: _shape,
+                      child: RepaintBoundary(
+                        key: _bodyKey,
+                        child: _body(context, list, error),
+                      ),
+                    ),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  /// The rows below the heading (what folds).
+  Widget _body(BuildContext context, List<T>? list, Object? error) {
+    final c = context.appColors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (error != null)
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text('$error', style: TextStyle(color: c.alert)),
@@ -1192,10 +1273,7 @@ class _SectionState<T> extends State<_Section<T>>
           _Empty(widget.empty, c)
         else
           ...widget.rows(list.take(_homeItems).toList()),
-        if (!widget.fold.collapsed &&
-            error == null &&
-            list != null &&
-            list.length > _homeItems)
+        if (error == null && list != null && list.length > _homeItems)
           _ShowAllRow(
             key: ValueKey('section-show-all-${widget.fold.section.name}'),
             count: widget.total?.call(list) ?? list.length,
