@@ -636,6 +636,40 @@ fn search_class_url(class: &str) -> AtomicResult<String> {
     .to_string())
 }
 
+/// The kinds of thing opened far more often than anything else: a name hit on
+/// one of these is listed before every other hit (see [`name_match_rank`]).
+const OFTEN_OPENED: [&str; 5] = [
+    urls::DRIVE,
+    AI_CHAT,
+    urls::CONVERSATION,
+    urls::CHATROOM,
+    urls::AGENT,
+];
+
+/// How well `name` matches `query`, best (0) first: the whole name, its start,
+/// a word's start, or every word of the query somewhere in it. `None` when the
+/// name does not match, so a hit on the body alone earns no boost.
+fn name_match_rank(name: &str, query: &str) -> Option<u8> {
+    let (name, query) = (name.to_lowercase(), query.trim().to_lowercase());
+    if query.is_empty() {
+        return None;
+    }
+    if name == query {
+        Some(0)
+    } else if name.starts_with(&query) {
+        Some(1)
+    } else if name
+        .split(|c: char| !c.is_alphanumeric())
+        .any(|word| word.starts_with(&query))
+    {
+        Some(2)
+    } else if query.split_whitespace().all(|t| name.contains(t)) {
+        Some(3)
+    } else {
+        None
+    }
+}
+
 /// [`search`] for only the resources of one of `classes` (none: any). The
 /// class is filtered in the index, before the result limit: a query whose
 /// best twenty are documents still finds the chat in place 21.
@@ -657,10 +691,29 @@ pub fn search_classes(
     let hits = if classes.is_empty() {
         let opts = crate::client::search::SearchOpts {
             limit: Some(fetch as u32),
-            parents,
+            parents: parents.clone(),
             ..Default::default()
         };
-        crate::search::query(store, query.trim(), &opts)?
+        let mut hits = crate::search::query(store, query.trim(), &opts)?;
+        // Drives, chats and contacts are looked up on their own: ten notes
+        // that match better must not push a drive named like the query out
+        // of the fetched hits.
+        let mut seen: std::collections::HashSet<String> =
+            hits.iter().map(|h| h.subject.to_string()).collect();
+        for class in OFTEN_OPENED {
+            let opts = crate::client::search::SearchOpts {
+                limit: Some(5),
+                parents: parents.clone(),
+                filter_pairs: Some(vec![(urls::IS_A.to_string(), class.to_string())]),
+                ..Default::default()
+            };
+            for hit in crate::search::query(store, query.trim(), &opts)? {
+                if seen.insert(hit.subject.to_string()) {
+                    hits.push(hit);
+                }
+            }
+        }
+        hits
     } else {
         // One indexed filter per class (a kind can be two classes, such as
         // conversations and chat rooms), merged best first.
@@ -690,11 +743,13 @@ pub fn search_classes(
     let mut drives = DriveCache::default();
     let mut classes: HashMap<String, String> = Default::default();
     let mut out = Vec::new();
-    for hit in hits.into_iter().take(fetch) {
+    let wanted = fetch + OFTEN_OPENED.len() * 5;
+    for hit in hits.into_iter().take(wanted) {
         let Ok(resource) = store.get_resource_shallow(&hit.subject) else {
             continue;
         };
         let class = first_class(&resource);
+        let class_url = class.clone();
         let class_name = match classes.get(&class) {
             Some(name) => name.clone(),
             None => {
@@ -706,11 +761,17 @@ pub fn search_classes(
                 name
             }
         };
+        let title = name_of(&resource);
+        let boost = OFTEN_OPENED
+            .contains(&class_url.as_str())
+            .then(|| name_match_rank(&title, query))
+            .flatten();
         out.push(with_icon(
             store,
             json!({
                 "subject": hit.subject.to_string(),
-                "title": name_of(&resource),
+                "title": title,
+                "boost": boost,
                 "class_name": class_name,
                 "score": hit.score,
                 "drive": drives.of(store, &resource),
@@ -721,6 +782,15 @@ pub fn search_classes(
     if !scoped {
         // Stable: within each group the search's own order stays.
         out.sort_by_key(|row| row["drive"].as_str().is_none_or(str::is_empty));
+    }
+    // The strong boost: a name hit on a drive, chat or contact comes first,
+    // the exact name before a prefix before a substring. Stable, and the key
+    // is internal: it is not part of the row.
+    out.sort_by_key(|row| row["boost"].as_u64().unwrap_or(u64::MAX));
+    for row in &mut out {
+        if let Some(row) = row.as_object_mut() {
+            row.remove("boost");
+        }
     }
     out.truncate(limit);
     Ok(out)
@@ -936,10 +1006,11 @@ mod tests {
             .await
             .unwrap();
 
-        // The best three are folders: the chat is not among them...
+        // Chats are boosted, so the plain search lists it among the best
+        // three folders too...
         let any = search(&d.store, None, "quokka", 3).unwrap();
-        assert!(!has(&any, &chat));
-        // ...but a filter on the class finds it, and only it.
+        assert!(has(&any, &chat));
+        // ...and a filter on the class finds it, and only it.
         let chats = search_classes(&d.store, None, "quokka", 3, &["aichat".into()]).unwrap();
         assert_eq!(chats.len(), 1, "{chats:?}");
         assert!(has(&chats, &chat));
@@ -1033,6 +1104,52 @@ mod tests {
         let only = search(&d.store, Some(second), "pangolin", 10).unwrap();
         assert_eq!(only.len(), 1);
         assert!(only[0]["subject"].as_str().unwrap().ends_with(&there[9..]));
+    }
+
+    #[test]
+    fn name_matches_rank_exact_before_prefix_before_substring() {
+        assert_eq!(name_match_rank("Alice", "alice"), Some(0));
+        assert_eq!(name_match_rank("Alice Smith", "ali"), Some(1));
+        assert_eq!(name_match_rank("Chat with Alice", "ali"), Some(2));
+        assert_eq!(name_match_rank("Malice", "alic"), Some(3));
+        assert_eq!(name_match_rank("Bob", "alice"), None);
+        assert_eq!(name_match_rank("Bob", " "), None);
+    }
+
+    #[tokio::test]
+    async fn search_boosts_name_hits_on_drives_chats_and_contacts() {
+        let d = Device::new().await;
+        // Many notes whose titles match the query as well as a name can.
+        for i in 0..12 {
+            d.synced(
+                &sync_subject("note", 900 + i),
+                &d.drive,
+                "Quagga",
+                Some(urls::FOLDER),
+                Some(&d.drive),
+            )
+            .await;
+        }
+        d.store.create_drive("Quagga drive").await.unwrap();
+        d.store.set_active_drive(&d.drive).unwrap();
+        d.new_chat("Quagga").await;
+        d.synced(
+            &sync_subject("contact", 950),
+            &d.drive,
+            "Quagga Jones",
+            Some(urls::AGENT),
+            Some(&d.drive),
+        )
+        .await;
+        let hits = search(&d.store, None, "quagga", 5).unwrap();
+        // Exact name first, then the prefix matches, before any plain note.
+        let titles: Vec<&str> = hits.iter().map(|h| h["title"].as_str().unwrap()).collect();
+        assert_eq!(titles[0], "Quagga", "{hits:?}");
+        assert_eq!(hits[0]["class_name"], "ai-chat", "{hits:?}");
+        let mut next = titles[1..3].to_vec();
+        next.sort();
+        assert_eq!(next, ["Quagga Jones", "Quagga drive"], "{hits:?}");
+        assert!(hits.iter().all(|h| h.get("boost").is_none()));
     }
 
     #[tokio::test]
