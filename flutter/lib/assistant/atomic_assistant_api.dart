@@ -23,6 +23,10 @@ class AtomicAssistantApi extends AssistantApi {
       AssistantJson.parseDriveChildren(
           await ffi_assistant.listChildren(parent: parent, limit: 200));
   @override
+  Future<void> moveResource(String subject, String newParent, int index) =>
+      ffi_assistant.moveResource(
+          subject: subject, newParent: newParent, index: index);
+  @override
   Future<void> setActiveDrive(String subject) =>
       ffi_simple.setActiveDrive(subject: subject);
   @override

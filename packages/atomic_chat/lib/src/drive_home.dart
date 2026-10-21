@@ -44,11 +44,35 @@ class CurrentDriveHeader extends StatelessWidget {
   final DriveInfo? drive;
   final VoidCallback onTap;
 
+  /// A resource of the tree was dropped on the header: move it to the drive's
+  /// root. Null: the header accepts no drops.
+  final ValueChanged<DriveDrag>? onDrop;
+
   const CurrentDriveHeader(
-      {super.key, required this.drive, required this.onTap});
+      {super.key, required this.drive, required this.onTap, this.onDrop});
 
   @override
   Widget build(BuildContext context) {
+    final header = _header(context);
+    final drop = onDrop;
+    if (drop == null) return header;
+    final c = context.appColors;
+    return DragTarget<DriveDrag>(
+      key: const Key('current-drive-drop'),
+      // Already at the root: the rows' own drop lines reorder it.
+      onWillAcceptWithDetails: (d) => d.data.parent != d.data.drive,
+      onAcceptWithDetails: (d) => drop(d.data),
+      builder: (context, candidate, rejected) => DecoratedBox(
+        decoration: BoxDecoration(
+          color: candidate.isEmpty ? Colors.transparent : c.rowHighlight,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: header,
+      ),
+    );
+  }
+
+  Widget _header(BuildContext context) {
     final c = context.appColors;
     final d = drive;
     final name = d == null ? 'Drive' : driveTitle(d);
@@ -421,10 +445,79 @@ class DriveTree extends StatefulWidget {
   State<DriveTree> createState() => DriveTreeState();
 }
 
+/// What a dragged tree row carries: the resource, the parent it sits under
+/// and the drive the tree shows.
+class DriveDrag {
+  final String subject;
+  final String parent;
+  final String drive;
+  const DriveDrag(this.subject, this.parent, this.drive);
+}
+
+/// Where on a row a drop lands: above it, below it, or into it.
+enum DropZone { before, after, into }
+
+/// A resolved drop: the new parent and the position among its children
+/// without the dragged one.
+class DriveMove {
+  final String parent;
+  final int index;
+  const DriveMove(this.parent, this.index);
+
+  @override
+  bool operator ==(Object other) =>
+      other is DriveMove && other.parent == parent && other.index == index;
+
+  @override
+  int get hashCode => Object.hash(parent, index);
+
+  @override
+  String toString() => 'DriveMove($parent, $index)';
+}
+
+/// Past every child: the host clamps it, so "the end" needs no count.
+const driveMoveToEnd = 1 << 30;
+
+/// Where dropping [dragged] on [zone] of a row lands, or null when that is
+/// refused or changes nothing. As the web sidebar: a drop above or below a row
+/// puts the item next to it under the row's parent; a drop into a row appends
+/// to that row's children (only when [canHoldChildren]); never into the item
+/// itself or one of its own descendants ([path] is the row's ancestors, its
+/// parent included).
+///
+/// [siblings] are the subjects under the row's parent in tree order.
+DriveMove? resolveDrop({
+  required String dragged,
+  required String row,
+  required String parent,
+  required Set<String> path,
+  required List<String> siblings,
+  required DropZone zone,
+  required bool canHoldChildren,
+}) {
+  if (dragged == row || path.contains(dragged)) return null;
+  if (zone == DropZone.into) {
+    return canHoldChildren ? DriveMove(row, driveMoveToEnd) : null;
+  }
+  final others = [
+    for (final s in siblings)
+      if (s != dragged) s
+  ];
+  final at = others.indexOf(row);
+  if (at < 0) return null;
+  final index = zone == DropZone.before ? at : at + 1;
+  // Back where it already is.
+  if (siblings.indexOf(dragged) == index) return null;
+  return DriveMove(parent, index);
+}
+
 class _Level {
   DriveChildren? data;
   Object? error;
   bool loading = false;
+
+  /// Asked again while a read was running: read once more when it ends.
+  bool again = false;
 }
 
 sealed class _Item {}
@@ -432,7 +525,29 @@ sealed class _Item {}
 class _ChildItem extends _Item {
   final DriveChild child;
   final int depth;
-  _ChildItem(this.child, this.depth);
+
+  /// The folder (or the drive) this row is listed under.
+  final String parent;
+
+  /// The subjects listed under [parent], in order.
+  final List<String> siblings;
+
+  /// The row's ancestors: [parent] and everything above it.
+  final Set<String> path;
+  _ChildItem(this.child, this.depth, this.parent, this.siblings, this.path);
+}
+
+class _Hint {
+  final String subject;
+  final DropZone zone;
+  const _Hint(this.subject, this.zone);
+
+  @override
+  bool operator ==(Object other) =>
+      other is _Hint && other.subject == subject && other.zone == zone;
+
+  @override
+  int get hashCode => Object.hash(subject, zone);
 }
 
 class _StatusItem extends _Item {
@@ -504,9 +619,12 @@ class DriveTreeState extends State<DriveTree> {
   }
 
   /// Reads the children of [parent] (the old ones stay until the new arrive).
-  Future<void> _load(String parent) async {
+  Future<void> _load(String parent, {bool again = false}) async {
     final level = _levels[parent] ??= _Level();
-    if (level.loading) return;
+    if (level.loading) {
+      if (again) level.again = true;
+      return;
+    }
     level.loading = true;
     try {
       final data = await widget.api.driveChildren(parent);
@@ -519,6 +637,10 @@ class DriveTreeState extends State<DriveTree> {
       level.loading = false;
     }
     if (mounted) setState(() {});
+    if (level.again) {
+      level.again = false;
+      if (mounted) _load(parent);
+    }
   }
 
   /// Reads the root and every open folder again.
@@ -550,9 +672,10 @@ class DriveTreeState extends State<DriveTree> {
         out.add(_StatusItem(depth, parent, level?.error));
         return;
       }
+      final siblings = [for (final c in data.children) c.subject];
       for (final child in data.children) {
         if (path.contains(child.subject)) continue;
-        out.add(_ChildItem(child, depth));
+        out.add(_ChildItem(child, depth, parent, siblings, path));
         if (child.expandable &&
             depth < _maxDepth &&
             _open.contains(child.subject)) {
@@ -601,7 +724,7 @@ class DriveTreeState extends State<DriveTree> {
     final lead = leadingOf(child.picture, child.emoji, child.className);
     final open = _open.contains(child.subject);
     final m = SidebarMetrics.of(context);
-    return Padding(
+    final row = Padding(
       key: ValueKey('drive-tree-row-${child.subject}'),
       // Compact rows indent themselves (full-bleed tint, same icon grid).
       padding: EdgeInsets.only(left: m.compact ? 0 : 16.0 * item.depth),
@@ -619,6 +742,72 @@ class DriveTreeState extends State<DriveTree> {
         onTap: () => widget.onOpen(child),
       ),
     );
+    return _DragRow(
+      key: ValueKey('drive-tree-drag-${child.subject}'),
+      // A mouse drags at once; a finger holds first, so a swipe still scrolls.
+      holdToDrag: !m.compact,
+      data: DriveDrag(child.subject, item.parent, widget.drive),
+      title: child.title.isEmpty ? 'Untitled' : child.title,
+      canHoldChildren: _canDropInto(child),
+      hint: _hint?.subject == child.subject ? _hint!.zone : null,
+      resolve: (dragged, zone) => _resolve(dragged, item, zone),
+      onHint: (zone) =>
+          _setHint(zone == null ? null : _Hint(child.subject, zone)),
+      onDrop: (dragged, zone) {
+        final move = _resolve(dragged, item, zone);
+        _setHint(null);
+        if (move != null) _move(dragged.subject, dragged.parent, move);
+      },
+      child: row,
+    );
+  }
+
+  _Hint? _hint;
+
+  void _setHint(_Hint? hint) {
+    if (_hint == hint) return;
+    setState(() => _hint = hint);
+  }
+
+  /// Like the web sidebar, any resource whose children the sidebar unfolds
+  /// takes a drop into it (the host marks tables, chat rooms and the like not
+  /// expandable).
+  bool _canDropInto(DriveChild child) => child.expandable;
+
+  DriveMove? _resolve(DriveDrag dragged, _ChildItem item, DropZone zone) =>
+      resolveDrop(
+        dragged: dragged.subject,
+        row: item.child.subject,
+        parent: item.parent,
+        path: item.path,
+        siblings: item.siblings,
+        zone: zone,
+        canHoldChildren: _canDropInto(item.child),
+      );
+
+  /// Moves a resource to the drive's root, at the end (a drop on the header).
+  Future<void> moveToRoot(DriveDrag dragged) => _move(
+      dragged.subject, dragged.parent, DriveMove(widget.drive, driveMoveToEnd));
+
+  /// Asks the host to move [subject] and reads the two affected levels again.
+  /// A folder dropped into opens, so the result shows.
+  Future<void> _move(String subject, String from, DriveMove to) async {
+    try {
+      await widget.api.moveResource(subject, to.parent, to.index);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+          key: const Key('drive-tree-move-error'),
+          content: Text('Could not move: $e')));
+      return;
+    }
+    if (!mounted) return;
+    if (to.parent != widget.drive && !_open.contains(to.parent)) {
+      setState(() => _open.add(to.parent));
+      _saveOpen();
+    }
+    _load(from, again: true);
+    if (to.parent != from) _load(to.parent, again: true);
   }
 
   /// Only folders and the like unfold (the host marks what keeps its children
@@ -727,6 +916,135 @@ class DriveTreeState extends State<DriveTree> {
           return _newRow();
         },
       ),
+    );
+  }
+}
+
+/// A tree row that can be dragged and dropped on: dragging it moves the
+/// resource, dropping another row on its top or bottom quarter puts that one
+/// next to it, on its middle (when it can hold children) into it. A mouse
+/// drags at once; with [holdToDrag] (touch) a long press starts the drag, so a
+/// swipe still scrolls the list and a tap still opens the row.
+class _DragRow extends StatelessWidget {
+  final bool holdToDrag;
+  final DriveDrag data;
+  final String title;
+  final bool canHoldChildren;
+
+  /// Where a drop would land on this row now (the drop line or highlight).
+  final DropZone? hint;
+
+  /// Where [DropZone] of this row puts a drag; null: a drop there is refused.
+  final DriveMove? Function(DriveDrag, DropZone) resolve;
+  final ValueChanged<DropZone?> onHint;
+  final void Function(DriveDrag, DropZone) onDrop;
+  final Widget child;
+
+  const _DragRow({
+    super.key,
+    required this.holdToDrag,
+    required this.data,
+    required this.title,
+    required this.canHoldChildren,
+    required this.hint,
+    required this.resolve,
+    required this.onHint,
+    required this.onDrop,
+    required this.child,
+  });
+
+  DropZone _zoneAt(BuildContext context, Offset global) {
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return DropZone.after;
+    final h = box.size.height;
+    final y = box.globalToLocal(global).dy;
+    if (canHoldChildren) {
+      if (y < h * 0.25) return DropZone.before;
+      if (y > h * 0.75) return DropZone.after;
+      return DropZone.into;
+    }
+    return y < h / 2 ? DropZone.before : DropZone.after;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    final accent = Theme.of(context).colorScheme.primary;
+    final feedback = Material(
+      elevation: 4,
+      color: c.bg1,
+      borderRadius: BorderRadius.circular(8),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 260),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Text(title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  color: c.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  decoration: TextDecoration.none)),
+        ),
+      ),
+    );
+    final whileDragging = Opacity(opacity: 0.35, child: child);
+    final Widget source = holdToDrag
+        ? LongPressDraggable<DriveDrag>(
+            data: data,
+            dragAnchorStrategy: pointerDragAnchorStrategy,
+            feedback: feedback,
+            childWhenDragging: whileDragging,
+            child: child)
+        : Draggable<DriveDrag>(
+            data: data,
+            dragAnchorStrategy: pointerDragAnchorStrategy,
+            feedback: feedback,
+            childWhenDragging: whileDragging,
+            child: child);
+    return DragTarget<DriveDrag>(
+      onWillAcceptWithDetails: (d) => d.data.subject != data.subject,
+      onMove: (d) {
+        final zone = _zoneAt(context, d.offset);
+        onHint(resolve(d.data, zone) == null ? null : zone);
+      },
+      onLeave: (_) => onHint(null),
+      onAcceptWithDetails: (d) => onDrop(d.data, _zoneAt(context, d.offset)),
+      builder: (context, candidate, rejected) {
+        final zone = hint;
+        return Stack(fit: StackFit.passthrough, children: [
+          source,
+          if (zone == DropZone.into)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  key: const Key('drop-into'),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.14),
+                    border: Border.all(color: accent, width: 1.5),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+              ),
+            ),
+          if (zone == DropZone.before || zone == DropZone.after)
+            Positioned(
+              top: zone == DropZone.before ? 0 : null,
+              bottom: zone == DropZone.after ? 0 : null,
+              left: 0,
+              right: 0,
+              height: 2,
+              child: IgnorePointer(
+                child: ColoredBox(
+                    key: Key(zone == DropZone.before
+                        ? 'drop-before'
+                        : 'drop-after'),
+                    color: accent),
+              ),
+            ),
+        ]);
+      },
     );
   }
 }

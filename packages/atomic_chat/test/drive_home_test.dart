@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:atomic_chat/atomic_chat.dart';
+import 'package:flutter/gestures.dart'
+    show PointerDeviceKind, kLongPressTimeout;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:atomic_chat/src/sidebar_metrics.dart';
@@ -957,5 +959,200 @@ void main() {
         expect(find.text('Inside the folder'), findsOneWidget);
       });
     }
+  });
+
+  group('resolving a drop', () {
+    DriveMove? resolve(DropZone zone,
+            {String dragged = 'd',
+            String row = 'b',
+            String parent = 'p',
+            Set<String> path = const {'drive', 'p'},
+            List<String> siblings = const ['a', 'b', 'c'],
+            bool canHold = true}) =>
+        resolveDrop(
+            dragged: dragged,
+            row: row,
+            parent: parent,
+            path: path,
+            siblings: siblings,
+            zone: zone,
+            canHoldChildren: canHold);
+
+    test('above and below a row land next to it under its parent', () {
+      expect(resolve(DropZone.before), const DriveMove('p', 1));
+      expect(resolve(DropZone.after), const DriveMove('p', 2));
+    });
+
+    test('the dragged sibling is not counted: its own slot is no move', () {
+      // a b c with a dragged: before b is a's own place, after b is not.
+      expect(resolve(DropZone.before, dragged: 'a'), isNull);
+      expect(resolve(DropZone.after, dragged: 'a'), const DriveMove('p', 1));
+      // c dragged to before b: index 1 among a, b.
+      expect(
+          resolve(DropZone.before, dragged: 'c'), const DriveMove('p', 1));
+      expect(resolve(DropZone.after, dragged: 'c'), isNull);
+    });
+
+    test('into a row appends to its children, only when it can hold them', () {
+      expect(resolve(DropZone.into),
+          const DriveMove('b', driveMoveToEnd));
+      expect(resolve(DropZone.into, canHold: false), isNull);
+    });
+
+    test('never into itself or a descendant', () {
+      expect(resolve(DropZone.into, dragged: 'b'), isNull);
+      expect(resolve(DropZone.before, dragged: 'b'), isNull);
+      // The row sits under the dragged one.
+      for (final zone in DropZone.values) {
+        expect(resolve(zone, dragged: 'p'), isNull, reason: '$zone');
+      }
+    });
+  });
+
+  group('dragging rows in the tree', () {
+    Finder row(String subject) =>
+        find.byKey(ValueKey('drive-tree-row-$subject'));
+
+    /// Long-presses [subject]'s row and drags it to [at] of [target]'s row:
+    /// 0 is its top edge, 0.5 its middle, 1 its bottom edge. Returns the
+    /// gesture, still down, when [release] is false.
+    Future<TestGesture> drag(WidgetTester tester, String subject,
+        {String? target, Offset? to, double at = 0.5, bool release = true}) async {
+      final gesture = await tester.startGesture(tester.getCenter(row(subject)));
+      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+      Offset point;
+      if (to != null) {
+        point = to;
+      } else {
+        final rect = tester.getRect(row(target!));
+        point = Offset(rect.center.dx, rect.top + rect.height * at);
+        // Keep off the exact edge, which belongs to the next row.
+        point = Offset(point.dx,
+            point.dy.clamp(rect.top + 2, rect.bottom - 2).toDouble());
+      }
+      await gesture.moveBy(const Offset(0, 4));
+      await tester.pump();
+      await gesture.moveTo(point);
+      await tester.pump();
+      if (release) {
+        await gesture.up();
+        await tester.pumpAndSettle();
+      }
+      return gesture;
+    }
+
+    testWidgets('dropping above a row reorders and reloads the level',
+        (tester) async {
+      final api = _api();
+      await _home(tester, api);
+      expect(_top(tester, 'did:ad:z') < _top(tester, 'did:ad:m'), isTrue);
+      await drag(tester, 'did:ad:m', target: 'did:ad:z', at: 0);
+      expect(api.moves, [('did:ad:m', 'did:ad:a', 0)]);
+      expect(_top(tester, 'did:ad:m') < _top(tester, 'did:ad:z'), isTrue);
+      expect(_top(tester, 'did:ad:z') < _top(tester, 'did:ad:f'), isTrue);
+    });
+
+    testWidgets('dropping below the last row moves it to the end',
+        (tester) async {
+      final api = _api();
+      await _home(tester, api);
+      await drag(tester, 'did:ad:z', target: 'did:ad:f', at: 1);
+      expect(api.moves, [('did:ad:z', 'did:ad:a', 2)]);
+      expect(_top(tester, 'did:ad:f') < _top(tester, 'did:ad:z'), isTrue);
+    });
+
+    testWidgets('dropping on a folder moves into it, with a highlight',
+        (tester) async {
+      final api = _api();
+      await _home(tester, api);
+      final gesture =
+          await drag(tester, 'did:ad:z', target: 'did:ad:f', release: false);
+      expect(find.byKey(const Key('drop-into')), findsOneWidget);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('drop-into')), findsNothing);
+      expect(api.moves, [('did:ad:z', 'did:ad:f', driveMoveToEnd)]);
+      // Gone from the root, shown in the folder, which opened.
+      expect(api.childrenOf['did:ad:a']!.map((c) => c.subject),
+          ['did:ad:m', 'did:ad:f']);
+      expect(api.childrenOf['did:ad:f']!.map((c) => c.subject),
+          ['did:ad:f1', 'did:ad:z']);
+      expect(row('did:ad:z'), findsOneWidget);
+      expect(row('did:ad:f1'), findsOneWidget);
+    });
+
+    testWidgets('a line shows where a drop between rows lands',
+        (tester) async {
+      await _home(tester, _api());
+      final gesture = await drag(tester, 'did:ad:z',
+          target: 'did:ad:f', at: 0, release: false);
+      expect(find.byKey(const Key('drop-before')), findsOneWidget);
+      await gesture.moveTo(tester.getRect(row('did:ad:f')).bottomCenter -
+          const Offset(0, 2));
+      await tester.pump();
+      expect(find.byKey(const Key('drop-after')), findsOneWidget);
+      await gesture.cancel();
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('a folder cannot be dropped into its own child',
+        (tester) async {
+      final api = _api();
+      await _home(tester, api);
+      await tester.tap(find.byKey(const ValueKey('drive-tree-toggle-did:ad:f')));
+      await tester.pumpAndSettle();
+      final gesture =
+          await drag(tester, 'did:ad:f', target: 'did:ad:f1', release: false);
+      expect(find.byKey(const Key('drop-into')), findsNothing);
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(api.moves, isEmpty);
+    });
+
+    testWidgets('a row dropped on the drive header moves to the root',
+        (tester) async {
+      final api = _api();
+      await _home(tester, api);
+      await tester.tap(find.byKey(const ValueKey('drive-tree-toggle-did:ad:f')));
+      await tester.pumpAndSettle();
+      await drag(tester, 'did:ad:f1',
+          to: tester.getCenter(find.byKey(const Key('current-drive-header'))));
+      expect(api.moves, [('did:ad:f1', 'did:ad:a', driveMoveToEnd)]);
+      expect(api.childrenOf['did:ad:a']!.last.subject, 'did:ad:f1');
+      expect(api.childrenOf['did:ad:f'], isEmpty);
+    });
+
+    testWidgets('a refused move says so and changes nothing', (tester) async {
+      final api = _api()..moveError = 'not allowed';
+      await _home(tester, api);
+      await drag(tester, 'did:ad:m', target: 'did:ad:z', at: 0);
+      expect(find.byKey(const Key('drive-tree-move-error')), findsOneWidget);
+      expect(_top(tester, 'did:ad:z') < _top(tester, 'did:ad:m'), isTrue);
+    });
+
+    macTest('on desktop a mouse drags a row at once', (tester) async {
+      final api = _api();
+      await _home(tester, api);
+      final rect = tester.getRect(row('did:ad:z'));
+      final g = await tester.startGesture(tester.getCenter(row('did:ad:m')),
+          kind: PointerDeviceKind.mouse);
+      await g.moveBy(const Offset(0, -30));
+      await tester.pump();
+      await g.moveTo(Offset(rect.center.dx, rect.top + 2));
+      await tester.pump();
+      await g.up();
+      await tester.pumpAndSettle();
+      expect(api.moves, [('did:ad:m', 'did:ad:a', 0)]);
+    });
+
+    testWidgets('moving before the hold ends does not drag', (tester) async {
+      final api = _api();
+      await _home(tester, api);
+      final g = await tester.startGesture(tester.getCenter(row('did:ad:m')));
+      await g.moveBy(const Offset(0, 60));
+      await g.up();
+      await tester.pumpAndSettle();
+      expect(api.moves, isEmpty);
+    });
   });
 }

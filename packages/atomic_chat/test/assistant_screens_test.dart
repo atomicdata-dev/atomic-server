@@ -73,11 +73,32 @@ class FakeApi extends UnimplementedApi {
     await driveChildrenGate;
     final error = driveChildrenError;
     if (error != null) throw error;
-    return DriveChildren(childrenOf[parent] ?? const []);
+    return DriveChildren(List.of(childrenOf[parent] ?? const []));
   }
 
   @override
   Future<void> setActiveDrive(String subject) async => activeSet.add(subject);
+
+  /// The moves asked for, as `(subject, newParent, index)`.
+  final List<(String, String, int)> moves = [];
+  Object? moveError;
+
+  /// Records the move and applies it to [childrenOf] as the host would: out of
+  /// the old parent, into the new at `index` among the others (clamped).
+  @override
+  Future<void> moveResource(String subject, String newParent, int index) async {
+    moves.add((subject, newParent, index));
+    final error = moveError;
+    if (error != null) throw error;
+    DriveChild? moved;
+    for (final list in childrenOf.values) {
+      final at = list.indexWhere((c) => c.subject == subject);
+      if (at >= 0) moved = list.removeAt(at);
+    }
+    if (moved == null) return;
+    final target = childrenOf[newParent] ??= [];
+    target.insert(index.clamp(0, target.length), moved);
+  }
 
   @override
   Future<String> createResource(

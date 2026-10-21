@@ -219,6 +219,12 @@ abstract class RustLibApi extends BaseApi {
 
   Future<void> crateApiAssistantMarkNotificationRead({required String subject});
 
+  Future<void> crateApiAssistantMoveResource({
+    required String subject,
+    required String newParent,
+    required int index,
+  });
+
   void crateApiAssistantNoteResourceOpened({
     required String drive,
     required String subject,
@@ -1699,6 +1705,43 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(
         debugName: "mark_notification_read",
         argNames: ["subject"],
+      );
+
+  @override
+  Future<void> crateApiAssistantMoveResource({
+    required String subject,
+    required String newParent,
+    required int index,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(subject, serializer);
+          sse_encode_String(newParent, serializer);
+          sse_encode_u_32(index, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 98,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiAssistantMoveResourceConstMeta,
+        argValues: [subject, newParent, index],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiAssistantMoveResourceConstMeta =>
+      const TaskConstMeta(
+        debugName: "move_resource",
+        argNames: ["subject", "newParent", "index"],
       );
 
   @override

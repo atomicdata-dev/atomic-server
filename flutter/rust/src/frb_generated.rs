@@ -1640,6 +1640,49 @@ fn wire__crate__api__assistant__mark_notification_read_impl(
         },
     )
 }
+fn wire__crate__api__assistant__move_resource_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "move_resource",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_subject = <String>::sse_decode(&mut deserializer);
+            let api_new_parent = <String>::sse_decode(&mut deserializer);
+            let api_index = <u32>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok = crate::api::assistant::move_resource(
+                            api_subject,
+                            api_new_parent,
+                            api_index,
+                        )
+                        .await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__assistant__note_resource_opened_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -3991,6 +4034,7 @@ fn pde_ffi_dispatcher_primary_impl(
         95 => wire__crate__api__assistant__warm_search_impl(port, ptr, rust_vec_len, data_len),
         96 => wire__crate__api__simple__watch_children_impl(port, ptr, rust_vec_len, data_len),
         97 => wire__crate__api__simple__watch_resource_impl(port, ptr, rust_vec_len, data_len),
+        98 => wire__crate__api__assistant__move_resource_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

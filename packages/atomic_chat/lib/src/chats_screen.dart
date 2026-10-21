@@ -1118,6 +1118,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                 child: CurrentDriveHeader(
                   drive: _currentDrive,
                   onTap: _toggleSwitcher,
+                  onDrop: (d) => _tree.currentState?.moveToRoot(d),
                 ),
               ),
             ),

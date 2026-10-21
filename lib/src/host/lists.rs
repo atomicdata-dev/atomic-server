@@ -476,7 +476,7 @@ const AI_CHATS_FOLDER: &str =
 
 /// Classes whose children the web sidebar does not unfold: they show them in
 /// their own page (table rows, messages, classes, results).
-fn keeps_own_children(resource: &Resource) -> bool {
+pub(super) fn keeps_own_children(resource: &Resource) -> bool {
     [
         urls::TABLE,
         urls::CHATROOM,

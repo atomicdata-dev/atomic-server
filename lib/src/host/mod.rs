@@ -21,6 +21,7 @@
 //! - [`conversations`]: end-to-end encrypted conversations: list, read, send.
 //! - [`context`]: a resource as plain text, to hand to an AI.
 //! - [`create`]: a new resource of a class in a drive (the "New" buttons).
+//! - [`move_resource`]: drag and drop in the drive tree: re-parent and reorder.
 //! - [`notifications`]: the Inbox of the private drive: list, mark read.
 //! - [`own_profile`]: this device's agent's profile: read, edit.
 //! - [`peer_search`]: looking for this agent's other devices, with retries and
@@ -52,6 +53,7 @@ pub mod conversations;
 pub mod create;
 pub mod embed;
 pub mod lists;
+pub mod move_resource;
 pub mod notifications;
 pub mod own_profile;
 pub mod peer_search;

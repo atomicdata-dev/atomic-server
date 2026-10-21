@@ -211,6 +211,15 @@ abstract class AssistantApi {
   Future<DriveChildren> driveChildren(String parent) async =>
       const DriveChildren.empty();
 
+  /// Moves [subject] under [newParent] at [index] among that parent's
+  /// children as [driveChildren] lists them (without [subject] itself; past
+  /// the end appends), as the web sidebar's drag and drop does: `parent` when
+  /// it changes and a fractional `sortOrder`. Throws when the host refuses
+  /// (into itself or its own descendant, a parent that holds no children).
+  /// Unsupported by default.
+  Future<void> moveResource(String subject, String newParent, int index) =>
+      throw UnsupportedError('AssistantApi.moveResource');
+
   /// Makes [subject] the store's active drive, which the app opens on again
   /// after a restart. Does nothing by default.
   Future<void> setActiveDrive(String subject) async {}

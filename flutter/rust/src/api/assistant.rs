@@ -517,6 +517,26 @@ pub async fn create_resource_of_class(
     .map_err(err)
 }
 
+/// Move `subject` under `new_parent` at `index` among the parent's children as
+/// the sidebar lists them (an index past the end appends), as the web app's
+/// drag and drop does: `parent` when it changes, a fractional `sortOrder`
+/// always. Refuses its own descendants. Pushed like every local write.
+pub async fn move_resource(
+    subject: String,
+    new_parent: String,
+    index: u32,
+) -> Result<(), String> {
+    atomic_lib::host::move_resource::move_resource(
+        &node()?,
+        pusher().as_ref(),
+        &subject,
+        &new_parent,
+        index as usize,
+    )
+    .await
+    .map_err(err)
+}
+
 /// Import a whole AI chat at once: an AI chat named `name` in the agent's
 /// private drive with every message of `entries_json`, a JSON array of
 /// `{role, parts, c}` (`parts` as `append_chat_entry` takes them, as an array

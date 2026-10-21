@@ -35,6 +35,20 @@ Future<void> markNotificationRead({required String subject}) =>
     RustLib.instance.api
         .crateApiAssistantMarkNotificationRead(subject: subject);
 
+/// Move `subject` under `newParent` at `index` among that parent's children as
+/// the sidebar lists them (past the end appends), as the web app's drag and
+/// drop does. Throws when the move is refused (own descendant, a parent that
+/// holds no children).
+Future<void> moveResource({
+  required String subject,
+  required String newParent,
+  required int index,
+}) => RustLib.instance.api.crateApiAssistantMoveResource(
+  subject: subject,
+  newParent: newParent,
+  index: index,
+);
+
 /// What changed lately in every drive, newest first, by whom. Read from the
 /// recents index, which the store's change events keep.
 /// `include_own` adds the person's own changes (the feed's "Show mine"),
