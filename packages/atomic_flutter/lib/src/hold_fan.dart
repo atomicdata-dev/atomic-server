@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 
+import 'click_cursor.dart';
 import 'theme.dart';
 
 /// One choice of a [HoldFan]: a short label, optionally led by an emoji (or,
@@ -330,6 +331,13 @@ class _HoldFanState<T> extends State<HoldFan<T>>
   /// Waiting to see whether the touch is a tap, a swipe or a hold.
   Timer? _holdTimer;
   bool _pending = false;
+
+  /// Finger or button down on the face: it sinks a little, flat, no ripple.
+  bool _pressed = false;
+  void _look(bool down) {
+    if (_pressed != down && mounted) setState(() => _pressed = down);
+  }
+
   Offset _pendingAt = Offset.zero;
 
   void _cancelPending() {
@@ -711,6 +719,7 @@ class _HoldFanState<T> extends State<HoldFan<T>>
         // A label: the wash hugs it, rounded, and no ripple spreads from the
         // finger.
         ? InkWell(
+          mouseCursor: WidgetStateMouseCursor.clickable,
             onTap: onTap,
             onTapDown: onDown ? (_) {} : null,
             borderRadius: rounded,
@@ -722,7 +731,9 @@ class _HoldFanState<T> extends State<HoldFan<T>>
             ),
           )
         : InkResponse(
+          mouseCursor: WidgetStateMouseCursor.clickable,
             onTap: onTap,
+            splashFactory: NoSplash.splashFactory,
             // The tap itself is the Listener's; this only shows the press.
             onTapDown: onDown ? (_) {} : null,
             radius: widget.size / 2,
@@ -734,6 +745,17 @@ class _HoldFanState<T> extends State<HoldFan<T>>
                   : widget.child,
             ),
           );
+    final calm = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    target = Listener(
+      onPointerDown: (_) => _look(true),
+      onPointerUp: (_) => _look(false),
+      onPointerCancel: (_) => _look(false),
+      child: AnimatedScale(
+        scale: _pressed && !calm ? 0.94 : 1,
+        duration: calm ? Duration.zero : const Duration(milliseconds: 90),
+        child: target,
+      ),
+    );
     if (widget.tooltip != null) {
       target = Tooltip(
         message: widget.tooltip,
@@ -780,6 +802,10 @@ class _HoldFanState<T> extends State<HoldFan<T>>
         ),
       );
     }
+    target = ClickCursor(
+      enabled: onTap != null || onDown || hold,
+      child: target,
+    );
     return Semantics(
       container: true,
       button: true,
@@ -887,44 +913,48 @@ class _MenuRow extends StatelessWidget {
       label: item.semanticLabel,
       onTap: onTap,
       excludeSemantics: true,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: hovered
-              ? c.main.withValues(alpha: HoldMenuStyle.hoverAlpha)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(HoldMenuStyle.rowRadius),
-        ),
-        child: Padding(
-          padding: _rowPadding,
-          child: Row(children: [
-            SizedBox(
-              width: _rowIcon,
-              child: item.icon != null
-                  ? Icon(item.icon, size: 22, color: color)
-                  : item.emoji != null
-                      ? Text(item.emoji!, style: const TextStyle(fontSize: 18))
-                      : null,
-            ),
-            const SizedBox(width: _rowGap),
-            Expanded(
-              child: Text(
-                item.label,
-                maxLines: 1,
-                softWrap: false,
-                overflow: TextOverflow.ellipsis,
-                style: style.copyWith(color: color),
+      child: ClickCursor(
+        enabled: true,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: hovered
+                ? c.main.withValues(alpha: HoldMenuStyle.hoverAlpha)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(HoldMenuStyle.rowRadius),
+          ),
+          child: Padding(
+            padding: _rowPadding,
+            child: Row(children: [
+              SizedBox(
+                width: _rowIcon,
+                child: item.icon != null
+                    ? Icon(item.icon, size: 22, color: color)
+                    : item.emoji != null
+                        ? Text(item.emoji!,
+                            style: const TextStyle(fontSize: 18))
+                        : null,
               ),
-            ),
-            if (item.hint != null) ...[
-              const SizedBox(width: 8),
-              Text(item.hint!,
-                  key: const Key('hold-fan-hint'),
+              const SizedBox(width: _rowGap),
+              Expanded(
+                child: Text(
+                  item.label,
                   maxLines: 1,
-                  style: style.copyWith(
-                      color: c.textSecondary,
-                      fontSize: (style.fontSize ?? 16) * 0.8)),
-            ],
-          ]),
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: style.copyWith(color: color),
+                ),
+              ),
+              if (item.hint != null) ...[
+                const SizedBox(width: 8),
+                Text(item.hint!,
+                    key: const Key('hold-fan-hint'),
+                    maxLines: 1,
+                    style: style.copyWith(
+                        color: c.textSecondary,
+                        fontSize: (style.fontSize ?? 16) * 0.8)),
+              ],
+            ]),
+          ),
         ),
       ),
     );

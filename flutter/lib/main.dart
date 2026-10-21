@@ -24,7 +24,7 @@ import 'screens/store_recovery_screen.dart';
 import 'screens/sync_screen.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:atomic_flutter/atomic_flutter.dart'
-    show AppScrollBehavior, Perf;
+    show AppScrollBehavior, Perf, withCalmInteraction;
 import 'theme.dart';
 import 'atomic/atomic_client.dart';
 import 'atomic/session.dart';
@@ -370,33 +370,32 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
       title: 'atomic.place',
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1976D2),
+      theme: withCalmInteraction(
+        ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF1976D2),
+            brightness: Brightness.light,
+          ),
+          useMaterial3: true,
           brightness: Brightness.light,
+          scaffoldBackgroundColor: AppColors.light.pageBg,
+          extensions: const [AppColors.light],
         ),
-        useMaterial3: true,
-        brightness: Brightness.light,
-        scaffoldBackgroundColor: AppColors.light.pageBg,
-        extensions: const [AppColors.light],
-        // A press shows a faint wash of the text colour, as the embedded page
-        // does, not the default tinted flat rectangle.
-        splashColor: AppColors.light.textPrimary.withValues(alpha: 0.06),
-        highlightColor: AppColors.light.textPrimary.withValues(alpha: 0.08),
+        // A flat wash of the text colour on press, no expanding ink.
+        ink: AppColors.light.textPrimary,
       ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1976D2),
+      darkTheme: withCalmInteraction(
+        ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF1976D2),
+            brightness: Brightness.dark,
+          ),
+          useMaterial3: true,
           brightness: Brightness.dark,
+          scaffoldBackgroundColor: AppColors.dark.pageBg,
+          extensions: const [AppColors.dark],
         ),
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: AppColors.dark.pageBg,
-        extensions: const [AppColors.dark],
-        // A press shows a faint wash of the text colour, as the embedded page
-        // does, not the default tinted flat rectangle.
-        splashColor: AppColors.dark.textPrimary.withValues(alpha: 0.06),
-        highlightColor: AppColors.dark.textPrimary.withValues(alpha: 0.08),
+        ink: AppColors.dark.textPrimary,
       ),
       home: _storeRecovery != null
           ? StoreRecoveryScreen(

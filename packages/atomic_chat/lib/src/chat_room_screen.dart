@@ -449,6 +449,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     );
     return tappable
         ? InkWell(
+          mouseCursor: WidgetStateMouseCursor.clickable,
             key: const Key('event-row'),
             onTap: () => _openAbout(m),
             child: row,

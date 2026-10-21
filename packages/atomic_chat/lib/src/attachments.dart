@@ -385,6 +385,7 @@ class AttachmentChip extends StatelessWidget {
       color: onMine ? c.main.withValues(alpha: 0.10) : c.bg1,
       shape: StadiumBorder(side: BorderSide(color: c.border)),
       child: InkWell(
+        mouseCursor: WidgetStateMouseCursor.clickable,
         customBorder: const StadiumBorder(),
         onTap: onTap,
         child: Padding(
@@ -406,6 +407,7 @@ class AttachmentChip extends StatelessWidget {
               ),
               if (onRemove != null)
                 InkResponse(
+                  mouseCursor: WidgetStateMouseCursor.clickable,
                   onTap: onRemove,
                   radius: 14,
                   child: Padding(

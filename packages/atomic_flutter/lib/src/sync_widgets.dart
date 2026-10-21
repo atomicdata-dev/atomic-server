@@ -46,6 +46,7 @@ abstract final class SyncText {
       body(c).copyWith(fontWeight: FontWeight.w600);
   static TextStyle caption(AppColors c) =>
       TextStyle(fontSize: 13, height: 1.3, color: c.textSecondary);
+
   /// The app's section-header style (see [SectionHeaderStyle]).
   static TextStyle header(AppColors c) => c.sectionHeaderText;
   static TextStyle title(AppColors c) => TextStyle(
@@ -342,6 +343,7 @@ class KeyValueRow extends StatelessWidget {
     );
     if (tap == null) return row;
     return InkWell(
+      mouseCursor: WidgetStateMouseCursor.clickable,
       onTap: tap,
       child: Semantics(
           button: true,
@@ -609,6 +611,11 @@ class SyncRow extends StatelessWidget {
         ]),
       ),
     );
-    return onTap == null ? row : InkWell(onTap: onTap, child: row);
+    return onTap == null
+        ? row
+        : InkWell(
+            onTap: onTap,
+            mouseCursor: WidgetStateMouseCursor.clickable,
+            child: row);
   }
 }

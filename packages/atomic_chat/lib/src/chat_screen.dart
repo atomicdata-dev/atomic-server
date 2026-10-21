@@ -1,4 +1,4 @@
-import 'package:atomic_flutter/atomic_flutter.dart' show ErrorText;
+import 'package:atomic_flutter/atomic_flutter.dart' show ErrorText, ClickCursor;
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt, Perf;
 import 'package:flutter/material.dart';
@@ -1435,9 +1435,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         runSpacing: 6,
         children: [
           for (final p in images)
-            GestureDetector(
-              onTap: () => _showImage(p),
-              child: AttachmentThumb(p, size: images.length == 1 ? 160 : 96),
+            ClickCursor(
+              enabled: true,
+              child: GestureDetector(
+                onTap: () => _showImage(p),
+                child: AttachmentThumb(p, size: images.length == 1 ? 160 : 96),
+              ),
             ),
         ],
       ));
@@ -1507,6 +1510,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ),
       ),
       child: InkWell(
+        mouseCursor: WidgetStateMouseCursor.clickable,
         customBorder: const StadiumBorder(),
         onTap: () => _toggle(item),
         child: Padding(
@@ -1627,6 +1631,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         color: c.bg2,
         shape: const CircleBorder(),
         child: InkResponse(
+          mouseCursor: WidgetStateMouseCursor.clickable,
           onTap: onTap,
           radius: 14,
           child: Padding(

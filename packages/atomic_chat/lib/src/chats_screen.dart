@@ -1161,6 +1161,7 @@ class _SectionState<T> extends State<_Section<T>>
           child: Material(
             color: c.sectionBand,
             child: InkWell(
+              mouseCursor: WidgetStateMouseCursor.clickable,
               onTap: fold.onToggle,
               onLongPress: fold.onHold,
               child: Padding(
@@ -1310,6 +1311,7 @@ class _ShowAllRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
+    mouseCursor: WidgetStateMouseCursor.clickable,
         onTap: onTap,
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 48),
@@ -1567,6 +1569,7 @@ class _ActivityPageState extends State<_ActivityPage> {
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: ChoiceChip(
+                  mouseCursor: WidgetStateMouseCursor.clickable,
                   key: Key('activity-drive-${key ?? 'all'}'),
                   label: Text(label),
                   selected: _drive == key,

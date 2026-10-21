@@ -197,6 +197,7 @@ class _ToolStepRowState extends State<ToolStepRow> {
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
+          mouseCursor: WidgetStateMouseCursor.clickable,
           key: Key('tool-step-${p.toolCallId}'),
           borderRadius: BorderRadius.circular(6),
           onTap: () => setState(() => _open = !_open),

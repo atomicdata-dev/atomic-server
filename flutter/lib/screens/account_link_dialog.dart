@@ -142,13 +142,17 @@ class _AccountLinkDialogState extends State<AccountLinkDialog> {
                         'you are signed in, and enter this code.'),
                 const SizedBox(height: 16),
                 Center(
-                  child: GestureDetector(
-                    onTap: () {
-                      Clipboard.setData(ClipboardData(text: request.userCode));
-                    },
-                    child: SelectableText(request.userCode,
-                        style: theme.textTheme.headlineMedium
-                            ?.copyWith(letterSpacing: 4)),
+                  child: shared.ClickCursor(
+                    enabled: true,
+                    child: GestureDetector(
+                      onTap: () {
+                        Clipboard.setData(
+                            ClipboardData(text: request.userCode));
+                      },
+                      child: SelectableText(request.userCode,
+                          style: theme.textTheme.headlineMedium
+                              ?.copyWith(letterSpacing: 4)),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),

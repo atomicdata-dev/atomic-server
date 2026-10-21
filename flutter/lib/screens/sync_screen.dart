@@ -578,6 +578,7 @@ class _SyncScreenState extends State<SyncScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         InkWell(
+          mouseCursor: WidgetStateMouseCursor.clickable,
           onTap: agent == null ? null : _openProfile,
           borderRadius: BorderRadius.circular(12),
           child: Row(children: [
@@ -597,6 +598,7 @@ class _SyncScreenState extends State<SyncScreen> {
                     Tooltip(
                       message: 'Copy ID',
                       child: InkWell(
+                        mouseCursor: WidgetStateMouseCursor.clickable,
                         key: const Key('copy-agent-id'),
                         onTap: () => _copy(agent.subject, 'Agent ID'),
                         borderRadius: BorderRadius.circular(6),

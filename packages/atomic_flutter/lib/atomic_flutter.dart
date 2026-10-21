@@ -12,6 +12,8 @@ export 'src/theme.dart';
 export 'src/app_scroll_physics.dart';
 
 export 'src/hold_fan.dart';
+export 'src/click_cursor.dart';
+export 'src/interaction_theme.dart';
 
 export 'src/copyable_error.dart';
 export 'src/error_snack.dart';

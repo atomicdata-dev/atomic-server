@@ -1,5 +1,6 @@
 import 'copyable_error.dart';
 import 'package:flutter/material.dart';
+import 'click_cursor.dart';
 import 'package:flutter/services.dart';
 import 'settings_backend.dart';
 import 'error_snack.dart';
@@ -361,24 +362,28 @@ class _AgentSettingsDialogState extends State<AgentSettingsDialog> {
               Icon(icon, size: 20, color: theme.colorScheme.onSurface),
               const SizedBox(width: 8),
               Expanded(
-                  child: GestureDetector(
-                onTap: onTitleTap,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                        child: Text(title,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w600))),
-                    if (onTitleTap != null) ...[
-                      const SizedBox(width: 4),
-                      Icon(Icons.edit,
-                          size: 12, color: theme.colorScheme.onSurfaceVariant),
-                    ],
-                  ],
-                ),
-              )),
+                  child: ClickCursor(
+                      enabled: onTitleTap != null,
+                      child: GestureDetector(
+                        onTap: onTitleTap,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                                child: Text(title,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600))),
+                            if (onTitleTap != null) ...[
+                              const SizedBox(width: 4),
+                              Icon(Icons.edit,
+                                  size: 12,
+                                  color: theme.colorScheme.onSurfaceVariant),
+                            ],
+                          ],
+                        ),
+                      ))),
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -421,12 +426,15 @@ class _AgentSettingsDialogState extends State<AgentSettingsDialog> {
                 overflow: TextOverflow.ellipsis),
           ),
           if (onCopy != null)
-            GestureDetector(
-              onTap: onCopy,
-              child: Text('Copy',
-                  style: TextStyle(
-                      fontSize: 10,
-                      color: Theme.of(context).colorScheme.primary)),
+            ClickCursor(
+              enabled: true,
+              child: GestureDetector(
+                onTap: onCopy,
+                child: Text('Copy',
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: Theme.of(context).colorScheme.primary)),
+              ),
             ),
         ],
       ),

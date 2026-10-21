@@ -308,10 +308,15 @@ class _Renderer {
     TapGestureRecognizer? link,
   ]) =>
       switch (n) {
-        MdText(:final text) => TextSpan(text: text, recognizer: link),
+        MdText(:final text) => TextSpan(
+            text: text,
+            recognizer: link,
+            mouseCursor: link == null ? null : SystemMouseCursors.click,
+          ),
         MdCodeSpan(:final code) => TextSpan(
             text: code,
             recognizer: link,
+            mouseCursor: link == null ? null : SystemMouseCursors.click,
             style: style.copyWith(
               fontFamily: _mono,
               fontFamilyFallback: _monoFallback,
@@ -337,9 +342,18 @@ class _Renderer {
                 decorationColor: (linkColor ?? c.main).withValues(alpha: 0.5),
               ),
               children: [
-                if (image) TextSpan(text: '🖼 ', recognizer: r),
+                if (image)
+                  TextSpan(
+                    text: '🖼 ',
+                    recognizer: r,
+                    mouseCursor: r == null ? null : SystemMouseCursors.click,
+                  ),
                 if (children.isEmpty)
-                  TextSpan(text: url, recognizer: r)
+                  TextSpan(
+                    text: url,
+                    recognizer: r,
+                    mouseCursor: r == null ? null : SystemMouseCursors.click,
+                  )
                 else
                   for (final k in children) span(k, style, tap, r),
               ],

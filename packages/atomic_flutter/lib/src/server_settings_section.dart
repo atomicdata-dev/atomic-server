@@ -452,6 +452,7 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
                   ),
                 Expanded(
                   child: InkWell(
+                    mouseCursor: WidgetStateMouseCursor.clickable,
                     onTap: detail == null
                         ? null
                         : () => setState(
@@ -670,6 +671,7 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
     return Padding(
       padding: const EdgeInsets.only(bottom: SyncGap.s),
       child: InkWell(
+        mouseCursor: WidgetStateMouseCursor.clickable,
         key: ValueKey('peer-card-$nodeId'),
         borderRadius: BorderRadius.circular(12),
         onTap: () => _openPeer(device),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:atomic_flutter/atomic_flutter.dart' show withCalmInteraction;
 
 import 'screens/startup_failed_screen.dart';
 import 'screens/store_recovery_screen.dart';
@@ -75,16 +76,22 @@ Future<void> bootstrap({
 Widget _fallbackApp(Widget home) => MaterialApp(
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.system,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1976D2)),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1976D2),
-          brightness: Brightness.dark,
+      theme: withCalmInteraction(
+        ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1976D2)),
+          useMaterial3: true,
         ),
-        useMaterial3: true,
+        ink: Colors.black,
+      ),
+      darkTheme: withCalmInteraction(
+        ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF1976D2),
+            brightness: Brightness.dark,
+          ),
+          useMaterial3: true,
+        ),
+        ink: Colors.white,
       ),
       home: home,
     );

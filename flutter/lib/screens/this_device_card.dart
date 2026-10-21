@@ -147,6 +147,7 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
       title: 'This device',
       children: [
         InkWell(
+          mouseCursor: WidgetStateMouseCursor.clickable,
           key: const Key('this-device-name'),
           onTap: widget.onRename,
           child: ConstrainedBox(
@@ -401,6 +402,7 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
       child: open == null
           ? row
           : InkWell(
+            mouseCursor: WidgetStateMouseCursor.clickable,
               onTap: () => open(d.subject, name),
               child: Semantics(
                   button: true, label: 'Storage of $name', child: row)),

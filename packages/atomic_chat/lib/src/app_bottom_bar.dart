@@ -422,14 +422,17 @@ class _Current extends StatelessWidget {
     return Semantics(
       selected: current,
       child: IconButtonTheme(
+        // Merged onto the app's, which carries the flat press and the pointer.
         data: current
             ? IconButtonThemeData(
-                style: IconButton.styleFrom(
+                style: (Theme.of(context).iconButtonTheme.style ??
+                        const ButtonStyle())
+                    .merge(IconButton.styleFrom(
                   foregroundColor: main,
                   disabledForegroundColor: main,
-                ),
+                )),
               )
-            : const IconButtonThemeData(),
+            : Theme.of(context).iconButtonTheme,
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -503,7 +506,9 @@ class _ProfileButton extends StatelessWidget {
             excludeSemantics: true,
             onTap: current ? null : onPressed,
             child: InkResponse(
+              mouseCursor: WidgetStateMouseCursor.clickable,
               onTap: current ? null : onPressed,
+              splashFactory: NoSplash.splashFactory,
               radius: 28,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(minWidth: 48, minHeight: 48),

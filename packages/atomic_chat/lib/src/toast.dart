@@ -313,7 +313,8 @@ class _ToastCardState extends State<_ToastCard> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: pal.border, width: 1),
         boxShadow: [
-          BoxShadow(color: pal.shadow, blurRadius: 16, offset: const Offset(0, 2)),
+          BoxShadow(
+              color: pal.shadow, blurRadius: 16, offset: const Offset(0, 2)),
         ],
       ),
       padding: const EdgeInsets.all(12),
@@ -338,11 +339,14 @@ class _ToastCardState extends State<_ToastCard> {
             TextButton(
               style: TextButton.styleFrom(
                 foregroundColor: accent,
+                enabledMouseCursor: SystemMouseCursors.click,
+                disabledMouseCursor: SystemMouseCursors.basic,
+                splashFactory: NoSplash.splashFactory,
                 minimumSize: const Size(48, 48),
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 tapTargetSize: MaterialTapTargetSize.padded,
-                textStyle:
-                    const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500),
+                textStyle: const TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.w500),
               ),
               onPressed: () {
                 widget.onDismiss();

@@ -269,6 +269,7 @@ class _NewDocumentSheetState extends State<NewDocumentSheet> {
                         Padding(
                           padding: const EdgeInsets.only(right: 6),
                           child: ChoiceChip(
+                            mouseCursor: WidgetStateMouseCursor.clickable,
                             key: ValueKey('drive-${d.subject}'),
                             label: Text(driveLabel(d)),
                             selected: d.subject == _drive,

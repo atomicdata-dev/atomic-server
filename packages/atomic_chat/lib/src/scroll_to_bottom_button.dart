@@ -141,6 +141,7 @@ class _ScrollToBottomButtonState extends State<ScrollToBottomButton>
             child: Tooltip(
               message: unseen > 0 ? '$unseen new' : 'Scroll to newest',
               child: InkResponse(
+                mouseCursor: WidgetStateMouseCursor.clickable,
                 key: const Key('scroll-to-bottom'),
                 onTap: _show.isAnimating && !_wanted ? null : _tap,
                 radius: 24,

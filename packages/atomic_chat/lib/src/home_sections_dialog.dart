@@ -111,6 +111,7 @@ class _HomeSectionsBodyState extends State<_HomeSectionsBody> {
       child: SizedBox(
         height: 48,
         child: InkWell(
+          mouseCursor: WidgetStateMouseCursor.clickable,
           onTap: () => _set(_layout.setHidden(s, on)),
           child: Row(children: [
             const SizedBox(width: 8),
@@ -128,10 +129,13 @@ class _HomeSectionsBodyState extends State<_HomeSectionsBody> {
             ),
             ReorderableDragStartListener(
               index: index,
-              child: SizedBox(
-                width: 48,
-                height: 48,
-                child: Icon(Icons.drag_handle, color: c.textSecondary),
+              child: MouseRegion(
+                cursor: SystemMouseCursors.grab,
+                child: SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Icon(Icons.drag_handle, color: c.textSecondary),
+                ),
               ),
             ),
             const SizedBox(width: 8),

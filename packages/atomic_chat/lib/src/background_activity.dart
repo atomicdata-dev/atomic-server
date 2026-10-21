@@ -400,6 +400,7 @@ class _BackgroundActivityIndicatorState
           child: Tooltip(
             message: caption,
             child: InkResponse(
+              mouseCursor: WidgetStateMouseCursor.clickable,
               onTap: widget.onTap,
               radius: 22,
               child: SizedBox(

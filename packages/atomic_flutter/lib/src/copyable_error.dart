@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'click_cursor.dart';
 import 'package:flutter/services.dart';
 
 /// Error or diagnostic text a person can select and copy for a bug report:
@@ -77,16 +78,19 @@ class _ErrorTextState extends State<ErrorText> {
               .merge(widget.style),
         ),
         if (_long)
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => setState(() => _expanded = !_expanded),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Text(_expanded ? 'Show less' : 'Show more',
-                  style: TextStyle(
-                      color: color,
-                      fontSize: widget.fontSize - 1,
-                      decoration: TextDecoration.underline)),
+          ClickCursor(
+            enabled: true,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(_expanded ? 'Show less' : 'Show more',
+                    style: TextStyle(
+                        color: color,
+                        fontSize: widget.fontSize - 1,
+                        decoration: TextDecoration.underline)),
+              ),
             ),
           ),
       ],
