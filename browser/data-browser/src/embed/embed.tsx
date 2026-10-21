@@ -23,7 +23,7 @@
  * Reading: only from the host (`noServer`, `embedStore.ts`).
  */
 import '../helpers/preloadLocale';
-import { StrictMode, useEffect, useState } from 'react';
+import { lazy, StrictMode, Suspense, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   createMemoryHistory,
@@ -65,8 +65,6 @@ import {
 import { setLocalStorageValue } from '../hooks/useLocalStorage';
 import { useNativeChatRoom } from './useNativeChatRoom';
 import { embedTouchCss } from './touchStyle';
-import { aiCall } from './aiTools';
-import { AiToolsHost } from './AiToolsHost';
 
 enableEmbedMode();
 registerEmbedActions();
@@ -184,11 +182,20 @@ window.addEventListener('pagehide', () => void flush());
 // tools (`?ai=1&drive=<subject>`).
 const aiParams = new URLSearchParams(location.search);
 const aiMode = aiParams.get('ai') === '1';
+// The AI SDK and the web chat's tools are only for the app's AI chat: a lazy
+// chunk keeps them out of the first resource's load.
+const AiToolsHost = lazy(() =>
+  import('./AiToolsHost').then(m => ({ default: m.AiToolsHost })),
+);
 
 const rootRoute = createRootRoute({
   component: () => (
     <Providers>
-      {aiMode && <AiToolsHost drive={aiParams.get('drive') ?? undefined} />}
+      {aiMode && (
+        <Suspense>
+          <AiToolsHost drive={aiParams.get('drive') ?? undefined} />
+        </Suspense>
+      )}
       <Outlet />
     </Providers>
   ),
@@ -391,7 +398,9 @@ window.atomicEmbed = {
   },
   setGestures,
   aiCall(id, method, args) {
-    void aiCall(m => window.AtomicFlutter?.postMessage(m), id, method, args);
+    void import('./aiTools').then(({ aiCall }) =>
+      aiCall(m => window.AtomicFlutter?.postMessage(m), id, method, args),
+    );
   },
   openMenu(anchor) {
     window.dispatchEvent(
