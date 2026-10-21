@@ -213,8 +213,8 @@ void main() {
       final events = await ai.run([
         ChatEntry.text((id: 'u', role: 'user', text: 'hi', createdAt: 0)),
       ], bridge: bridge).toList();
-      expect(seen.single.\$1, ['web_tool']);
-      expect(seen.single.\$2, 'WEB PROMPT');
+      expect(seen.single.$1, ['web_tool']);
+      expect(seen.single.$2, 'WEB PROMPT');
       // This bridge has no web search tool.
       expect(events.whereType<AiNotice>().single.text,
           HostedAi.webUnavailableNotice);
