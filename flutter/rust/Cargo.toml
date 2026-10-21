@@ -50,3 +50,7 @@ opt-level = 1
 [profile.release]
 lto = "fat"
 codegen-units = 1
+
+# netdev 0.31 calls macOS-only SCNetworkInterface APIs on iOS.
+[patch.crates-io]
+netdev = { path = "vendor/netdev" }

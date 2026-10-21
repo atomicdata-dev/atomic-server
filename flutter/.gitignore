@@ -58,3 +58,11 @@ assets/embed/*
 !assets/embed/assets/
 assets/embed/assets/*
 !assets/embed/assets/.gitkeep
+
+# Ephemeral CI signing settings
+ios/Flutter/Signing.xcconfig
+
+# Android upload signing (local or ephemeral CI files)
+/android/key.properties
+*.jks
+*.keystore

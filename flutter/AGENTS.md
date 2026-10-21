@@ -40,9 +40,11 @@ Ed25519 keypairs (agents).
 ### Package and identifier names
 
 The Dart package is `atomic_app` and the Rust crate `atomic_flutter_rust`. The
-Android `applicationId`/namespace (`com.ontola.atomiccanvas_flutter`, with the
-matching Kotlin directory) and the iOS bundle identifier are legacy names kept
-on purpose: changing them would orphan the installed app's keys and data.
+The permanent iOS bundle identifier and Android application ID are
+`io.ontola.atomic`; the displayed app name is `atomic.place`. The product owner
+explicitly approved replacing the legacy development IDs on 2026-10-20 for the
+main app's first store release. Do not add canvas, Flutter, or implementation
+names to store identity. Android's internal Kotlin namespace may remain legacy.
 
 ## File Structure
 

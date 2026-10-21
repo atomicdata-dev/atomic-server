@@ -11,9 +11,9 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleDisplayName</key>
-	<string>atomic.place (flutter)</string>
+	<string>atomic.place</string>
 	<key>CFBundleName</key>
-	<string>Atomic</string>
+	<string>atomic.place</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

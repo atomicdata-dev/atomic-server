@@ -95,6 +95,15 @@ NodeIDs are persistent (stored in the local DB), so a QR code stays valid across
 
 The Dart client code in `lib/atomic/` (`AtomicClient`, `session.dart`, FRB bridge) is a general-purpose Atomic Data SDK wrapping `atomic_lib` via `flutter_rust_bridge`. Once the API stabilizes, it should be extracted to `atomic-server/dart/` (or `sdk/dart/`) as a reusable Dart package, keeping this app as a thin UI layer on top.
 
-## Names that look old but are intentional
+## App identity
 
-The Dart package is `atomic_app` and the Rust crate `atomic_flutter_rust`, but the Android `applicationId`/namespace (`com.ontola.atomiccanvas_flutter`, including the Kotlin package directory) and the iOS bundle identifier (`com.ontola.atomiccanvasFlutter`) keep their original names on purpose. Renaming them would make the OS treat the app as a different one and orphan the installed app's keys and data.
+The app is **atomic.place**. Its permanent iOS bundle identifier and Android
+application ID are both `io.ontola.atomic`, following the `io.ontola.*` naming
+used by the other Ontola apps. This is the main app, not a separate Flutter
+edition. The product owner approved replacing the development identifiers on
+2026-10-20 before the first store release.
+
+The Dart package is `atomic_app` and the Rust crate is `atomic_flutter_rust`.
+Android's internal Kotlin namespace remains `com.ontola.atomiccanvas_flutter`;
+it is not the installed application ID. Existing development installs with the
+old application IDs remain separate and their local data is not migrated.
