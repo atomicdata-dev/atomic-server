@@ -299,15 +299,14 @@ extension AppColorsExt on BuildContext {
 }
 
 /// The one section-header style of the app (Home's sections, Sync's
-/// sections): the title in the full text colour, 14 sp bold, on a faint band
-/// (the text colour at 6% over the page) that sets headers apart from the
-/// rows under them. Three levels read: header (strong, on the band), item
+/// sections): the title in the full text colour, 14 sp bold, on the bar's
+/// own surface ([AppColors.barSurface], the bottom bar's colour) that sets
+/// headers apart from the rows under them. Three levels read: header (strong, on the band), item
 /// title (normal), item caption ([AppColors.textSecondary]).
 extension SectionHeaderStyle on AppColors {
-  /// The surface of a section header: at least 1.08:1 off the page in both
-  /// themes.
-  Color get sectionBand =>
-      Color.alphaBlend(textPrimary.withValues(alpha: 0.06), bgBody);
+  /// The surface of a section header: exactly the bottom bar's colour, so
+  /// the sidebar and the bar read as one family.
+  Color get sectionBand => barSurface;
 
   /// The header's title.
   TextStyle get sectionHeaderText => TextStyle(

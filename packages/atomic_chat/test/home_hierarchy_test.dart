@@ -23,10 +23,11 @@ void main() {
     test('${entry.key}: header band, rows and text levels have the contrast',
         () {
       final c = entry.value;
-      // The header surface is told apart from the rows' surface.
-      expect(_contrast(c.sectionBand, c.bgBody), greaterThanOrEqualTo(1.08));
+      // The header band is exactly the bottom bar's colour.
+      expect(c.sectionBand, c.barSurface);
       // The selected row differs from the header band and the page.
       expect(c.rowHighlight, isNot(c.sectionBand));
+      expect(_contrast(c.rowHighlight, c.sectionBand), greaterThanOrEqualTo(1.05));
       expect(_contrast(c.rowHighlight, c.bgBody), greaterThan(1.0));
       // Three readable text levels.
       final header = c.sectionHeaderText.color!;
