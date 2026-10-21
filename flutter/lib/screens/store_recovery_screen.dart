@@ -167,9 +167,7 @@ class _StoreOpenFailedScreenState extends State<StoreOpenFailedScreen> {
                 style: theme.textTheme.headlineSmall),
             const SizedBox(height: 12),
             Text(
-              'Nothing was changed or deleted. This can happen when the '
-              'device is out of storage. Free some space and try again, or '
-              'restart the app.',
+              storeErrorAdvice(_error),
               style: theme.textTheme.bodyLarge,
             ),
             const SizedBox(height: 24),
@@ -185,4 +183,19 @@ class _StoreOpenFailedScreenState extends State<StoreOpenFailedScreen> {
       ),
     );
   }
+}
+
+/// What to tell the person for a store that did not open: a denied write is
+/// not a full disk, and the advice differs.
+String storeErrorAdvice(String error) {
+  final denied = RegExp('Operation not permitted|Permission denied',
+          caseSensitive: false)
+      .hasMatch(error);
+  if (denied) {
+    return "The app isn't allowed to write its data folder. Nothing was "
+        'changed or deleted. Check the folder\'s permissions, then try again.';
+  }
+  return 'Nothing was changed or deleted. This can happen when the '
+      'device is out of storage. Free some space and try again, or '
+      'restart the app.';
 }

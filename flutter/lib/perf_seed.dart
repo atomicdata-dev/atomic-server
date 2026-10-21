@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+
+import 'atomic/store_location.dart';
 import 'dart:math' as math;
 
 import 'package:atomic_flutter/atomic_flutter.dart' show Perf;
@@ -63,7 +65,9 @@ Future<void> _seedLongChat() async {
     });
   }
   await AtomicClient.importAiChat('Very long chat', jsonEncode(entries));
-  final docs = await getApplicationDocumentsDirectory();
+  final docs = storeInSupportDirectory
+      ? await getApplicationSupportDirectory()
+      : await getApplicationDocumentsDirectory();
   final store = File('${docs.path}/atomic.redb');
   final mb = store.existsSync() ? store.lengthSync() / 1e6 : 0;
   debugPrint('[perf] seeded long chat: $count messages, '
@@ -155,7 +159,9 @@ Future<void> _seedChats() async {
           '${(bytes / 1e6).toStringAsFixed(1)} MB text, ${watch.elapsedMilliseconds} ms');
     }
   }
-  final docs = await getApplicationDocumentsDirectory();
+  final docs = storeInSupportDirectory
+      ? await getApplicationSupportDirectory()
+      : await getApplicationDocumentsDirectory();
   final store = File('${docs.path}/atomic.redb');
   final mb = store.existsSync() ? store.lengthSync() / 1e6 : 0;
   debugPrint('[perf] seeded $count chats, $messages messages, '

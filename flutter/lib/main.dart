@@ -27,6 +27,7 @@ import 'package:atomic_flutter/atomic_flutter.dart'
 import 'theme.dart';
 import 'atomic/atomic_client.dart';
 import 'atomic/session.dart';
+import 'atomic/store_location.dart';
 import 'atomic/sync_notice_policy.dart';
 
 void main() async {
@@ -39,7 +40,11 @@ void main() async {
   await bootstrap(
     initRust: RustLib.init,
     ready: () => theme,
-    documentsPath: () async => (await getApplicationDocumentsDirectory()).path,
+    documentsPath: () => resolveStoreDirectory(
+      desktop: storeInSupportDirectory,
+      documents: () async => (await getApplicationDocumentsDirectory()).path,
+      support: () async => (await getApplicationSupportDirectory()).path,
+    ),
     openDb: _openDb,
     startApp: () {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
