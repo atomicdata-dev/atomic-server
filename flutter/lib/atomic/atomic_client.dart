@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:atomic_chat/atomic_chat.dart'
     show
         ActivityEntry,
+        BackgroundState,
         AssistantJson,
         ChatEntry,
         ChatMessage,
@@ -54,6 +55,18 @@ class AtomicClient {
     if (r == null) return null;
     return StoreRecoveryNotice(
         keptPath: r.keptPath, reason: r.reason, repaired: r.repaired);
+  }
+
+  /// What the host does in the background right now (see
+  /// `BackgroundActivity` in atomic_chat). Sync, cheap.
+  static BackgroundState backgroundActivity() {
+    final a = ffi.backgroundActivity();
+    return BackgroundState(
+      total: a.total,
+      byKind: Map<String, int>.of(a.byKind),
+      lastError: a.lastError,
+      lastOkMs: a.lastOkMs?.toInt(),
+    );
   }
 
   /// Make every write so far durable (the app is going to the background).

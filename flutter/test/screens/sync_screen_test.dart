@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
 import 'package:atomic_flutter/atomic_flutter.dart' show SyncCard;
 import 'package:atomic_chat/atomic_chat.dart'
-    show ProfileAvatar, ResourceWebView;
+    show BackgroundActivity, BackgroundState, ProfileAvatar, ResourceWebView;
 import 'package:atomic_app/atomic/account_store.dart';
 import 'package:atomic_app/screens/sync_screen.dart';
 import 'package:atomic_app/theme.dart';
@@ -189,6 +189,9 @@ void main() {
 
   testWidgets('shows the agent, this device and the workspaces; no account',
       (tester) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(_app(SyncScreen(
       backend: _Backend(),
       loadAccount: (_) async => null,
@@ -723,7 +726,36 @@ void main() {
       expect(find.text('Pixel'), findsOneWidget);
     });
 
+    testWidgets('the Background activity row says what runs', (tester) async {
+      tester.view.physicalSize = const Size(800, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      var state = BackgroundState.idle;
+      BackgroundActivity.instance.hostPoller = () => state;
+      addTearDown(() => BackgroundActivity.instance.hostPoller = null);
+      await tester.pumpWidget(_app(SyncScreen(
+        backend: full(),
+        loadAccount: (_) async => null,
+      )));
+      await tester.pumpAndSettle();
+      expect(find.text('Background activity'), findsOneWidget);
+      expect(find.text('Idle'), findsOneWidget);
+
+      state = const BackgroundState(total: 2, byKind: {'drives': 2});
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(find.text('Syncing drives \u00b7 2 tasks'), findsOneWidget);
+
+      state = const BackgroundState(lastError: 'Sync timed out');
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(find.text('Sync timed out'), findsOneWidget);
+    });
+
     testWidgets('the device id copies on tap', (tester) async {
+      tester.view.physicalSize = const Size(800, 1400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       String? copied;
       tester.binding.defaultBinaryMessenger
           .setMockMethodCallHandler(SystemChannels.platform, (call) async {

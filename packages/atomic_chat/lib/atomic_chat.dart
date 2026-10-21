@@ -32,6 +32,7 @@ export 'src/app_sidebar_icons.dart';
 export 'src/slide_back_route.dart';
 export 'src/covered_insets_freeze.dart';
 export 'src/toast.dart';
+export 'src/background_activity.dart';
 
 // Screens.
 export 'src/chats_screen.dart';

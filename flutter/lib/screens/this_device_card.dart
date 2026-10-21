@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:atomic_chat/atomic_chat.dart' show timeAgo;
+import 'package:atomic_chat/atomic_chat.dart'
+    show BackgroundActivity, BackgroundState, timeAgo;
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -62,6 +63,13 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
     unawaited(_loadExpanded());
     unawaited(_count());
     unawaited(_loadPeers());
+    BackgroundActivity.instance.start();
+  }
+
+  @override
+  void dispose() {
+    BackgroundActivity.instance.stop();
+    super.dispose();
   }
 
   Future<void> _loadExpanded() async {
@@ -184,6 +192,22 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
           icon: Icons.circle_outlined,
           valueWidget: shared.StatusChip(online ? 'Online' : 'Offline',
               tone: online ? shared.SyncTone.success : shared.SyncTone.neutral),
+        ),
+        ValueListenableBuilder<BackgroundState>(
+          valueListenable: BackgroundActivity.instance,
+          builder: (context, activity, _) => shared.KeyValueRow(
+            key: const Key('background-activity-row'),
+            label: 'Background activity',
+            value: activity.summary,
+            // A failure's text is copied with a tap.
+            copy: activity.problem ? activity.lastError : null,
+            copyLabel: 'Error',
+            icon: activity.busy
+                ? Icons.sync
+                : activity.problem
+                    ? Icons.sync_problem
+                    : Icons.check_circle_outline,
+          ),
         ),
         if (info?.appVersion != null)
           shared.KeyValueRow(

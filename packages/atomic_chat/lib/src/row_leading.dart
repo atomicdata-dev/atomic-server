@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt;
 import 'package:flutter/material.dart';
 
+import 'background_activity.dart';
 import 'models.dart';
 import 'profile_avatar.dart';
 
@@ -123,6 +124,7 @@ class RowPictures {
     final load = loader;
     if (load == null) return Future.value(null);
     return _inFlight[file] ??= () async {
+      final busy = BackgroundActivity.instance.begin('pictures');
       try {
         final b = await load(file);
         if (b != null && b.isNotEmpty) {
@@ -135,6 +137,8 @@ class RowPictures {
         }
       } catch (e) {
         debugPrint('RowPictures: $file not read: $e');
+      } finally {
+        busy.end();
       }
       _missed[file] = DateTime.now();
       return null;
