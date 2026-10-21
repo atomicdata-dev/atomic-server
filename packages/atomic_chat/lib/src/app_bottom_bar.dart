@@ -376,9 +376,6 @@ class ShellActions {
       };
 }
 
-/// The class of a chat room (a conversation), as the web app names it.
-const chatRoomClass = 'https://atomicdata.dev/classes/ChatRoom';
-
 /// What New offers, the most used first.
 const newItems = [
   HoldFanItem('AI chat', NewChoice.aiChat, icon: Icons.chat_bubble_outline),
