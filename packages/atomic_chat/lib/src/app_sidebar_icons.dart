@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// "Show icons in the sidebar" (Appearance): the icons, pictures, emoji and
@@ -43,4 +44,42 @@ class AppSidebarIcons {
 
   /// The query parameter a page is loaded with.
   static String get queryValue => show.value ? '1' : '0';
+}
+
+/// Tells the [ResourceRow]s below it whether to show their leading icon,
+/// picture, emoji or avatar. Home wraps its list in a [SidebarIconsScope] that
+/// follows [AppSidebarIcons.show]; a row outside one (search results, the
+/// attachment sheet) always shows its leading.
+class SidebarIconsScope extends StatelessWidget {
+  final Widget child;
+
+  /// Fixed value instead of [AppSidebarIcons.show] (tests).
+  final bool? show;
+
+  const SidebarIconsScope({super.key, required this.child, this.show});
+
+  /// Whether rows below [context] show their leading; true outside a scope.
+  static bool of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_SidebarIcons>()?.show ?? true;
+
+  @override
+  Widget build(BuildContext context) {
+    final fixed = show;
+    if (fixed != null) return _SidebarIcons(show: fixed, child: child);
+    return ValueListenableBuilder<bool>(
+      valueListenable: AppSidebarIcons.show,
+      child: child,
+      builder: (context, show, child) =>
+          _SidebarIcons(show: show, child: child!),
+    );
+  }
+}
+
+class _SidebarIcons extends InheritedWidget {
+  final bool show;
+
+  const _SidebarIcons({required this.show, required super.child});
+
+  @override
+  bool updateShouldNotify(_SidebarIcons old) => old.show != show;
 }

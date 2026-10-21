@@ -3,6 +3,7 @@ import 'package:atomic_flutter/atomic_flutter.dart'
 import 'package:flutter/material.dart';
 
 import 'app_shell.dart';
+import 'app_sidebar_icons.dart';
 import 'models.dart';
 import 'row_leading.dart';
 
@@ -131,13 +132,15 @@ class ResourceRow extends StatelessWidget {
 
   bool get _hasEmoji => emoji != null && emoji!.isNotEmpty;
 
-  bool get _hasLeading =>
-      icon != null || _hasEmoji || (image != null && !image!.isEmpty);
+  bool _hasLeading(BuildContext context) =>
+      // "Show icons in the sidebar" off: text only, starting at the 16 dp inset.
+      SidebarIconsScope.of(context) &&
+      (icon != null || _hasEmoji || (image != null && !image!.isEmpty));
 
   /// The leading slot is 32 dp for every kind of row, so rows line up and
   /// their text starts at the same x.
   Widget? _leading(BuildContext context) {
-    if (!_hasLeading) return null;
+    if (!_hasLeading(context)) return null;
     final img = image;
     final source = img == null
         ? (_hasEmoji ? ImageSource.emoji(emoji!) : null)
@@ -171,7 +174,7 @@ class ResourceRow extends StatelessWidget {
       subtitle: detail == null || detail!.isEmpty ? null : Text(detail!),
       subtitleTextStyle: TextStyle(color: captionColor, fontSize: 13),
       // A plain list of titles reads better tight.
-      visualDensity: detail == null && !_hasLeading
+      visualDensity: detail == null && !_hasLeading(context)
           ? VisualDensity.compact
           : VisualDensity.standard,
       trailing: trailing,

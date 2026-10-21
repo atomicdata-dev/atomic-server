@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'app_sidebar_icons.dart';
 import 'app_top_bar.dart';
 import 'home_sections.dart';
 import 'home_sections_dialog.dart';
@@ -853,7 +854,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
   Widget build(BuildContext context) {
     final c = context.appColors;
     final split = ShellScope.layoutOf(context) == ShellLayout.split;
-    return FutureBuilder<List<DriveInfo>>(
+    // "Show icons in the sidebar" off: the rows below are text only.
+    return SidebarIconsScope(
+        child: FutureBuilder<List<DriveInfo>>(
       future: _drives,
       builder: (context, snapshot) {
         return Scaffold(
@@ -881,7 +884,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
           ),
         );
       },
-    );
+    ));
   }
 }
 
