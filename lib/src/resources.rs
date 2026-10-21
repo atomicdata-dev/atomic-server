@@ -1073,6 +1073,19 @@ impl Resource {
         Ok(self)
     }
 
+    /// Append an entry to this `ChatLog` page's `entries` map (a Loro op, so
+    /// entries from different devices merge). Returns the entry's key; the
+    /// change is saved by `save_locally` like any other edit.
+    pub fn add_chat_entry(
+        &mut self,
+        entry: &crate::chat_log::Entry,
+    ) -> crate::errors::AtomicResult<String> {
+        self.ensure_materialized()?;
+        let key = self.loro().add_entry(entry)?;
+        self.loro().commit();
+        Ok(key)
+    }
+
     /// Append a JSON item to a Json property. CRDT-friendly — appends to the
     /// LoroList instead of replacing it. Items from different devices merge cleanly.
     pub fn push_list_item(

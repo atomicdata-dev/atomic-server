@@ -1,0 +1,27 @@
+name: atomic_chat
+description: Shared Atomic assistant UI (home, AI chat, conversations, search, resource web view, voice) on an injectable AssistantApi.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+  flutter: '>=3.44.0'
+dependencies:
+  atomic_flutter:
+    path: ../atomic_flutter
+  flutter:
+    sdk: flutter
+  flutter_svg: ^2.2.0
+  shared_preferences: ^2.3.3
+  webview_flutter: ^4.14.1
+  webview_flutter_android: ^4.10.0
+  url_launcher: ^6.3.0
+  speech_to_text: ^7.5.0
+  flutter_tts: ^4.2.5
+  record: ^7.1.2
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+flutter:
+  uses-material-design: true

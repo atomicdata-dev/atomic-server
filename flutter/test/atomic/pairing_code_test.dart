@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:atomiccanvas_flutter/screens/pair_screen.dart';
+import 'package:atomic_app/screens/pair_screen.dart';
 
 /// The node id in the code the data-browser showed for its server.
 const _hex =

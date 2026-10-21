@@ -79,6 +79,10 @@ export const registerBasicInstanceHandler = (
   basicNewInstanceHandlers.set(classSubject, handler);
 };
 
+/** Whether creating a `classSubject` needs no form (a basic handler makes it). */
+export const hasBasicInstanceHandler = (classSubject: string): boolean =>
+  basicNewInstanceHandlers.has(classSubject);
+
 const NewResourceUIContext = createContext<NewResourceUIContextType>({
   showNewResourceUI: () => undefined,
 });

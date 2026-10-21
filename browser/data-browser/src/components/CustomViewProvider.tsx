@@ -64,10 +64,15 @@ function parsePluginList(data: UIPluginListItem[]): PluginListResult {
   return [viewMap, dataMap];
 }
 
-const fetchPluginList = async (
+export const fetchPluginList = async (
   store: Store,
   drive: string,
 ): Promise<PluginListResult> => {
+  // No server to list them (the app's embedded renderer): no server plugins.
+  // Asking anyway signed the request through the host, which signs only
+  // commits.
+  if (store.noServer) return [new Map(), new Map()];
+
   // Drive subjects (DIDs) often contain `+`. Without explicit encoding the
   // server's form-urlencoded query parser would decode `+` as space, so the
   // ClassExtenderScope::Drive comparison fails and plugin-list returns [].

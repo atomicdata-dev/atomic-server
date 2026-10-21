@@ -8,7 +8,7 @@ class ServerSettingsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => shared.ServerSettingsSection(
-        backend: CanvasSettingsBackend(),
+        backend: AppSettingsBackend(),
         onServerChanged: onServerChanged,
       );
 }

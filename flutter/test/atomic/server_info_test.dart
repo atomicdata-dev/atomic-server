@@ -1,8 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:atomiccanvas_flutter/atomic/atomic_auth.dart';
-import 'package:atomiccanvas_flutter/atomic/server_info.dart';
+import 'package:atomic_app/atomic/atomic_auth.dart';
+import 'package:atomic_app/atomic/server_info.dart';
 
 /// A secret in the shape `setup()` hands out: base64 of {privateKey, subject}.
 String _secret(String privateKeyB64, String subject) => base64Encode(

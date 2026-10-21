@@ -1132,8 +1132,9 @@ mod test {
         assert_eq!(found.get(urls::LOCAL_ID).unwrap().to_string(), local_id);
     }
     #[cfg(feature = "db")]
-    async fn create_db_and_importer() -> (crate::Db, crate::Subject) {
-        let store = crate::Db::init_temp("import_i18n_db").await.unwrap();
+    /// `id` names the store: two tests on one store file would race.
+    async fn create_db_and_importer(id: &str) -> (crate::Db, crate::Subject) {
+        let store = crate::Db::init_temp(id).await.unwrap();
         let mut importer = Resource::new_instance(urls::IMPORTER, &store)
             .await
             .unwrap();
@@ -1149,7 +1150,7 @@ mod test {
     #[cfg(feature = "db")]
     #[tokio::test]
     async fn import_keeps_scalar_values_that_equal_a_local_id() {
-        let (store, importer) = create_db_and_importer().await;
+        let (store, importer) = create_db_and_importer("import_scalar_local_id_db").await;
 
         let json = r#"[
         {
@@ -1209,7 +1210,7 @@ mod test {
     #[cfg(feature = "db")]
     #[tokio::test]
     async fn import_preserves_i18n_properties_db() {
-        let (store, importer) = create_db_and_importer().await;
+        let (store, importer) = create_db_and_importer("import_i18n_db").await;
         import_i18n_and_assert(&store, &importer).await;
     }
 

@@ -18,6 +18,7 @@ import {
   FormattingToolbarToggle,
   TitleRow,
 } from '../../chunks/RTE/useFormattingToolbarVisible';
+import { showMeetingStart } from '../../embed/settings';
 import { getMeetingPhase } from './meetingLifecycle';
 
 const CollaborativeEditor = lazy(
@@ -76,7 +77,7 @@ export function MeetingPage({
             <Button subtle onClick={() => openMeetingPanel(resource.subject)}>
               Open chat
             </Button>
-            {phase === 'agenda' && (
+            {phase === 'agenda' && showMeetingStart() && (
               <Button onClick={handleStart} disabled={changing}>
                 Start meeting
               </Button>

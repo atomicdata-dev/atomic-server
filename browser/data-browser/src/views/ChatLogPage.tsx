@@ -21,7 +21,8 @@ export function ChatLogPage({ resource }: ResourcePageProps) {
   useEffect(() => {
     if (!target) return;
 
-    navigate(constructOpenURL(target));
+    // A redirect: back must not return to this page, which only redirects.
+    navigate({ to: constructOpenURL(target), replace: true });
 
     if (about) setPanelOpen('comments', true);
   }, [target, about, navigate, setPanelOpen]);

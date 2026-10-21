@@ -259,6 +259,13 @@ pub fn run_startup_policy(
         );
         return Err(Skip::Disabled);
     }
+    // Measuring walks every page (a quarter second for a few MiB on a phone,
+    // at every start). Below a quarter of the size floor neither a compaction
+    // nor the "reclaimable but below the floor" hint can follow: its free
+    // space cannot reach `min_file_bytes / 4`.
+    if disk_bytes < policy.min_file_bytes / 4 {
+        return Err(Skip::TooSmall);
+    }
 
     let stats = match StoreFileStats::collect(db, path) {
         Ok(stats) => stats,
@@ -638,6 +645,21 @@ mod tests {
         assert_eq!(store.last_compaction(), Some(record));
         assert_intact(&store).await;
         drop(store);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// A store far below the floor opens without the page walk that
+    /// measures it (it cost a quarter second at every app start).
+    #[test]
+    fn a_small_store_is_not_measured() {
+        let dir = temp_store_dir("small");
+        let path = dir.join("small.redb");
+        let mut db = Database::create(&path).unwrap();
+        assert_eq!(
+            run_startup_policy(&mut db, &path, Duration::ZERO, &CompactionPolicy::default()),
+            Err(Skip::TooSmall)
+        );
+        drop(db);
         std::fs::remove_dir_all(&dir).ok();
     }
 

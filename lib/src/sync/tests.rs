@@ -1006,9 +1006,10 @@ mod peer_sync_tests {
             // Filter out Device B's own NodeID (in tests, the global ENDPOINT is Device A's)
             let my_node_id_b = ep_b.node_id().to_string();
             let discovered_node_id =
-                crate::discovery::resolve_node_id_filtered(&drive_a, Some(my_node_id_b.as_str()))
+                crate::discovery::resolve_node_ids_filtered(&drive_a, Some(my_node_id_b.as_str()))
                     .await
-                    .expect("pkarr resolve should find Device A");
+                    .expect("pkarr resolve should find Device A")
+                    .remove(0);
             println!("Device B discovered: {discovered_node_id}");
             assert_eq!(
                 discovered_node_id,

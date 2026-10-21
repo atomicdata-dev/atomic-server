@@ -7,7 +7,7 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'simple/types.dart';
 
-// These functions are ignored because they are not marked as `pub`: `canvas_cache_key`, `canvas_entry`, `db_event_to_json`, `destroy_resource_and_sync`, `drive_resource_exists`, `ensure_cache_listener`, `ensure_sync_connectivity`, `get_canvas`, `is_unreachable_hub_url`, `nudge_peers_after_local_change`, `save_and_push`, `sync_connectivity_inner`, `try_auto_peer_sync`, `version_id_from_json`
+// These functions are ignored because they are not marked as `pub`: `catch_up_search_index`, `db_event_to_json`, `describe_file`, `drive_resource_exists`, `drives_by_use`, `ensure_sync_connectivity`, `fetch_other_drive`, `follow_listed_drives`, `is_unreachable_hub_url`, `node_apply_local`, `nudge_peers_after_local_change`, `open_native_store`, `open_store_catching`, `peer_ids_to_try`, `push_local_write`, `save_and_push`, `short_id`, `sync_connectivity_inner`, `try_auto_peer_sync`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `PeerSyncReport`, `SyncConnectivityReport`
 
 /// Local-first Atomic Data SDK for Flutter.
@@ -17,14 +17,30 @@ import 'simple/types.dart';
 ///   2. Agent     — setup(), load_agent(), get_active_agent(), clear_agent()
 ///   3. Drive     — create_drive(), list_drives(), get_active_drive(), set_active_drive()
 ///   4. Resource  — create_resource(), set_property(), get_property()
-///   5. Canvas    — create_canvas(), save/load/list/delete/rename
-///   6. History   — warm_resource_history(), get_resource_history(), get_resource_at_version()
-///   7. Peer      — start_peer(), get_peer_id(), peer_announce(), peer_sync(), peer_discover_sync()
+///   5. History   — warm_resource_history(), get_resource_history()
+///   6. Peer      — start_peer(), get_peer_id(), peer_announce(), peer_sync(), peer_discover_sync()
 ///
-/// Networking (group 7) is explicit and opt-in. Nothing in groups 1-6 touches the network.
-/// Open a local database. Call once on app start.
+/// Networking (group 6) is explicit and opt-in. Nothing in groups 1-5 touches the network.
+/// Open a local database. Call on app start; a second call in the same
+/// process (Android runs `main` again when it recreates the activity) keeps
+/// the store that is already open.
+///
+/// Never panics and never deletes the user's data. A store that cannot be
+/// opened because the file is damaged is renamed to
+/// `atomic.redb.corrupt-<ms>`, a repaired copy (or, failing that, an empty
+/// store) takes its place, and `store_recovery` tells the app so it can say
+/// so. Other errors (permissions, a full disk) are returned as they are.
 Future<void> openDb({required String path}) =>
     RustLib.instance.api.crateApiSimpleOpenDb(path: path);
+
+/// Set when the last `open_db` had to set a damaged store aside.
+StoreRecovery? storeRecovery() =>
+    RustLib.instance.api.crateApiSimpleStoreRecovery();
+
+/// Make every write so far durable now. The app calls it when it goes to
+/// the background, where Android may kill it without warning; the store
+/// otherwise makes writes durable on a 100 ms tick.
+Future<void> flushDb() => RustLib.instance.api.crateApiSimpleFlushDb();
 
 /// Create an agent and a personal drive in one call. Pure local — no networking.
 /// Call `start_peer()` + `peer_announce()` afterwards if you want to be discoverable.
@@ -52,6 +68,26 @@ AgentInfo createAgent({required String name}) =>
 AgentInfo agentFromSecret({required String secret}) =>
     RustLib.instance.api.crateApiSimpleAgentFromSecret(secret: secret);
 
+/// The profile of this device's agent as JSON `{subject, name, description,
+/// emoji?, imageUrl?}`: what the store holds, else what the connected server
+/// has (`atomic_lib::host::own_profile`).
+Future<String> getOwnProfile() =>
+    RustLib.instance.api.crateApiSimpleGetOwnProfile();
+
+/// The bytes of a File resource (a profile picture) when this device holds
+/// them; `None` when the File or its bytes are not here (yet) or too large.
+Future<Uint8List?> readFileBytes({required String file}) =>
+    RustLib.instance.api.crateApiSimpleReadFileBytes(file: file);
+
+/// Save this device's agent's profile: a commit by the agent on its own
+/// resource, stored here and synced like any other edit. An empty
+/// `description` removes it; `icon` is the subject of a File for the picture
+/// (empty removes it, `None` leaves it as it is).
+Future<void> setAgentProfile(
+        {required String name, required String description, String? icon}) =>
+    RustLib.instance.api.crateApiSimpleSetAgentProfile(
+        name: name, description: description, icon: icon);
+
 /// Create a new drive. Returns the drive subject.
 Future<String> createDrive({required String name}) =>
     RustLib.instance.api.crateApiSimpleCreateDrive(name: name);
@@ -67,7 +103,8 @@ Future<void> setActiveDrive({required String subject}) =>
 Future<List<String>> listDrives() =>
     RustLib.instance.api.crateApiSimpleListDrives();
 
-/// List drives with names. Returns JSON-encoded array of {subject, name}.
+/// List drives with names. Returns JSON-encoded array of {subject, name,
+/// emoji?} (`emoji` is the drive's own icon, absent when it has none).
 Future<String> listDrivesWithNames() =>
     RustLib.instance.api.crateApiSimpleListDrivesWithNames();
 
@@ -88,78 +125,6 @@ Future<String> getProperty(
     RustLib.instance.api
         .crateApiSimpleGetProperty(subject: subject, property: property);
 
-/// Create a new canvas. Uses the active drive as parent.
-Future<String> createCanvas({required String name}) =>
-    RustLib.instance.api.crateApiSimpleCreateCanvas(name: name);
-
-/// Create a canvas, optionally in a gallery folder (`folder_id` = folder resource subject).
-Future<String> createCanvasWithFolder(
-        {required String name, String? folderId}) =>
-    RustLib.instance.api
-        .crateApiSimpleCreateCanvasWithFolder(name: name, folderId: folderId);
-
-/// Create a folder resource under the active drive.
-Future<String> createFolder({required String name}) =>
-    RustLib.instance.api.crateApiSimpleCreateFolder(name: name);
-
-/// List folder resources in the active drive.
-Future<List<FolderListItem>> listFolders() =>
-    RustLib.instance.api.crateApiSimpleListFolders();
-
-/// Set or clear the gallery folder for a canvas (persisted + synced).
-Future<void> setCanvasFolder({required String subject, String? folderId}) =>
-    RustLib.instance.api
-        .crateApiSimpleSetCanvasFolder(subject: subject, folderId: folderId);
-
-/// Push a single stroke to a canvas. Appends to the stroke list; merges across devices.
-Future<void> pushStroke(
-        {required String subject, required String strokeJson}) =>
-    RustLib.instance.api
-        .crateApiSimplePushStroke(subject: subject, strokeJson: strokeJson);
-
-/// Load strokes JSON from a canvas. Reads directly from DB (no edit session).
-Future<String> loadCanvasStrokes({required String subject}) =>
-    RustLib.instance.api.crateApiSimpleLoadCanvasStrokes(subject: subject);
-
-/// List all canvases in the active drive.
-/// Uses the query index (not a full scan) so results include synced resources.
-Future<List<CanvasListItem>> listCanvases() =>
-    RustLib.instance.api.crateApiSimpleListCanvases();
-
-/// List canvases as JSON (includes `folder_id`). Prefer this from Dart until FRB codegen.
-Future<String> listCanvasesJson() =>
-    RustLib.instance.api.crateApiSimpleListCanvasesJson();
-
-/// Delete a canvas (or any resource) with a signed destroy commit.
-Future<void> deleteCanvas({required String subject}) =>
-    RustLib.instance.api.crateApiSimpleDeleteCanvas(subject: subject);
-
-/// Rename a canvas.
-Future<void> renameCanvas({required String subject, required String name}) =>
-    RustLib.instance.api
-        .crateApiSimpleRenameCanvas(subject: subject, name: name);
-
-/// Delete a single stroke by index.
-Future<void> deleteStroke({required String subject, required int index}) =>
-    RustLib.instance.api
-        .crateApiSimpleDeleteStroke(subject: subject, index: index);
-
-/// Undo the last edit on a canvas. Returns the new stroke count.
-Future<int> undoCanvas({required String subject}) =>
-    RustLib.instance.api.crateApiSimpleUndoCanvas(subject: subject);
-
-/// Whether the canvas has a local undo step available.
-Future<bool> canUndoCanvas({required String subject}) =>
-    RustLib.instance.api.crateApiSimpleCanUndoCanvas(subject: subject);
-
-/// Whether the canvas has a local redo step available.
-Future<bool> canRedoCanvas({required String subject}) =>
-    RustLib.instance.api.crateApiSimpleCanRedoCanvas(subject: subject);
-
-/// Redo the last undone edit on a canvas. Returns the new stroke count.
-Future<int> redoCanvas({required String subject}) =>
-    RustLib.instance.api.crateApiSimpleRedoCanvas(subject: subject);
-
 /// Load versioned state for history operations.
 Future<void> warmResourceHistory({required String subject}) =>
     RustLib.instance.api.crateApiSimpleWarmResourceHistory(subject: subject);
@@ -167,12 +132,6 @@ Future<void> warmResourceHistory({required String subject}) =>
 /// Get the edit history of a resource.
 Future<List<VersionMetadata>> getResourceHistory({required String subject}) =>
     RustLib.instance.api.crateApiSimpleGetResourceHistory(subject: subject);
-
-/// Get canvas strokes at a specific historical version.
-Future<String> getResourceAtVersion(
-        {required String subject, required List<int> versionId}) =>
-    RustLib.instance.api.crateApiSimpleGetResourceAtVersion(
-        subject: subject, versionId: versionId);
 
 /// Open a WebSocket sync session to an Atomic Server. Authenticates, SUBs the active drive,
 /// and applies incoming UPDATE / QUERY_UPDATE / COMMIT frames to the local DB.
@@ -211,9 +170,25 @@ Future<String> resumeAppSession(
 Future<String> syncConnectivityNow() =>
     RustLib.instance.api.crateApiSimpleSyncConnectivityNow();
 
-/// Subscribe to live updates for an open canvas over WebSocket.
-Future<void> wsSubscribeCanvas({required String subject}) =>
-    RustLib.instance.api.crateApiSimpleWsSubscribeCanvas(subject: subject);
+/// The https origins the drive's pkarr record names. The record is public and
+/// anyone may add to it, so none of them is trusted yet: the host fetches each
+/// one's `/genesis` and asks [`genesis_answer_verifies`]. (The fetch is the
+/// host's, not Rust's: the platform's own HTTPS stack is the one that is known
+/// to trust the device's certificates.)
+Future<List<String>> resolveDriveOrigins({required String drive}) =>
+    RustLib.instance.api.crateApiSimpleResolveDriveOrigins(drive: drive);
+
+/// Whether `body`, the answer of `GET /genesis?subject=<drive>`, is the drive's
+/// own genesis certificate and verifies against the DID.
+bool genesisAnswerVerifies({required String body, required String drive}) =>
+    RustLib.instance.api
+        .crateApiSimpleGenesisAnswerVerifies(body: body, drive: drive);
+
+/// Connect to the server that hosts the active drive: fetches the drive and
+/// follows its commits over WS, then, in the background, follows the drives the
+/// personal drive lists. Call it only for an origin whose genesis verified.
+Future<void> connectHomeServer({required String origin}) =>
+    RustLib.instance.api.crateApiSimpleConnectHomeServer(origin: origin);
 
 /// Block until a local DB event arrives. Returns JSON, or None on timeout.
 Future<String?> pollDbEvent({required int timeoutMs}) =>
@@ -222,6 +197,18 @@ Future<String?> pollDbEvent({required int timeoutMs}) =>
 /// Start the Iroh peer node. Returns the NodeID.
 /// Call this before any sync operations.
 Future<String> startPeer() => RustLib.instance.api.crateApiSimpleStartPeer();
+
+/// What the search for this account's other devices is doing, as JSON:
+/// `{"state": "starting" | "searching" | "no_peers_yet" | "connected" |
+/// "failed", "message": "…", "detail": "…" | null, "retry_in_secs"?,
+/// "devices"?, "reason"?, "last_checked_ms": …, "attempts": …}`.
+String peerSearchStatus() =>
+    RustLib.instance.api.crateApiSimplePeerSearchStatus();
+
+/// Look for the other devices now (a "Search again" button, a network
+/// change, the app coming back), dialling the ones that did not answer
+/// recently too.
+void peerSearchAgain() => RustLib.instance.api.crateApiSimplePeerSearchAgain();
 
 /// Get this device's Iroh NodeID (if peer is running).
 String? getPeerId() => RustLib.instance.api.crateApiSimpleGetPeerId();
@@ -280,10 +267,15 @@ Future<String> watchResource({required String subject}) =>
 Future<String> watchChildren({required String parent}) =>
     RustLib.instance.api.crateApiSimpleWatchChildren(parent: parent);
 
-Future<void> setStrokes(
-        {required String subject, required String strokesJson}) =>
-    RustLib.instance.api
-        .crateApiSimpleSetStrokes(subject: subject, strokesJson: strokesJson);
-
 String getKnownPeersJson() =>
     RustLib.instance.api.crateApiSimpleGetKnownPeersJson();
+
+/// What this build is, for the "This device" card: `{"version": …, "os": …,
+/// "arch": …}` (the library's version and the platform it was built for).
+String deviceInfo() => RustLib.instance.api.crateApiSimpleDeviceInfo();
+
+/// How much of the person's data this device holds: `{disk_bytes?, resources,
+/// loro_bytes, blob_bytes, drives: [{subject, name, resources, bytes, …}]}`,
+/// biggest drive first. Walks the drives' resources, so it runs on the async
+/// pool, never the UI thread; the caller caches it.
+Future<String> storeStats() => RustLib.instance.api.crateApiSimpleStoreStats();

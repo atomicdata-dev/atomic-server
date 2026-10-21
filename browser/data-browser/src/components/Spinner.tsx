@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { styled } from 'styled-components';
 import { holdBootSplash } from '../helpers/bootSplash';
+import { isEmbedded } from '../helpers/embedMode';
 import {
   TRAIL_HEAD,
   TRAIL_STROKE_WIDTH,
@@ -13,7 +14,15 @@ interface SpinnerProps {
   inheritColor?: boolean;
   /** Fill the available space and sit in the middle of it. */
   centered?: boolean;
+  /** Milliseconds before it shows; until then an empty, invisible status.
+   * Default: 1000 for a centered one in the app's embedded page (a resource
+   * opens there well within it: the page's plain background beats a loader
+   * that flashes), else 0. */
+  delay?: number;
 }
+
+/** Only the embedded page waits by default (see `delay`). */
+const EMBED_CENTERED_DELAY = 1000;
 
 /**
  * The orbiting mark from the boot splash (see `index.html`), at any size, so
@@ -24,10 +33,29 @@ export const Spinner = ({
   size,
   inheritColor = false,
   centered = false,
+  delay = centered && isEmbedded() ? EMBED_CENTERED_DELAY : 0,
 }: SpinnerProps) => {
   // A pane-level spinner that takes over from the boot splash would be a
   // second loader at another size and position; the splash waits for it.
   useEffect(() => (centered ? holdBootSplash() : undefined), [centered]);
+
+  const [waited, setWaited] = useState(delay <= 0);
+
+  useEffect(() => {
+    if (delay <= 0) {
+      return;
+    }
+
+    const id = setTimeout(() => setWaited(true), delay);
+
+    return () => clearTimeout(id);
+  }, [delay]);
+
+  if (!waited) {
+    // Still a loading state for assistive tech (and for the app, which
+    // shows the page once it holds more than that).
+    return <span role='status' aria-label='Loading' />;
+  }
 
   const mark = (
     <Mark

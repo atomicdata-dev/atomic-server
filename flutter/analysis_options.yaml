@@ -32,3 +32,7 @@ linter:
 analyzer:
   exclude:
     - rust_builder/cargokit/**
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
