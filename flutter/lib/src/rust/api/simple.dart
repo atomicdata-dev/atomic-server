@@ -79,6 +79,24 @@ Future<String> getOwnProfile() =>
 Future<Uint8List?> readFileBytes({required String file}) =>
     RustLib.instance.api.crateApiSimpleReadFileBytes(file: file);
 
+/// The bytes of a File resource (a profile picture): from this device when it
+/// holds them, else downloaded from the connected server the way the web app
+/// does (signed by the agent, checked against the blob's hash, an image of at
+/// most 16 MB) and kept in the store. Fails with the reason (HTTP status
+/// included) when they cannot be had.
+Future<Uint8List> fetchFileBytes({required String file}) =>
+    RustLib.instance.api.crateApiSimpleFetchFileBytes(file: file);
+
+/// Keep a picked picture as a File in the active drive (bytes in the local
+/// store, the File queued for sync like the web app's upload) and return the
+/// File's subject, to pass as `icon` to `set_agent_profile`.
+Future<String> uploadAgentPicture(
+        {required String filename,
+        required String mimetype,
+        required List<int> bytes}) =>
+    RustLib.instance.api.crateApiSimpleUploadAgentPicture(
+        filename: filename, mimetype: mimetype, bytes: bytes);
+
 /// Save this device's agent's profile: a commit by the agent on its own
 /// resource, stored here and synced like any other edit. An empty
 /// `description` removes it; `icon` is the subject of a File for the picture

@@ -6,6 +6,8 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+// These functions are ignored because they are not marked as `pub`: `conversations_in_json_ad`, `follow_conversations_in_background`, `follow_conversations`
+
 /// The emojis of `subjects` as JSON `{subject: emoji}`, only for those that
 /// have one. For rows that do not carry their icon themselves (the activity
 /// feed), read from the stored propvals like the other rows.
