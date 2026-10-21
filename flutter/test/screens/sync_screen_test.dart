@@ -216,6 +216,9 @@ void main() {
     expect(find.text('Team'), findsNothing);
     expect(find.text('Account'), findsNothing);
     expect(find.text('Link your account'), findsNothing);
+    // No page title; a button to the web app's settings instead.
+    expect(find.text('Sync'), findsNothing);
+    expect(find.byKey(const ValueKey('sync-open-settings')), findsOneWidget);
   });
 
   testWidgets('the ID under the name copies it, and says so', (tester) async {

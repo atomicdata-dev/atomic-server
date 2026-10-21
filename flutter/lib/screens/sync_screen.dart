@@ -310,6 +310,18 @@ class _SyncScreenState extends State<SyncScreen> {
     if (mounted) await _load();
   }
 
+  /// The web app's settings page, like the storage page: in the detail pane
+  /// next to the list, else pushed.
+  void _openSettings() {
+    final drive = _activeDrive ?? '';
+    Widget build(BuildContext _) => ResourceView(
+        api: const AtomicAssistantApi(),
+        drive: drive,
+        title: 'Settings',
+        path: '/app/settings');
+    openFromList<void>(context, build, subject: '$drive#settings');
+  }
+
   /// The web app's storage page for [drive], in the shell's detail pane next
   /// to the list, else pushed with the native app bar.
   void _openStorage(String drive, String name) {
@@ -457,7 +469,20 @@ class _SyncScreenState extends State<SyncScreen> {
     final c = shared.syncColors(context);
     return Scaffold(
       backgroundColor: c.bgBody,
-      appBar: const AppTopBar(title: 'Sync'),
+      // No title: the page is about you and your devices; the web app's
+      // settings are one tap away.
+      appBar: AppTopBar(
+        titleWidget: const SizedBox.shrink(),
+        actions: [
+          TextButton.icon(
+            key: const ValueKey('sync-open-settings'),
+            onPressed: _openSettings,
+            icon: const Icon(Icons.settings_outlined, size: 20),
+            label: const Text('Settings'),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           // A tablet's detail pane: a readable column, centred.
