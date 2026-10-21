@@ -532,7 +532,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
             changed: _feedChanged,
             mine: () => _mine,
             onMine: _setMine,
-            feed: () => _activity,
+            api: widget.api,
             row: _activityRow,
           ));
 
@@ -1212,66 +1212,153 @@ class _Notifier extends ChangeNotifier {
   void notifyListeners() => super.notifyListeners();
 }
 
-/// The activity's full list on a phone: the section's rows, all of them, with
-/// the "Show mine" chip in the bar. The setting is the home's own.
-class _ActivityPage extends StatelessWidget {
+/// The activity's full list on a phone: the feed paged back in time (newest
+/// first, [AssistantApi.activityPageSize] at a time as the end comes near,
+/// under a spinner row, then a "You're all caught up" footer), with the "Show
+/// mine" chip in the bar. The setting is the home's own.
+class _ActivityPage extends StatefulWidget {
   final String title;
+  final AssistantApi api;
   final Listenable changed;
   final bool Function() mine;
   final ValueChanged<bool> onMine;
-  final Future<List<ActivityEntry>> Function() feed;
   final Widget Function(ActivityEntry) row;
 
   const _ActivityPage({
     required this.title,
+    required this.api,
     required this.changed,
     required this.mine,
     required this.onMine,
-    required this.feed,
     required this.row,
   });
 
   @override
+  State<_ActivityPage> createState() => _ActivityPageState();
+}
+
+class _ActivityPageState extends State<_ActivityPage> {
+  List<ActivityEntry> _entries = [];
+  bool _done = false;
+  bool _loading = false;
+  bool _failed = false;
+
+  /// Bumped when the feed starts over, so a page read for the old one is
+  /// dropped.
+  int _generation = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.changed.addListener(_restart);
+    _loadMore();
+  }
+
+  @override
+  void dispose() {
+    widget.changed.removeListener(_restart);
+    super.dispose();
+  }
+
+  void _restart() {
+    _generation++;
+    setState(() {
+      _entries = [];
+      _done = false;
+      _loading = false;
+      _failed = false;
+    });
+    _loadMore();
+  }
+
+  Future<void> _loadMore() async {
+    if (_loading || _done) return;
+    _loading = true;
+    final generation = _generation;
+    try {
+      final page = await widget.api.activityPage(
+          before: _entries.isEmpty ? null : _entries.last,
+          includeOwn: widget.mine());
+      if (!mounted || generation != _generation) return;
+      final known = {for (final a in _entries) '${a.subject}@${a.at}'};
+      setState(() {
+        _entries = [
+          ..._entries,
+          for (final a in page)
+            if (known.add('${a.subject}@${a.at}')) a
+        ];
+        if (page.length < AssistantApi.activityPageSize) _done = true;
+      });
+    } catch (_) {
+      // Keep what is shown; do not ask again in a loop.
+      if (mounted && generation == _generation) {
+        setState(() {
+          _done = true;
+          _failed = true;
+        });
+      }
+    } finally {
+      if (generation == _generation) _loading = false;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    return ListenableBuilder(
-      listenable: changed,
-      builder: (context, _) => Scaffold(
-        backgroundColor: c.bgBody,
-        appBar: AppTopBar(title: title, actions: [
-          Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Center(
-                  child: ShowMineChip(value: mine(), onChanged: onMine))),
-        ]),
-        body: SafeArea(
-          top: false,
-          bottom: false,
-          child: FutureBuilder<List<ActivityEntry>>(
-            future: feed(),
-            builder: (context, snap) {
-              final list =
-                  (snap.data ?? const <ActivityEntry>[]).take(_maxActivity);
-              final rows = list.toList();
-              if (snap.connectionState != ConnectionState.done &&
-                  rows.isEmpty) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (rows.isEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: Text(
-                      mine()
-                          ? 'Nothing changed yet'
-                          : 'No activity from others yet',
-                      style: TextStyle(color: c.textSecondary)),
-                );
-              }
-              return ListView.builder(
-                  itemCount: rows.length, itemBuilder: (_, i) => row(rows[i]));
-            },
-          ),
-        ),
+    final empty = _entries.isEmpty && _done;
+    return Scaffold(
+      backgroundColor: c.bgBody,
+      appBar: AppTopBar(title: widget.title, actions: [
+        Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Center(
+                child: ShowMineChip(
+                    value: widget.mine(), onChanged: widget.onMine))),
+      ]),
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: empty
+            ? Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Text(
+                    _failed
+                        ? 'Could not read the activity'
+                        : widget.mine()
+                            ? 'Nothing changed yet'
+                            : 'No activity from others yet',
+                    style: TextStyle(color: c.textSecondary)),
+              )
+            : _entries.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    key: const Key('activity-all-list'),
+                    // The rows, then a spinner while more may come or the
+                    // end marker.
+                    itemCount: _entries.length + 1,
+                    itemBuilder: (context, i) {
+                      if (i >= _entries.length - _chatsPrefetch) _loadMore();
+                      if (i < _entries.length) return widget.row(_entries[i]);
+                      if (!_done) {
+                        return const Padding(
+                          key: ValueKey('activity-loading'),
+                          padding: EdgeInsets.all(16),
+                          child: Center(
+                              child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2))),
+                        );
+                      }
+                      return Padding(
+                        key: const ValueKey('activity-end'),
+                        padding: const EdgeInsets.all(24),
+                        child: Center(
+                            child: Text("You're all caught up",
+                                style: TextStyle(color: c.textSecondary))),
+                      );
+                    }),
       ),
     );
   }

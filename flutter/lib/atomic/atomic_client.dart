@@ -19,6 +19,8 @@ import 'package:atomic_chat/atomic_chat.dart'
         SearchHit;
 import 'package:atomic_chat/atomic_chat.dart' as chat show driveKey;
 import 'package:flutter/foundation.dart';
+import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
+    show PlatformInt64Util;
 import 'package:http/http.dart' as http;
 import '../src/rust/api/assistant.dart' as assistant;
 import '../src/rust/api/context.dart' as context;
@@ -239,6 +241,31 @@ class AtomicClient {
             name: a.name,
             className: a.className,
           ),
+      ];
+
+  static ActivityEntry _activityEntry(assistant.ActivityEntry a) => ActivityEntry(
+        subject: a.subject,
+        drive: a.drive,
+        kind: a.kind,
+        at: a.at.toInt(),
+        actor: a.actor,
+        name: a.name,
+        className: a.className,
+      );
+
+  /// One page of the full Activity feed, newest first: the entries after
+  /// [before] (null for the first page).
+  static Future<List<ActivityEntry>> activityPage(
+          {ActivityEntry? before,
+          int limit = 50,
+          bool includeOwn = false}) async =>
+      [
+        for (final a in await assistant.listActivityPage(
+            beforeAt: before == null ? null : PlatformInt64Util.from(before.at),
+            beforeSubject: before?.subject,
+            limit: limit,
+            includeOwn: includeOwn))
+          _activityEntry(a),
       ];
 
   /// Starts an AI chat named [name] in the private drive; returns its subject.

@@ -94,6 +94,27 @@ abstract class AssistantApi {
   /// whose actor is `You`.
   Future<List<ActivityEntry>> activityWithMine(int limit) => activity(limit);
 
+  /// How many entries one page of the full Activity page holds.
+  static const activityPageSize = 50;
+
+  /// One page of the full Activity page, newest first: the entries after
+  /// [before] (the last of the previous page; null for the first). A page
+  /// shorter than [limit] is the end of the feed. The default reads
+  /// everything [activity] has and cuts the page out of it.
+  Future<List<ActivityEntry>> activityPage(
+      {ActivityEntry? before,
+      int limit = activityPageSize,
+      bool includeOwn = false}) async {
+    final all = includeOwn
+        ? await activityWithMine(100000)
+        : await activity(100000);
+    final i = before == null
+        ? -1
+        : all.indexWhere(
+            (a) => a.subject == before.subject && a.at == before.at);
+    return all.skip(i + 1).take(limit).toList();
+  }
+
   /// The emojis (`{subject: emoji}`) of those of [subjects] that have one.
   Future<Map<String, String>> resourceIcons(List<String> subjects);
 

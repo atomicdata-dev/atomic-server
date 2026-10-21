@@ -72,6 +72,13 @@ class AtomicAssistantApi extends AssistantApi {
   Future<List<ActivityEntry>> activityWithMine(int limit) =>
       AtomicClient.activity(limit: limit, includeOwn: true);
   @override
+  Future<List<ActivityEntry>> activityPage(
+          {ActivityEntry? before,
+          int limit = AssistantApi.activityPageSize,
+          bool includeOwn = false}) =>
+      AtomicClient.activityPage(
+          before: before, limit: limit, includeOwn: includeOwn);
+  @override
   Future<Map<String, String>> resourceIcons(List<String> subjects) =>
       AtomicClient.resourceIcons(subjects);
   @override
