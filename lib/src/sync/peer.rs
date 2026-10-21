@@ -695,8 +695,8 @@ fn own_agent_update_frame(store: &Db, wire: super::engine::WireScheme) -> Option
 }
 
 /// The live links `subject` may be pushed to: those whose proven agent can
-/// read it (`check_read`), plus peers this node's owner paired with
-/// ([`peer_may_replicate_all`]). The resource is resolved once; each peer is
+/// read it (`check_read`). A paired node is judged like any other: by the
+/// agent it proved. The resource is resolved once; each peer is
 /// judged on its own agent. Fails closed: a subject that does not resolve to a
 /// resource can't be rights-checked, so nobody gets it.
 ///
@@ -718,10 +718,9 @@ async fn readable_live_peers(
         return allowed;
     };
     for (id, generation, agent) in candidates {
-        if peer_may_replicate_all(store, &id, &agent)
-            || crate::hierarchy::check_read(store, &resource, &agent)
-                .await
-                .is_ok()
+        if crate::hierarchy::check_read(store, &resource, &agent)
+            .await
+            .is_ok()
         {
             allowed.insert((id, generation));
         }
@@ -2128,7 +2127,6 @@ pub async fn sync_drive_with_peer_using_outcome(
                                 store,
                                 &remote_agent,
                                 &diff.pull,
-                                Some(&remote_key),
                             )
                             .await;
                             if !entries.is_empty() {
@@ -2212,7 +2210,6 @@ pub async fn sync_drive_with_peer_using_outcome(
                         store,
                         &remote_agent,
                         &pull_subjects,
-                        Some(&remote_key),
                     )
                     .await;
                     if !entries.is_empty() {
@@ -2441,19 +2438,6 @@ pub struct KnownPeer {
     /// forgotten by the node's own agent.
     #[serde(default)]
     pub drives: Vec<String>,
-}
-
-/// The one policy for "this peer may have everything we can read", whatever
-/// its own agent can read. Used by the pull path
-/// ([`super::engine::collect_readable_snapshots`]) and the live push
-/// ([`readable_live_peers`]), so the two cannot drift apart.
-///
-/// Today: the owner dialled this node (`is_paired_peer`). `remote_agent`, the
-/// identity the connection proved, is ignored. To also require that the peer
-/// proved our own default agent, change the body to
-/// `is_paired_peer(..) && remote_agent == &own default agent`.
-pub(crate) fn peer_may_replicate_all(store: &Db, node_id: &str, _remote_agent: &ForAgent) -> bool {
-    is_paired_peer(store, node_id)
 }
 
 /// Get all known peers from the DB.
@@ -3464,7 +3448,6 @@ mod initiator_trust_tests {
             &db,
             &ForAgent::Public,
             std::slice::from_ref(&child),
-            None,
         )
         .await;
         assert!(
@@ -3478,7 +3461,6 @@ mod initiator_trust_tests {
             &db,
             &ForAgent::AgentSubject(alice.subject.clone()),
             std::slice::from_ref(&child),
-            None,
         )
         .await;
         assert_eq!(
@@ -3503,7 +3485,6 @@ mod initiator_trust_tests {
             &db,
             &ForAgent::AgentSubject(mallory.subject.clone()),
             &[child],
-            None,
         )
         .await;
         assert!(
@@ -3522,45 +3503,34 @@ mod initiator_trust_tests {
     /// Pairing is already an authenticated choice by the owner; this treats it
     /// as one.
     #[tokio::test]
-    async fn a_paired_replica_receives_what_the_owner_can_read() {
+    async fn a_paired_node_is_served_by_the_agent_it_authenticated_as() {
         let db = Db::init_temp("paired_replica_serves").await.unwrap();
         let alice = crate::agents::Agent::new(Some("Alice")).unwrap();
         db.set_default_agent(alice.clone());
         let (_drive, child) = private_drive_with_child(&db, &alice).await;
 
-        // The replica's own identity: a node agent, granted nothing.
+        // Paired, but authenticated as a different agent that was granted
+        // nothing: pairing widens nothing, so it gets nothing.
         let replica_node = "aaaabbbbccccddddeeeeffff0000111122223333444455556666777788889999";
-        let replica_agent = db.create_agent(Some("Replica")).await.unwrap();
-        let as_replica = ForAgent::AgentSubject(replica_agent.subject.clone());
-
-        // Not paired yet — rights only, so nothing is served.
-        let unpaired = crate::sync::engine::collect_readable_snapshots(
+        add_known_peer(&db, replica_node, "Replica");
+        let other = db.create_agent(Some("Replica")).await.unwrap();
+        let as_other = ForAgent::AgentSubject(other.subject.clone());
+        let served = crate::sync::engine::collect_readable_snapshots(
             &db,
-            &as_replica,
+            &as_other,
             std::slice::from_ref(&child),
-            Some(replica_node),
         )
         .await;
         assert!(
-            unpaired.is_empty(),
-            "a node the owner never dialled must not be served"
+            served.is_empty(),
+            "a paired node is not entitled by pairing"
         );
 
-        // The owner pairs with it.
-        add_known_peer(&db, replica_node, "Replica");
-
-        let paired = crate::sync::engine::collect_readable_snapshots(
-            &db,
-            &as_replica,
-            &[child],
-            Some(replica_node),
-        )
-        .await;
-        assert_eq!(
-            paired.len(),
-            1,
-            "a paired replica must receive what the owner can read"
-        );
+        // Authenticated as the owner's own agent: served.
+        let as_owner = ForAgent::AgentSubject(alice.subject.clone());
+        let served =
+            crate::sync::engine::collect_readable_snapshots(&db, &as_owner, &[child]).await;
+        assert_eq!(served.len(), 1, "the owner's own agent is served");
     }
 
     /// A peer we dialed that isn't admitted for the drive must NOT be able to
@@ -3749,7 +3719,6 @@ mod accept_gate_tests {
             db,
             &ForAgent::AgentSubject(owner.subject.clone()),
             &[child.to_string()],
-            None,
         )
         .await;
         assert_eq!(snapshots.len(), 1, "owner can read its own child");
@@ -4334,8 +4303,9 @@ mod live_push_read_filter_tests {
         set.contains(&(normalize_node_id(key), g))
     }
 
-    /// An unpaired live peer without read rights gets nothing for a private
-    /// subject; one with read rights gets it; a paired peer gets it. Fails
+    /// A live peer without read rights gets nothing for a private subject,
+    /// paired or not; one proving an agent with read rights (the owner's own
+    /// included) gets it. Fails
     /// closed for a subject that does not resolve.
     #[tokio::test]
     async fn live_push_only_reaches_peers_that_may_read() {
@@ -4355,6 +4325,7 @@ mod live_push_read_filter_tests {
         let (g_public, _rx_public) = register_as(public, ForAgent::Public);
         let (g_reader, mut rx_reader) =
             register_as(reader, ForAgent::AgentSubject(alice.subject.clone()));
+        // Paired, but proving another agent: pairing grants nothing.
         let (g_paired, mut rx_paired) =
             register_as(paired, ForAgent::AgentSubject(mallory.subject.clone()));
         add_known_peer(&db, paired, "Replica");
@@ -4363,13 +4334,13 @@ mod live_push_read_filter_tests {
         assert!(!allowed(&set, stranger, g_stranger));
         assert!(!allowed(&set, public, g_public));
         assert!(allowed(&set, reader, g_reader));
-        assert!(allowed(&set, paired, g_paired));
+        assert!(!allowed(&set, paired, g_paired));
 
         // The send itself honours the set.
         send_live_update_wire_msg_except(&|_| vec![1, 2, 3], None, &set);
         assert!(rx_stranger.try_recv().is_err(), "stranger got private data");
         assert_eq!(rx_reader.try_recv().unwrap(), vec![1, 2, 3]);
-        assert_eq!(rx_paired.try_recv().unwrap(), vec![1, 2, 3]);
+        assert!(rx_paired.try_recv().is_err(), "pairing alone must not leak");
 
         // A subject that is not a resource we hold: nobody, not even a reader.
         let missing = readable_live_peers(&db, "did:ad:doesnotexist").await;
