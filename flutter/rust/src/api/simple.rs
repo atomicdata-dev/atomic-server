@@ -1,21 +1,23 @@
 use atomic_lib::Storelike;
 use flutter_rust_bridge::frb;
 
+#[cfg(not(target_arch = "wasm32"))]
+mod compaction_check;
 #[cfg(test)]
 mod peer_tests;
-mod state;
+mod peer_search;
+pub(crate) mod state;
 #[cfg(test)]
-mod tests;
+mod store_open_tests;
+#[cfg(test)]
+pub(crate) mod tests;
 pub mod types;
 pub mod ws_sync;
 
 pub use atomic_lib::{Commit, Db};
 
-use state::{
-    canvas_date_edited_ms, db, err, node, now_ms, set_db, touch_date_edited, CANVAS_CLASS,
-    CANVAS_DATE_EDITED, CANVAS_FOLDER_ID, CANVAS_STROKE_DATA, FOLDER_CLASS,
-};
-pub use types::{AgentInfo, CanvasListItem, FolderListItem, SetupResult, VersionMetadata};
+use state::{db, err, node, set_db};
+pub use types::{AgentInfo, SetupResult, StoreRecovery, VersionMetadata};
 
 /// Save resource locally, record it in the durable outbox, and drain the
 /// outbox over WS when a session is open. Offline edits wait on disk.
@@ -23,8 +25,27 @@ async fn save_and_push(
     resource: &mut atomic_lib::Resource,
     store: &atomic_lib::Db,
 ) -> Result<(), String> {
-    touch_date_edited(resource);
     let response = node()?.save_locally(resource).await.map_err(err)?;
+    push_local_write(&response, store).await;
+    Ok(())
+}
+
+/// Hand a commit this device just signed to whoever can take it: live peers
+/// get the state at once, the server gets the queued commit, and a paired
+/// device takes it when there is no server in reach.
+/// Apply a commit this device signed itself and queue it for the server, like
+/// `save_locally` does for an edit.
+pub(crate) async fn node_apply_local(
+    commit: atomic_lib::Commit,
+    opts: &atomic_lib::commit::CommitOpts,
+) -> Result<atomic_lib::commit::CommitResponse, String> {
+    node()?.apply_local_commit(commit, opts).await.map_err(err)
+}
+
+pub(crate) async fn push_local_write(
+    response: &atomic_lib::commit::CommitResponse,
+    store: &atomic_lib::Db,
+) {
     if let Some(bytes) = &response.commit.loro_update {
         if !bytes.is_empty() {
             let subject_key = response.commit.subject.pure_id();
@@ -43,28 +64,6 @@ async fn save_and_push(
     if !ws_ok || atomic_lib::sync::peer::live_peer_count() == 0 {
         nudge_peers_after_local_change(store).await;
     }
-    Ok(())
-}
-
-/// Catch a cached editing session up to the store's current snapshot before a
-/// local edit. A peer's stroke that the sync layer merged into the store since
-/// this session was cached is not in the in-memory doc; without this, appending
-/// and saving would export a snapshot missing that stroke and silently revert
-/// it. Synchronous (under the canvas guard), unlike the async cache-invalidation
-/// listener which can lag behind a fast next stroke. Cheap when already current
-/// — importing already-known state is a Loro no-op.
-fn refresh_editing_session(
-    resource: &mut atomic_lib::Resource,
-    store: &atomic_lib::Db,
-    subject: &str,
-) {
-    let key = atomic_lib::Subject::from_raw(subject, store.get_base_domain().as_deref()).pure_id();
-    if let Ok(Some(snapshot)) = store
-        .kv
-        .get(atomic_lib::db::trees::Tree::LoroSnapshots, key.as_bytes())
-    {
-        let _ = resource.merge_persisted_state(&snapshot);
-    }
 }
 
 fn is_unreachable_hub_url(url: &str) -> bool {
@@ -77,8 +76,10 @@ async fn ensure_sync_connectivity(store: &atomic_lib::Db) -> Result<(), String> 
     let Some(drive) = store.get_active_drive() else {
         return Ok(());
     };
+    let _ = drive;
+    // `start_peer` also starts the search loop, which announces this device
+    // for the active and the private drive and keeps looking for the others.
     let _ = start_peer().await?;
-    let _ = peer_announce(drive).await;
     Ok(())
 }
 
@@ -123,15 +124,22 @@ async fn nudge_peers_after_local_change(store: &atomic_lib::Db) {
 ///   2. Agent     — setup(), load_agent(), get_active_agent(), clear_agent()
 ///   3. Drive     — create_drive(), list_drives(), get_active_drive(), set_active_drive()
 ///   4. Resource  — create_resource(), set_property(), get_property()
-///   5. Canvas    — create_canvas(), save/load/list/delete/rename
-///   6. History   — warm_resource_history(), get_resource_history(), get_resource_at_version()
-///   7. Peer      — start_peer(), get_peer_id(), peer_announce(), peer_sync(), peer_discover_sync()
+///   5. History   — warm_resource_history(), get_resource_history()
+///   6. Peer      — start_peer(), get_peer_id(), peer_announce(), peer_sync(), peer_discover_sync()
 ///
-/// Networking (group 7) is explicit and opt-in. Nothing in groups 1-6 touches the network.
+/// Networking (group 6) is explicit and opt-in. Nothing in groups 1-5 touches the network.
 
 // ── 1. Database ────────────────────────────────────────────────────────────
 
-/// Open a local database. Call once on app start.
+/// Open a local database. Call on app start; a second call in the same
+/// process (Android runs `main` again when it recreates the activity) keeps
+/// the store that is already open.
+///
+/// Never panics and never deletes the user's data. A store that cannot be
+/// opened because the file is damaged is renamed to
+/// `atomic.redb.corrupt-<ms>`, a repaired copy (or, failing that, an empty
+/// store) takes its place, and `store_recovery` tells the app so it can say
+/// so. Other errors (permissions, a full disk) are returned as they are.
 pub async fn open_db(path: String) -> Result<(), String> {
     // Set up log filtering — suppress noisy TLS/mDNS/iroh internals
     #[cfg(target_os = "android")]
@@ -144,22 +152,23 @@ pub async fn open_db(path: String) -> Result<(), String> {
             ))
             .try_init();
     }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    let _opening = state::OPEN_DB_LOCK.lock().await;
+    if db().is_ok() {
+        // A second store handle on the same file is what damaged stores on
+        // Android (see `atomic_lib::db::recovery`).
+        tracing::info!("open_db: the store is already open in this process; keeping it");
+        return Ok(());
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     let store = {
-        let base_path = std::path::Path::new(&path);
-        let db_path = base_path.join("atomic.redb");
-        let uploads_path = base_path.join("uploads");
-        match atomic_lib::Db::init_redb_file(base_path, None, &uploads_path).await {
-            Ok(s) => s,
-            Err(e) if is_corruption_error(&e) => {
-                tracing::warn!("DB corrupted, deleting and recreating: {e}");
-                let _ = std::fs::remove_file(&db_path);
-                atomic_lib::Db::init_redb_file(base_path, None, &uploads_path)
-                    .await
-                    .map_err(err)?
-            }
-            Err(e) => return Err(err(e)),
+        let (store, recovery) = open_native_store(std::path::Path::new(&path)).await?;
+        if let Some(recovery) = recovery {
+            state::set_store_recovery(recovery);
         }
+        store
     };
 
     #[cfg(target_arch = "wasm32")]
@@ -168,31 +177,197 @@ pub async fn open_db(path: String) -> Result<(), String> {
         .map_err(err)?;
 
     set_db(store);
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        state::set_store_dir(std::path::Path::new(&path));
+        catch_up_search_index(db()?.clone()).await;
+        crate::host::start_recents(std::path::Path::new(&path), db()?.clone());
+    }
     Ok(())
 }
 
-/// Whether an open error means the file itself is damaged. redb reports that
-/// as `StorageError::Corrupted` ("DB corrupted: …"), and atomic_lib's own
-/// deserialisation failures say the DB is "possibly corrupt". Anything else —
-/// the file locked by another process, a permission problem, a redb version
-/// that needs an upgrade — is not a reason to throw the user's data away.
+/// Set when the last `open_db` had to set a damaged store aside.
+#[frb(sync)]
+pub fn store_recovery() -> Option<StoreRecovery> {
+    state::store_recovery()
+}
+
+/// Make every write so far durable now. The app calls it when it goes to
+/// the background, where Android may kill it without warning; the store
+/// otherwise makes writes durable on a 100 ms tick.
+pub fn flush_db() -> Result<(), String> {
+    db()?.flush().map_err(err)
+}
+
 #[cfg(not(target_arch = "wasm32"))]
-fn is_corruption_error(e: &atomic_lib::errors::AtomicError) -> bool {
-    e.to_string().to_ascii_lowercase().contains("corrupt")
+async fn open_native_store(
+    base_path: &std::path::Path,
+) -> Result<(atomic_lib::Db, Option<StoreRecovery>), String> {
+    use atomic_lib::db::recovery;
+    let db_path = base_path.join("atomic.redb");
+    let before = recovery::inspect(&db_path).ok().flatten();
+    let started = std::time::Instant::now();
+
+    let (store, recovered) = match open_store_catching(base_path).await {
+        Ok(store) => (store, None),
+        Err(e) if recovery::is_damaged_store_error(&e) => {
+            tracing::error!("The store could not be opened, setting it aside: {e} ({before:?})");
+            let kept = recovery::set_aside(&db_path).map_err(|io| {
+                format!("The store could not be opened ({e}) nor moved aside: {io}")
+            })?;
+            let mut repaired = match recovery::repair_copy(&kept, &db_path) {
+                Ok(()) => true,
+                Err(repair) => {
+                    tracing::warn!("Repairing a copy of the store failed: {repair}");
+                    false
+                }
+            };
+            let store = match open_store_catching(base_path).await {
+                Ok(store) => store,
+                Err(again) if repaired => {
+                    // Only the repaired copy goes; the original is `kept`.
+                    tracing::warn!("The repaired store did not open either: {again}");
+                    let _ = std::fs::remove_file(&db_path);
+                    repaired = false;
+                    open_store_catching(base_path).await?
+                }
+                Err(again) => return Err(again),
+            };
+            let recovery = StoreRecovery {
+                kept_path: kept.to_string_lossy().into_owned(),
+                reason: e,
+                repaired,
+            };
+            (store, Some(recovery))
+        }
+        Err(e) => return Err(e),
+    };
+
+    let after = recovery::inspect(&db_path).ok().flatten();
+    tracing::info!(
+        "store self-check: {} opened in {:?}; before {}; now {}; {}",
+        db_path.display(),
+        started.elapsed(),
+        describe_file(before),
+        describe_file(after),
+        match &recovered {
+            None => "no recovery needed".to_string(),
+            Some(r) if r.repaired => format!("REPAIRED a damaged store, kept at {}", r.kept_path),
+            Some(r) => format!(
+                "STARTED EMPTY, the damaged store is kept at {}",
+                r.kept_path
+            ),
+        }
+    );
+    Ok((store, recovered))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn describe_file(check: Option<atomic_lib::db::recovery::FileCheck>) -> String {
+    match check {
+        None => "no store file".into(),
+        Some(c) => format!(
+            "{} bytes, header describes {}{}{}",
+            c.file_len,
+            c.layout_len,
+            if c.is_short() { " (SHORT)" } else { "" },
+            if c.recovery_required {
+                ", last run did not close it"
+            } else {
+                ", closed cleanly"
+            }
+        ),
+    }
+}
+
+/// redb's read cache on a phone. Its default (1 GiB) keeps whatever was read,
+/// up to the size of the store, in memory (870 MB of RSS after a full walk of
+/// a 1 GB store); the lists and the search read little and repeatedly.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) const REDB_CACHE_BYTES: usize = 48 * 1024 * 1024;
+
+/// `Db::init_redb_file` with any panic inside it turned into a "damaged"
+/// error: a panic must not escape to the app, which then never draws.
+#[cfg(not(target_arch = "wasm32"))]
+async fn open_store_catching(base_path: &std::path::Path) -> Result<atomic_lib::Db, String> {
+    use futures::FutureExt;
+    let uploads_path = base_path.join("uploads");
+    let now = state::now_ms();
+    let policy = compaction_check::startup_policy(base_path, now);
+    let checks = policy.enabled;
+    let opening = atomic_lib::Db::init_redb_file_with_cache(
+        base_path,
+        None,
+        &uploads_path,
+        &policy,
+        Some(REDB_CACHE_BYTES),
+    );
+    match std::panic::AssertUnwindSafe(opening).catch_unwind().await {
+        Ok(Ok(store)) => {
+            if checks {
+                compaction_check::record_check(base_path, now);
+            }
+            Ok(store)
+        }
+        Ok(Err(e)) => Err(err(e)),
+        Err(panic) => Err(format!(
+            "The {}: panic while opening: {}",
+            atomic_lib::db::recovery::DAMAGED_STORE,
+            atomic_lib::db::recovery::panic_message(&panic)
+        )),
+    }
+}
+
+/// Make sure every stored resource is searchable. An index written by an older
+/// build can lack resources that arrived by sync, and nothing else notices: the
+/// library only rebuilds an empty index. Rebuilds once per install (a marker
+/// records it, so later starts cost one key read), then drains resources filed
+/// for deferred indexing.
+#[cfg(not(target_arch = "wasm32"))]
+async fn catch_up_search_index(store: std::sync::Arc<atomic_lib::Db>) {
+    let rebuilder = store.clone();
+    let rebuilt = tokio::task::spawn_blocking(move || {
+        atomic_lib::search::rebuild_search_index_once(&rebuilder, "flutter-1")
+    })
+    .await;
+    match rebuilt {
+        Ok(Ok(true)) => tracing::info!("search index rebuilt"),
+        Ok(Ok(false)) => {}
+        Ok(Err(e)) => tracing::warn!("search index rebuild failed: {e}"),
+        Err(e) => tracing::warn!("search index rebuild panicked: {e}"),
+    }
+    while let Ok(done) = atomic_lib::search::index_pending(&store, 500).await {
+        if done == 0 {
+            break;
+        }
+    }
 }
 
 #[frb(init)]
 pub fn init_app() {
-    flutter_rust_bridge::setup_default_user_utils();
+    // Not `setup_default_user_utils`: that forwards the `log` crate to logcat
+    // at Trace (rustls, reqwest and iroh wrote ~800 formatted lines per app
+    // start) and sets RUST_BACKTRACE=1, which also makes every `anyhow` error
+    // capture and print a stack (iroh makes them in its retry loops). Panics
+    // keep their backtrace; library errors do not capture one.
+    #[cfg(not(target_family = "wasm"))]
+    if std::env::var_os("RUST_LIB_BACKTRACE").is_none() {
+        std::env::set_var("RUST_LIB_BACKTRACE", "0");
+    }
+    flutter_rust_bridge::setup_backtrace();
+    flutter_rust_bridge::setup_log_to_console(log::LevelFilter::Warn);
 
-    // Initialize tracing → logcat on Android, stderr elsewhere
+    // Initialize tracing → logcat on Android, stderr elsewhere. Loro logs
+    // every encoded block at info.
     #[cfg(target_os = "android")]
     {
         use tracing_subscriber::layer::SubscriberExt;
         use tracing_subscriber::util::SubscriberInitExt;
         let _ = tracing_subscriber::registry()
             .with(tracing_android::layer("atomic").ok())
-            .with(tracing_subscriber::filter::LevelFilter::INFO)
+            .with(tracing_subscriber::filter::EnvFilter::new(
+                "info,loro_internal=warn,swarm_discovery=error",
+            ))
             .try_init();
     }
     #[cfg(not(target_os = "android"))]
@@ -284,6 +459,44 @@ pub fn agent_from_secret(secret: String) -> Result<AgentInfo, String> {
     })
 }
 
+/// The profile of this device's agent as JSON `{subject, name, description,
+/// emoji?, imageUrl?}`: what the store holds, else what the connected server
+/// has (`atomic_lib::host::own_profile`).
+pub async fn get_own_profile() -> Result<String, String> {
+    let profile = atomic_lib::host::own_profile::own_profile(db()?, &crate::host::profiles())
+        .await
+        .map_err(err)?;
+    crate::host::to_json(&profile)
+}
+
+/// The bytes of a File resource (a profile picture) when this device holds
+/// them; `None` when the File or its bytes are not here (yet) or too large.
+pub async fn read_file_bytes(file: String) -> Result<Option<Vec<u8>>, String> {
+    atomic_lib::host::own_profile::file_bytes(db()?, &file)
+        .await
+        .map_err(err)
+}
+
+/// Save this device's agent's profile: a commit by the agent on its own
+/// resource, stored here and synced like any other edit. An empty
+/// `description` removes it; `icon` is the subject of a File for the picture
+/// (empty removes it, `None` leaves it as it is).
+pub async fn set_agent_profile(
+    name: String,
+    description: String,
+    icon: Option<String>,
+) -> Result<(), String> {
+    atomic_lib::host::own_profile::set_own_profile(
+        &node()?,
+        crate::host::pusher().as_ref(),
+        &name,
+        &description,
+        icon.as_deref(),
+    )
+    .await
+    .map_err(err)
+}
+
 // ── 3. Drive ───────────────────────────────────────────────────────────────
 
 /// Create a new drive. Returns the drive subject.
@@ -304,14 +517,44 @@ pub async fn set_active_drive(subject: String) -> Result<(), String> {
 
 /// List drives belonging to the current agent, with names.
 pub async fn list_drives() -> Result<Vec<String>, String> {
-    let drives = db()?.list_drives().await.map_err(err)?;
-    Ok(drives.iter().map(|d| d.subject.clone()).collect())
+    Ok(drives_by_use()
+        .await?
+        .into_iter()
+        .map(|d| d.subject)
+        .collect())
 }
 
-/// List drives with names. Returns JSON-encoded array of {subject, name}.
+/// The agent's drives in the order every drive list shows: the active one,
+/// then the most recently used, then the rest by name.
+async fn drives_by_use() -> Result<Vec<atomic_lib::db::DriveInfo>, String> {
+    let store = db()?;
+    let drives = store.list_drives().await.map_err(err)?;
+    Ok(atomic_lib::host::lists::order_drives_by_use(
+        store,
+        crate::host::recents(),
+        drives,
+        |d| (d.subject.as_str(), d.name.as_str()),
+    ))
+}
+
+/// List drives with names. Returns JSON-encoded array of {subject, name,
+/// emoji?} (`emoji` is the drive's own icon, absent when it has none).
 pub async fn list_drives_with_names() -> Result<String, String> {
-    let drives = db()?.list_drives().await.map_err(err)?;
-    serde_json::to_string(&drives).map_err(|e| e.to_string())
+    let store = db()?;
+    let drives = drives_by_use().await?;
+    let mut rows = serde_json::to_value(&drives).map_err(|e| e.to_string())?;
+    if let Some(rows) = rows.as_array_mut() {
+        for row in rows {
+            let Some(subject) = row["subject"].as_str() else {
+                continue;
+            };
+            if let Some(drive) = atomic_lib::host::rows::row_resource(store, &subject.into()).await
+            {
+                *row = atomic_lib::host::rows::with_emoji(row.take(), &drive);
+            }
+        }
+    }
+    serde_json::to_string(&rows).map_err(|e| e.to_string())
 }
 
 // ── 4. Resource ────────────────────────────────────────────────────────────
@@ -343,440 +586,6 @@ pub async fn get_property(subject: String, property: String) -> Result<String, S
         .get(&property)
         .map(|v| v.to_string())
         .unwrap_or_default())
-}
-
-// ── 5. Canvas CRUD ─────────────────────────────────────────────────────────
-
-/// Create a new canvas. Uses the active drive as parent.
-pub async fn create_canvas(name: String) -> Result<String, String> {
-    create_canvas_with_folder(name, None).await
-}
-
-/// Create a canvas, optionally in a gallery folder (`folder_id` = folder resource subject).
-pub async fn create_canvas_with_folder(
-    name: String,
-    folder_id: Option<String>,
-) -> Result<String, String> {
-    let store = db()?;
-    let parent = store
-        .get_active_drive()
-        .ok_or("No drive set. Call setup() first.")?;
-    let mut props = vec![
-        (
-            CANVAS_STROKE_DATA,
-            atomic_lib::Value::Json(serde_json::Value::Array(vec![])),
-        ),
-        (CANVAS_DATE_EDITED, atomic_lib::Value::Timestamp(now_ms())),
-    ];
-    if let Some(fid) = folder_id.filter(|s| !s.is_empty()) {
-        props.push((CANVAS_FOLDER_ID, atomic_lib::Value::String(fid)));
-    }
-    let subject = store
-        .create_resource(CANVAS_CLASS, &parent, &name, Some(props))
-        .await
-        .map_err(err)?;
-    nudge_peers_after_local_change(store.as_ref()).await;
-    Ok(subject)
-}
-
-/// Create a folder resource under the active drive.
-pub async fn create_folder(name: String) -> Result<String, String> {
-    let store = db()?;
-    let parent = store
-        .get_active_drive()
-        .ok_or("No drive set. Call setup() first.")?;
-    let subject = store
-        .create_resource(FOLDER_CLASS, &parent, &name, None)
-        .await
-        .map_err(err)?;
-    nudge_peers_after_local_change(store.as_ref()).await;
-    Ok(subject)
-}
-
-/// List folder resources in the active drive.
-pub async fn list_folders() -> Result<Vec<FolderListItem>, String> {
-    let store = db()?;
-    let drive = store.get_active_drive().ok_or("No active drive")?;
-    let query = atomic_lib::storelike::Query::new_prop_val(atomic_lib::urls::PARENT, &drive);
-    let result = store.query(&query).await.map_err(err)?;
-    let mut items = Vec::new();
-    for subject in &result.subjects {
-        if let Ok(r) = store.get_resource(&subject.as_str().into()).await {
-            if let Ok(is_a) = r.get(atomic_lib::urls::IS_A) {
-                if !is_a.to_string().contains(FOLDER_CLASS) {
-                    continue;
-                }
-            } else {
-                continue;
-            }
-            items.push(FolderListItem {
-                subject: r.get_subject().to_string(),
-                name: r
-                    .get(atomic_lib::urls::NAME)
-                    .map(|v| v.to_string())
-                    .unwrap_or_default(),
-            });
-        }
-    }
-    items.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(items)
-}
-
-/// Set or clear the gallery folder for a canvas (persisted + synced).
-pub async fn set_canvas_folder(subject: String, folder_id: Option<String>) -> Result<(), String> {
-    let store = db()?;
-    let mut guard = get_canvas(&subject).await?;
-    let resource = guard.as_mut().unwrap();
-    if let Some(fid) = folder_id.filter(|s| !s.is_empty()) {
-        resource.set_unsafe(CANVAS_FOLDER_ID.into(), atomic_lib::Value::String(fid));
-    } else {
-        resource.remove_propval(CANVAS_FOLDER_ID);
-    }
-    save_and_push(resource, store.as_ref()).await
-}
-
-/// Per-canvas mutex that also caches the live Resource (with undo history).
-/// The Resource stays in memory so undo history survives across FFI calls.
-/// Auto-invalidates when the DB broadcasts a change for a cached subject.
-static CANVAS_CACHE: std::sync::Mutex<
-    Option<
-        std::collections::HashMap<
-            String,
-            std::sync::Arc<tokio::sync::Mutex<Option<atomic_lib::Resource>>>,
-        >,
-    >,
-> = std::sync::Mutex::new(None);
-
-/// Whether the cache listener is running.
-static CACHE_LISTENER_STARTED: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
-
-/// Start a background task that invalidates cached resources when the DB changes.
-fn ensure_cache_listener() {
-    if CACHE_LISTENER_STARTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
-        return;
-    }
-    let Ok(store) = db() else { return };
-    let mut rx = store.subscribe_events();
-    tokio::spawn(async move {
-        loop {
-            // `from_remote` decides whether to drop the cached edit session. A
-            // local commit already updated that cached doc in place, so keeping
-            // it is correct and skips a reload. A change that did NOT come from
-            // our own commit — a stroke merged in from a peer — is NOT in the
-            // cached doc, so we must drop it: otherwise the next local
-            // `push_stroke` appends to a stale doc and its save overwrites the
-            // just-merged remote stroke, silently reverting it.
-            // `from_commit == false` is the reliable signal (remote sync
-            // applies via `add_resource_opts`; local strokes via a signed
-            // commit), and a commit a peer sent carries its `source_id`. The
-            // import flag is per task now (`ws_apply::import_scope`), so it is
-            // never visible from this listener; the event itself says where
-            // the change came from. Over-invalidating only ever costs a
-            // reload, so a destroyed subject always drops its cached session.
-            let (subject, from_remote) = match rx.recv().await {
-                Ok(atomic_lib::DbEvent::Changed {
-                    subject,
-                    from_commit,
-                    source_id,
-                    ..
-                }) => (subject, !from_commit || source_id.is_some()),
-                Ok(atomic_lib::DbEvent::Destroyed { subject, .. }) => (subject, true),
-                Ok(atomic_lib::DbEvent::QueryMembershipChanged { .. }) => continue,
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                Err(_) => {
-                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                    if let Ok(s) = db() {
-                        rx = s.subscribe_events();
-                    }
-                    continue;
-                }
-            };
-            if from_remote {
-                let key = subject.to_string();
-                let mut cache = CANVAS_CACHE.lock().unwrap();
-                if let Some(map) = cache.as_mut() {
-                    if map.remove(&key).is_some() {
-                        tracing::debug!("[canvas_cache] invalidated {}", &key[..key.len().min(20)]);
-                    }
-                }
-            }
-        }
-    });
-}
-
-fn canvas_cache_key(subject: &str) -> String {
-    if let Ok(store) = db() {
-        atomic_lib::Subject::from_raw(subject, store.get_base_domain().as_deref())
-            .without_params()
-            .to_string()
-    } else {
-        subject.to_string()
-    }
-}
-
-fn canvas_entry(subject: &str) -> std::sync::Arc<tokio::sync::Mutex<Option<atomic_lib::Resource>>> {
-    let key = canvas_cache_key(subject);
-    let mut cache = CANVAS_CACHE.lock().unwrap();
-    let map = cache.get_or_insert_with(std::collections::HashMap::new);
-    map.entry(key)
-        .or_insert_with(|| std::sync::Arc::new(tokio::sync::Mutex::new(None)))
-        .clone()
-}
-
-/// Get or load the cached canvas resource (editable, with undo).
-async fn get_canvas(
-    subject: &str,
-) -> Result<tokio::sync::OwnedMutexGuard<Option<atomic_lib::Resource>>, String> {
-    ensure_cache_listener();
-    let entry = canvas_entry(subject);
-    let mut guard = entry.lock_owned().await;
-    if guard.is_none() {
-        let store = db()?;
-        let mut resource = store.get_resource(&subject.into()).await.map_err(err)?;
-        resource.ensure_editable().map_err(err)?;
-        *guard = Some(resource);
-    }
-    Ok(guard)
-}
-
-/// Push a single stroke to a canvas. Appends to the stroke list; merges across devices.
-pub async fn push_stroke(subject: String, stroke_json: String) -> Result<(), String> {
-    let store = db()?;
-    let item: serde_json::Value =
-        serde_json::from_str(&stroke_json).map_err(|e| format!("Invalid stroke JSON: {e}"))?;
-
-    let mut guard = get_canvas(&subject).await?;
-    let resource = guard.as_mut().unwrap();
-    // Merge any peer strokes the store received since this session was cached,
-    // so appending ours doesn't overwrite them.
-    refresh_editing_session(resource, store.as_ref(), &subject);
-    resource
-        .push_list_item(CANVAS_STROKE_DATA, item)
-        .map_err(err)?;
-    save_and_push(resource, store.as_ref()).await?;
-
-    Ok(())
-}
-
-/// Load strokes JSON from a canvas. Reads directly from DB (no edit session).
-pub async fn load_canvas_strokes(subject: String) -> Result<String, String> {
-    let store = db()?;
-    let resource = store
-        .get_resource(&subject.as_str().into())
-        .await
-        .map_err(err)?;
-    let result = match resource.get(CANVAS_STROKE_DATA) {
-        Ok(atomic_lib::Value::Json(val)) => {
-            serde_json::to_string(val).unwrap_or_else(|_| "[]".into())
-        }
-        Ok(v) => v.to_string(),
-        _ => "[]".into(),
-    };
-    Ok(result)
-}
-
-/// List all canvases in the active drive.
-/// Uses the query index (not a full scan) so results include synced resources.
-pub async fn list_canvases() -> Result<Vec<CanvasListItem>, String> {
-    let store = db()?;
-    let drive = store.get_active_drive().ok_or("No active drive")?;
-
-    let query = atomic_lib::storelike::Query::new_prop_val(atomic_lib::urls::PARENT, &drive);
-    let result = store.query(&query).await.map_err(err)?;
-
-    let mut items = Vec::new();
-    for subject in &result.subjects {
-        if let Ok(r) = store.get_resource(&subject.as_str().into()).await {
-            // Filter by canvas class
-            if let Ok(is_a) = r.get(atomic_lib::urls::IS_A) {
-                if !is_a.to_string().contains(CANVAS_CLASS) {
-                    continue;
-                }
-            } else {
-                continue;
-            }
-            items.push(CanvasListItem {
-                subject: r.get_subject().to_string(),
-                name: r
-                    .get(atomic_lib::urls::NAME)
-                    .map(|v| v.to_string())
-                    .unwrap_or_default(),
-                date_edited: canvas_date_edited_ms(&r),
-            });
-        }
-    }
-    items.sort_by(|a, b| b.date_edited.cmp(&a.date_edited));
-    Ok(items)
-}
-
-/// List canvases as JSON (includes `folder_id`). Prefer this from Dart until FRB codegen.
-pub async fn list_canvases_json() -> Result<String, String> {
-    let store = db()?;
-    let drive = store.get_active_drive().ok_or("No active drive")?;
-    let query = atomic_lib::storelike::Query::new_prop_val(atomic_lib::urls::PARENT, &drive);
-    let result = store.query(&query).await.map_err(err)?;
-
-    let mut items = Vec::new();
-    for subject in &result.subjects {
-        if let Ok(r) = store.get_resource(&subject.as_str().into()).await {
-            if let Ok(is_a) = r.get(atomic_lib::urls::IS_A) {
-                if !is_a.to_string().contains(CANVAS_CLASS) {
-                    continue;
-                }
-            } else {
-                continue;
-            }
-            let folder_id = r
-                .get(CANVAS_FOLDER_ID)
-                .map(|v| v.to_string())
-                .unwrap_or_default();
-            items.push(types::CanvasListItemJson {
-                subject: r.get_subject().to_string(),
-                name: r
-                    .get(atomic_lib::urls::NAME)
-                    .map(|v| v.to_string())
-                    .unwrap_or_default(),
-                folder_id,
-                date_edited: canvas_date_edited_ms(&r),
-            });
-        }
-    }
-    items.sort_by(|a, b| b.date_edited.cmp(&a.date_edited));
-    serde_json::to_string(&items).map_err(|e| e.to_string())
-}
-
-/// Signed destroy commit + WS push + Iroh live/bulk nudge (same path for canvases and folders).
-///
-/// Not used by `delete_canvas` any more, which parks the canvas in the drive's
-/// Trash instead. Kept for a permanent-delete API, which needs the bindings
-/// regenerated (`flutter_rust_bridge_codegen`) before Dart can call it.
-#[allow(dead_code)]
-async fn destroy_resource_and_sync(subject: String) -> Result<(), String> {
-    tracing::info!("[destroy_resource] {}", &subject[..subject.len().min(30)]);
-    let store = db()?;
-    let mut builder = atomic_lib::commit::CommitBuilder::new(subject.clone().into());
-    builder.destroy(true);
-    let agent = store.get_default_agent().map_err(err)?;
-    let resource = store
-        .get_resource(&subject.as_str().into())
-        .await
-        .map_err(err)?;
-    let commit = builder
-        .sign(&agent, store.as_ref(), &resource)
-        .await
-        .map_err(err)?;
-    let opts = atomic_lib::commit::CommitOpts {
-        validate_signature: true,
-        validate_timestamp: false,
-        validate_rights: false,
-        update_index: true,
-        ..atomic_lib::commit::CommitOpts::no_validations_no_index()
-    };
-    let response = node()?
-        .apply_local_commit(commit, &opts)
-        .await
-        .map_err(err)?;
-    let ws_ok = ws_sync::drain_outbox(store.as_ref()).await;
-    if !ws_ok {
-        nudge_peers_after_local_change(store.as_ref()).await;
-    }
-    Ok(())
-}
-
-/// Delete a canvas (or any resource): move it to the active drive's Trash
-/// folder (created on first use) and remember its old parent in `trashedFrom`.
-/// Nothing is destroyed, so `atomic_lib::trash::restore` can bring it back.
-/// A canvas already in the Trash is left alone. Trashed canvases drop out of
-/// `list_canvases*`, which list the drive's direct children.
-pub async fn delete_canvas(subject: String) -> Result<(), String> {
-    let store = db()?;
-    let drive = store
-        .get_active_drive()
-        .ok_or("No drive set. Call setup() first.")?;
-    let had_trash = atomic_lib::trash::peek_trash_folder(store.as_ref(), &drive).is_some();
-    let trash = atomic_lib::trash::get_or_create_trash_folder(store.as_ref(), &drive)
-        .await
-        .map_err(err)?;
-    if !had_trash {
-        // The folder and the drive's pointer to it are plain local commits.
-        nudge_peers_after_local_change(store.as_ref()).await;
-    }
-    let mut resource = store
-        .get_resource(&subject.as_str().into())
-        .await
-        .map_err(err)?;
-    if atomic_lib::trash::apply_trash(&mut resource, &trash).map_err(err)? {
-        save_and_push(&mut resource, store.as_ref()).await?;
-    }
-    Ok(())
-}
-
-/// Rename a canvas.
-pub async fn rename_canvas(subject: String, name: String) -> Result<(), String> {
-    let store = db()?;
-    let mut resource = store
-        .get_resource(&subject.as_str().into())
-        .await
-        .map_err(err)?;
-    resource.set_unsafe(
-        atomic_lib::urls::NAME.into(),
-        atomic_lib::Value::String(name),
-    );
-    save_and_push(&mut resource, store.as_ref()).await
-}
-
-/// Delete a single stroke by index.
-pub async fn delete_stroke(subject: String, index: i32) -> Result<(), String> {
-    let store = db()?;
-    let mut guard = get_canvas(&subject).await?;
-    let resource = guard.as_mut().unwrap();
-    resource
-        .delete_list_item(CANVAS_STROKE_DATA, index as usize)
-        .map_err(err)?;
-    save_and_push(resource, store.as_ref()).await
-}
-
-/// Undo the last edit on a canvas. Returns the new stroke count.
-pub async fn undo_canvas(subject: String) -> Result<i32, String> {
-    let store = db()?;
-    let mut guard = get_canvas(&subject).await?;
-    let resource = guard.as_mut().unwrap();
-    if resource.undo().map_err(err)? {
-        save_and_push(resource, store.as_ref()).await?;
-    }
-    let count = match resource.get(CANVAS_STROKE_DATA) {
-        Ok(atomic_lib::Value::Json(serde_json::Value::Array(arr))) => arr.len() as i32,
-        _ => 0,
-    };
-    Ok(count)
-}
-
-/// Whether the canvas has a local undo step available.
-pub async fn can_undo_canvas(subject: String) -> Result<bool, String> {
-    let guard = get_canvas(&subject).await?;
-    Ok(guard.as_ref().unwrap().can_undo())
-}
-
-/// Whether the canvas has a local redo step available.
-pub async fn can_redo_canvas(subject: String) -> Result<bool, String> {
-    let guard = get_canvas(&subject).await?;
-    Ok(guard.as_ref().unwrap().can_redo())
-}
-
-/// Redo the last undone edit on a canvas. Returns the new stroke count.
-pub async fn redo_canvas(subject: String) -> Result<i32, String> {
-    let store = db()?;
-    let mut guard = get_canvas(&subject).await?;
-    let resource = guard.as_mut().unwrap();
-    if resource.redo().map_err(err)? {
-        save_and_push(resource, store.as_ref()).await?;
-    }
-    let count = match resource.get(CANVAS_STROKE_DATA) {
-        Ok(atomic_lib::Value::Json(serde_json::Value::Array(arr))) => arr.len() as i32,
-        _ => 0,
-    };
-    Ok(count)
 }
 
 // ── 6. History ─────────────────────────────────────────────────────────────
@@ -811,25 +620,6 @@ pub async fn get_resource_history(subject: String) -> Result<Vec<VersionMetadata
             message: m.message,
         })
         .collect())
-}
-
-/// Get canvas strokes at a specific historical version.
-pub async fn get_resource_at_version(
-    subject: String,
-    version_id: Vec<u8>,
-) -> Result<String, String> {
-    let store = db()?;
-    let mut resource = store
-        .get_resource(&subject.as_str().into())
-        .await
-        .map_err(err)?;
-    resource.warm_history().map_err(|e| e.to_string())?;
-    let version = atomic_lib::history::VersionID::from_bytes(version_id);
-    let detached = resource.view_at(&version).map_err(|e| e.to_string())?;
-    Ok(detached
-        .get(CANVAS_STROKE_DATA)
-        .map(|v| v.to_string())
-        .unwrap_or_else(|_| "[]".into()))
 }
 
 // ── 6b. WebSocket sync (server-backed, same as browser) ─────────────────────
@@ -917,8 +707,19 @@ pub async fn resume_app_session(
     let store = db()?;
     store.load_agent_from_secret(&secret).await.map_err(err)?;
 
-    if let Some(drive) = drive_hint.filter(|s| !s.is_empty()) {
-        let _ = store.set_active_drive(&drive);
+    match drive_hint.filter(|s| !s.is_empty()) {
+        Some(drive) => {
+            let _ = store.set_active_drive(&drive);
+        }
+        // A secret holds an identity and nothing else — but the one drive that
+        // follows from the key alone is the agent's personal drive. Work on
+        // that, not on whatever the previous agent left active; the sync
+        // screen then finds where it is hosted.
+        None => {
+            if let Ok(home) = store.private_drive_subject() {
+                let _ = store.set_active_drive(&home);
+            }
+        }
     }
 
     let origin = server_url.trim();
@@ -944,7 +745,15 @@ pub async fn resume_app_session(
     // now lives only on the needs-sync screen (`sync_connectivity_now`), where
     // there is a loading state for it, not a spinning button.
     if drive_resource_exists(store.as_ref()).await {
-        let _ = ensure_sync_connectivity(store.as_ref()).await;
+        // Iroh comes up in the background: binding and waiting for the relay
+        // (up to 10 s offline) must not hold the home back. Everything that
+        // needs the peer calls `start_peer` itself, which waits for this one.
+        tokio::spawn(async move {
+            let _ = ensure_sync_connectivity(store.as_ref()).await;
+        });
+        if let Some(home) = store.get_active_drive() {
+            tokio::spawn(follow_listed_drives(home));
+        }
 
         return Ok("ok".into());
     }
@@ -962,12 +771,26 @@ async fn drive_resource_exists(store: &atomic_lib::Db) -> bool {
 
 const PEER_SYNC_ATTEMPT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(22);
 const PKARR_RESOLVE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(12);
+/// How many of the NodeIDs a drive's pkarr record names are dialled at once.
+const PKARR_PEERS_TO_TRY: usize = 4;
+
+fn short_id(node_id: &str) -> &str {
+    &node_id[..node_id.len().min(12)]
+}
+
+/// The report's message when the lookup worked and named no other device.
+/// The app keeps it quiet (no toast): it is the normal state of a new account.
+const NO_OTHER_DEVICE_YET: &str =
+    "No other device found yet. Open the app on another device signed in with this account, or pair with QR.";
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct SyncConnectivityReport {
     pub imported: i32,
     pub live_peers: u32,
     pub message: String,
+    /// The server the drive was found on through pkarr, when it was.
+    #[serde(default)]
+    pub server: Option<String>,
 }
 
 /// Start Iroh, sync known peers (then pkarr). Returns JSON [`SyncConnectivityReport`].
@@ -1025,31 +848,68 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
         }
     }
 
-    // pkarr discover when still not live to any peer
-    if atomic_lib::sync::peer::live_peer_count() == 0 {
+    // pkarr discover, also when some peer is live already: a live server
+    // used to stop this lookup, and then the account's other devices were
+    // never dialled. The record also names replicas that are gone (an
+    // uninstalled app, an old laptop), so several are dialled at once and
+    // the first that answers wins; live ones are skipped
+    // (`sync_drive_with_peer_if_needed`). The search loop keeps looking
+    // after this; wake it, too.
+    peer_search::PEER_SEARCH.search_again();
+    {
         match tokio::time::timeout(PKARR_RESOLVE_TIMEOUT, async {
             let my_node_id = atomic_lib::sync::peer::get_node_id()
                 .ok_or("Peer not started")?
                 .to_string();
-            atomic_lib::discovery::resolve_node_id_filtered(&drive, Some(&my_node_id)).await
+            // Only other devices: a drive on this device alone names none,
+            // which is nothing to report (it toasted "No peer on network:
+            // Found 1 NodeID(s) but all are ours (…)" on every start).
+            let mut others = Vec::new();
+            for search in peer_search::search_drives(store) {
+                for id in
+                    atomic_lib::discovery::resolve_other_node_ids(&search, Some(&my_node_id))
+                        .await?
+                {
+                    if !others.contains(&id) {
+                        others.push(id);
+                    }
+                }
+            }
+            Ok::<_, atomic_lib::AtomicError>(others)
         })
         .await
         {
-            Ok(Ok(node_id)) => {
-                match tokio::time::timeout(
-                    PEER_SYNC_ATTEMPT_TIMEOUT,
-                    atomic_lib::sync::peer::sync_drive_with_peer_if_needed(&node_id, &drive, store),
-                )
-                .await
-                {
-                    Ok(Ok(count)) => imported += count as i32,
-                    Ok(Err(e)) => errors.push(format!("discover: {e}")),
-                    Err(_) => errors.push("discover: connect timed out".into()),
+            Ok(Ok(node_ids)) if node_ids.is_empty() => {}
+            Ok(Ok(node_ids)) => {
+                let tried = node_ids.len().min(PKARR_PEERS_TO_TRY);
+                let drive = drive.as_str();
+                let attempts = node_ids.iter().take(PKARR_PEERS_TO_TRY).map(|node_id| {
+                    Box::pin(async move {
+                        tokio::time::timeout(
+                            PEER_SYNC_ATTEMPT_TIMEOUT,
+                            atomic_lib::sync::peer::sync_drive_with_peer_if_needed(
+                                node_id, drive, store,
+                            ),
+                        )
+                        .await
+                        .map_err(|_| format!("{}: timed out", short_id(node_id)))?
+                        .map_err(|e| format!("{}: {e}", short_id(node_id)))
+                    })
+                });
+                match futures::future::select_ok(attempts).await {
+                    Ok((count, _)) => imported += count as i32,
+                    Err(last) => errors.push(format!(
+                        "None of the {tried} devices that announced your drive answered ({last})"
+                    )),
                 }
             }
-            Ok(Err(e)) => errors.push(format!("No peer on network: {e}")),
-            Err(_) => errors.push("Peer lookup timed out (pkarr)".into()),
+            Ok(Err(e)) => errors.push(format!("Could not look for devices: {e}")),
+            Err(_) => errors.push("Could not look for devices: the directory (pkarr) timed out".into()),
         }
+    }
+
+    if drive_resource_exists(store).await {
+        tokio::spawn(follow_listed_drives(drive.clone()));
     }
 
     let live = atomic_lib::sync::peer::live_peer_count() as u32;
@@ -1084,7 +944,9 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
     } else if imported > 0 {
         "Synced data but no live connection — try again".to_string()
     } else if errors.is_empty() {
-        "No peers online. Open the other device or pair with QR.".to_string()
+        // Said only when the lookup worked and named nobody else; the search
+        // loop keeps looking (`peer_search_status`).
+        NO_OTHER_DEVICE_YET.to_string()
     } else {
         errors.join(" · ")
     };
@@ -1093,18 +955,203 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
         imported,
         live_peers: live,
         message,
+        server: None,
     })
+}
+
+/// The https origins the drive's pkarr record names. The record is public and
+/// anyone may add to it, so none of them is trusted yet: the host fetches each
+/// one's `/genesis` and asks [`genesis_answer_verifies`]. (The fetch is the
+/// host's, not Rust's: the platform's own HTTPS stack is the one that is known
+/// to trust the device's certificates.)
+pub async fn resolve_drive_origins(drive: String) -> Result<Vec<String>, String> {
+    let record = tokio::time::timeout(
+        PKARR_RESOLVE_TIMEOUT,
+        atomic_lib::discovery::resolve_drive_record(&drive),
+    )
+    .await
+    .map_err(|_| "Server lookup timed out (pkarr)".to_string())?
+    .map_err(err)?;
+    tracing::info!(
+        "[home] {drive} names {} origins {:?}",
+        record.http_origins.len(),
+        record.http_origins
+    );
+    Ok(record.http_origins)
+}
+
+/// Whether `body`, the answer of `GET /genesis?subject=<drive>`, is the drive's
+/// own genesis certificate and verifies against the DID.
+#[frb(sync)]
+pub fn genesis_answer_verifies(body: String, drive: String) -> bool {
+    atomic_lib::discovery::genesis_body_verifies(&body, &drive)
+}
+
+/// Connect to the server that hosts the active drive: fetches the drive and
+/// follows its commits over WS, then, in the background, follows the drives the
+/// personal drive lists. Call it only for an origin whose genesis verified.
+pub async fn connect_home_server(origin: String) -> Result<(), String> {
+    let store = db()?;
+    ws_sync::open_ws_sync(&origin).await?;
+    let Some(drive) = store.get_active_drive() else {
+        return Err("No active drive".into());
+    };
+    if !drive_resource_exists(store.as_ref()).await {
+        return Err(format!("{origin} did not send the drive"));
+    }
+    tokio::spawn(follow_listed_drives(drive));
+    Ok(())
+}
+
+/// Node ids of the live peers, then the known (paired) ones, minus `skip`.
+fn peer_ids_to_try(skip: &std::collections::HashSet<String>) -> Vec<String> {
+    let mut ids = atomic_lib::sync::peer::live_peer_ids();
+    let known: Vec<serde_json::Value> =
+        serde_json::from_str(&get_known_peers()).unwrap_or_default();
+    for peer in known {
+        if let Some(id) = peer.get("node_id").and_then(|v| v.as_str()) {
+            if !id.is_empty() && !ids.iter().any(|i| i == id) {
+                ids.push(id.to_string());
+            }
+        }
+    }
+    ids.retain(|id| !skip.contains(id));
+    ids
+}
+
+static OTHER_DRIVES_RUNNING: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// The drives the personal drive lists that this device does not hold yet:
+/// fetched from the server the session is on, or else from a live paired
+/// device. Each drive is tried once per run and a drive nobody here has is
+/// skipped, not an error. One run at a time, in the background.
+async fn follow_listed_drives(home: String) {
+    use std::sync::atomic::Ordering;
+    if OTHER_DRIVES_RUNNING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let Ok(store) = db() else {
+        OTHER_DRIVES_RUNNING.store(false, Ordering::SeqCst);
+        return;
+    };
+    let drives = match store.list_drives().await {
+        Ok(drives) => drives,
+        Err(e) => {
+            tracing::warn!("[home] cannot list drives: {e}");
+            OTHER_DRIVES_RUNNING.store(false, Ordering::SeqCst);
+            return;
+        }
+    };
+    let key = |s: &str| {
+        s.trim_start_matches("did:ad:")
+            .trim_start_matches("atomic:")
+            .split('?')
+            .next()
+            .unwrap_or("")
+            .to_string()
+    };
+    let mut seen = std::collections::HashSet::new();
+    seen.insert(key(&home));
+    let wanted: Vec<String> = drives
+        .into_iter()
+        .filter(|d| seen.insert(key(&d.subject)) && !store.has_resource_locally(&d.subject))
+        .map(|d| d.subject)
+        .collect();
+    tracing::info!("[home] fetching {} other drives", wanted.len());
+    let dead_peers = std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashSet::new()));
+    let mut followed = 0;
+    // A few at a time: each one is a round trip or a dial.
+    for chunk in wanted.chunks(OTHER_DRIVES_PARALLEL) {
+        let mut tasks = tokio::task::JoinSet::new();
+        for drive in chunk {
+            tasks.spawn(fetch_other_drive(drive.clone(), dead_peers.clone()));
+        }
+        while let Some(done) = tasks.join_next().await {
+            if matches!(done, Ok(true)) {
+                followed += 1;
+            }
+        }
+    }
+    tracing::info!(
+        "[home] other drives: {followed} followed, {} not available here",
+        wanted.len() - followed
+    );
+    OTHER_DRIVES_RUNNING.store(false, Ordering::SeqCst);
+}
+
+const OTHER_DRIVES_PARALLEL: usize = 4;
+
+/// One drive of the person that this device lacks, tried where it is most
+/// likely to be: the server the session is connected to, then the paired
+/// devices, then whatever pkarr says hosts this drive (its announced Iroh
+/// nodes). Whether it arrived is whether it is stored here afterwards.
+async fn fetch_other_drive(
+    drive: String,
+    dead_peers: std::sync::Arc<std::sync::Mutex<std::collections::HashSet<String>>>,
+) -> bool {
+    let Ok(store) = db() else { return false };
+    let store = store.as_ref();
+
+    // 1. The connected server.
+    match ws_sync::follow_drive(&drive).await {
+        Ok(()) if store.has_resource_locally(&drive) => return true,
+        Ok(()) => tracing::info!("[home] {drive}: the server sent nothing"),
+        Err(e) => tracing::info!("[home] {drive}: not on the connected server: {e}"),
+    }
+
+    // 2. Paired devices, then 3. pkarr's nodes for this drive.
+    let mut candidates = peer_ids_to_try(&dead_peers.lock().map(|d| d.clone()).unwrap_or_default());
+    let own = atomic_lib::sync::peer::get_node_id().map(|n| n.to_string());
+    match tokio::time::timeout(
+        PKARR_RESOLVE_TIMEOUT,
+        atomic_lib::discovery::resolve_drive_record(&drive),
+    )
+    .await
+    {
+        Ok(Ok(record)) => {
+            for node in record.node_ids {
+                if own.as_deref() != Some(node.as_str()) && !candidates.contains(&node) {
+                    candidates.push(node);
+                }
+            }
+        }
+        Ok(Err(e)) => tracing::info!("[home] {drive}: pkarr: {e}"),
+        Err(_) => tracing::info!("[home] {drive}: pkarr timed out"),
+    }
+    for node_id in candidates.into_iter().take(6) {
+        let attempt = tokio::time::timeout(
+            PEER_SYNC_ATTEMPT_TIMEOUT,
+            atomic_lib::sync::peer::sync_drive_with_peer_if_needed(&node_id, &drive, store),
+        )
+        .await;
+        match attempt {
+            Ok(Ok(_)) if store.has_resource_locally(&drive) => return true,
+            Ok(Ok(_)) => {}
+            // Did not answer: not dialled again for the next drive.
+            Ok(Err(e)) if e.to_string().contains("timed out") => {
+                if let Ok(mut dead) = dead_peers.lock() {
+                    dead.insert(node_id);
+                }
+            }
+            Ok(Err(e)) => tracing::info!(
+                "[home] {drive} at {}: {e}",
+                &node_id[..node_id.len().min(12)]
+            ),
+            Err(_) => {
+                if let Ok(mut dead) = dead_peers.lock() {
+                    dead.insert(node_id);
+                }
+            }
+        }
+    }
+    false
 }
 
 /// Iroh: known peers, then pkarr discover. Returns true if any sync ran.
 async fn try_auto_peer_sync(store: &atomic_lib::Db) -> Result<bool, String> {
     let report = sync_connectivity_inner(store).await?;
     Ok(report.imported > 0 || report.live_peers > 0)
-}
-
-/// Subscribe to live updates for an open canvas over WebSocket.
-pub async fn ws_subscribe_canvas(subject: String) -> Result<(), String> {
-    ws_sync::subscribe_canvas(&subject).await
 }
 
 /// Block until a local DB event arrives. Returns JSON, or None on timeout.
@@ -1159,22 +1206,48 @@ fn db_event_to_json(event: atomic_lib::DbEvent) -> String {
 /// Start the Iroh peer node. Returns the NodeID.
 /// Call this before any sync operations.
 pub async fn start_peer() -> Result<String, String> {
-    tracing::info!("[start_peer] called");
+    // One endpoint per process: a second caller (the background start after a
+    // resume, a sync button) waits for the first instead of binding another.
+    // A failed start is not remembered: the next caller tries again.
     let store = db()?;
-    if let Some(existing) = atomic_lib::sync::peer::get_node_id() {
-        tracing::info!("[start_peer] already running: {existing}");
-        return Ok(existing.to_string());
-    }
-    tracing::info!("[start_peer] starting Iroh endpoint...");
-    let (node_id, _router) = atomic_lib::sync::peer::start(store.as_ref().clone())
-        .await
-        .map_err(|e| {
-            tracing::error!("[start_peer] failed: {e}");
-            format!("Failed to start Iroh: {e}")
-        })?;
-    tracing::info!("[start_peer] OK, NodeID: {node_id}");
+    let node_id = peer_search::PEER_SEARCH
+        .start_with(|| async {
+            tracing::info!("[start_peer] called");
+            if let Some(existing) = atomic_lib::sync::peer::get_node_id() {
+                tracing::info!("[start_peer] already running: {existing}");
+                return Ok(existing.to_string());
+            }
+            tracing::info!("[start_peer] starting Iroh endpoint...");
+            let (node_id, _router) = atomic_lib::sync::peer::start(store.as_ref().clone())
+                .await
+                .map_err(|e| {
+                    tracing::error!("[start_peer] failed: {e}");
+                    format!("Failed to start Iroh: {e}")
+                })?;
+            tracing::info!("[start_peer] OK, NodeID: {node_id}");
+            Ok(node_id.to_string())
+        })
+        .await?;
+    // Returns at once when the loop already runs.
+    peer_search::spawn(store.as_ref().clone(), node_id.clone());
+    Ok(node_id)
+}
 
-    Ok(node_id.to_string())
+/// What the search for this account's other devices is doing, as JSON:
+/// `{"state": "starting" | "searching" | "no_peers_yet" | "connected" |
+/// "failed", "message": "…", "detail": "…" | null, "retry_in_secs"?,
+/// "devices"?, "reason"?, "last_checked_ms": …, "attempts": …}`.
+#[frb(sync)]
+pub fn peer_search_status() -> String {
+    serde_json::to_string(&peer_search::PEER_SEARCH.status()).unwrap_or_else(|_| "{}".into())
+}
+
+/// Look for the other devices now (a "Search again" button, a network
+/// change, the app coming back), dialling the ones that did not answer
+/// recently too.
+#[frb(sync)]
+pub fn peer_search_again() {
+    peer_search::PEER_SEARCH.search_again();
 }
 
 /// Get this device's Iroh NodeID (if peer is running).
@@ -1419,67 +1492,33 @@ pub async fn watch_children(parent: String) -> Result<String, String> {
     }
 }
 
-pub async fn set_strokes(subject: String, strokes_json: String) -> Result<(), String> {
-    let store = db()?;
-    let parsed: serde_json::Value =
-        serde_json::from_str(&strokes_json).map_err(|e| format!("Invalid strokes JSON: {e}"))?;
-
-    // History scrub on a synced canvas: checkout a Loro version and persist it.
-    if let Some(v) = parsed.get("checkout_version_id") {
-        let bytes = version_id_from_json(v)?;
-        let mut guard = get_canvas(&subject).await?;
-        let resource = guard.as_mut().unwrap();
-        resource.warm_history().map_err(err)?;
-        let version = atomic_lib::history::VersionID::from_bytes(bytes);
-        resource.checkout(&version).map_err(err)?;
-        save_and_push(resource, store.as_ref()).await?;
-        return Ok(());
-    }
-
-    let arr: Vec<serde_json::Value> =
-        if let Some(strokes) = parsed.get("strokes").and_then(|s| s.as_array()) {
-            strokes.clone()
-        } else if parsed.is_array() {
-            parsed.as_array().cloned().unwrap_or_default()
-        } else {
-            return Err("Expected stroke array or {checkout_version_id: [...]}".into());
-        };
-
-    let mut guard = get_canvas(&subject).await?;
-    let resource = guard.as_mut().unwrap();
-    // Catch up first: `arr` was derived from the store's full stroke list, so
-    // the session has to be on that same basis before we clear. A clear can
-    // only remove elements the doc knows about, so against a stale session a
-    // peer's stroke survives the clear *and* is re-added by the loop below —
-    // the erase leaves a duplicate behind instead of erasing.
-    refresh_editing_session(resource, store.as_ref(), &subject);
-    resource.clear_json_array(CANVAS_STROKE_DATA).map_err(err)?;
-    for item in &arr {
-        resource
-            .push_list_item(CANVAS_STROKE_DATA, item.clone())
-            .map_err(err)?;
-    }
-    save_and_push(resource, store.as_ref()).await?;
-    Ok(())
-}
-
-fn version_id_from_json(v: &serde_json::Value) -> Result<Vec<u8>, String> {
-    let items = v
-        .as_array()
-        .ok_or_else(|| "checkout_version_id must be a JSON array of bytes".to_string())?;
-    items
-        .iter()
-        .map(|x| {
-            x.as_u64()
-                .ok_or_else(|| "checkout_version_id must be a JSON array of bytes".to_string())
-                .map(|n| n as u8)
-        })
-        .collect()
-}
-
 #[frb(sync)]
 pub fn get_known_peers_json() -> String {
     let Ok(store) = db() else { return "[]".into() };
     let peers = atomic_lib::sync::peer::get_known_peers(store.as_ref());
     serde_json::to_string(&peers).unwrap_or_else(|_| "[]".into())
+}
+
+/// What this build is, for the "This device" card: `{"version": …, "os": …,
+/// "arch": …}` (the library's version and the platform it was built for).
+#[frb(sync)]
+pub fn device_info() -> String {
+    serde_json::json!({
+        "version": atomic_lib::VERSION,
+        "os": std::env::consts::OS,
+        "arch": std::env::consts::ARCH,
+    })
+    .to_string()
+}
+
+/// How much of the person's data this device holds: `{disk_bytes?, resources,
+/// loro_bytes, blob_bytes, drives: [{subject, name, resources, bytes, …}]}`,
+/// biggest drive first. Walks the drives' resources, so it runs on the async
+/// pool, never the UI thread; the caller caches it.
+pub async fn store_stats() -> Result<String, String> {
+    let dir = state::store_dir();
+    let stats = atomic_lib::host::store_stats::store_stats(db()?, dir.as_deref())
+        .await
+        .map_err(err)?;
+    Ok(stats.to_string())
 }

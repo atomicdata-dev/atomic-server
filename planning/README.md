@@ -184,6 +184,7 @@ Not top-level plans. Indexed so they do not go missing.
 | [`ai-chat-draft-persistence.md`](./ai-chat-draft-persistence.md) | **Diagnosed, not fixed** (2026-08-24). AI chats are lost while the model is still generating. |
 | [`live-conversations.md`](./live-conversations.md) | Push-to-talk voice chat with OpenRouter and SaaS credits. |
 | [`dart-sdk-package.md`](./dart-sdk-package.md) | **Proposal** (2026-09-18). Publish `flutter/lib/atomic/` as a Dart SDK package. |
+| [`flutter-performance.md`](./flutter-performance.md) | **Measured on the emulator** (2026-10-20). `scripts/perf_android.sh`, budgets, first fixes (start-up, warm page, Rust size); phone numbers and a store-lost-after-kill bug open. |
 
 Closed decisions, as-built records, closed explorations and fixed notes live
 in [`completed/`](./completed/): the five decisions above, the 2026-07 sync

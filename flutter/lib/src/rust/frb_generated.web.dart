@@ -6,6 +6,9 @@
 // Static analysis wrongly picks the IO variant, thus ignore this
 // ignore_for_file: argument_type_not_assignable
 
+import 'api/assistant.dart';
+import 'api/context.dart';
+import 'api/embed.dart';
 import 'api/simple.dart';
 import 'api/simple/types.dart';
 import 'api/simple/ws_sync.dart';
@@ -26,6 +29,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  ActivityEntry dco_decode_activity_entry(dynamic raw);
+
+  @protected
   AgentInfo dco_decode_agent_info(dynamic raw);
 
   @protected
@@ -35,10 +41,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AgentInfo dco_decode_box_autoadd_agent_info(dynamic raw);
 
   @protected
-  CanvasListItem dco_decode_canvas_list_item(dynamic raw);
-
-  @protected
-  FolderListItem dco_decode_folder_list_item(dynamic raw);
+  StoreRecovery dco_decode_box_autoadd_store_recovery(dynamic raw);
 
   @protected
   int dco_decode_i_32(dynamic raw);
@@ -50,13 +53,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String> dco_decode_list_String(dynamic raw);
 
   @protected
-  List<CanvasListItem> dco_decode_list_canvas_list_item(dynamic raw);
-
-  @protected
-  List<FolderListItem> dco_decode_list_folder_list_item(dynamic raw);
-
-  @protected
-  List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
+  List<ActivityEntry> dco_decode_list_activity_entry(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
@@ -71,7 +68,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AgentInfo? dco_decode_opt_box_autoadd_agent_info(dynamic raw);
 
   @protected
+  StoreRecovery? dco_decode_opt_box_autoadd_store_recovery(dynamic raw);
+
+  @protected
+  Uint8List? dco_decode_opt_list_prim_u_8_strict(dynamic raw);
+
+  @protected
   SetupResult dco_decode_setup_result(dynamic raw);
+
+  @protected
+  StoreRecovery dco_decode_store_recovery(dynamic raw);
 
   @protected
   int dco_decode_u_32(dynamic raw);
@@ -92,6 +98,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
+  ActivityEntry sse_decode_activity_entry(SseDeserializer deserializer);
+
+  @protected
   AgentInfo sse_decode_agent_info(SseDeserializer deserializer);
 
   @protected
@@ -101,10 +110,8 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AgentInfo sse_decode_box_autoadd_agent_info(SseDeserializer deserializer);
 
   @protected
-  CanvasListItem sse_decode_canvas_list_item(SseDeserializer deserializer);
-
-  @protected
-  FolderListItem sse_decode_folder_list_item(SseDeserializer deserializer);
+  StoreRecovery sse_decode_box_autoadd_store_recovery(
+      SseDeserializer deserializer);
 
   @protected
   int sse_decode_i_32(SseDeserializer deserializer);
@@ -116,15 +123,8 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
-  List<CanvasListItem> sse_decode_list_canvas_list_item(
+  List<ActivityEntry> sse_decode_list_activity_entry(
       SseDeserializer deserializer);
-
-  @protected
-  List<FolderListItem> sse_decode_list_folder_list_item(
-      SseDeserializer deserializer);
-
-  @protected
-  List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
@@ -141,7 +141,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       SseDeserializer deserializer);
 
   @protected
+  StoreRecovery? sse_decode_opt_box_autoadd_store_recovery(
+      SseDeserializer deserializer);
+
+  @protected
+  Uint8List? sse_decode_opt_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
   SetupResult sse_decode_setup_result(SseDeserializer deserializer);
+
+  @protected
+  StoreRecovery sse_decode_store_recovery(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
@@ -162,6 +172,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
+  void sse_encode_activity_entry(ActivityEntry self, SseSerializer serializer);
+
+  @protected
   void sse_encode_agent_info(AgentInfo self, SseSerializer serializer);
 
   @protected
@@ -172,12 +185,8 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       AgentInfo self, SseSerializer serializer);
 
   @protected
-  void sse_encode_canvas_list_item(
-      CanvasListItem self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_folder_list_item(
-      FolderListItem self, SseSerializer serializer);
+  void sse_encode_box_autoadd_store_recovery(
+      StoreRecovery self, SseSerializer serializer);
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
@@ -189,15 +198,8 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
-  void sse_encode_list_canvas_list_item(
-      List<CanvasListItem> self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_list_folder_list_item(
-      List<FolderListItem> self, SseSerializer serializer);
-
-  @protected
-  void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
+  void sse_encode_list_activity_entry(
+      List<ActivityEntry> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_prim_u_8_strict(
@@ -215,7 +217,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       AgentInfo? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_store_recovery(
+      StoreRecovery? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_list_prim_u_8_strict(
+      Uint8List? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_setup_result(SetupResult self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_store_recovery(StoreRecovery self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);

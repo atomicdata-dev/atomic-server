@@ -69,6 +69,9 @@ export const NOT_AVAILABLE_SERVER_UNREACHABLE_MESSAGE =
  * signed-out visitor to a drive they made here ends up exactly where a visitor
  * to one they never held does — and should be sent the same way, to sign in.
  */
+/** A store with no server (`StoreOpts.noServer`) whose host does not have it. */
+export const NOT_IN_HOST_STORE_MESSAGE = "Not found in this device's store.";
+
 export const LOCAL_ONLY_NOT_FOUND_MESSAGE =
   'This resource belongs to a local-only drive but was not found in local storage.';
 

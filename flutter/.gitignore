@@ -53,3 +53,8 @@ app.*.map.json
 
 # Generated Flutter Rust Bridge web package
 /web/pkg/
+assets/embed/*
+!assets/embed/.gitkeep
+!assets/embed/assets/
+assets/embed/assets/*
+!assets/embed/assets/.gitkeep

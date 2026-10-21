@@ -8,25 +8,25 @@
 
 `flutter/lib/atomic/` is a general-purpose Atomic Data SDK (`AtomicClient`,
 `AtomicStore`, `AtomicSession`, `atomic_auth.dart`, the FRB bridge) that
-happens to live inside Atomic Canvas. Extract it into a package other Flutter
+happens to live inside the Atomic app. Extract it into a package other Flutter
 apps can depend on, so the docs can say `flutter pub add atomic_data` instead
 of "vendor this folder".
 
-## What is general and what is canvas
+## What is general and what is app-specific
 
-| General (moves) | Canvas-only (stays) |
+| General (moves) | App-specific (stays) |
 | --- | --- |
-| `openDb`, agent setup / load, drives, `getProperty` / `setProperty` | `createCanvas*`, `loadCanvasStrokes`, `listCanvases*`, folders, thumbnails |
-| history (`warmResourceHistory`, `getResourceHistory`, `getResourceAtVersion`) | `wsSubscribeCanvas` |
-| peer sync (`startPeer`, `peerSync`, `peerAnnounce`, `peerDiscoverSync`, known peers) | stroke models, gallery, canvas painter |
+| `openDb`, agent setup / load, drives, `getProperty` / `setProperty` | `screens/` (login, pairing, sync), `assistant/` |
+| history (`warmResourceHistory`, `getResourceHistory`) | `main.dart`, theme, deep links |
+| peer sync (`startPeer`, `peerSync`, `peerAnnounce`, `peerDiscoverSync`, known peers) | |
 | WS sync (`openWsSync`, `syncDriveToServer`, `resumeSession`, `pollDbEvent`) | |
 | `atomic_auth.dart` (pure-Dart request signing) | |
 | `server_url.dart`, `server_info.dart`, `session.dart` | |
 | `widgets/` sync + settings screens (twins of `SyncRoute` in the browser) | |
 
-The Rust side (`flutter/rust/src/api/simple/`) has the same split: `state.rs`,
-`ws_sync.rs` and the peer functions are general; the `CANVAS_*` constants and
-stroke functions are not.
+The old drawing API (`createCanvas*`, strokes, galleries) is gone from the
+bridge, so the Rust side (`flutter/rust/src/api/simple/`) is now almost all
+general: `state.rs`, `ws_sync.rs` and the peer functions.
 
 ## Shape
 
@@ -35,26 +35,24 @@ flutter/
   packages/
     atomic_data/            # the SDK: Dart + rust_builder + FRB config
       lib/
-      rust/                 # today's flutter/rust, minus canvas api
+      rust/                 # today's flutter/rust
       rust_builder/
       pubspec.yaml          # name: atomic_data
   apps/
-    atomic_canvas/          # today's flutter/, depends on ../packages/atomic_data
+    atomic_app/             # today's flutter/, depends on ../packages/atomic_data
 ```
 
-`flutter_rust_bridge` generates bindings per crate, so the canvas keeps a
-small FRB crate of its own for stroke functions, depending on `atomic_data`'s
+`flutter_rust_bridge` generates bindings per crate, so the app keeps a small
+FRB crate of its own for app-specific functions, depending on `atomic_data`'s
 crate for the store. Alternatively expose a generic `callAction(json)` from the
-SDK and keep canvas logic in Dart; decide after measuring the stroke path.
+SDK and keep app logic in Dart.
 
 ## Steps
 
-- [ ] Split `flutter/rust/src/api/simple.rs` into `atomic` (general) and
-      `canvas` modules; make `canvas` depend on `atomic`'s `db()` / `node()`.
 - [ ] Create `flutter/packages/atomic_data` with its own `pubspec.yaml`,
       `flutter_rust_bridge.yaml` and `rust_builder`; move the general Dart
       files and the generated `src/rust/` bindings.
-- [ ] Point Atomic Canvas at the package with a path dependency; keep
+- [ ] Point the Atomic app at the package with a path dependency; keep
       `make phone` / `make tablet` / `make web` working.
 - [ ] Move the Dart unit tests in `flutter/test/atomic/` (URL rules, pairing
       parsing, signing parity with Rust) with the package.

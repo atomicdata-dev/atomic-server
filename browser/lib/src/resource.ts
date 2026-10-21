@@ -725,8 +725,9 @@ export class Resource<C extends OptionalClass = any> {
         // OPFS persist landing would lose the edit. `_saveInner`'s
         // offline branch awaits `saveOffline` and only then calls
         // `markDirty`, so the count rising correctly implies the
-        // edit is in clientDb.
-        if (!this._store.serverConnected) return;
+        // edit is in clientDb. (A store with a commit transport is not
+        // offline: its commits go to the transport, like to a server.)
+        if (!this._store.canCommit) return;
         this._store.outbox.markDirty(this.subject);
       });
     }
@@ -2927,7 +2928,7 @@ export class Resource<C extends OptionalClass = any> {
     this.store.outbox.setDestroyCommit(this.subject, commit);
     this.store.removeResource(this.subject);
 
-    if (!this.store.serverConnected) {
+    if (!this.store.canCommit) {
       // Queued; the reconnect drain POSTs it. Resolve once the queued
       // envelope is on disk, like an offline save.
       await this.store.outbox.flush();
@@ -3776,7 +3777,7 @@ export class Resource<C extends OptionalClass = any> {
       throw new Error('No agent has been set, you cannot save.');
     }
 
-    if (this.store.requireOnlineWrites && !this.store.serverConnected) {
+    if (this.store.requireOnlineWrites && !this.store.canCommit) {
       throw new Error(
         'The local node is not connected; this change was not saved.',
       );
@@ -3856,7 +3857,7 @@ export class Resource<C extends OptionalClass = any> {
         }
       }
 
-      if (!this.store.serverConnected) {
+      if (!this.store.canCommit) {
         // Offline: the snapshot and the outbox entry are written together.
         await this.saveOffline(hasChanges);
 

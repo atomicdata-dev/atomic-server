@@ -1,11 +1,11 @@
 {
-    "name": "Atomic Canvas",
-    "short_name": "Atomic Canvas",
+    "name": "atomic.place",
+    "short_name": "atomic.place",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#2210FF",
-    "description": "Atomic Canvas - infinite drawing canvas",
+    "description": "atomic.place",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -6,8 +6,8 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `ensure_drive_materialized`, `fetch_resource_state`, `handle_ws_message`, `ws_client_slot`, `ws_task_slot`
-// These functions are ignored (category: IgnoreBecauseExplicitAttribute): `try_push_commit`
+// These functions are ignored because they are not marked as `pub`: `ensure_drive_materialized`, `fetch_resource_state`, `follow_drive`, `handle_ws_message`, `ws_client_slot`, `ws_task_slot`
+// These functions are ignored (category: IgnoreBecauseExplicitAttribute): `drain_outbox`
 
 /// `http://host:9883` → `ws://host:9883/ws`
 Future<String> serverOriginToWsUrl({required String origin}) =>
@@ -19,10 +19,6 @@ Future<void> closeWsSync() =>
 
 Future<void> openWsSync({required String serverOrigin}) => RustLib.instance.api
     .crateApiSimpleWsSyncOpenWsSync(serverOrigin: serverOrigin);
-
-/// Subscribe to live updates for a single canvas over WebSocket.
-Future<void> subscribeCanvas({required String subject}) =>
-    RustLib.instance.api.crateApiSimpleWsSyncSubscribeCanvas(subject: subject);
 
 /// Post a commit JSON-AD over the open WS session (falls back to error if closed).
 Future<String> postCommitOverWs({required String commitJson}) =>

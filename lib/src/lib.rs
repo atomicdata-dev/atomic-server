@@ -62,6 +62,9 @@ tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().bloc
 ```
 */
 
+/// The version of this library, for an app to show in its About / device views.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub mod agents;
 pub mod aggregate;
 pub mod atoms;
@@ -93,6 +96,9 @@ pub mod expression;
 pub mod genesis;
 pub mod hierarchy;
 pub mod history;
+/// Host logic for app shells around a local store (`host/mod.rs`).
+#[cfg(all(feature = "db", not(target_arch = "wasm32")))]
+pub mod host;
 pub mod identifiers;
 pub mod import_identity;
 pub mod loro;

@@ -263,18 +263,18 @@ const TARGETS = [
     files: [{ kind: 'svg', to: 'logo-square.svg' }],
   },
 
-  /* Atomic Canvas — its own mark, same family. See brand/src/canvas-mark.svg. */
+  /* atomic.place (the Flutter app) — the regular Atomic Place mark. */
   {
-    mark: 'canvas',
+    mark: 'place',
     root: SERVER_ROOT,
-    label: 'atomic-canvas: web',
+    label: 'atomic.place app: web',
     dir: 'flutter/web',
     files: [png('favicon.png', 16)],
   },
   {
-    mark: 'canvas',
+    mark: 'place',
     root: SERVER_ROOT,
-    label: 'atomic-canvas: web PWA icons',
+    label: 'atomic.place app: web PWA icons',
     dir: 'flutter/web/icons',
     files: [
       png('Icon-192.png', 192),
@@ -284,9 +284,9 @@ const TARGETS = [
     ],
   },
   {
-    mark: 'canvas',
+    mark: 'place',
     root: SERVER_ROOT,
-    label: 'atomic-canvas: iOS',
+    label: 'atomic.place app: iOS',
     dir: 'flutter/ios/Runner/Assets.xcassets/AppIcon.appiconset',
     files: [
       png('Icon-App-20x20@1x.png', 20, 'flat'),
@@ -309,9 +309,9 @@ const TARGETS = [
   ...['mdpi:48', 'hdpi:72', 'xhdpi:96', 'xxhdpi:144', 'xxxhdpi:192'].map(d => {
     const [density, size] = d.split(':');
     return {
-      mark: 'canvas',
+      mark: 'place',
       root: SERVER_ROOT,
-      label: `atomic-canvas: Android ${density}`,
+      label: `atomic.place app: Android ${density}`,
       dir: `flutter/android/app/src/main/res/mipmap-${density}`,
       files: [png('ic_launcher.png', Number(size))],
     };

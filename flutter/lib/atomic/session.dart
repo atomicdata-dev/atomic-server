@@ -1,7 +1,7 @@
+import 'package:atomic_flutter/atomic_flutter.dart'
+    show normalizeServerUrl, sameOrigin;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import 'server_url.dart';
 
 /// Persists the atomic session across restarts.
 ///
@@ -29,16 +29,39 @@ class AtomicSession {
     await _secure.write(key: _keySecret, value: secret);
     // Clear any legacy plaintext copy left in SharedPreferences.
     await prefs.remove(_keySecret);
-    if (drive != null) {
-      await prefs.setString(_keyDrive, drive);
+    if (isResumableDrive(drive)) {
+      await prefs.setString(_keyDrive, drive!);
     }
 
     await addKnownServer(serverUrl);
   }
 
+  /// Only a drive that can be found again from its own subject is worth
+  /// remembering: an old `https://…/drive/…` one cannot (nothing resolves it
+  /// from a cold start), and resuming with it as the hint left the person at
+  /// the sign-in screen with a perfectly good secret.
+  static bool isResumableDrive(String? drive) =>
+      drive != null &&
+      (drive.startsWith('did:ad:') || drive.startsWith('atomic:'));
+
   static Future<void> saveDrive(String drive) async {
+    if (!isResumableDrive(drive)) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyDrive, drive);
+  }
+
+  static Future<({String serverUrl, String secret, String? drive})?>? _early;
+
+  /// Starts [load] from `main`, once: the sign-in screen takes the result
+  /// with [loadEarly] instead of reading again.
+  static void preload() => _early ??= load();
+
+  /// The [preload]ed session the first time (once), else a fresh [load].
+  static Future<({String serverUrl, String secret, String? drive})?>
+      loadEarly() {
+    final early = _early;
+    _early = null;
+    return early ?? load();
   }
 
   static Future<({String serverUrl, String secret, String? drive})?>
@@ -50,7 +73,9 @@ class AtomicSession {
     return (
       serverUrl: serverUrl,
       secret: secret,
-      drive: prefs.getString(_keyDrive),
+      drive: isResumableDrive(prefs.getString(_keyDrive))
+          ? prefs.getString(_keyDrive)
+          : null,
     );
   }
 

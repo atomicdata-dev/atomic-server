@@ -35,6 +35,25 @@ async fn synthetic_agent_reads_have_stable_history_without_persisting() {
 
 /// A profile stored under a padded spelling of the key answers for the
 /// canonical unpadded subject too, instead of an empty synthesized twin.
+/// The Flutter app signs in again with the saved secret on every start. The
+/// secret carries no name, and that used to overwrite the stored agent: a
+/// fresh account's own activity read "Someone created".
+#[tokio::test]
+async fn signing_in_again_with_the_secret_keeps_the_agents_name() {
+    let db = Db::init_redb(None).await.unwrap();
+    let (agent, drive) = db.setup("Tester").await.unwrap();
+    let secret = agent.build_secret().unwrap();
+
+    let loaded = db.load_agent_from_secret(&secret).await.unwrap();
+
+    assert_eq!(loaded.agent.name.as_deref(), Some("Tester"));
+    assert!(!loaded.drive_needs_sync);
+    let stored = db.get_resource(&agent.subject).await.unwrap();
+    assert_eq!(stored.get(urls::NAME).unwrap().to_string(), "Tester");
+    let home = stored.get(urls::PRIVATE_DRIVE).unwrap().to_string();
+    assert_eq!(Subject::from(home.as_str()), Subject::from(drive.as_str()));
+}
+
 #[tokio::test]
 async fn agent_profile_under_padded_key_answers_for_unpadded_subject() {
     let db = Db::init_temp("agent_padded_spelling").await.unwrap();
@@ -4294,6 +4313,50 @@ async fn deferred_search_entries_are_added_by_index_pending() {
     assert_eq!(crate::search::index_pending(&store, 10).await.unwrap(), 1);
     assert_eq!(crate::search::index_pending(&store, 10).await.unwrap(), 0);
     assert_eq!(store.search_hits("zebrafish", &opts).unwrap().len(), 1);
+}
+
+/// An index an older build left incomplete is rebuilt once per marker, and
+/// not again.
+#[tokio::test]
+#[timeout(120000)]
+async fn search_index_is_rebuilt_once_per_marker() {
+    let store = Db::init_temp("rebuild_once").await.unwrap();
+    let drive =
+        "did:ad:driveONCEaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa==";
+    let subj = "did:ad:once000000000000000000000000000000000000000000000000000000000000000000==";
+    let mut authored = crate::Resource::new(subj.to_string());
+    authored
+        .set_unsafe(urls::PARENT.into(), Value::AtomicUrl(drive.into()))
+        .unwrap();
+    authored
+        .set_unsafe(urls::DRIVE_PROP.into(), Value::AtomicUrl(drive.into()))
+        .unwrap();
+    authored
+        .set_unsafe(
+            urls::NAME.into(),
+            Value::String("axolotl field guide".into()),
+        )
+        .unwrap();
+    let state = authored.build_state_doc().unwrap().export_snapshot();
+    crate::sync::ws_apply::apply_state_updates(&store, &[(subj.to_string(), state)], false)
+        .await
+        .unwrap();
+    let opts = crate::client::search::SearchOpts::default();
+    assert_eq!(store.search_hits("axolotl", &opts).unwrap().len(), 1);
+
+    // Lose the index entries, as a store filled by an older build can have.
+    for tree in [
+        crate::db::trees::Tree::SearchDocs,
+        crate::db::trees::Tree::SearchPostings,
+        crate::db::trees::Tree::SearchTrigrams,
+    ] {
+        store.kv.clear_tree(tree).unwrap();
+    }
+    assert!(store.search_hits("axolotl", &opts).unwrap().is_empty());
+
+    assert!(crate::search::rebuild_search_index_once(&store, "t1").unwrap());
+    assert_eq!(store.search_hits("axolotl", &opts).unwrap().len(), 1);
+    assert!(!crate::search::rebuild_search_index_once(&store, "t1").unwrap());
 }
 
 #[tokio::test]
