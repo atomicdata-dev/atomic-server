@@ -167,7 +167,7 @@ class _NewDocumentSheetState extends State<NewDocumentSheet> {
       drives = const [];
     }
     if (drives.isEmpty && widget.fallbackDrive.isNotEmpty) {
-      drives = [(subject: widget.fallbackDrive, name: '', emoji: null)];
+      drives = [(subject: widget.fallbackDrive, name: '', emoji: null, picture: null)];
     }
     final last = await lastNewResourceDrive();
     if (!mounted) return;

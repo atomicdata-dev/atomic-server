@@ -550,7 +550,7 @@ pub async fn list_drives_with_names() -> Result<String, String> {
             };
             if let Some(drive) = atomic_lib::host::rows::row_resource(store, &subject.into()).await
             {
-                *row = atomic_lib::host::rows::with_emoji(row.take(), &drive);
+                *row = atomic_lib::host::rows::with_icon(store, row.take(), &drive);
             }
         }
     }

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart' show Listenable;
 import 'chat_parts.dart';
 import 'chat_window.dart';
@@ -94,6 +96,11 @@ abstract class AssistantApi {
 
   /// The emojis (`{subject: emoji}`) of those of [subjects] that have one.
   Future<Map<String, String>> resourceIcons(List<String> subjects);
+
+  /// The bytes of a File resource (a row's picture) when this device holds
+  /// them; null otherwise. Rows read them lazily and keep them in
+  /// `RowPictures`. A host without files leaves this.
+  Future<Uint8List?> fileBytes(String file) async => null;
 
   /// Remember that this device opened [subject] in [drive].
   void noteOpened(String drive, String subject);

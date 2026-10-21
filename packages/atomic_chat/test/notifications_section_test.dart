@@ -12,7 +12,8 @@ NotificationItem _n(int i, {bool read = false}) => (
       about: 'did:ad:x$i',
       kind: 'chat',
       occurredAt: DateTime.now().millisecondsSinceEpoch - 60000,
-      read: read
+      read: read,
+      actor: null
     );
 
 Widget _shell(FakeApi api) => app(AppShell(

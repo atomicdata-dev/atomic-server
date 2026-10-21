@@ -17,6 +17,7 @@ import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'chat_screen.dart';
 import 'resource_row.dart';
+import 'row_leading.dart';
 import 'resource_view.dart';
 import 'native_views.dart';
 import 'new_document_sheet.dart';
@@ -109,6 +110,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   @override
   void initState() {
     super.initState();
+    RowPictures.loader = widget.api.fileBytes;
     if (!kReleaseMode) _markLoaded();
     // Once the home is drawn: read the search index so the first keystroke is
     // not the first read.
@@ -353,7 +355,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   Future<List<DriveInfo>> _loadDrives() async {
     var drives = await widget.api.drives();
     if (drives.isEmpty) {
-      drives = [(subject: widget.drive, name: '', emoji: null)];
+      drives = [(subject: widget.drive, name: '', emoji: null, picture: null)];
     }
     _drive = drives.any((d) => d.subject == widget.drive)
         ? widget.drive
@@ -543,6 +545,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         subject: d.subject,
         icon: Icons.folder_outlined,
         emoji: d.emoji,
+        image: ImageSource.of(d.picture),
         title: d.name.isEmpty ? 'Untitled drive' : d.name,
         // The drive itself, drawn by the page: everything in it, read from
         // the store with the same query the web app uses.
@@ -559,6 +562,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   Widget _chatRow(ChatSummary chat) => ResourceRow(
         subject: chat.subject,
+        icon: iconForClass('ai-chat'),
+        shape: RowShape.circle,
         title: chat.name.isEmpty ? 'Untitled chat' : chat.name,
         onTap: () => _openChat(chat),
       );
@@ -576,6 +581,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
       key: ValueKey('notification-${n.subject}'),
       subject: n.about.isEmpty ? null : n.about,
       icon: Icons.notifications_none,
+      image: ImageSource.of(n.actor),
+      shape: n.actor == null ? RowShape.square : RowShape.circle,
+      showInitial: n.actor != null,
+      label: (n.actor?.name ?? '').isEmpty ? n.title : n.actor!.name,
       title: n.title.isEmpty ? n.about : n.title,
       detail: body.length > 80 ? '${body.substring(0, 79)}…' : body,
       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -617,10 +626,14 @@ class _ChatsScreenState extends State<ChatsScreen> {
   Widget _conversationRow(ConversationRow c) {
     final r = c.resource;
     final preview = c.lastMessage.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final lead = leadingOf(r.picture, r.emoji, 'conversation');
     return ResourceRow(
       subject: r.subject,
-      icon: iconForClass(r.className),
-      emoji: r.emoji,
+      icon: lead.icon,
+      image: lead.image,
+      shape: lead.shape,
+      showInitial: lead.initial,
+      label: r.picture?.name,
       title: r.title.isEmpty ? r.subject : r.title,
       detail: preview.length > 80 ? '${preview.substring(0, 79)}…' : preview,
       trailing: r.openedAt > 0
@@ -810,12 +823,16 @@ class _ChatsScreenState extends State<ChatsScreen> {
 /// The current drive; tapping it lets you pick another.
 
 ResourceRow _resourceRow(RecentResource r,
-        void Function(String drive, RecentResource) onOpen, String drive,
-        {String? driveName}) =>
-    ResourceRow(
+    void Function(String drive, RecentResource) onOpen, String drive,
+    {String? driveName}) {
+  final lead = leadingOf(r.picture, r.emoji, r.className);
+  return ResourceRow(
       subject: r.subject,
-      icon: iconForClass(r.className),
-      emoji: r.emoji,
+      icon: lead.icon,
+      image: lead.image,
+      shape: lead.shape,
+      showInitial: lead.initial,
+      label: r.picture?.name,
       title: r.title.isEmpty ? r.subject : r.title,
       detail: [
         if (driveName != null) driveName,
@@ -824,6 +841,7 @@ ResourceRow _resourceRow(RecentResource r,
       ].where((t) => t.isNotEmpty).join(' · '),
       onTap: () => onOpen(drive, r),
     );
+}
 
 /// One home section: a heading, the first [_homeItems] rows, a "Show all"
 /// row when there are more, and the loading, error or empty state while

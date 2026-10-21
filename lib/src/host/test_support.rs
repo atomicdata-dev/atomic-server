@@ -114,6 +114,40 @@ impl Device {
         r.save_locally(&self.store).await.unwrap();
     }
 
+    /// A File in the device's drive with a download URL, as a server-hosted
+    /// picture is.
+    pub async fn new_picture(&self, download_url: &str) -> String {
+        let file = self
+            .store
+            .create_resource(urls::FILE, &self.drive, "pic.png", None)
+            .await
+            .unwrap();
+        let mut f = self
+            .store
+            .get_resource(&file.as_str().into())
+            .await
+            .unwrap();
+        f.set_unsafe(
+            urls::DOWNLOAD_URL.into(),
+            Value::String(download_url.into()),
+        )
+        .unwrap();
+        self.node.save_locally(&mut f).await.unwrap();
+        file
+    }
+
+    /// Give `subject` a picture the way the web app's icon editor does: its
+    /// `icon` names a File.
+    pub async fn set_icon(&self, subject: &str, file: &str) {
+        let mut r = self.store.get_resource(&subject.into()).await.unwrap();
+        r.set_unsafe(
+            super::own_profile::ICON.into(),
+            Value::AtomicUrl(file.into()),
+        )
+        .unwrap();
+        self.node.save_locally(&mut r).await.unwrap();
+    }
+
     /// A resource as the server's sync delivers it: a Loro state with a
     /// parent, a name, maybe a class and maybe a `drive` of its own.
     pub async fn synced(

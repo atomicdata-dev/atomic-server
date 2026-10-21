@@ -13,6 +13,7 @@ import 'covered_insets_freeze.dart';
 import 'app_shell.dart';
 import 'assistant_api.dart';
 import 'resource_row.dart';
+import 'row_leading.dart';
 import 'native_views.dart';
 import 'list_and_field.dart';
 import 'new_document_sheet.dart';
@@ -315,7 +316,8 @@ typedef _Item = ({
   String subject,
   String title,
   String className,
-  String? emoji
+  String? emoji,
+  ResourcePicture? picture
 });
 
 /// What the list shows. The screen is built once; only the list listens.
@@ -549,7 +551,8 @@ class _SearchScreenState extends State<SearchScreen> {
                 subject: d.subject,
                 title: d.name.isEmpty ? 'Untitled drive' : d.name,
                 className: 'Drive',
-                emoji: d.emoji
+                emoji: d.emoji,
+                picture: d.picture
               )
           ],
         SearchKind.chats => await _loadChats(kind),
@@ -561,7 +564,8 @@ class _SearchScreenState extends State<SearchScreen> {
                 subject: c.resource.subject,
                 title: c.resource.title,
                 className: c.resource.className,
-                emoji: c.resource.emoji
+                emoji: c.resource.emoji,
+                picture: c.resource.picture
               )
           ],
       };
@@ -589,7 +593,8 @@ class _SearchScreenState extends State<SearchScreen> {
           subject: c.subject,
           title: c.name.isEmpty ? 'Untitled chat' : c.name,
           className: 'ai-chat',
-          emoji: null
+          emoji: null,
+          picture: null
         ));
       }
       if (!mounted || kind != _model.kind) return items;
@@ -748,7 +753,8 @@ class _SearchScreenState extends State<SearchScreen> {
                   subject: r.subject,
                   title: r.title,
                   className: r.className,
-                  emoji: r.emoji
+                  emoji: r.emoji,
+                  picture: r.picture
                 )
             ]
           : [
@@ -763,7 +769,8 @@ class _SearchScreenState extends State<SearchScreen> {
                     subject: h.subject,
                     title: h.title,
                     className: h.className,
-                    emoji: h.emoji
+                    emoji: h.emoji,
+                    picture: h.picture
                   )
             ];
 
@@ -1055,6 +1062,11 @@ class _SearchScreenState extends State<SearchScreen> {
       subject: i.subject,
       icon: iconForClass(i.className),
       emoji: i.emoji,
+      image: ImageSource.of(i.picture),
+      shape: i.picture?.person == true || i.picture?.group == true
+          ? RowShape.circle
+          : RowShape.square,
+      showInitial: i.picture?.person == true,
       title: i.title.isEmpty ? i.subject : i.title,
       detail: _detail(i.className, i.shown),
       onTap: () => _open(i.drive, i.subject, i.title, i.className),

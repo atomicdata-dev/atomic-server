@@ -15,7 +15,7 @@ SearchHit _hit(String s, String t) => (
       className: 'document-v2',
       drive: 'did:ad:drive',
       score: 1.0,
-      emoji: null
+      emoji: null, picture: null
     );
 
 Future<void> _pump(WidgetTester tester, Size size,
@@ -84,8 +84,10 @@ void main() {
           final topRowReal = rows.firstWhere(
               (r) => r.top >= top.top - 0.5 && r.bottom <= top.bottom + 0.5);
           expect(top, topRowReal);
-          expect(topRow.height, inInclusiveRange(48, 80));
-          final icon = tester.getRect(icons.last);
+          // The 32 dp leading slot leaves the text 8 dp less than the old 24 dp
+          // icon did: at large text a detail line may wrap.
+          expect(topRow.height, inInclusiveRange(48, scale > 1 ? 104 : 80));
+          final icon = tester.getRect(find.byType(RowLeading).last);
           // ignore: avoid_print
           print(
               'w=$w s=$scale scope=$scope field=${field.left}..${field.right} '

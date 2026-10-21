@@ -8,7 +8,7 @@ use super::{
     lists::private_drive_list,
     own_commit_opts,
     profiles::AgentProfiles,
-    rows::{name_of, row_resource, with_emoji},
+    rows::{agent_picture, name_of, row_resource, with_icon},
     LocalWritePusher,
 };
 use crate::{
@@ -180,12 +180,15 @@ impl Conversations {
     }
 
     /// The person's conversations, as
-    /// `[{subject, title, class_name, opened_at, last_message, emoji?}]`,
+    /// `[{subject, title, class_name, opened_at, last_message, emoji?,
+    /// icon_file?, image_url?, peer?, group?}]`,
     /// newest activity first (`opened_at` is the time of the last message in
     /// ms, 0 for an empty or unreadable one, which come last in the order the
     /// private drive lists them). `last_message` is the text of the newest
     /// message ("" when there is none or it cannot be opened). `class_name` is
-    /// `conversation`.
+    /// `conversation`. `peer` (`{subject, name, emoji?, icon_file?,
+    /// image_url?}`, from the agent's profile on this device) is the other
+    /// member of a DM; `group` is true when there are several others.
     pub async fn list(&self, store: &Db, limit: usize) -> AtomicResult<Vec<Json>> {
         let agent = store.get_default_agent()?;
         let me = agent.subject.to_string();
@@ -225,19 +228,32 @@ impl Conversations {
                     }
                 }
             }
-            out.push((
-                last_at,
-                with_emoji(
-                    json!({
-                        "subject": subject,
-                        "title": title,
-                        "class_name": "conversation",
-                        "opened_at": last_at,
-                        "last_message": last_text,
-                    }),
-                    &conversation,
-                ),
-            ));
+            let mut row = with_icon(
+                store,
+                json!({
+                    "subject": subject,
+                    "title": title,
+                    "class_name": "conversation",
+                    "opened_at": last_at,
+                    "last_message": last_text,
+                }),
+                &conversation,
+            );
+            // A DM shows the other person's picture, a group is marked as one.
+            let others: Vec<String> = members_of(&conversation)
+                .into_iter()
+                .filter(|m| !same_agent(m, &me))
+                .collect();
+            match others.as_slice() {
+                [] => {}
+                [other] => {
+                    row["peer"] = agent_picture(store, other)
+                        .await
+                        .unwrap_or_else(|| json!({ "subject": other, "name": "" }));
+                }
+                _ => row["group"] = json!(true),
+            }
+            out.push((last_at, row));
         }
         // Stable: conversations without activity keep the drive's order.
         out.sort_by_key(|row| std::cmp::Reverse(row.0));
@@ -706,6 +722,62 @@ mod tests {
         assert_eq!(list[0]["subject"], convo.as_str());
         assert_eq!(list[0]["title"], UNKNOWN_MEMBER);
         assert_eq!(list[1]["title"], "Only you");
+    }
+
+    #[tokio::test]
+    async fn a_dm_carries_the_other_members_picture_and_a_group_is_marked() {
+        let d = Device::new().await;
+        let me = d.store.get_default_agent().unwrap().subject.to_string();
+        let add_agent = |name: &'static str| {
+            let store = d.store.clone();
+            async move {
+                let agent = Agent::new(Some(name)).unwrap();
+                store
+                    .add_resource(&agent.to_resource().unwrap())
+                    .await
+                    .unwrap();
+                agent.subject.to_string()
+            }
+        };
+        let (bob, carol) = (add_agent("Bob").await, add_agent("Carol").await);
+        let file = d.new_picture("https://example.test/download/bob.png").await;
+        d.set_icon(&bob, &file).await;
+        let with_members = |members: Vec<String>| {
+            let d = &d;
+            async move {
+                let convo = d.new_chat("c").await;
+                let mut r = d
+                    .store
+                    .get_resource(&Subject::from(convo.as_str()))
+                    .await
+                    .unwrap();
+                let members =
+                    Value::ResourceArray(members.iter().map(|m| m.as_str().into()).collect());
+                r.set_unsafe(urls::READ.into(), members).unwrap();
+                d.node.save_locally(&mut r).await.unwrap();
+                convo
+            }
+        };
+        let dm = with_members(vec![me.clone(), bob.clone()]).await;
+        let plain = with_members(vec![me.clone(), carol.clone()]).await;
+        let group = with_members(vec![me.clone(), bob.clone(), carol.clone()]).await;
+        d.set_home_list(urls::CONVERSATIONS, &[&dm, &plain, &group])
+            .await;
+
+        let list = conversations().list(&d.store, 10).await.unwrap();
+        let row = |s: &str| list.iter().find(|r| r["subject"] == s).unwrap();
+        assert_eq!(row(&dm)["peer"]["name"], "Bob");
+        assert_eq!(row(&dm)["peer"]["subject"], bob.as_str());
+        assert_eq!(row(&dm)["peer"]["icon_file"], file.as_str());
+        assert_eq!(
+            row(&dm)["peer"]["image_url"],
+            "https://example.test/download/bob.png"
+        );
+        assert_eq!(row(&plain)["peer"]["name"], "Carol");
+        assert!(row(&plain)["peer"].get("icon_file").is_none());
+        assert!(row(&dm).get("group").is_none());
+        assert_eq!(row(&group)["group"], true);
+        assert!(row(&group).get("peer").is_none());
     }
 
     struct Talk {

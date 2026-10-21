@@ -277,6 +277,25 @@ async fn rows_and_icons_carry_the_resources_own_emoji() {
         .find(|r| r["subject"] == drive.as_str())
         .unwrap();
     assert_eq!(row["emoji"], "🏔");
+
+    // So does its picture: the File its `icon` names.
+    {
+        let store = db().unwrap();
+        let mut r = store.get_resource(&drive.as_str().into()).await.unwrap();
+        r.set_unsafe(
+            atomic_lib::host::own_profile::ICON.into(),
+            atomic_lib::Value::AtomicUrl("https://example.test/file/drive-icon".into()),
+        )
+        .unwrap();
+        r.save_locally(store.as_ref()).await.unwrap();
+    }
+    let drives: Vec<Json> =
+        serde_json::from_str(&crate::api::simple::list_drives_with_names().await.unwrap()).unwrap();
+    let row = drives
+        .iter()
+        .find(|r| r["subject"] == drive.as_str())
+        .unwrap();
+    assert_eq!(row["icon_file"], "https://example.test/file/drive-icon");
 }
 
 /// A conversation between the device's agent and a new agent called `name`,

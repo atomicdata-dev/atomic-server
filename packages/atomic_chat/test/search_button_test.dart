@@ -15,7 +15,7 @@ RecentResource _r(String subject, String title) => (
       title: title,
       className: 'document-v2',
       openedAt: 1,
-      emoji: null,
+      emoji: null, picture: null,
     );
 
 FakeApi _api() => FakeApi(recent: [
@@ -27,7 +27,7 @@ FakeApi _api() => FakeApi(recent: [
         className: 'document-v2',
         drive: 'did:ad:drive',
         score: 1.0,
-        emoji: null
+        emoji: null, picture: null
       ),
     ]);
 
@@ -196,8 +196,8 @@ void main() {
     ResourceView.serverFactory = () async => throw 'no server in a test';
     addTearDown(() => ResourceView.serverFactory = serverFactory);
     final api = FakeApi(driveList: const [
-      (subject: 'did:ad:drive', name: 'Home', emoji: null),
-      (subject: 'did:ad:work', name: 'Work', emoji: null),
+      (subject: 'did:ad:drive', name: 'Home', emoji: null, picture: null),
+      (subject: 'did:ad:work', name: 'Work', emoji: null, picture: null),
     ], hits: const [
       (
         subject: 'did:ad:work',
@@ -205,7 +205,7 @@ void main() {
         className: 'Drive',
         drive: 'did:ad:drive',
         score: 1.0,
-        emoji: null
+        emoji: null, picture: null
       ),
     ]);
     await tester.pumpWidget(_shell(api));

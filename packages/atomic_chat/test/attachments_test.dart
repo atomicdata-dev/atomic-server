@@ -49,7 +49,7 @@ class _Api extends UnimplementedApi {
       );
   @override
   Future<List<DriveInfo>> drives() async =>
-      const [(subject: 'did:ad:home', name: 'Home', emoji: null)];
+      const [(subject: 'did:ad:home', name: 'Home', emoji: null, picture: null)];
   @override
   Future<List<RecentResource>> recentResources(String drive) async => const [
         (
@@ -57,7 +57,7 @@ class _Api extends UnimplementedApi {
           title: 'Meeting notes',
           className: 'document',
           openedAt: 2,
-          emoji: '📝'
+          emoji: '📝', picture: null
         ),
       ];
   @override
@@ -68,7 +68,7 @@ class _Api extends UnimplementedApi {
           className: 'table',
           drive: 'did:ad:home',
           score: 1,
-          emoji: null
+          emoji: null, picture: null
         ),
       ];
   @override

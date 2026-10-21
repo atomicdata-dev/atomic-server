@@ -48,6 +48,59 @@ typedef ChatRoomMessage = ({
 /// is the time of that message in ms (0 when none).
 typedef ConversationRow = ({RecentResource resource, String lastMessage});
 
+/// The picture a row shows for what it lists, besides its emoji: a File
+/// (`file`, whose bytes this device may hold) and/or a URL a server serves.
+/// `person` marks an agent's picture (round, with the initial of `name` as
+/// fallback); `group` a conversation with several others (no picture).
+class ResourcePicture {
+  final String? file;
+  final String? url;
+  final String? name;
+  final String? emoji;
+  final bool person;
+  final bool group;
+
+  const ResourcePicture(
+      {this.file,
+      this.url,
+      this.name,
+      this.emoji,
+      this.person = false,
+      this.group = false});
+
+  /// Null when [e] (a row's JSON object) names no picture and is no person.
+  static ResourcePicture? fromJson(Object? e, {bool person = false}) {
+    if (e is! Map) return null;
+    String? s(String k) {
+      final v = e[k];
+      return v is String && v.trim().isNotEmpty ? v.trim() : null;
+    }
+
+    final p = ResourcePicture(
+        file: s('icon_file'),
+        url: s('image_url'),
+        name: s('name'),
+        emoji: s('emoji'),
+        person: person);
+    return p.file == null && p.url == null && !person ? null : p;
+  }
+
+  bool get hasImage => file != null || url != null;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ResourcePicture &&
+      other.file == file &&
+      other.url == url &&
+      other.name == name &&
+      other.emoji == emoji &&
+      other.person == person &&
+      other.group == group;
+
+  @override
+  int get hashCode => Object.hash(file, url, name, emoji, person, group);
+}
+
 typedef SearchHit = ({
   String subject,
   String title,
@@ -56,7 +109,9 @@ typedef SearchHit = ({
   String drive,
   double score,
   // The resource's own icon (an emoji); null when it has none.
-  String? emoji
+  String? emoji,
+  // The resource's own picture (its `icon` File); null when it has none.
+  ResourcePicture? picture
 });
 
 /// A Notification of the Inbox in the private drive (as the web app records
@@ -69,10 +124,17 @@ typedef NotificationItem = ({
   String about,
   String kind,
   int occurredAt,
-  bool read
+  bool read,
+  // Who did it (their picture and name); null when unknown to this device.
+  ResourcePicture? actor
 });
 
-typedef DriveInfo = ({String subject, String name, String? emoji});
+typedef DriveInfo = ({
+  String subject,
+  String name,
+  String? emoji,
+  ResourcePicture? picture
+});
 
 typedef RecentResource = ({
   String subject,
@@ -80,7 +142,10 @@ typedef RecentResource = ({
   String className,
   int openedAt,
   // The resource's own icon (an emoji); null when it has none.
-  String? emoji
+  String? emoji,
+  // The resource's own picture (its `icon` File); null when it has none. A
+  // DM's is the other member's, a group's is marked `group`.
+  ResourcePicture? picture
 });
 
 /// One change in the activity feed: something another member did (the
@@ -169,6 +234,15 @@ abstract final class AssistantJson {
     return v is String && v.isNotEmpty ? v : null;
   }
 
+  /// A row's picture: its DM peer's (round), a group's marker, else its own.
+  static ResourcePicture? _picture(Map e) {
+    if (e['group'] == true) return const ResourcePicture(group: true);
+    if (e['peer'] is Map) {
+      return ResourcePicture.fromJson(e['peer'], person: true);
+    }
+    return ResourcePicture.fromJson(e);
+  }
+
   /// `[{subject, name, emoji}]`, filtered by [visibleDrives].
   static List<DriveInfo> parseDrives(String json, {String? active}) =>
       visibleDrives([
@@ -177,6 +251,7 @@ abstract final class AssistantJson {
             subject: e['subject'] as String,
             name: e['name'] as String? ?? '',
             emoji: _emoji(e),
+            picture: ResourcePicture.fromJson(e),
           ),
       ], active: active);
 
@@ -230,6 +305,7 @@ abstract final class AssistantJson {
             kind: e['kind'] as String? ?? '',
             occurredAt: (e['occurred_at'] as num?)?.toInt() ?? 0,
             read: e['read'] == true,
+            actor: ResourcePicture.fromJson(e['actor_picture'], person: true),
           ),
       ];
 
@@ -326,6 +402,7 @@ abstract final class AssistantJson {
             className: e['class_name'] as String? ?? '',
             openedAt: (e['opened_at'] as num?)?.toInt() ?? 0,
             emoji: _emoji(e),
+            picture: _picture(e),
           ),
       ];
 
@@ -338,6 +415,7 @@ abstract final class AssistantJson {
             drive: e['drive'] as String? ?? '',
             score: (e['score'] as num?)?.toDouble() ?? 0,
             emoji: _emoji(e),
+            picture: ResourcePicture.fromJson(e),
           ),
       ];
 

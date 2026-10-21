@@ -17,8 +17,8 @@ class _BarApi extends FakeApi {
 
   _BarApi({super.ai})
       : super(driveList: const [
-          (subject: 'did:ad:home', name: 'Home', emoji: null),
-          (subject: 'did:ad:work', name: 'Work', emoji: '💼'),
+          (subject: 'did:ad:home', name: 'Home', emoji: null, picture: null),
+          (subject: 'did:ad:work', name: 'Work', emoji: '💼', picture: null),
         ]);
 
   @override
@@ -433,7 +433,7 @@ void main() {
             className: 'Drive',
             drive: 'did:ad:home',
             score: 1.0,
-            emoji: null
+            emoji: null, picture: null
           ),
         ];
       await tester.pumpWidget(_shell(api));
@@ -462,7 +462,7 @@ void main() {
             className: 'Drive',
             drive: 'did:ad:home',
             score: 1.0,
-            emoji: null
+            emoji: null, picture: null
           ),
         ];
       await tester.pumpWidget(_shell(api));

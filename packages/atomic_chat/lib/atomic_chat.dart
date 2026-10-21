@@ -42,6 +42,7 @@ export 'src/warm_resource_web_view.dart';
 export 'src/resource_web_view.dart';
 export 'src/embed_server.dart';
 export 'src/resource_row.dart';
+export 'src/row_leading.dart';
 
 // Voice.
 export 'src/voice.dart';

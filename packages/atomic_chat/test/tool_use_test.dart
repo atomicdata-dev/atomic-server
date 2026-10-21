@@ -85,7 +85,7 @@ class _Api extends UnimplementedApi {
         className: 'document',
         drive: 'did:ad:d',
         score: 1,
-        emoji: null
+        emoji: null, picture: null
       ),
     ];
   }

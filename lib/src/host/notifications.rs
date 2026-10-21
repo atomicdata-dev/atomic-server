@@ -8,7 +8,10 @@
 //! event, so a list shows one item per `notificationSource` (read when any
 //! copy is), as the web app's list does.
 
-use super::{rows::row_resource, LocalWritePusher};
+use super::{
+    rows::{agent_picture, row_resource},
+    LocalWritePusher,
+};
 use crate::{
     errors::AtomicResult, runtime::AtomicNode, storelike::Query, urls, Db, Storelike, Subject,
     Value,
@@ -85,18 +88,28 @@ pub async fn list_notifications(store: &Db, limit: usize) -> AtomicResult<Vec<Js
             .and_then(|v| v.to_int().ok())
             .unwrap_or(0);
         let read = n.get(READ_AT).is_ok();
+        let actor = text(&n, ACTOR);
+        let actor_picture = if actor.is_empty() {
+            None
+        } else {
+            agent_picture(store, &actor).await
+        };
+        let mut json = json!({
+            "subject": subject,
+            "title": text(&n, urls::NAME),
+            "body": text(&n, urls::DESCRIPTION),
+            "about": text(&n, urls::ABOUT),
+            "kind": text(&n, NOTIFICATION_KIND),
+            "actor": actor,
+            "source": source,
+            "occurred_at": occurred_at,
+            "read": read,
+        });
+        if let Some(p) = actor_picture {
+            json["actor_picture"] = p;
+        }
         let item = Item {
-            json: json!({
-                "subject": subject,
-                "title": text(&n, urls::NAME),
-                "body": text(&n, urls::DESCRIPTION),
-                "about": text(&n, urls::ABOUT),
-                "kind": text(&n, NOTIFICATION_KIND),
-                "actor": text(&n, ACTOR),
-                "source": source,
-                "occurred_at": occurred_at,
-                "read": read,
-            }),
+            json,
             subject,
             read,
             occurred_at,
@@ -261,6 +274,48 @@ mod tests {
         assert_eq!(list[1]["read"], true);
 
         assert_eq!(list_notifications(&d.store, 1).await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_notification_carries_the_actors_picture_when_the_device_holds_it() {
+        let d = Device::new().await;
+        let inbox = inbox(&d).await;
+        let actor = crate::agents::Agent::new(Some("Dora")).unwrap();
+        d.store
+            .add_resource(&actor.to_resource().unwrap())
+            .await
+            .unwrap();
+        let file = d
+            .new_picture("https://example.test/download/dora.png")
+            .await;
+        d.set_icon(&actor.subject.to_string(), &file).await;
+        let n = d
+            .store
+            .create_resource(
+                NOTIFICATION,
+                &inbox,
+                "Dora wrote",
+                Some(vec![(
+                    ACTOR,
+                    Value::AtomicUrl(actor.subject.to_string().as_str().into()),
+                )]),
+            )
+            .await
+            .unwrap();
+        // The default actor of `notify` is an agent this device does not hold.
+        notify(&d, &inbox, "Stranger", "https://example.test/m", 5, false).await;
+
+        let list = list_notifications(&d.store, 10).await.unwrap();
+        let row = |s: &str| list.iter().find(|r| r["subject"] == s).unwrap();
+        assert_eq!(row(&n)["actor_picture"]["name"], "Dora");
+        assert_eq!(row(&n)["actor_picture"]["icon_file"], file.as_str());
+        assert_eq!(
+            row(&n)["actor_picture"]["image_url"],
+            "https://example.test/download/dora.png"
+        );
+        assert!(list
+            .iter()
+            .any(|r| r["title"] == "Stranger" && r.get("actor_picture").is_none()));
     }
 
     #[tokio::test]

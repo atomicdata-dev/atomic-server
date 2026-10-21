@@ -10,7 +10,7 @@ RecentResource _r(String subject, String title) => (
       title: title,
       className: 'document-v2',
       openedAt: 1,
-      emoji: null,
+      emoji: null, picture: null,
     );
 
 Widget _shell(FakeApi api) => app(AppShell(
@@ -38,8 +38,8 @@ void main() {
     ResourceView.serverFactory = () async => throw 'no server in a test';
     api = FakeApi(
       driveList: const [
-        (subject: 'did:ad:home', name: 'Home', emoji: null),
-        (subject: 'did:ad:work', name: 'Work', emoji: null),
+        (subject: 'did:ad:home', name: 'Home', emoji: null, picture: null),
+        (subject: 'did:ad:work', name: 'Work', emoji: null, picture: null),
       ],
       favoriteList: [_r('did:ad:fav', 'Starred doc')],
     );

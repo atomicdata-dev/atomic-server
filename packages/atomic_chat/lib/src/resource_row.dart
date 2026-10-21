@@ -2,6 +2,8 @@ import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt;
 import 'package:flutter/material.dart';
 
 import 'app_shell.dart';
+import 'models.dart';
+import 'row_leading.dart';
 
 /// The icon of a class, by the class's name as the rows carry it (the class's
 /// own name, or the last part of its subject), as the web app's
@@ -98,6 +100,19 @@ class ResourceRow extends StatelessWidget {
   /// shell) the row is marked while that is the resource shown there.
   final String? subject;
 
+  /// The row's own picture (see [RowLeading]); shown instead of [icon], and
+  /// before [emoji] when it loads.
+  final ImageSource? image;
+
+  /// People and chats are circles, resources rounded squares.
+  final RowShape shape;
+
+  /// Fall back to the title's initial (people) instead of [icon].
+  final bool showInitial;
+
+  /// The name the initial comes from; the title by default.
+  final String? label;
+
   const ResourceRow({
     super.key,
     this.subject,
@@ -107,26 +122,38 @@ class ResourceRow extends StatelessWidget {
     this.detail,
     this.onTap,
     this.trailing,
+    this.image,
+    this.shape = RowShape.square,
+    this.showInitial = false,
+    this.label,
   });
 
   bool get _hasEmoji => emoji != null && emoji!.isNotEmpty;
 
-  /// The icon's box is 24 px either way, so rows line up.
+  bool get _hasLeading =>
+      icon != null || _hasEmoji || (image != null && !image!.isEmpty);
+
+  /// The leading slot is 32 dp for every kind of row, so rows line up and
+  /// their text starts at the same x.
   Widget? _leading(BuildContext context) {
-    if (_hasEmoji) {
-      return SizedBox(
-        width: 24,
-        height: 24,
-        child: Center(
-          child: Text(
-            emoji!,
-            key: const Key('resource-emoji'),
-            style: const TextStyle(fontSize: 20, height: 1),
-          ),
-        ),
-      );
-    }
-    return icon == null ? null : Icon(icon, color: context.appColors.main);
+    if (!_hasLeading) return null;
+    final img = image;
+    final source = img == null
+        ? (_hasEmoji ? ImageSource.emoji(emoji!) : null)
+        : ImageSource(
+            bytes: img.bytes,
+            file: img.file,
+            url: img.url,
+            data: img.data,
+            baseUrl: img.baseUrl,
+            emoji: _hasEmoji ? emoji : img.emoji);
+    return RowLeading(
+      image: source,
+      fallbackLabel: label ?? title,
+      fallbackIcon: icon ?? Icons.description_outlined,
+      shape: shape,
+      showInitial: showInitial,
+    );
   }
 
   Widget _tile(BuildContext context, {bool selected = false}) {
@@ -136,7 +163,7 @@ class ResourceRow extends StatelessWidget {
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: detail == null || detail!.isEmpty ? null : Text(detail!),
       // A plain list of titles reads better tight.
-      visualDensity: detail == null && icon == null && !_hasEmoji
+      visualDensity: detail == null && !_hasLeading
           ? VisualDensity.compact
           : VisualDensity.standard,
       trailing: trailing,
@@ -172,4 +199,22 @@ class ResourceRow extends StatelessWidget {
       child: row,
     );
   }
+}
+
+/// How a row of [className] shows [picture] and [emoji]: the image, the
+/// shape (agents, DMs and groups are circles), whether the initial is the
+/// fallback, and the generic icon.
+({ImageSource? image, RowShape shape, bool initial, IconData icon}) leadingOf(
+    ResourcePicture? picture, String? emoji, String className) {
+  final key = className.split('/').last.toLowerCase();
+  final person = picture?.person == true || key == 'agent';
+  final group = picture?.group == true;
+  return (
+    image: ImageSource.of(picture, emoji: emoji),
+    shape: person || group || key == 'conversation' || key == 'chatroom'
+        ? RowShape.circle
+        : RowShape.square,
+    initial: person,
+    icon: group ? Icons.groups_outlined : iconForClass(className),
+  );
 }

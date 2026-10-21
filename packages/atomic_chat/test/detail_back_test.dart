@@ -29,7 +29,7 @@ FakeApi _api() => FakeApi(
             title: 'Fav $i',
             className: 'document-v2',
             openedAt: 1,
-            emoji: null,
+            emoji: null, picture: null,
           ),
       ],
       conversationList: [
@@ -39,7 +39,7 @@ FakeApi _api() => FakeApi(
             title: 'Talk $i',
             className: 'chatroom',
             openedAt: 100 - i,
-            emoji: null,
+            emoji: null, picture: null,
           ),
       ],
       lastMessages: {

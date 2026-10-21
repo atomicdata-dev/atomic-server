@@ -2,6 +2,7 @@
 //! stored propvals so a list never decodes a Loro history or waits on the
 //! network.
 
+use super::own_profile::{ICON, IMAGE};
 use crate::{urls, Db, Resource, Storelike, Subject};
 use serde_json::{json, Value as Json};
 use std::collections::HashMap;
@@ -67,23 +68,93 @@ pub fn emoji_of(resource: &Resource) -> String {
         .to_string()
 }
 
-/// Add `emoji` to a row when the resource has one (absent otherwise).
-pub fn with_emoji(mut row: Json, resource: &Resource) -> Json {
+/// The File of the resource's own picture: its `icon` (what the web app's
+/// icon editor writes). `agent` also reads the older `image` property, which
+/// agent profiles still carry. Empty when it has none.
+pub fn icon_file_of(resource: &Resource, agent: bool) -> String {
+    let get = |p: &str| {
+        resource
+            .get(p)
+            .map(|v| v.to_string())
+            .unwrap_or_default()
+            .trim()
+            .to_string()
+    };
+    match get(ICON) {
+        i if i.is_empty() && agent => get(IMAGE),
+        i => i,
+    }
+}
+
+/// The resource's own pictures as row fields: `emoji?`, `icon_file?` (the
+/// File subject, whose bytes the host hands out when this device holds them)
+/// and `image_url?` (a URL a server serves: the File's download URL when it
+/// is stored here, else the resource's `imageUrl`). Nothing for a resource
+/// without any. Reads propvals only, plus the File's own row.
+pub fn picture_fields(
+    store: &Db,
+    resource: &Resource,
+    agent: bool,
+) -> serde_json::Map<String, Json> {
+    let mut out = serde_json::Map::new();
     let emoji = emoji_of(resource);
     if !emoji.is_empty() {
-        row["emoji"] = json!(emoji);
+        out.insert("emoji".into(), json!(emoji));
+    }
+    let file = icon_file_of(resource, agent);
+    let from_file = (!file.is_empty())
+        .then(|| {
+            store
+                .get_resource_shallow(&Subject::from(file.as_str()))
+                .ok()
+        })
+        .flatten()
+        .and_then(|f| f.get(urls::DOWNLOAD_URL).ok().map(|v| v.to_string()))
+        .filter(|u| u.starts_with("http"));
+    if !file.is_empty() {
+        out.insert("icon_file".into(), json!(file));
+    }
+    let url = from_file.or_else(|| {
+        resource
+            .get(urls::IMAGE_URL)
+            .ok()
+            .map(|v| v.to_string())
+            .filter(|u| u.starts_with("http"))
+    });
+    if let Some(url) = url {
+        out.insert("image_url".into(), json!(url));
+    }
+    out
+}
+
+/// Add the resource's own pictures (see [`picture_fields`]) to a row.
+pub fn with_icon(store: &Db, mut row: Json, resource: &Resource) -> Json {
+    for (k, v) in picture_fields(store, resource, false) {
+        row[k.as_str()] = v;
     }
     row
 }
 
-/// A `{subject, title, class_name, <extra>, emoji?}` row of the resource lists.
+/// `{subject, name, emoji?, icon_file?, image_url?}` of an agent, as far as
+/// this device holds its profile; `None` when it does not hold it. `name` is
+/// "" when the profile has none.
+pub async fn agent_picture(store: &Db, agent: &str) -> Option<Json> {
+    let resource = row_resource(store, &Subject::from(agent)).await?;
+    let mut out = picture_fields(store, &resource, true);
+    out.insert("subject".into(), json!(agent));
+    out.insert("name".into(), json!(name_of(&resource)));
+    Some(Json::Object(out))
+}
+
+/// A `{subject, title, class_name, <extra>, emoji?, icon_file?, image_url?}` row of the resource lists.
 pub async fn resource_row(
     store: &Db,
     subject: &str,
     resource: &Resource,
     extra: (&str, Json),
 ) -> Json {
-    with_emoji(
+    with_icon(
+        store,
         json!({
             "subject": subject,
             "title": name_of(resource),

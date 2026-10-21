@@ -29,6 +29,7 @@ RecentResource _r(String subject, String title) => (
       className: 'document-v2',
       openedAt: 1,
       emoji: null,
+      picture: null,
     );
 
 FakeApi _api() => FakeApi(favoriteList: [
@@ -1227,7 +1228,8 @@ void main() {
             className: 'document-v2',
             drive: 'did:ad:drive',
             score: 2.0,
-            emoji: null
+            emoji: null,
+            picture: null
           ),
         ]);
     final palette = find.byKey(const Key('search-palette'));
@@ -1462,8 +1464,8 @@ class _IdentityApi extends FakeApi {
 class _VisitApi extends FakeApi {
   _VisitApi()
       : super(driveList: const [
-          (subject: 'did:ad:a', name: 'Alpha', emoji: null),
-          (subject: 'did:ad:b', name: 'Beta', emoji: null),
+          (subject: 'did:ad:a', name: 'Alpha', emoji: null, picture: null),
+          (subject: 'did:ad:b', name: 'Beta', emoji: null, picture: null),
         ]);
 }
 

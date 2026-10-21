@@ -26,7 +26,7 @@ RecentResource _r(String subject, String title) => (
       title: title,
       className: 'document-v2',
       openedAt: 1,
-      emoji: null,
+      emoji: null, picture: null,
     );
 
 class _Api extends FakeApi {

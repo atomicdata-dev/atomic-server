@@ -35,7 +35,7 @@ class ThousandChatsApi extends UnimplementedApi {
 
   @override
   Future<List<DriveInfo>> drives() async =>
-      [(subject: 'did:ad:drive', name: 'Home', emoji: null)];
+      [(subject: 'did:ad:drive', name: 'Home', emoji: null, picture: null)];
   @override
   Future<List<RecentResource>> recentResources(String drive) async => const [];
   @override
@@ -67,7 +67,7 @@ class ThousandChatsApi extends UnimplementedApi {
           className: 'Document',
           drive: 'did:ad:drive',
           score: 2.0,
-          emoji: null
+          emoji: null, picture: null
         ),
     ];
   }
@@ -83,7 +83,7 @@ class ThousandChatsApi extends UnimplementedApi {
         className: 'AiChat',
         drive: 'did:ad:drive',
         score: 0.1,
-        emoji: null
+        emoji: null, picture: null
       ),
     ];
   }

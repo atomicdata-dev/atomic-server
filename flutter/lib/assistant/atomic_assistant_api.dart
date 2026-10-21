@@ -1,4 +1,6 @@
 
+import 'dart:typed_data';
+
 import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/foundation.dart' show Listenable, debugPrint;
 
@@ -72,6 +74,9 @@ class AtomicAssistantApi extends AssistantApi {
   @override
   Future<Map<String, String>> resourceIcons(List<String> subjects) =>
       AtomicClient.resourceIcons(subjects);
+  @override
+  Future<Uint8List?> fileBytes(String file) =>
+      AtomicClient.readFileBytes(file);
   @override
   void noteOpened(String drive, String subject) =>
       AtomicClient.noteResourceOpened(drive, subject);

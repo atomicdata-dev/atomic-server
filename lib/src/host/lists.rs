@@ -6,7 +6,7 @@ use super::{
     own_profile::own_profile,
     profiles::{same_agent, short_agent, AgentProfiles},
     recents::{ActivityKind, RecentsIndex},
-    rows::{emoji_of, first_class, name_of, resource_row, row_resource, with_emoji, DriveCache},
+    rows::{emoji_of, first_class, name_of, resource_row, row_resource, with_icon, DriveCache},
 };
 use crate::{errors::AtomicResult, Db, Storelike, Subject};
 use serde_json::{json, Value as Json};
@@ -438,7 +438,8 @@ pub fn search_classes(
                 name
             }
         };
-        out.push(with_emoji(
+        out.push(with_icon(
+            store,
             json!({
                 "subject": hit.subject.to_string(),
                 "title": name_of(&resource),
@@ -871,6 +872,30 @@ mod tests {
         assert_eq!(titles, ["Fav b", "Fav a"]);
         assert_eq!(list[0]["subject"], b.as_str());
         assert_eq!(list_favorites(&d.store, 1).await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn rows_carry_the_resources_icon_file_and_its_url() {
+        let d = Device::new().await;
+        let with = d.new_chat("Picture with").await;
+        let without = d.new_chat("Picture without").await;
+        let file = d.new_picture("https://example.test/download/pic.png").await;
+        d.set_icon(&with, &file).await;
+        d.recents.note_opened(&d.drive, &with, 1);
+        d.recents.note_opened(&d.drive, &without, 2);
+        d.set_home_list(FAVORITES, &[&with, &without]).await;
+
+        let recent = list_recent_resources(&d.store, &d.recents, &d.drive, 500).await;
+        let favs = list_favorites(&d.store, 50).await.unwrap();
+        let hits = search(&d.store, Some(&d.drive), "picture", 20).unwrap();
+        for rows in [&recent, &favs, &hits] {
+            let row = find(rows, &with);
+            assert_eq!(row["icon_file"], file.as_str());
+            assert_eq!(row["image_url"], "https://example.test/download/pic.png");
+            let none = find(rows, &without);
+            assert!(none.get("icon_file").is_none());
+            assert!(none.get("image_url").is_none());
+        }
     }
 
     #[tokio::test]

@@ -42,7 +42,7 @@ class FakeApi extends UnimplementedApi {
   FakeApi({
     this.notificationList = const [],
     this.driveList = const [
-      (subject: 'did:ad:drive', name: 'Home', emoji: null)
+      (subject: 'did:ad:drive', name: 'Home', emoji: null, picture: null)
     ],
     this.recent = const [],
     this.favoriteList = const [],
@@ -123,7 +123,8 @@ class FakeApi extends UnimplementedApi {
                 about: n.about,
                 kind: n.kind,
                 occurredAt: n.occurredAt,
-                read: true
+                read: true,
+        actor: null
               )
             : n,
     ];
@@ -325,12 +326,12 @@ void main() {
             title: 'Doc $s',
             className: 'Document',
             openedAt: now - 60 * 60 * 1000,
-            emoji: null
+            emoji: null, picture: null
           );
       final api = FakeApi(
         driveList: [
           for (var i = 0; i < 6; i++)
-            (subject: 'did:ad:drive$i', name: 'Drive $i', emoji: '📁'),
+            (subject: 'did:ad:drive$i', name: 'Drive $i', emoji: '📁', picture: null),
         ],
         favoriteList: [for (var i = 0; i < 6; i++) res('f$i')],
         conversationList: [for (var i = 0; i < 6; i++) res('c$i')],
@@ -348,7 +349,8 @@ void main() {
               about: 'x$i',
               kind: 'chat',
               occurredAt: now,
-              read: false
+              read: false,
+        actor: null
             ),
         ],
       );
@@ -434,7 +436,8 @@ void main() {
             about: 'did:ad:teamchat',
             kind: 'chat',
             occurredAt: now - 5 * 60 * 1000,
-            read: false
+            read: false,
+        actor: null
           ),
           (
             subject: 'n2',
@@ -443,7 +446,8 @@ void main() {
             about: 'did:ad:old',
             kind: 'chat',
             occurredAt: now - 3 * 3600 * 1000,
-            read: true
+            read: true,
+        actor: null
           ),
         ],
       );
@@ -568,7 +572,7 @@ void main() {
               title: 'A star',
               className: 'Document',
               openedAt: 1,
-              emoji: null
+              emoji: null, picture: null
             ),
           ],
         );
@@ -789,7 +793,7 @@ void main() {
             title: 'A doc',
             className: 'Document',
             openedAt: 1,
-            emoji: null
+            emoji: null, picture: null
           ),
         ],
       );
@@ -827,7 +831,7 @@ void main() {
             title: 'Starred',
             className: 'Folder',
             openedAt: 0,
-            emoji: null
+            emoji: null, picture: null
           ),
         ],
         conversationList: [
@@ -836,7 +840,7 @@ void main() {
             title: 'Alice, Bob',
             className: '',
             openedAt: 0,
-            emoji: null
+            emoji: null, picture: null
           ),
         ],
       );
@@ -866,7 +870,7 @@ void main() {
             title: 'Alice, Bob',
             className: 'conversation',
             openedAt: 0,
-            emoji: null
+            emoji: null, picture: null
           ),
         ],
         lastMessages: {'m1': 'See you\n  tomorrow'},
@@ -890,7 +894,7 @@ void main() {
             title: 'Fav $i',
             className: '',
             openedAt: 0,
-            emoji: null
+            emoji: null, picture: null
           ),
       ]);
       await tester
@@ -932,7 +936,7 @@ void main() {
             title: 'A doc',
             className: 'Document',
             openedAt: 1,
-            emoji: null
+            emoji: null, picture: null
           ),
         ],
         activityList: [_activity('a1', 'Plan')],
@@ -1029,7 +1033,7 @@ void main() {
 
     testWidgets('a drive opens as a resource page', (tester) async {
       final api = _PerDrive(
-        driveList: [(subject: 'did:ad:a', name: 'Alpha', emoji: null)],
+        driveList: [(subject: 'did:ad:a', name: 'Alpha', emoji: null, picture: null)],
         byDrive: {
           'did:ad:a': [
             for (var i = 0; i < 6; i++)
@@ -1038,7 +1042,7 @@ void main() {
                 title: 'Doc $i',
                 className: '',
                 openedAt: i,
-                emoji: null
+                emoji: null, picture: null
               ),
           ],
         },
@@ -1125,17 +1129,17 @@ void main() {
           title: 'Fox doc',
           className: 'Document',
           openedAt: 2,
-          emoji: '🦊'
+          emoji: '🦊', picture: null
         ),
         (
           subject: 'r2',
           title: 'Plain table',
           className: 'Table',
           openedAt: 1,
-          emoji: null
+          emoji: null, picture: null
         ),
       ], driveList: const [
-        (subject: 'did:ad:drive', name: 'Home', emoji: '🏔'),
+        (subject: 'did:ad:drive', name: 'Home', emoji: '🏔', picture: null),
       ], activityList: [
         _activity('a1', 'Active thing'),
       ], icons: {
@@ -1162,7 +1166,7 @@ void main() {
           className: 'Document',
           drive: '',
           score: 2.0,
-          emoji: '🦊'
+          emoji: '🦊', picture: null
         ),
         (
           subject: 'did:ad:2',
@@ -1170,7 +1174,7 @@ void main() {
           className: 'Canvas',
           drive: '',
           score: 1.0,
-          emoji: null
+          emoji: null, picture: null
         ),
       ]);
       await tester
@@ -1196,7 +1200,7 @@ void main() {
               title: 'Fox doc',
               className: 'Document',
               openedAt: 2,
-              emoji: '🦊'
+              emoji: '🦊', picture: null
             ),
           ]);
       await tester.pumpWidget(app(ChatScreen(api: api)));
@@ -1226,7 +1230,7 @@ void main() {
           className: 'Folder',
           drive: '',
           score: 1.5,
-          emoji: null
+          emoji: null, picture: null
         ),
       ]);
       await tester
@@ -1260,7 +1264,7 @@ void main() {
             title: 'Opened doc',
             className: 'Document',
             openedAt: 1,
-            emoji: null
+            emoji: null, picture: null
           ),
         ],
         hits: [
@@ -1270,7 +1274,7 @@ void main() {
             className: 'Folder',
             drive: '',
             score: 1.5,
-            emoji: null
+            emoji: null, picture: null
           ),
         ],
       );
@@ -1338,7 +1342,7 @@ void main() {
           className: 'Drive',
           drive: 'did:ad:drive',
           score: 2,
-          emoji: null
+          emoji: null, picture: null
         ),
       ]);
       await tester.pumpWidget(app(SearchScreen(
@@ -1362,7 +1366,7 @@ void main() {
             title: 'Opened doc',
             className: 'Document',
             openedAt: 1,
-            emoji: null
+            emoji: null, picture: null
           ),
         ],
         hits: [
@@ -1372,7 +1376,7 @@ void main() {
             className: 'Folder',
             drive: '',
             score: 1.0,
-            emoji: null
+            emoji: null, picture: null
           ),
         ],
       );
@@ -1412,7 +1416,7 @@ void main() {
           className: 'Folder',
           drive: '',
           score: 1.5,
-          emoji: null
+          emoji: null, picture: null
         ),
       ]);
       await tester
@@ -1437,7 +1441,7 @@ void main() {
           className: 'Folder',
           drive: '',
           score: score,
-          emoji: null
+          emoji: null, picture: null
         );
 
     Future<void> type(WidgetTester tester, String text) async {
@@ -1525,14 +1529,14 @@ void main() {
           title: 'Newer',
           className: 'Document',
           openedAt: 2,
-          emoji: null
+          emoji: null, picture: null
         ),
         (
           subject: 'r1',
           title: 'Older',
           className: 'Document',
           openedAt: 1,
-          emoji: null
+          emoji: null, picture: null
         ),
       ]);
       await tester
@@ -1556,8 +1560,8 @@ void main() {
         (tester) async {
       final api = FakeApi(
         driveList: [
-          (subject: 'did:ad:drive', name: 'Home', emoji: null),
-          (subject: 'did:ad:work', name: 'Work', emoji: null),
+          (subject: 'did:ad:drive', name: 'Home', emoji: null, picture: null),
+          (subject: 'did:ad:work', name: 'Work', emoji: null, picture: null),
         ],
         hits: [
           (
@@ -1566,7 +1570,7 @@ void main() {
             className: 'Folder',
             drive: 'did:ad:drive',
             score: 2.0,
-            emoji: null
+            emoji: null, picture: null
           ),
           (
             subject: 'did:ad:b',
@@ -1574,7 +1578,7 @@ void main() {
             className: 'Document',
             drive: 'did:ad:work',
             score: 1.0,
-            emoji: null
+            emoji: null, picture: null
           ),
         ],
       );
@@ -2113,14 +2117,14 @@ void main() {
           title: 'Trip plan',
           className: 'Document',
           openedAt: 5,
-          emoji: null
+          emoji: null, picture: null
         ),
         (
           subject: 'r2',
           title: 'Budget',
           className: 'Table',
           openedAt: 9,
-          emoji: null
+          emoji: null, picture: null
         ),
       ];
 
@@ -2205,7 +2209,7 @@ void main() {
               title: 'Res $i',
               className: 'Document',
               openedAt: i,
-              emoji: null
+              emoji: null, picture: null
             ),
         ];
         await tester
@@ -2410,7 +2414,7 @@ void main() {
       title: 'A doc',
       className: 'Document',
       openedAt: 1,
-      emoji: null
+      emoji: null, picture: null
     );
 
     Future<void> pumpHome(WidgetTester tester) async {
@@ -2606,7 +2610,7 @@ void main() {
       expect(groupChatsByAge([], now: now), isEmpty);
     });
 
-    testWidgets('the full chat list has the headings and no chat icons',
+    testWidgets('the full chat list has the headings and a chat icon per row',
         (tester) async {
       final now = DateTime.now();
       final api = FakeApi(chatList: [
@@ -2623,7 +2627,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Today'), findsOneWidget);
       expect(find.text('Earlier'), findsOneWidget);
-      expect(find.byIcon(Icons.chat_bubble_outline), findsNothing);
+      expect(find.byIcon(Icons.chat_bubble_outline), findsNWidgets(5));
     });
   });
 
@@ -2683,11 +2687,11 @@ void main() {
 
     test('lists each drive once, only those that are on the device', () {
       final shown = visibleDrives([
-        (subject: 'did:ad:AAA', name: 'Private', emoji: null),
-        (subject: 'atomic:AAA', name: 'Private', emoji: null),
-        (subject: 'did:ad:BBB', name: '', emoji: null),
-        (subject: 'did:ad:CCC', name: 'Team', emoji: null),
-        (subject: 'did:ad:DDD', name: '', emoji: null),
+        (subject: 'did:ad:AAA', name: 'Private', emoji: null, picture: null),
+        (subject: 'atomic:AAA', name: 'Private', emoji: null, picture: null),
+        (subject: 'did:ad:BBB', name: '', emoji: null, picture: null),
+        (subject: 'did:ad:CCC', name: 'Team', emoji: null, picture: null),
+        (subject: 'did:ad:DDD', name: '', emoji: null, picture: null),
       ], active: 'atomic:DDD');
       expect(shown.map((d) => d.subject),
           ['did:ad:AAA', 'did:ad:CCC', 'did:ad:DDD']);
@@ -2698,7 +2702,7 @@ void main() {
           '[{"subject":"did:ad:A","name":"Home","emoji":"🏠"},'
           '{"subject":"atomic:A","name":"Home"},'
           '{"subject":"did:ad:B","name":""}]');
-      expect(drives, [(subject: 'did:ad:A', name: 'Home', emoji: '🏠')]);
+      expect(drives, [(subject: 'did:ad:A', name: 'Home', emoji: '🏠', picture: null)]);
       final rows = AssistantJson.parseConversations(
           '[{"subject":"did:ad:c","title":"Ann","class_name":"conversation",'
           '"opened_at":3,"last_message":"hi"},{"subject":"did:ad:d"}]');
@@ -2848,7 +2852,7 @@ void main() {
           title: 'Opened doc',
           className: 'Document',
           openedAt: 1,
-          emoji: null
+          emoji: null, picture: null
         ),
       ]);
       await tester

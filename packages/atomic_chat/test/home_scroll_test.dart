@@ -10,7 +10,7 @@ RecentResource _r(String subject, String title) => (
       title: title,
       className: 'document-v2',
       openedAt: 1,
-      emoji: null,
+      emoji: null, picture: null,
     );
 
 Widget _shell(FakeApi api) => app(AppShell(
@@ -37,7 +37,7 @@ void main() {
     api = FakeApi(
       driveList: [
         for (var i = 0; i < 7; i++)
-          (subject: 'did:ad:d$i', name: 'Drive $i', emoji: null),
+          (subject: 'did:ad:d$i', name: 'Drive $i', emoji: null, picture: null),
       ],
       favoriteList: [for (var i = 0; i < 7; i++) _r('did:ad:f$i', 'Fav $i')],
     );

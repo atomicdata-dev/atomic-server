@@ -36,7 +36,7 @@ void main() {
           title: 'My own edit',
           className: 'Document',
           openedAt: _fiveMinAgo,
-          emoji: null
+          emoji: null, picture: null
         ),
       ],
       activityList: [
@@ -72,7 +72,7 @@ void main() {
         title: 'My own edit',
         className: 'Document',
         openedAt: _fiveMinAgo,
-        emoji: null
+        emoji: null, picture: null
       ),
     ]);
     await tester.pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));

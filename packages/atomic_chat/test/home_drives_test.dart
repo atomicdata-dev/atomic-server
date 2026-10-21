@@ -13,9 +13,9 @@ void main() {
   testWidgets('Home lists the drives in the order the host gives',
       (tester) async {
     final api = FakeApi(driveList: [
-      (subject: 'did:ad:current', name: 'Zebra', emoji: null),
-      (subject: 'did:ad:used', name: 'Mango', emoji: null),
-      (subject: 'did:ad:never-a', name: 'Apple', emoji: null),
+      (subject: 'did:ad:current', name: 'Zebra', emoji: null, picture: null),
+      (subject: 'did:ad:used', name: 'Mango', emoji: null, picture: null),
+      (subject: 'did:ad:never-a', name: 'Apple', emoji: null, picture: null),
     ]);
     await tester
         .pumpWidget(app(ChatsScreen(drive: 'did:ad:current', api: api)));
