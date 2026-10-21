@@ -401,6 +401,69 @@ pub async fn fetch_body(
     fetch_body_with_client(&client, url, content_type, client_agent, None).await
 }
 
+/// Bytes from a URL the system itself determined (a server it is connected
+/// to), with the content type the server gave.
+#[derive(Debug, Clone)]
+pub struct FetchedBytes {
+    pub bytes: Vec<u8>,
+    pub content_type: Option<String>,
+}
+
+/// Fetches raw bytes from a URL the system determined, signing the request
+/// with the agent when the URL is on the agent's own server (like
+/// [`fetch_body`]). The body is read as a stream and refused as soon as it
+/// passes `max_bytes`. Errors name the HTTP status (`Status: 403`) so a caller
+/// can log why a file did not come.
+#[tracing::instrument(skip_all)]
+pub async fn fetch_bytes(
+    url: &str,
+    max_bytes: usize,
+    client_agent: Option<&Agent>,
+) -> AtomicResult<FetchedBytes> {
+    if !url.starts_with("http") {
+        return Err(format!("Could not fetch url '{}', must start with http.", url).into());
+    }
+    let client = http_client_builder()
+        .build()
+        .map_err(|e| format!("Could not build HTTP client: {}", e))?;
+    let mut req = client.get(url);
+    if let Some(agent) = client_agent {
+        if should_sign_request(url, agent) {
+            for (key, value) in get_authentication_headers(url, agent)? {
+                req = req.header(key, value);
+            }
+        }
+    }
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| format!("Error when fetching {}: {}", url, e))?;
+    let status = resp.status().as_u16();
+    if status != 200 {
+        let message = format!("Could not fetch url '{}'. Status: {}", url, status);
+        return Err(if status == 404 || status == 410 {
+            AtomicError {
+                message,
+                error_type: AtomicErrorType::NotFoundError,
+                subject: Some(url.to_string()),
+            }
+        } else {
+            message.into()
+        });
+    }
+    let content_type = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.split(';').next().unwrap_or(v).trim().to_ascii_lowercase());
+    let bytes = read_body_bounded(resp, url, max_bytes).await?;
+    crate::metrics::external_fetch();
+    Ok(FetchedBytes {
+        bytes,
+        content_type,
+    })
+}
+
 /// Largest body `fetch_body_untrusted` will read: a caller-supplied URL
 /// must not be able to make the server buffer an arbitrarily large response.
 pub const UNTRUSTED_BODY_MAX_BYTES: usize = 10 * 1024 * 1024;

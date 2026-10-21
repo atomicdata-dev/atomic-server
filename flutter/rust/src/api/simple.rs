@@ -477,6 +477,43 @@ pub async fn read_file_bytes(file: String) -> Result<Option<Vec<u8>>, String> {
         .map_err(err)
 }
 
+/// The bytes of a File resource (a profile picture): from this device when it
+/// holds them, else downloaded from the connected server the way the web app
+/// does (signed by the agent, checked against the blob's hash, an image of at
+/// most 16 MB) and kept in the store. Fails with the reason (HTTP status
+/// included) when they cannot be had.
+pub async fn fetch_file_bytes(file: String) -> Result<Vec<u8>, String> {
+    let origins: Vec<String> = state::connected_server().into_iter().collect();
+    atomic_lib::host::own_profile::fetch_file_bytes(db()?, &file, &origins)
+        .await
+        .map_err(err)
+}
+
+/// Keep a picked picture as a File in the active drive (bytes in the local
+/// store, the File queued for sync like the web app's upload) and return the
+/// File's subject, to pass as `icon` to `set_agent_profile`.
+pub async fn upload_agent_picture(
+    filename: String,
+    mimetype: String,
+    bytes: Vec<u8>,
+) -> Result<String, String> {
+    let drive = db()?
+        .get_active_drive()
+        .ok_or("No workspace to keep the picture in")?;
+    let origin = state::connected_server();
+    atomic_lib::host::own_profile::upload_own_picture(
+        &node()?,
+        crate::host::pusher().as_ref(),
+        &drive,
+        origin.as_deref(),
+        &filename,
+        &mimetype,
+        &bytes,
+    )
+    .await
+    .map_err(err)
+}
+
 /// Save this device's agent's profile: a commit by the agent on its own
 /// resource, stored here and synced like any other edit. An empty
 /// `description` removes it; `icon` is the subject of a File for the picture
