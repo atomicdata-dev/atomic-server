@@ -64,9 +64,10 @@ lookup by agent stays on proven `AGENT_LINKS` only.
 
 - [ ] atomic-saas: `app_key` on device-link request, returned by code lookup;
       deposit endpoint; poll returns `sealed_identity`; tests.
-- [ ] data-browser: `/app/send-identity` route reusing restore UI + sealing; vitest
+- [x] data-browser: `/app/send-identity` route reusing restore UI + sealing; vitest
       for the seal against a fixed vector.
-- [ ] atomic_flutter: X25519 + open + verify (`cryptography` package), same vector.
-- [ ] Flutter login: use it for "Sign in with atomic.place"; keep
+- [x] atomic_flutter: X25519 + open + verify (`cryptography` package), same vector.
+- [x] Flutter login: use it for "Sign in with atomic.place"; keep
       `AtomicNoAssistedRecovery` paste fallback for old portals.
-- [ ] Shared test vector in `planning/` or a fixtures file used by both sides.
+- [x] Shared test vector: `packages/atomic_flutter/test/fixtures/identity_handback_vector.json`,
+      read by the vitest `identityHandback.test.ts` and the Dart `identity_handback_test.dart`.

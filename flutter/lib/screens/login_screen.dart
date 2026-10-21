@@ -20,7 +20,17 @@ class LoginScreen extends StatefulWidget {
   final Future<shared.AtomicRecoveredIdentity?> Function(BuildContext context)?
       accountSignIn;
 
-  const LoginScreen({super.key, required this.onLoggedIn, this.accountSignIn});
+  /// The account client for the default sign-in, and how it opens a page in
+  /// the system browser. Replaceable in tests.
+  final shared.AtomicAccountClient Function()? accountClient;
+  final Future<void> Function(Uri url)? openBrowser;
+
+  const LoginScreen(
+      {super.key,
+      required this.onLoggedIn,
+      this.accountSignIn,
+      this.accountClient,
+      this.openBrowser});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -302,7 +312,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<shared.AtomicRecoveredIdentity?> _defaultAccountSignIn(
       BuildContext context) async {
-    final client = shared.AtomicAccountClient(AccountStore.defaultPortal);
+    final client = widget.accountClient?.call() ??
+        shared.AtomicAccountClient(AccountStore.defaultPortal);
     try {
       final linked = await showDialog<bool>(
         context: context,
@@ -311,14 +322,21 @@ class _LoginScreenState extends State<LoginScreen> {
           client: client,
           deviceName: 'atomic.place',
           save: AccountStore.save,
-          openInBrowser: (url) async {
-            await launchUrl(url, mode: LaunchMode.externalApplication);
-          },
+          // The browser unlocks the backup, which it can for passkey and
+          // recovery-code backups too, and sends the secret back sealed.
+          handback: true,
+          openInBrowser: widget.openBrowser ??
+              (url) async {
+                await launchUrl(url, mode: LaunchMode.externalApplication);
+              },
         ),
       );
       if (linked != true) return null;
       try {
-        return await client.recoverIdentity();
+        // An older portal approves without a sealed identity: fall back to
+        // the server-assisted backup.
+        return client.takeHandedBackIdentity() ??
+            await client.recoverIdentity();
       } catch (_) {
         // Without the identity the account session is of no use here, and
         // keeping it made a failed sign-in look half done.

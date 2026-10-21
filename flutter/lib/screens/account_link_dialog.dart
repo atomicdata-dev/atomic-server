@@ -19,12 +19,17 @@ class AccountLinkDialog extends StatefulWidget {
   /// emailed link, a passkey) can finish; an in-app page cannot receive it.
   final Future<void> Function(Uri url)? openInBrowser;
 
+  /// Ask the browser to send the account's identity to this app instead of
+  /// only approving the device: the page is the web app's `send-identity`.
+  final bool handback;
+
   const AccountLinkDialog({
     super.key,
     required this.client,
     required this.deviceName,
     required this.save,
     this.openInBrowser,
+    this.handback = false,
   });
 
   @override
@@ -58,7 +63,8 @@ class _AccountLinkDialogState extends State<AccountLinkDialog> {
       _error = null;
     });
     try {
-      final request = await widget.client.requestLink(widget.deviceName);
+      final request = await widget.client
+          .requestLink(widget.deviceName, handback: widget.handback);
       if (!mounted || generation != _generation) return;
       setState(() => _request = request);
       _timer = Timer(request.interval, () => _poll(request, generation));
@@ -94,6 +100,11 @@ class _AccountLinkDialogState extends State<AccountLinkDialog> {
     }
   }
 
+  Uri _url(shared.AtomicDeviceLink request) => request.wantsIdentity
+      ? request.sendIdentityUrl(
+          shared.AtomicAccountClient.appOrigin(widget.client.origin))
+      : request.approvalUrl;
+
   /// Not faster than every three seconds: the code does not get approved
   /// sooner for being asked more often.
   Duration _every(shared.AtomicDeviceLink request) =>
@@ -124,8 +135,11 @@ class _AccountLinkDialogState extends State<AccountLinkDialog> {
               if (request == null && _error == null)
                 const LinearProgressIndicator()
               else if (request != null) ...[
-                Text('Open ${widget.client.origin.host}/link on a device where '
-                    'you are signed in, and enter this code.'),
+                Text(request.wantsIdentity
+                    ? 'Open the page in your browser and check that it shows '
+                        'this code.'
+                    : 'Open ${widget.client.origin.host}/link on a device where '
+                        'you are signed in, and enter this code.'),
                 const SizedBox(height: 16),
                 Center(
                   child: GestureDetector(
@@ -152,7 +166,7 @@ class _AccountLinkDialogState extends State<AccountLinkDialog> {
                   OutlinedButton.icon(
                     icon: const Icon(Icons.open_in_browser, size: 18),
                     label: const Text('Open in your browser'),
-                    onPressed: () => widget.openInBrowser!(request.approvalUrl),
+                    onPressed: () => widget.openInBrowser!(_url(request)),
                   ),
                 ],
               ],

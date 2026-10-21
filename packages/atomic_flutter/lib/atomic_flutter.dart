@@ -5,6 +5,7 @@ export 'src/server_info.dart';
 export 'src/server_url.dart';
 
 export 'src/account/client.dart';
+export 'src/account/identity_handback.dart';
 export 'src/account/link_dialog.dart';
 
 export 'src/theme.dart';

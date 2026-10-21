@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:cryptography/cryptography.dart';
 import 'package:http/http.dart' as http;
+import 'identity_handback.dart';
 
 /// Explicit, provider-neutral account linking. Constructing this client never
 /// makes a network request. Credentials stay bound to one HTTPS origin.
@@ -172,10 +173,40 @@ class AtomicAccountClient {
     return value;
   }
 
-  Future<AtomicDeviceLink> requestLink(String deviceName) async {
-    final data = _object(await _request('POST', 'device-link',
-        authenticated: false, body: {'device_name': deviceName}));
-    return AtomicDeviceLink.fromJson(data, origin);
+  /// Start a link. With [handback] the request carries a fresh in-memory
+  /// X25519 public key (`app_key`), so the browser can seal the identity to
+  /// this app (see [AtomicIdentityHandback]); [pollLink] then opens it.
+  Future<AtomicDeviceLink> requestLink(String deviceName,
+      {bool handback = false}) async {
+    final key = handback ? await AtomicIdentityHandback.create() : null;
+    final data = _object(
+        await _request('POST', 'device-link', authenticated: false, body: {
+      'device_name': deviceName,
+      if (key != null) 'app_key': key.appKey,
+    }));
+    return AtomicDeviceLink.fromJson(data, origin, handback: key);
+  }
+
+  /// Where the web app lives for a portal: `app.` before the portal's host,
+  /// as `https://app.atomic.place` belongs to `https://atomic.place`.
+  static Uri appOrigin(Uri portal) {
+    final host = portal.host;
+    return portal.replace(
+        host: host.startsWith('app.') ? host : 'app.$host',
+        path: '',
+        query: null,
+        fragment: null);
+  }
+
+  AtomicRecoveredIdentity? _handedBack;
+
+  /// The identity the browser sealed to this app, once, after [pollLink]
+  /// reported approval; null when the portal approved without one (an older
+  /// portal), in which case [recoverIdentity] is the way on.
+  AtomicRecoveredIdentity? takeHandedBackIdentity() {
+    final identity = _handedBack;
+    _handedBack = null;
+    return identity;
   }
 
   Future<AtomicLinkProgress> pollLink(AtomicDeviceLink request) async {
@@ -196,6 +227,26 @@ class AtomicAccountClient {
         throw const FormatException('Missing account session');
       }
       _token = token;
+      final sealed = body['sealed_identity'];
+      final key = request._handback;
+      if (key != null && sealed is Map) {
+        final opened = await key.openVerified(
+            epk: sealed['epk'] as String,
+            nonce: sealed['nonce'] as String,
+            ciphertext: sealed['ciphertext'] as String);
+        var address = '';
+        try {
+          final me = await account();
+          address = '${me['address'] ?? me['email'] ?? ''}';
+        } catch (_) {
+          // Only a label; the identity is already verified.
+        }
+        _handedBack = AtomicRecoveredIdentity(
+            subject: opened.subject,
+            secret: opened.secret,
+            address: address,
+            drive: opened.drive);
+      }
       return AtomicLinkProgress.approved;
     }
     if (body['state'] != 'pending') {
@@ -522,8 +573,10 @@ class AtomicNoAssistedRecovery implements Exception {
 }
 
 class AtomicDeviceLink {
-  AtomicDeviceLink.fromJson(Map<String, dynamic> data, this.origin)
-      : _deviceCode = data['device_code'] as String,
+  AtomicDeviceLink.fromJson(Map<String, dynamic> data, this.origin,
+      {AtomicIdentityHandback? handback})
+      : _handback = handback,
+        _deviceCode = data['device_code'] as String,
         userCode = data['user_code'] as String,
         interval = Duration(seconds: (data['interval'] as int).clamp(1, 3600)),
         expiresAt = DateTime.now().add(
@@ -536,8 +589,17 @@ class AtomicDeviceLink {
   final String _deviceCode, userCode;
   final Duration interval;
   final DateTime expiresAt;
+  final AtomicIdentityHandback? _handback;
+
+  /// Whether the browser is asked to hand the identity back.
+  bool get wantsIdentity => _handback != null;
   Uri get approvalUrl =>
       origin.replace(path: '/link', queryParameters: {'code': userCode});
+
+  /// The web app page that sends the identity to this app. [appOrigin] is
+  /// [AtomicAccountClient.appOrigin] of the portal.
+  Uri sendIdentityUrl(Uri appOrigin) => appOrigin
+      .replace(path: '/app/send-identity', queryParameters: {'code': userCode});
 }
 
 /// Carries a credential: deliberately has no Debug/toString serialization.
