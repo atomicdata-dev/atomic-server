@@ -322,6 +322,26 @@ pub(crate) fn parse_json<T: serde::de::DeserializeOwned>(body: &[u8]) -> AtomicS
 /// actix's `JsonConfig` allowed before (2 MiB).
 pub(crate) const JSON_BODY_LIMIT: usize = 2_097_152;
 
+/// [get_client_agent] for a request the client signed over its full URL
+/// (origin + path + query), which is rebuilt here to match the signature.
+pub async fn get_client_agent_for_signed_url(
+    req: &actix_web::HttpRequest,
+    appstate: &AppState,
+) -> AtomicServerResult<ForAgent> {
+    let origin = crate::context::RequestContext::new(req, appstate).origin;
+    let full_url = format!("{}{}", origin, req.uri());
+    get_client_agent(req.headers(), appstate, &full_url).await
+}
+
+/// `Cache-Control` for responses that must never be cached or replayed. Every
+/// visitor-facing form response carries it. The routes answer for a
+/// form whose state the owner changes at will (publish, schedule, unpublish),
+/// and a `410 Gone` is cacheable by default: Chromium kept serving a cached
+/// "not accepting responses" for the definition of a form that had since been
+/// published — the builder said published, visitors kept the old answer, and
+/// nothing on the wire explained why.
+pub const NO_STORE: &str = "no-store, no-cache, must-revalidate, private";
+
 /// [get_client_agent] for a handler that knows the body it acts on, so it
 /// also accepts a version 2 request signature (`x-atomic-signature-version:
 /// 2`, ontola/atomic-plugins#54), which covers the method and that body.

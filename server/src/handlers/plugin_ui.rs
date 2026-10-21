@@ -8,9 +8,8 @@ use base64::{engine::general_purpose, Engine as _};
 
 use crate::{
     appstate::AppState,
-    context::RequestContext,
     errors::{AtomicServerError, AtomicServerResult},
-    helpers::get_client_agent,
+    helpers::get_client_agent_for_signed_url,
 };
 
 #[derive(serde::Deserialize, Debug)]
@@ -380,9 +379,7 @@ pub async fn handle_plugin_ui(
     // as the same agent that fetches the page — signed headers or the
     // session cookie, like any other handler.
     let store = &appstate.store;
-    let origin = RequestContext::new(&req, &appstate).origin;
-    let full_url = format!("{}{}", origin, req.uri());
-    let for_agent = get_client_agent(req.headers(), &appstate, &full_url).await?;
+    let for_agent = get_client_agent_for_signed_url(&req, &appstate).await?;
     let Some(meta) = store.get_plugin_meta(&PluginMetaKey::new(drive_subject, namespace, name))?
     else {
         return Ok(HttpResponse::NotFound().body("Plugin UI file not found"));
@@ -532,9 +529,7 @@ pub async fn handle_plugin_list(
     let store = &appstate.store;
     let drive_subject = &query.drive;
 
-    let origin = RequestContext::new(&req, &appstate).origin;
-    let full_url = format!("{}{}", origin, req.uri());
-    let for_agent = get_client_agent(req.headers(), &appstate, &full_url).await?;
+    let for_agent = get_client_agent_for_signed_url(&req, &appstate).await?;
 
     let plugins = store.get_class_extenders_on_drive(drive_subject);
     let mut plugin_list: Vec<UIPluginListItem> = vec![];
