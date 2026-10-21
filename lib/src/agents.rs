@@ -12,7 +12,8 @@ struct DecodedSecret {
     #[serde(rename = "privateKey")]
     private_key: String,
     subject: crate::Subject,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The web app (`@tomic/lib` `decodeSecret`) spells it `initialDrive`.
+    #[serde(skip_serializing_if = "Option::is_none", alias = "initialDrive")]
     initial_drive: Option<crate::Subject>,
 }
 
@@ -163,8 +164,20 @@ impl Agent {
     }
 
     pub fn from_secret(secret_b64: &str) -> AtomicResult<Agent> {
-        let agent_bytes = decode_base64(secret_b64)?;
-        let decoded: DecodedSecret = serde_json::from_slice(&agent_bytes)?;
+        let agent_bytes = decode_base64(secret_b64.trim())?;
+        let decoded: DecodedSecret = serde_json::from_slice(&agent_bytes)
+            .map_err(|e| format!("Invalid secret: not a whole secret ({e})"))?;
+        // `generate_public_key` panics on a key that is not 32 bytes; a pasted
+        // secret is input, and a cut-off key must be an error, not a crash.
+        let key_len = decode_base64(&decoded.private_key)
+            .map_err(|_| "Invalid secret: its private key is not valid base64")?
+            .len();
+        if key_len != 32 {
+            return Err(format!(
+                "Invalid secret: its private key is {key_len} bytes, an Ed25519 key is 32"
+            )
+            .into());
+        }
         // Migrate legacy HTTP agent subjects (https://server/agents/{pubkey}) to did:ad:agent:{pubkey}
         let subject = migrate_legacy_agent_subject(decoded.subject.as_str());
         let agent = Agent {
@@ -450,6 +463,30 @@ mod test {
             agent.subject,
             "atomic:agent:RqPwpgHv+PK7Pnz/dVab8hmHjYnvTL1YrlVa6L9G9Zg="
         );
+    }
+
+    #[test]
+    fn a_damaged_secret_is_an_error_not_a_panic() {
+        use base64::Engine;
+        let b64 = |json: &str| base64::engine::general_purpose::STANDARD.encode(json);
+        // Private key cut short.
+        let short = b64(r#"{"privateKey":"SMyxRgF7QhiC7C506qXSUKfE","subject":"did:ad:agent:x"}"#);
+        let e = Agent::from_secret(&short).unwrap_err().to_string();
+        assert!(e.contains("Invalid secret"), "{e}");
+        // Not JSON at all.
+        let e = Agent::from_secret(&b64("hello")).unwrap_err().to_string();
+        assert!(e.contains("Invalid secret"), "{e}");
+        // Not base64.
+        assert!(Agent::from_secret("not a secret!").is_err());
+    }
+
+    #[test]
+    fn reads_the_web_apps_initial_drive_spelling() {
+        use base64::Engine;
+        let json = r#"{"privateKey":"SMyxRgF7QhiC7C506qXSUKfE+SKAtCdNFu5XeTjzadA=","subject":"did:ad:agent:RqPwpgHv+PK7Pnz/dVab8hmHjYnvTL1YrlVa6L9G9Zg=","initialDrive":"did:ad:drive1"}"#;
+        let secret = base64::engine::general_purpose::STANDARD.encode(json);
+        let agent = Agent::from_secret(&format!("  {secret}\n")).unwrap();
+        assert_eq!(agent.initial_drive.unwrap().to_string(), "did:ad:drive1");
     }
 
     #[test]
