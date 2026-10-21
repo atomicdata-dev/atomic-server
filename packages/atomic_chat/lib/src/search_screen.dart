@@ -889,53 +889,79 @@ class _SearchScreenState extends State<SearchScreen> {
   late final Widget _field = RepaintBoundary(
     child: SafeArea(
       top: false,
-      child: Padding(
-        // The palette: the same 12 dp above and below. Both: the field, the
-        // chip and the result rows share one 16 dp gutter at both sides.
-        padding: widget.palette
-            ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
-            : const EdgeInsets.fromLTRB(16, 4, 16, 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Builder(builder: (context) {
-                final c = context.appColors;
-                // Only the hint follows the kind: typing rebuilds no field.
-                return ValueListenableBuilder<SearchKind>(
-                    valueListenable: _hintKind,
-                    builder: (context, kind, _) => TextField(
-                          controller: _text,
-                          focusNode: _focus,
-                          autofocus: true,
-                          textInputAction: TextInputAction.search,
-                          // Keeps the keyboard (and focus) after Enter.
-                          onEditingComplete: () {},
-                          onSubmitted: (_) => _openBest(),
-                          onChanged: _changed,
-                          decoration: InputDecoration(
-                            hintText: kind.hint,
-                            filled: true,
-                            fillColor: c.bg1,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(9),
-                              borderSide: BorderSide.none,
+      child: Builder(builder: (context) {
+        final back = !widget.palette && !_inSidebar(context);
+        return Padding(
+          // The palette: the same 12 dp above and below. Both: the field, the
+          // chip and the result rows share one 16 dp gutter at both sides.
+          // The phone's back arrow takes x 4..52 (its icon sits at 16..40).
+          padding: widget.palette
+              ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
+              : EdgeInsets.fromLTRB(back ? 4 : 16, 4, 16, 12),
+          child: Row(
+            children: [
+              if (back)
+                Semantics(
+                  label: 'Back',
+                  excludeSemantics: true,
+                  button: true,
+                  child: IconButton(
+                    key: const Key('search-back'),
+                    icon: const Icon(Icons.arrow_back, size: 24),
+                    tooltip: 'Back',
+                    constraints:
+                        const BoxConstraints(minWidth: 48, minHeight: 48),
+                    padding: const EdgeInsets.all(12),
+                    onPressed: () => Navigator.of(context).maybePop(),
+                  ),
+                ),
+              Expanded(
+                child: Builder(builder: (context) {
+                  final c = context.appColors;
+                  // Only the hint follows the kind: typing rebuilds no field.
+                  return ValueListenableBuilder<SearchKind>(
+                      valueListenable: _hintKind,
+                      builder: (context, kind, _) => TextField(
+                            controller: _text,
+                            focusNode: _focus,
+                            autofocus: true,
+                            textInputAction: TextInputAction.search,
+                            // Keeps the keyboard (and focus) after Enter.
+                            onEditingComplete: () {},
+                            onSubmitted: (_) => _openBest(),
+                            onChanged: _changed,
+                            decoration: InputDecoration(
+                              hintText: kind.hint,
+                              filled: true,
+                              fillColor: c.bg1,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(9),
+                                borderSide: BorderSide.none,
+                              ),
+                              suffixIconConstraints: const BoxConstraints(
+                                  minWidth: 48, minHeight: 48),
+                              suffixIcon: _clearButton(c),
                             ),
-                            suffixIconConstraints: const BoxConstraints(
-                                minWidth: 48, minHeight: 48),
-                            suffixIcon: _clearButton(c),
-                          ),
-                        ));
-              }),
-            ),
-            ListenableBuilder(
-              listenable: _model,
-              builder: (context, _) => _scopeLabel(context),
-            ),
-          ],
-        ),
-      ),
+                          ));
+                }),
+              ),
+              ListenableBuilder(
+                listenable: _model,
+                builder: (context, _) => _scopeLabel(context),
+              ),
+            ],
+          ),
+        );
+      }),
     ),
   );
+
+  /// Next to the pages in the split layout, with no route to pop: the bar's
+  /// back goes to the home's list.
+  bool _inSidebar(BuildContext context) =>
+      _shell != null &&
+      _shell!.split &&
+      !(ModalRoute.of(context)?.canPop ?? false);
 
   Widget _results(BuildContext context) {
     final c = context.appColors;
@@ -1022,20 +1048,19 @@ class _SearchScreenState extends State<SearchScreen> {
         ]),
       );
     }
+    final sidebar = _inSidebar(context);
     return Scaffold(
       backgroundColor: c.bgBody,
-      appBar: AppTopBar(
-        title: 'Search',
-        // In the sidebar next to the pages (no route to pop): back to the
-        // home's list.
-        leading: _shell != null &&
-                _shell!.split &&
-                !(ModalRoute.of(context)?.canPop ?? false)
-            ? BackButton(onPressed: () => _shell!.showList(ShellPage.home))
-            : null,
-      ),
+      // The phone has no bar: its back arrow sits left of the field.
+      appBar: sidebar
+          ? AppTopBar(
+              title: 'Search',
+              leading:
+                  BackButton(onPressed: () => _shell!.showList(ShellPage.home)),
+            )
+          : null,
       body: SafeArea(
-        top: false,
+        top: !sidebar,
         bottom: false,
         child: ListAndField(
           minHeight: _fieldRoom,

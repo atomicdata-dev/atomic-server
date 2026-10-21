@@ -15,7 +15,8 @@ SearchHit _hit(String s, String t) => (
       className: 'document-v2',
       drive: 'did:ad:drive',
       score: 1.0,
-      emoji: null, picture: null
+      emoji: null,
+      picture: null
     );
 
 Future<void> _pump(WidgetTester tester, Size size,
@@ -47,6 +48,7 @@ Future<void> _pump(WidgetTester tester, Size size,
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
   clearTests();
+  backTests();
 
   for (final w in [360.0, 393.0, 412.0]) {
     for (final scale in [1.0, 1.3]) {
@@ -92,10 +94,20 @@ void main() {
           print(
               'w=$w s=$scale scope=$scope field=${field.left}..${field.right} '
               'top=${top.left}..${top.right} icon.left=${icon.left}');
-          expect(field.left, closeTo(16, 0.5));
+          final back = find.byKey(const Key('search-back'));
+          expect(back, findsOneWidget);
+          expect(find.byType(AppBar), findsNothing);
+          final arrow = tester.getRect(back);
+          final arrowIcon = tester.getRect(find.byIcon(Icons.arrow_back));
+          expect(arrow.size, const Size(48, 48));
+          expect(arrow.left, closeTo(4, 0.5));
+          expect(arrowIcon.left, closeTo(16, 0.5));
+          expect(arrow.center.dy, closeTo(field.center.dy, 0.5));
+          expect(arrow.right, lessThanOrEqualTo(field.left + 0.5));
+          expect(field.left, closeTo(52, 0.5));
+          expect(icon.left, closeTo(arrowIcon.left, 0.5));
           expect(top.left, closeTo(0, 0.5)); // full-width highlight
           expect(top.right, closeTo(w, 0.5));
-          expect(icon.left, closeTo(field.left, 0.5));
           if (scope) {
             final chip = tester.getRect(find.byKey(const Key('search-scope')));
             expect(chip.right, closeTo(w - 16, 0.5));
@@ -107,6 +119,36 @@ void main() {
       }
     }
   }
+}
+
+void backTests() {
+  testWidgets('back arrow pops the route', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(393, 800);
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(app(Builder(
+        builder: (context) => TextButton(
+            onPressed: () => Navigator.of(context).push(SearchScreen.route(
+                drive: 'did:ad:drive', api: FakeApi(hits: const []))),
+            child: const Text('go')))));
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SearchScreen), findsOneWidget);
+    expect(find.byType(AppBar), findsNothing);
+    expect(find.bySemanticsLabel('Back'), findsWidgets);
+    await tester.tap(find.byKey(const Key('search-back')));
+    await tester.pumpAndSettle();
+    expect(find.byType(SearchScreen), findsNothing);
+  });
+  testWidgets('palette has no back arrow', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1000, 800);
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(app(SearchScreen(
+        drive: 'did:ad:drive', palette: true, api: FakeApi(hits: const []))));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('search-back')), findsNothing);
+  });
 }
 
 void clearTests() {
