@@ -13224,3 +13224,11 @@ msgstr "The next backup from that browser or app adds them"
 #: src/components/ConnectDrivePicker.tsx
 msgid "All drives"
 msgstr "All drives"
+
+#: src/routes/SyncRoute.tsx
+msgid "Cloud Server isn’t on for this drive. This server only accepts it for a short while; after that it stops syncing. Set up Cloud Server to keep it here, or turn off sync to keep it on this device only."
+msgstr "Cloud Server isn’t on for this drive. This server only accepts it for a short while; after that it stops syncing. Set up Cloud Server to keep it here, or turn off sync to keep it on this device only."
+
+#: src/routes/SyncRoute.tsx
+msgid "Not hosted yet"
+msgstr "Not hosted yet"

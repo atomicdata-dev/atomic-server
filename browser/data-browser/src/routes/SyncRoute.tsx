@@ -295,6 +295,17 @@ function ServerCard({
     (refusedByServer ||
       (isCloudSyncAvailable(managedInfo) && cloudEnrolled === false));
   const isCloud = isActive && cloudHosted;
+  // A managed node admits a drive it does not host for a short bootstrap window,
+  // so first sync can finish while the enrollment propagates. In that window
+  // the connection looks healthy ("In sync") for a drive the node will refuse
+  // minutes later. The node says so itself via `/drive-usage`.
+  const hostingPending =
+    isActive &&
+    !isCloud &&
+    !refusedByServer &&
+    managedInfo.managed &&
+    cloudEnrolled === false &&
+    nodeUsage?.enrolled === false;
   const serverHostname = status.serverUrl
     ? new URL(status.serverUrl).hostname
     : undefined;
@@ -397,12 +408,14 @@ function ServerCard({
           ? { tone: 'unknown', label: 'Drive sync off' }
           : refusedByServer
             ? { tone: 'offline', label: 'Not hosted here' }
-            : isActive
-              ? {
-                  tone: serverStatus,
-                  label: serverStatusLabel(serverStatus, !!nodeUsage),
-                }
-              : { tone: 'unknown', label: 'Not connected' }
+            : hostingPending
+              ? { tone: 'unsynced', label: 'Not hosted yet' }
+              : isActive
+                ? {
+                    tone: serverStatus,
+                    label: serverStatusLabel(serverStatus, !!nodeUsage),
+                  }
+                : { tone: 'unknown', label: 'Not connected' }
       }
       controls={
         isSelectedServer ? (
@@ -438,7 +451,9 @@ function ServerCard({
         isActive
           ? isCloud
             ? serverHostname
-            : ['Always-on · in use', syncedFact].filter(Boolean).join(' · ')
+            : ['Always-on · in use', hostingPending ? null : syncedFact]
+                .filter(Boolean)
+                .join(' · ')
           : 'Always-on device'
       }
       facts={isActive ? facts : undefined}
@@ -465,6 +480,16 @@ function ServerCard({
             This server doesn’t host this drive, so it refuses its changes. Set
             up Cloud Server to sync it here, or turn off sync to keep it on this
             device only.
+          </span>
+        </ConnError>
+      )}
+      {hostingPending && (
+        <ConnError role='status'>
+          <FaCircleExclamation aria-hidden />
+          <span>
+            Cloud Server isn’t on for this drive. This server only accepts it
+            for a short while; after that it stops syncing. Set up Cloud Server
+            to keep it here, or turn off sync to keep it on this device only.
           </span>
         </ConnError>
       )}

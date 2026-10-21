@@ -13211,3 +13211,11 @@ msgstr ""
 #: src/components/ConnectDrivePicker.tsx
 msgid "All drives"
 msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Cloud Server isn’t on for this drive. This server only accepts it for a short while; after that it stops syncing. Set up Cloud Server to keep it here, or turn off sync to keep it on this device only."
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Not hosted yet"
+msgstr ""
