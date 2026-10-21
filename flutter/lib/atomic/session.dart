@@ -17,6 +17,10 @@ class AtomicSession {
 
   static const _secure = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    // The data protection keychain needs a keychain-access-groups entitlement,
+    // which an ad-hoc signed build can't carry (-34018). The login keychain
+    // works without one.
+    mOptions: MacOsOptions(useDataProtectionKeyChain: false),
   );
 
   static Future<void> save({
