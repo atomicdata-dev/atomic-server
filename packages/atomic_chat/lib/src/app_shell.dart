@@ -1370,9 +1370,8 @@ class _PaneHandleState extends State<_PaneHandle> {
                                 color: c.barSurface,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .outlineVariant),
+                                    color: _PaneDivider.colorFor(c.bgBody,
+                                        active: false)),
                               ),
                               child: Icon(
                                 Icons.chevron_left,
@@ -1562,10 +1561,19 @@ class _PaneDivider extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => ColoredBox(
-      key: const Key('pane-divider'),
-      color: colorFor(context.appColors.bgBody, active: active),
-      child: SizedBox(width: shown ? 1 : 0));
+  Widget build(BuildContext context) {
+    final page = context.appColors.bgBody;
+    // The line is a translucent ink: drawn over nothing it shows what is
+    // behind the window (black), a solid black line in light mode. So it
+    // lies on an opaque strip in the page colour, and only the ink is quiet.
+    return ColoredBox(
+      color: page,
+      child: ColoredBox(
+          key: const Key('pane-divider'),
+          color: colorFor(page, active: active),
+          child: SizedBox(width: shown ? 1 : 0)),
+    );
+  }
 }
 
 /// The pages' region ends above the bar, but the keyboard is drawn over the

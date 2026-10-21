@@ -482,11 +482,15 @@ void main() {
     await _settle(tester);
     await tapNewChat(tester);
     await _settle(tester);
+    // The row keeps the readable width; its strip and hairline run edge to
+    // edge (see full_bleed_lines_test).
     final composer = tester.getRect(find
         .descendant(
-            of: find.byType(ListAndField), matching: find.byType(Column))
+            of: find.byType(ReadableWidth), matching: find.byType(SizedBox))
         .first);
     expect(composer.width, ReadableWidth.maxWidth);
+    final strip = tester.getRect(find.byType(ListAndField));
+    expect(strip.width, greaterThan(ReadableWidth.maxWidth));
     await _done(tester);
   });
 

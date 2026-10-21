@@ -203,7 +203,10 @@ class _ConversationScreenState extends State<ConversationScreen>
                   subtitle: _subtitle,
                 ),
               ),
-              body: ListAndField(list: _list(c), field: _composer(c)),
+              body: ListAndField(
+                  fullWidthField: true,
+                  list: _list(c),
+                  field: _composer(c)),
             )));
   }
 

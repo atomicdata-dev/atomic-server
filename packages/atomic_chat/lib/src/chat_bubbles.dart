@@ -2,6 +2,7 @@ import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt;
 import 'package:flutter/material.dart';
 
 import 'chat_text_styles.dart';
+import 'list_and_field.dart' show ReadableWidth;
 import 'row_leading.dart';
 
 /// "14:05": the time of a message inside its bubble (the day is on the
@@ -237,7 +238,10 @@ class ChatComposerFrame extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Padding(padding: const EdgeInsets.all(8), child: child),
+        // The strip and its hairline run edge to edge; the row keeps the
+        // readable width inside.
+        child: ReadableWidth(
+            child: Padding(padding: const EdgeInsets.all(8), child: child)),
       ),
     );
   }

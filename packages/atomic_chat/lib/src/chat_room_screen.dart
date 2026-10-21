@@ -278,7 +278,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                   ),
                 ],
               ),
-              body: ListAndField(list: _list(c), field: _composer(c)),
+              body: ListAndField(
+                  fullWidthField: true,
+                  list: _list(c),
+                  field: _composer(c)),
             )));
   }
 

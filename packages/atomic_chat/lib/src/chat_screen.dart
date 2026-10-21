@@ -1293,7 +1293,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   icon: Icons.auto_awesome_outlined,
                 ),
               ),
-              body: ListAndField(list: _list(c), field: _composer(c)),
+              body: ListAndField(
+                  fullWidthField: true,
+                  list: _list(c),
+                  field: _composer(c)),
             )));
   }
 
