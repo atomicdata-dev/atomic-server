@@ -52,7 +52,7 @@ pub(crate) async fn push_local_write(
     if let Some(bytes) = &response.commit.loro_update {
         if !bytes.is_empty() {
             let subject_key = response.commit.subject.pure_id();
-            atomic_lib::sync::peer::broadcast_live_update(&subject_key, bytes);
+            atomic_lib::sync::peer::broadcast_live_update(store, &subject_key, bytes);
         }
     }
     let ws_ok = ws_sync::drain_outbox(store).await;
