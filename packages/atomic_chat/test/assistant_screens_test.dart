@@ -550,6 +550,7 @@ void main() {
               subject: 'f1',
               title: 'A star',
               className: 'Document',
+              classUrl: '',
               openedAt: 1,
               emoji: null,
               picture: null
@@ -762,6 +763,7 @@ void main() {
             subject: 'r1',
             title: 'A doc',
             className: 'Document',
+            classUrl: '',
             openedAt: 1,
             emoji: null,
             picture: null
@@ -804,6 +806,7 @@ void main() {
             subject: 'f1',
             title: 'Starred',
             className: 'Folder',
+            classUrl: '',
             openedAt: 0,
             emoji: null,
             picture: null
@@ -814,6 +817,7 @@ void main() {
             subject: 'm1',
             title: 'Alice, Bob',
             className: '',
+            classUrl: '',
             openedAt: 0,
             emoji: null,
             picture: null
@@ -845,6 +849,7 @@ void main() {
             subject: 'm1',
             title: 'Alice, Bob',
             className: 'conversation',
+            classUrl: 'https://atomicdata.dev/classes/Conversation',
             openedAt: 0,
             emoji: null,
             picture: null
@@ -870,6 +875,7 @@ void main() {
             subject: 'f$i',
             title: 'Fav $i',
             className: '',
+            classUrl: '',
             openedAt: 0,
             emoji: null,
             picture: null
@@ -914,6 +920,7 @@ void main() {
             subject: 'r1',
             title: 'A doc',
             className: 'Document',
+            classUrl: '',
             openedAt: 1,
             emoji: null,
             picture: null
@@ -1030,6 +1037,7 @@ void main() {
                 subject: 'a$i',
                 title: 'Doc $i',
                 className: '',
+                classUrl: '',
                 openedAt: i,
                 emoji: null,
                 picture: null
@@ -1102,6 +1110,7 @@ void main() {
           subject: 'r1',
           title: 'Fox doc',
           className: 'Document',
+          classUrl: '',
           openedAt: 2,
           emoji: '🦊',
           picture: null
@@ -1110,6 +1119,7 @@ void main() {
           subject: 'r2',
           title: 'Plain table',
           className: 'Table',
+          classUrl: '',
           openedAt: 1,
           emoji: null,
           picture: null
@@ -1140,6 +1150,7 @@ void main() {
           subject: 'did:ad:1',
           title: 'Fox',
           className: 'Document',
+          classUrl: '',
           drive: '',
           score: 2.0,
           emoji: '🦊',
@@ -1149,6 +1160,7 @@ void main() {
           subject: 'did:ad:2',
           title: 'Board',
           className: 'Canvas',
+          classUrl: '',
           drive: '',
           score: 1.0,
           emoji: null,
@@ -1177,6 +1189,7 @@ void main() {
               subject: 'r1',
               title: 'Fox doc',
               className: 'Document',
+              classUrl: '',
               openedAt: 2,
               emoji: '🦊',
               picture: null
@@ -1207,6 +1220,7 @@ void main() {
           subject: 'did:ad:9',
           title: 'Zebra',
           className: 'Folder',
+          classUrl: '',
           drive: '',
           score: 1.5,
           emoji: null,
@@ -1243,6 +1257,7 @@ void main() {
             subject: 'r1',
             title: 'Opened doc',
             className: 'Document',
+            classUrl: '',
             openedAt: 1,
             emoji: null,
             picture: null
@@ -1253,6 +1268,7 @@ void main() {
             subject: 'did:ad:9',
             title: 'Zebra',
             className: 'Folder',
+            classUrl: '',
             drive: '',
             score: 1.5,
             emoji: null,
@@ -1322,6 +1338,7 @@ void main() {
           subject: 'did:ad:drive',
           title: 'My drive',
           className: 'Drive',
+          classUrl: '',
           drive: 'did:ad:drive',
           score: 2,
           emoji: null,
@@ -1348,6 +1365,7 @@ void main() {
             subject: 'r1',
             title: 'Opened doc',
             className: 'Document',
+            classUrl: '',
             openedAt: 1,
             emoji: null,
             picture: null
@@ -1358,6 +1376,7 @@ void main() {
             subject: 'did:ad:9',
             title: 'Zebra',
             className: 'Folder',
+            classUrl: '',
             drive: '',
             score: 1.0,
             emoji: null,
@@ -1399,6 +1418,7 @@ void main() {
           subject: 'did:ad:9',
           title: 'Zebra',
           className: 'Folder',
+          classUrl: '',
           drive: '',
           score: 1.5,
           emoji: null,
@@ -1425,6 +1445,7 @@ void main() {
           subject: 'did:ad:$id',
           title: title,
           className: 'Folder',
+          classUrl: '',
           drive: '',
           score: score,
           emoji: null,
@@ -1515,6 +1536,7 @@ void main() {
           subject: 'r2',
           title: 'Newer',
           className: 'Document',
+          classUrl: '',
           openedAt: 2,
           emoji: null,
           picture: null
@@ -1523,6 +1545,7 @@ void main() {
           subject: 'r1',
           title: 'Older',
           className: 'Document',
+          classUrl: '',
           openedAt: 1,
           emoji: null,
           picture: null
@@ -1557,6 +1580,7 @@ void main() {
             subject: 'did:ad:a',
             title: 'Zebra home',
             className: 'Folder',
+            classUrl: '',
             drive: 'did:ad:drive',
             score: 2.0,
             emoji: null,
@@ -1566,6 +1590,7 @@ void main() {
             subject: 'did:ad:b',
             title: 'Zebra work',
             className: 'Document',
+            classUrl: '',
             drive: 'did:ad:work',
             score: 1.0,
             emoji: null,
@@ -2107,6 +2132,7 @@ void main() {
           subject: 'r1',
           title: 'Trip plan',
           className: 'Document',
+          classUrl: '',
           openedAt: 5,
           emoji: null,
           picture: null
@@ -2115,6 +2141,7 @@ void main() {
           subject: 'r2',
           title: 'Budget',
           className: 'Table',
+          classUrl: '',
           openedAt: 9,
           emoji: null,
           picture: null
@@ -2201,6 +2228,7 @@ void main() {
               subject: 'r$i',
               title: 'Res $i',
               className: 'Document',
+              classUrl: '',
               openedAt: i,
               emoji: null,
               picture: null
@@ -2320,26 +2348,29 @@ void main() {
         (tester) async {
       ResourceView.serverFactory = () async => throw 'no server in a test';
       final api = FakeApi();
-      Widget open(String className) => openResourceView(
+      const aiChat =
+          'https://atomicdata.dev/01jtjxtsa9syxmfca2zx5gcnmj/class/ai-chat';
+      Widget open(String classUrl) => openResourceView(
           api: api,
           drive: 'did:ad:drive',
           subject: 'did:ad:x',
           title: 'X',
-          className: className);
+          classUrl: classUrl);
 
-      await tester.pumpWidget(app(open('ai-chat')));
+      await tester.pumpWidget(app(open(aiChat)));
       await tester.pumpAndSettle();
       expect(find.byType(ChatScreen), findsOneWidget);
       expect(find.byType(ResourceView), findsNothing);
 
-      // The tree's rows carry the class's own name, not its shortname.
-      for (final name in ['AI Chat', 'aichat']) {
+      // Matched exactly on the class subject: names are not classes.
+      for (final name in ['AI Chat', 'aichat', 'ai-chat']) {
         await tester.pumpWidget(app(open(name)));
         await tester.pumpAndSettle();
-        expect(find.byType(ChatScreen), findsOneWidget, reason: name);
+        expect(find.byType(ChatScreen), findsNothing, reason: name);
+        expect(find.byType(ResourceView), findsOneWidget, reason: name);
       }
 
-      await tester.pumpWidget(app(open('Document')));
+      await tester.pumpWidget(app(open('https://atomicdata.dev/classes/Document')));
       await tester.pumpAndSettle();
       expect(find.byType(ResourceView), findsOneWidget);
       expect(find.byType(ChatScreen), findsNothing);
@@ -2352,7 +2383,8 @@ void main() {
     testWidgets('a host registers its own native view, and removes it',
         (tester) async {
       ResourceView.serverFactory = () async => throw 'no server in a test';
-      addTearDown(() => registerNativeView('table', null));
+      addTearDown(() => registerNativeView(
+          'https://atomicdata.dev/classes/Table', null));
       registerNativeView('https://atomicdata.dev/classes/Table',
           (api, drive, subject, title) => Text('table $title'));
       Widget open() => openResourceView(
@@ -2360,12 +2392,12 @@ void main() {
           drive: 'did:ad:drive',
           subject: 'did:ad:x',
           title: 'Sales',
-          className: 'Table');
+          classUrl: 'https://atomicdata.dev/classes/Table');
 
       await tester.pumpWidget(app(open()));
       expect(find.text('table Sales'), findsOneWidget);
 
-      registerNativeView('table', null);
+      registerNativeView('https://atomicdata.dev/classes/Table', null);
       await tester.pumpWidget(app(open()));
       await tester.pumpAndSettle();
       expect(find.byType(ResourceView), findsOneWidget);
@@ -2414,6 +2446,7 @@ void main() {
       subject: 'r1',
       title: 'A doc',
       className: 'Document',
+      classUrl: '',
       openedAt: 1,
       emoji: null,
       picture: null
@@ -2841,6 +2874,7 @@ void main() {
           subject: 'r1',
           title: 'Opened doc',
           className: 'Document',
+          classUrl: '',
           openedAt: 1,
           emoji: null,
           picture: null

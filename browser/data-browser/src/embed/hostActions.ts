@@ -10,8 +10,12 @@ export function setActionsHost(channel: NativeChannel | undefined) {
   lastShown = undefined;
 }
 
-/** What the app can show natively instead of the page. */
-export type NativeKind = 'chatroom';
+/**
+ * What the app can show natively instead of the page: the subject of the
+ * resource's class (`dataBrowser.classes.chatroom`), which the app matches
+ * exactly.
+ */
+export type NativeKind = string;
 
 /**
  * Asks the app to open `subject` in its own native screen of that kind (the

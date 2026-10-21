@@ -3262,8 +3262,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ActivityEntry dco_decode_activity_entry(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 8)
-      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
     return ActivityEntry(
       subject: dco_decode_String(arr[0]),
       drive: dco_decode_String(arr[1]),
@@ -3272,7 +3272,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       actor: dco_decode_opt_String(arr[4]),
       name: dco_decode_String(arr[5]),
       className: dco_decode_String(arr[6]),
-      pictures: dco_decode_String(arr[7]),
+      classUrl: dco_decode_String(arr[7]),
+      pictures: dco_decode_String(arr[8]),
     );
   }
 
@@ -3508,6 +3509,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_actor = sse_decode_opt_String(deserializer);
     var var_name = sse_decode_String(deserializer);
     var var_className = sse_decode_String(deserializer);
+    var var_classUrl = sse_decode_String(deserializer);
     var var_pictures = sse_decode_String(deserializer);
     return ActivityEntry(
       subject: var_subject,
@@ -3517,6 +3519,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       actor: var_actor,
       name: var_name,
       className: var_className,
+      classUrl: var_classUrl,
       pictures: var_pictures,
     );
   }
@@ -3822,6 +3825,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.actor, serializer);
     sse_encode_String(self.name, serializer);
     sse_encode_String(self.className, serializer);
+    sse_encode_String(self.classUrl, serializer);
     sse_encode_String(self.pictures, serializer);
   }
 

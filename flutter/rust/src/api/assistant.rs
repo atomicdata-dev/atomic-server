@@ -71,6 +71,8 @@ pub struct ActivityEntry {
     pub actor: Option<String>,
     pub name: String,
     pub class_name: String,
+    /// Subject of the resource's class (what a native view is keyed by).
+    pub class_url: String,
     /// JSON `{emoji?, icon_file?, image_url?, actor: {subject, name?, emoji?,
     /// icon_file?, image_url?}, drive: {subject, name?, emoji?, icon_file?,
     /// image_url?}}`: the resource's own picture, the agent's and the
@@ -90,6 +92,7 @@ fn activity_entry(a: lists::ActivityRow) -> ActivityEntry {
         actor: Some(a.actor),
         name: a.name,
         class_name: a.class_name,
+        class_url: a.class_url,
         pictures: serde_json::Value::Object(pictures).to_string(),
     }
 }

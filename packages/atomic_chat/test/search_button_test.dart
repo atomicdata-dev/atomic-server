@@ -14,6 +14,7 @@ RecentResource _r(String subject, String title) => (
       subject: subject,
       title: title,
       className: 'document-v2',
+      classUrl: '',
       openedAt: 1,
       emoji: null, picture: null,
     );
@@ -25,6 +26,7 @@ FakeApi _api() => FakeApi(recent: [
         subject: 'did:ad:abc',
         title: 'Abc result',
         className: 'document-v2',
+        classUrl: '',
         drive: 'did:ad:drive',
         score: 1.0,
         emoji: null, picture: null
@@ -203,6 +205,7 @@ void main() {
         subject: 'did:ad:work',
         title: 'Work drive',
         className: 'Drive',
+        classUrl: '',
         drive: 'did:ad:drive',
         score: 1.0,
         emoji: null, picture: null

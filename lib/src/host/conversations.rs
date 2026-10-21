@@ -234,6 +234,7 @@ impl Conversations {
                     "subject": subject,
                     "title": title,
                     "class_name": "conversation",
+                    "class_url": crate::urls::CONVERSATION,
                     "opened_at": last_at,
                     "last_message": last_text,
                 }),

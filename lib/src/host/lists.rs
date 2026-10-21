@@ -82,6 +82,8 @@ pub struct ActivityRow {
     pub actor: String,
     pub name: String,
     pub class_name: String,
+    /// The subject of the resource's class (what a native view is keyed by).
+    pub class_url: String,
     /// The resource's own picture fields (`emoji?`, `icon_file?`,
     /// `image_url?`; see [`picture_fields`]).
     pub picture: serde_json::Map<String, Json>,
@@ -376,6 +378,7 @@ async fn list_activity_rows(
             actor,
             name: a.name,
             class_name: a.class_name,
+            class_url: a.class_url,
         });
     }
     rows
@@ -773,6 +776,7 @@ pub fn search_classes(
                 "title": title,
                 "boost": boost,
                 "class_name": class_name,
+                "class_url": class_url,
                 "score": hit.score,
                 "drive": drives.of(store, &resource),
             }),
@@ -1146,6 +1150,7 @@ mod tests {
         let titles: Vec<&str> = hits.iter().map(|h| h["title"].as_str().unwrap()).collect();
         assert_eq!(titles[0], "Quagga", "{hits:?}");
         assert_eq!(hits[0]["class_name"], "ai-chat", "{hits:?}");
+        assert_eq!(hits[0]["class_url"], AI_CHAT, "{hits:?}");
         let mut next = titles[1..3].to_vec();
         next.sort();
         assert_eq!(next, ["Quagga Jones", "Quagga drive"], "{hits:?}");
@@ -1407,6 +1412,7 @@ mod tests {
             actor: None,
             name: "Edited elsewhere".into(),
             class_name: "Folder".into(),
+            class_url: String::new(),
             checked: false,
         });
         let none = AgentProfiles::none();
@@ -1458,6 +1464,7 @@ mod tests {
             actor: Some("did:ad:agent:bob".into()),
             name: "Local".into(),
             class_name: "Folder".into(),
+            class_url: String::new(),
             checked: false,
         });
         let rows = list_activity(&d.store, &d.recents, &AgentProfiles::none(), None, 50).await;

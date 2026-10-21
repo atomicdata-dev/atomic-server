@@ -344,6 +344,9 @@ class ActivityEntry {
   final String name;
   final String className;
 
+  /// Subject of the resource's class (what a native view is keyed by).
+  final String classUrl;
+
   /// JSON `{emoji?, icon_file?, image_url?, actor: {subject, name?, emoji?,
   /// icon_file?, image_url?}, drive: {subject, name?, emoji?, icon_file?,
   /// image_url?}}`: the resource's own picture, the agent's and the
@@ -358,6 +361,7 @@ class ActivityEntry {
     this.actor,
     required this.name,
     required this.className,
+    required this.classUrl,
     required this.pictures,
   });
 
@@ -370,6 +374,7 @@ class ActivityEntry {
       actor.hashCode ^
       name.hashCode ^
       className.hashCode ^
+      classUrl.hashCode ^
       pictures.hashCode;
 
   @override
@@ -384,5 +389,6 @@ class ActivityEntry {
           actor == other.actor &&
           name == other.name &&
           className == other.className &&
+          classUrl == other.classUrl &&
           pictures == other.pictures;
 }

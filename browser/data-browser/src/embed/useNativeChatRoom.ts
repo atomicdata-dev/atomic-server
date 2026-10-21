@@ -20,7 +20,7 @@ export function useNativeChatRoom(subject: string, onOpened: () => void): void {
   useEffect(() => {
     if (!isChatRoom || asked.current === subject) return;
     asked.current = subject;
-    void openNative('chatroom', subject, title).then(handled => {
+    void openNative(dataBrowser.classes.chatroom, subject, title).then(handled => {
       if (handled) opened.current();
     });
   }, [isChatRoom, subject, title]);

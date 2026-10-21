@@ -25,6 +25,7 @@ RecentResource _r(String subject, String title) => (
       subject: subject,
       title: title,
       className: 'document-v2',
+      classUrl: '',
       openedAt: 1,
       emoji: null, picture: null,
     );

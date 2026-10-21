@@ -69,6 +69,7 @@ void main() {
         subject: 'did:ad:doc',
         title: 'Plain doc',
         className: 'document-v2',
+        classUrl: '',
         openedAt: 0,
         emoji: null,
         picture: null

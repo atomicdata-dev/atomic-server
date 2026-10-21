@@ -35,6 +35,7 @@ void main() {
           subject: 'did:ad:mine',
           title: 'My own edit',
           className: 'Document',
+          classUrl: '',
           openedAt: _fiveMinAgo,
           emoji: null, picture: null
         ),
@@ -71,6 +72,7 @@ void main() {
         subject: 'did:ad:mine',
         title: 'My own edit',
         className: 'Document',
+        classUrl: '',
         openedAt: _fiveMinAgo,
         emoji: null, picture: null
       ),

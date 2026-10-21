@@ -259,6 +259,7 @@ class AtomicClient {
         actor: a.actor,
         name: a.name,
         className: a.className,
+        classUrl: a.classUrl,
         pictures: a.pictures,
       );
 

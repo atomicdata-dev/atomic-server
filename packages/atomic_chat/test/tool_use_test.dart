@@ -83,6 +83,7 @@ class _Api extends UnimplementedApi {
         subject: 'did:ad:lisbon',
         title: 'Lisbon trip',
         className: 'document',
+        classUrl: '',
         drive: 'did:ad:d',
         score: 1,
         emoji: null, picture: null

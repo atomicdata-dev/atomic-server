@@ -147,6 +147,7 @@ void main() {
           subject: 'did:ad:$i',
           title: 'Hit $i',
           className: 'Document',
+          classUrl: '',
           drive: '',
           score: 1.0,
           emoji: null,

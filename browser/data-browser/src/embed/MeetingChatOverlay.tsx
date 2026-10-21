@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { unknownSubject, useResource } from '@tomic/react';
+import { dataBrowser, unknownSubject, useResource } from '@tomic/react';
 import { styled } from 'styled-components';
 import { FaXmark } from 'react-icons/fa6';
 import { useRightPanel } from '../components/RightPanel/RightPanelContext';
@@ -40,7 +40,11 @@ export function MeetingChatOverlay(): React.JSX.Element | null {
     if (!isOpen || !subject || declined === subject) return;
     let cancelled = false;
 
-    void openNative('chatroom', subject, latest.current.title).then(handled => {
+    void openNative(
+      dataBrowser.classes.chatroom,
+      subject,
+      latest.current.title,
+    ).then(handled => {
       if (cancelled) return;
 
       if (handled) {

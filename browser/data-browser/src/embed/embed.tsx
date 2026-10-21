@@ -13,7 +13,7 @@
  *   changed(subjects) these resources changed in the host's store
  *   flush(leaving?)   hand every pending edit to the host; resolves when done
  *
- * Page to host, besides the store's calls: `openNative(kind, subject, title)`
+ * Page to host, besides the store's calls: `openNative(classUrl, subject, title)`
  * (`hostActions.ts`) asks the app to show the chat of a meeting or chat room in
  * its own screen; the answer is whether it did. `opened(subject)` tells the app
  * the page settled on a resource, for its Recents.

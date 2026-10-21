@@ -528,6 +528,7 @@ void main() {
             subject: 'did:ad:work',
             title: 'Work drive',
             className: 'Drive',
+            classUrl: '',
             drive: 'did:ad:home',
             score: 1.0,
             emoji: null, picture: null
@@ -557,6 +558,7 @@ void main() {
             subject: 'did:ad:work',
             title: 'Work drive',
             className: 'Drive',
+            classUrl: '',
             drive: 'did:ad:home',
             score: 1.0,
             emoji: null, picture: null

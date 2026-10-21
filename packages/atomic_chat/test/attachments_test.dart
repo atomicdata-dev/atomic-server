@@ -56,6 +56,7 @@ class _Api extends UnimplementedApi {
           subject: 'did:ad:notes',
           title: 'Meeting notes',
           className: 'document',
+          classUrl: '',
           openedAt: 2,
           emoji: '📝', picture: null
         ),
@@ -66,6 +67,7 @@ class _Api extends UnimplementedApi {
           subject: 'did:ad:budget',
           title: 'Budget 2026',
           className: 'table',
+          classUrl: '',
           drive: 'did:ad:home',
           score: 1,
           emoji: null, picture: null

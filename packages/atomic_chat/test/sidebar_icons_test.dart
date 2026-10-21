@@ -22,6 +22,7 @@ void main() {
         subject: 'did:ad:doc',
         title: 'Plan',
         className: 'document-v2',
+        classUrl: '',
         expandable: true,
         emoji: '🦊',
         picture: null

@@ -13,6 +13,7 @@ SearchHit _hit(String s, String t) => (
       subject: s,
       title: t,
       className: 'document-v2',
+      classUrl: '',
       drive: 'did:ad:drive',
       score: 1.0,
       emoji: null,

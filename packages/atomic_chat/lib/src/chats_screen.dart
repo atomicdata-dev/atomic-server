@@ -639,7 +639,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
             drive: drive,
             subject: r.subject,
             title: r.title,
-            className: r.className),
+            classUrl: r.classUrl),
         drive: drive,
         subject: r.subject);
   }
@@ -836,7 +836,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                           drive: a.drive,
                           subject: a.subject,
                           title: a.name,
-                          className: a.className),
+                          classUrl: a.classUrl),
                       drive: a.drive,
                       subject: a.subject);
                 },
@@ -1013,7 +1013,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                 drive: _drive,
                 subject: child.subject,
                 title: child.title,
-                className: child.className),
+                classUrl: child.classUrl),
             drive: _drive,
             subject: child.subject),
       );

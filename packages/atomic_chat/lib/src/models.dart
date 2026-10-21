@@ -111,6 +111,8 @@ typedef SearchHit = ({
   String subject,
   String title,
   String className,
+  // The subject of the resource's class ('' when unknown); what picks a native view.
+  String classUrl,
   // The drive the hit lives in; '' when unknown.
   String drive,
   double score,
@@ -149,6 +151,7 @@ typedef DriveChild = ({
   String subject,
   String title,
   String className,
+  String classUrl,
   bool expandable,
   String? emoji,
   ResourcePicture? picture
@@ -169,6 +172,7 @@ typedef RecentResource = ({
   String subject,
   String title,
   String className,
+  String classUrl,
   int openedAt,
   // The resource's own icon (an emoji); null when it has none.
   String? emoji,
@@ -195,6 +199,9 @@ class ActivityEntry {
   final String name;
   final String className;
 
+  /// The subject of the resource's class ('' when unknown).
+  final String classUrl;
+
   /// The resource's own picture and emoji; null when it has none.
   final ResourcePicture? picture;
 
@@ -213,6 +220,7 @@ class ActivityEntry {
     this.actor,
     required this.name,
     required this.className,
+    this.classUrl = '',
     this.picture,
     this.actorPicture,
     this.driveName,
@@ -229,6 +237,7 @@ class ActivityEntry {
     String? actor,
     required String name,
     required String className,
+    String classUrl = '',
     required String pictures,
   }) {
     Object? json;
@@ -248,6 +257,7 @@ class ActivityEntry {
       actor: actor,
       name: name,
       className: className,
+      classUrl: classUrl,
       picture: ResourcePicture.fromJson(map),
       actorPicture: ResourcePicture.fromJson(
           (map['actor'] is Map
@@ -261,7 +271,7 @@ class ActivityEntry {
 
   @override
   int get hashCode => Object.hash(subject, drive, kind, at, actor, name,
-      className, picture, actorPicture, driveName, drivePicture);
+      className, classUrl, picture, actorPicture, driveName, drivePicture);
 
   @override
   bool operator ==(Object other) =>
@@ -274,6 +284,7 @@ class ActivityEntry {
           actor == other.actor &&
           name == other.name &&
           className == other.className &&
+          classUrl == other.classUrl &&
           picture == other.picture &&
           actorPicture == other.actorPicture &&
           driveName == other.driveName &&
@@ -491,6 +502,7 @@ abstract final class AssistantJson {
           subject: e['subject'] as String,
           title: e['title'] as String? ?? '',
           className: e['class_name'] as String? ?? '',
+            classUrl: e['class_url'] as String? ?? '',
           expandable: e['expandable'] != false,
           emoji: _emoji(e),
           picture: ResourcePicture.fromJson(e),
@@ -505,6 +517,7 @@ abstract final class AssistantJson {
             subject: e['subject'] as String,
             title: e['title'] as String? ?? '',
             className: e['class_name'] as String? ?? '',
+            classUrl: e['class_url'] as String? ?? '',
             openedAt: (e['opened_at'] as num?)?.toInt() ?? 0,
             emoji: _emoji(e),
             picture: _picture(e),
@@ -517,6 +530,7 @@ abstract final class AssistantJson {
             subject: e['subject'] as String,
             title: e['title'] as String? ?? '',
             className: e['class_name'] as String? ?? '',
+            classUrl: e['class_url'] as String? ?? '',
             drive: e['drive'] as String? ?? '',
             score: (e['score'] as num?)?.toDouble() ?? 0,
             emoji: _emoji(e),

@@ -15,12 +15,14 @@ import 'assistant_screens_test.dart' show FakeApi, app;
 
 DriveChild _child(String subject, String title,
         {String className = 'document-v2',
+        String classUrl = '',
         bool expandable = true,
         String? emoji}) =>
     (
       subject: subject,
       title: title,
       className: className,
+      classUrl: classUrl,
       expandable: expandable,
       emoji: emoji,
       picture: null,
@@ -34,6 +36,7 @@ RecentResource _res(String subject, String title) => (
       subject: subject,
       title: title,
       className: 'document-v2',
+      classUrl: '',
       openedAt: 1,
       emoji: null,
       picture: null,

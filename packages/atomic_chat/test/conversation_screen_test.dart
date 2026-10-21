@@ -247,23 +247,26 @@ void main() {
       'the web view', (tester) async {
     ResourceView.serverFactory = () async => throw 'no server in a test';
     final api = _ConversationApi(const []);
-    Widget open(String className) => openResourceView(
+    Widget open(String classUrl) => openResourceView(
         api: api,
         drive: 'did:ad:drive',
         subject: 'did:ad:convo',
         title: 'Alice',
-        className: className);
+        classUrl: classUrl);
 
-    await tester.pumpWidget(_app(open('conversation')));
+    await tester.pumpWidget(_app(open('https://atomicdata.dev/classes/Conversation')));
     await tester.pumpAndSettle();
     expect(find.byType(ConversationScreen), findsOneWidget);
     expect(find.byType(ResourceView), findsNothing);
 
-    await tester.pumpWidget(_app(open('Conversation')));
-    await tester.pumpAndSettle();
-    expect(find.byType(ConversationScreen), findsOneWidget);
+    // Exact: the display name or a lowercased URL is not the class.
+    for (final other in ['conversation', 'Conversation']) {
+      await tester.pumpWidget(_app(open(other)));
+      await tester.pumpAndSettle();
+      expect(find.byType(ConversationScreen), findsNothing, reason: other);
+    }
 
-    await tester.pumpWidget(_app(open('Document')));
+    await tester.pumpWidget(_app(open('https://atomicdata.dev/classes/Document')));
     await tester.pumpAndSettle();
     expect(find.byType(ResourceView), findsOneWidget);
     expect(find.byType(ConversationScreen), findsNothing);

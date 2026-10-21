@@ -106,7 +106,7 @@ it('asks the app to open its native chat first, and shows no overlay when it doe
   );
   expect(host.openNative).toHaveBeenCalledTimes(1);
   expect(host.openNative.mock.calls[0].slice(0, 2)).toEqual([
-    'chatroom',
+    'https://atomicdata.dev/classes/ChatRoom',
     'https://x/meeting',
   ]);
   expect(screen.queryByTestId('meeting-chat-overlay')).toBeNull();

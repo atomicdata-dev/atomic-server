@@ -146,7 +146,7 @@ pub async fn agent_picture(store: &Db, agent: &str) -> Option<Json> {
     Some(Json::Object(out))
 }
 
-/// A `{subject, title, class_name, <extra>, emoji?, icon_file?, image_url?}` row of the resource lists.
+/// A `{subject, title, class_name, class_url, <extra>, emoji?, icon_file?, image_url?}` row of the resource lists.
 pub async fn resource_row(
     store: &Db,
     subject: &str,
@@ -159,6 +159,7 @@ pub async fn resource_row(
             "subject": subject,
             "title": name_of(resource),
             "class_name": class_name_of(store, resource).await,
+            "class_url": first_class(resource),
             extra.0: extra.1,
         }),
         resource,

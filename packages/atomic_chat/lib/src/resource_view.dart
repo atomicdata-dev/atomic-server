@@ -585,7 +585,7 @@ class _ResourceViewState extends State<ResourceView>
                   drive: widget.drive,
                   subject: subject,
                   title: title,
-                  className: kind),
+                  classUrl: kind),
             ))
             // The native screen can have changed it (renamed a chat room):
             // the page reads it again.

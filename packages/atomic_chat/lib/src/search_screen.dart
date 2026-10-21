@@ -336,6 +336,7 @@ typedef _Item = ({
   String subject,
   String title,
   String className,
+  String classUrl,
   String? emoji,
   ResourcePicture? picture
 });
@@ -571,6 +572,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 subject: d.subject,
                 title: d.name.isEmpty ? 'Untitled drive' : d.name,
                 className: 'Drive',
+                classUrl: '',
                 emoji: d.emoji,
                 picture: d.picture
               )
@@ -584,6 +586,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 subject: c.resource.subject,
                 title: c.resource.title,
                 className: c.resource.className,
+                classUrl: c.resource.classUrl,
                 emoji: c.resource.emoji,
                 picture: c.resource.picture
               )
@@ -613,6 +616,7 @@ class _SearchScreenState extends State<SearchScreen> {
           subject: c.subject,
           title: c.name.isEmpty ? 'Untitled chat' : c.name,
           className: 'ai-chat',
+          classUrl: aiChatClass,
           emoji: c.emoji,
           picture: null
         ));
@@ -646,7 +650,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   /// Opens a resource, notes it as opened, and refreshes the list after.
   Future<void> _open(
-      String drive, String subject, String title, String className) async {
+      String drive, String subject, String title, String classUrl) async {
     final opened = openFromList<void>(
       context,
       (_) => openResourceView(
@@ -654,7 +658,7 @@ class _SearchScreenState extends State<SearchScreen> {
           drive: drive,
           subject: subject,
           title: title,
-          className: className),
+          classUrl: classUrl),
       subject: subject,
       // Noted once it is left: the lists do not move under the finger.
       onLeave: () {
@@ -773,6 +777,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   subject: r.subject,
                   title: r.title,
                   className: r.className,
+                  classUrl: r.classUrl,
                   emoji: r.emoji,
                   picture: r.picture
                 )
@@ -789,6 +794,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     subject: h.subject,
                     title: h.title,
                     className: h.className,
+                    classUrl: h.classUrl,
                     emoji: h.emoji,
                     picture: h.picture
                   )
@@ -799,7 +805,7 @@ class _SearchScreenState extends State<SearchScreen> {
     final items = _items;
     if (items.isEmpty) return;
     final i = items.first;
-    _open(i.drive, i.subject, i.title, i.className);
+    _open(i.drive, i.subject, i.title, i.classUrl);
   }
 
   /// `In: <drive>` with a way back to every drive, while scoped; the kind
@@ -1134,7 +1140,7 @@ class _SearchScreenState extends State<SearchScreen> {
       showInitial: i.picture?.person == true,
       title: i.title.isEmpty ? i.subject : i.title,
       detail: _detail(i.className, i.shown),
-      onTap: () => _open(i.drive, i.subject, i.title, i.className),
+      onTap: () => _open(i.drive, i.subject, i.title, i.classUrl),
       trailing: _isDrive(i.subject, i.className)
           ? IconButton(
               key: Key('search-in-drive-${i.subject}'),

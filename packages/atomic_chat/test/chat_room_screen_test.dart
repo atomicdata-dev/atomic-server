@@ -290,7 +290,7 @@ void main() {
   });
 
   test('a chat room opens natively from anywhere', () {
-    expect(hasNativeView('chatroom'), isTrue);
+    expect(hasNativeView('chatroom'), isFalse);
     expect(hasNativeView('https://atomicdata.dev/classes/ChatRoom'), isTrue);
     // A meeting page stays the web page (notes and all).
     expect(hasNativeView('meeting'), isFalse);
@@ -298,7 +298,7 @@ void main() {
         api: const UnimplementedApi(),
         drive: 'd',
         subject: 's',
-        className: 'chatroom');
+        classUrl: 'https://atomicdata.dev/classes/ChatRoom');
     expect(view, isA<ChatRoomScreen>());
   });
 }

@@ -72,6 +72,9 @@ pub struct Activity {
     /// The resource's name at that time (for a deletion: the last known one).
     pub name: String,
     pub class_name: String,
+    /// The subject of the resource's class.
+    #[serde(default)]
+    pub class_url: String,
     /// The server's history attribution was read for this entry (its actor
     /// and time are the newest signed change's). Cleared by a newer change.
     #[serde(default)]
@@ -184,6 +187,9 @@ fn record_activity(recents: &mut Recents, mut new: Activity) {
                 if new.class_name.is_empty() {
                     new.class_name = old.class_name;
                 }
+                if new.class_url.is_empty() {
+                    new.class_url = old.class_url;
+                }
             } else {
                 i += 1;
             }
@@ -210,6 +216,9 @@ fn record_activity(recents: &mut Recents, mut new: Activity) {
         }
         if new.class_name.is_empty() {
             new.class_name = old.class_name;
+        }
+        if new.class_url.is_empty() {
+            new.class_url = old.class_url;
         }
         // A deletion that is followed by a change: the resource is back, and
         // other agents' entries of it may no longer hold.
@@ -398,6 +407,7 @@ impl RecentsIndex {
             actor,
             name: name_of(resource),
             class_name: class_name_of(store, resource).await,
+            class_url: super::rows::first_class(resource),
             checked: false,
         };
         self.with(|s| {
@@ -793,6 +803,7 @@ mod tests {
             actor: Some("did:ad:agent:a".into()),
             name: format!("name of {subject}"),
             class_name: "Document".into(),
+            class_url: String::new(),
             checked: false,
         }
     }
