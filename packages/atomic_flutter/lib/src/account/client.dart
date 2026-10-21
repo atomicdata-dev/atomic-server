@@ -229,8 +229,7 @@ class AtomicAccountClient {
         .where((w) => w['wrapper_type'] == 'atomic-assisted')
         .firstOrNull;
     if (wrapper == null) {
-      throw StateError(
-          'Use your recovery code or passkey in the browser, then import your Atomic secret');
+      throw const AtomicNoAssistedRecovery();
     }
     final keyResponse =
         await _request('POST', 'recovery-secret/assisted-key', body: {
@@ -499,6 +498,18 @@ class AtomicVoiceError implements Exception {
 }
 
 enum AtomicLinkProgress { pending, approved, expired }
+
+/// The account's backup has no server-assisted wrapper, so only its recovery
+/// code or passkey opens it, in the browser. The app can't, and asks for the
+/// secret instead.
+class AtomicNoAssistedRecovery implements Exception {
+  const AtomicNoAssistedRecovery();
+
+  @override
+  String toString() =>
+      "This account's backup only opens with its recovery code or passkey. "
+      'Paste your Atomic secret instead.';
+}
 
 class AtomicDeviceLink {
   AtomicDeviceLink.fromJson(Map<String, dynamic> data, this.origin)

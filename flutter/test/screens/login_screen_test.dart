@@ -97,6 +97,20 @@ void main() {
         findsOneWidget);
   });
 
+  testWidgets('a backup the app cannot open leads to the secret field',
+      (tester) async {
+    await tester.pumpWidget(_app(
+        accountSignIn: (_) async =>
+            throw const shared.AtomicNoAssistedRecovery()));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sign in with atomic.place'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Paste your Atomic secret instead'),
+        findsOneWidget);
+    expect(find.byType(TextField), findsWidgets);
+    expect(find.text('Get Started'), findsNothing);
+  });
+
   test('a secret that is not one gets a sentence, not a decoder error', () {
     expect(
         signInError(

@@ -286,6 +286,9 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _busy = false;
           _error = '$e'.replaceFirst('Bad state: ', '');
+          // The account is linked but its secret can't be recovered here:
+          // the paste field is the way on.
+          if (e is shared.AtomicNoAssistedRecovery) _step = _Step.signIn;
         });
       }
       return;
