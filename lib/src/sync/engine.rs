@@ -2102,13 +2102,20 @@ pub async fn collect_readable_snapshots(
     // device waiting on a live-link drain that may never come. The signed
     // delta follows from the outbox and applies on top idempotently.
     let mut entries = Vec::new();
+    // This node's own agent resource travels on every connect, whoever
+    // connects. It is the one subject served regardless of rights.
+    let own_agent = store
+        .get_default_agent()
+        .ok()
+        .map(|a| a.subject.to_string());
     for subject in subjects {
         let subj = crate::Subject::from_raw(subject, store.get_base_domain().as_deref());
         match store.get_resource(&subj).await {
             Ok(resource) => {
-                let readable = crate::hierarchy::check_read(store, &resource, agent)
-                    .await
-                    .is_ok();
+                let readable = own_agent.as_deref() == Some(subj.pure_id().as_str())
+                    || crate::hierarchy::check_read(store, &resource, agent)
+                        .await
+                        .is_ok();
 
                 if !readable {
                     tracing::warn!(
