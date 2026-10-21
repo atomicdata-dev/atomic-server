@@ -2345,6 +2345,13 @@ void main() {
       expect(find.byType(ChatScreen), findsOneWidget);
       expect(find.byType(ResourceView), findsNothing);
 
+      // The tree's rows carry the class's own name, not its shortname.
+      for (final name in ['AI Chat', 'aichat']) {
+        await tester.pumpWidget(app(open(name)));
+        await tester.pumpAndSettle();
+        expect(find.byType(ChatScreen), findsOneWidget, reason: name);
+      }
+
       await tester.pumpWidget(app(open('Document')));
       await tester.pumpAndSettle();
       expect(find.byType(ResourceView), findsOneWidget);

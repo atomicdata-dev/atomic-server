@@ -18,7 +18,7 @@ typedef NativeViewBuilder = Widget Function(
 /// package registers AI chats, conversations and chat rooms (a meeting's chat
 /// is a chat room's).
 final Map<String, NativeViewBuilder> nativeViews = {
-  'ai-chat': (api, drive, subject, title) =>
+  'aichat': (api, drive, subject, title) =>
       ChatScreen(api: api, subject: subject, title: title),
   'conversation': (api, drive, subject, title) =>
       ConversationScreen(api: api, subject: subject, title: title),
@@ -56,9 +56,11 @@ Widget openResourceView({
   return ResourceView(api: api, drive: drive, subject: subject, title: title);
 }
 
-/// A class name may arrive as a full class URL; compare on its last segment.
-String _key(String className) {
-  final name = className.trim().toLowerCase();
-  final slash = name.lastIndexOf('/');
-  return slash < 0 ? name : name.substring(slash + 1);
-}
+/// A class name arrives as a full class URL, a shortname (`ai-chat`) or the
+/// class's own name (`AI Chat`): compare on the last segment's letters and
+/// digits, as `iconForClass` does.
+String _key(String className) => className
+    .split('/')
+    .last
+    .toLowerCase()
+    .replaceAll(RegExp(r'[^a-z0-9]'), '');
