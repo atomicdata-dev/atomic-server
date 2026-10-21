@@ -299,6 +299,7 @@ async fn e2e_presence_crosses_the_link_without_being_stored() {
 
     let payload = b"cursor-position-blob".to_vec();
     crate::sync::peer::broadcast_ephemeral(
+        &pair.db_a,
         crate::sync::protocol::ephemeral_kind::PRESENCE,
         &pair.drive,
         "did:ad:agent:someone",

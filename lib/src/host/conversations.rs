@@ -1178,7 +1178,10 @@ mod tests {
         let d = Device::new().await;
         let me = d.store.get_default_agent().unwrap();
         let key = me.public_key.clone();
-        let url_safe = key.trim_end_matches('=').replace('+', "-").replace('/', "_");
+        let url_safe = key
+            .trim_end_matches('=')
+            .replace('+', "-")
+            .replace('/', "_");
         let authors = [
             me.subject.to_string(),
             format!("https://example.test/agents/{key}"),

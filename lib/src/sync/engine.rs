@@ -2079,12 +2079,12 @@ pub async fn import_sync_push(
 /// exists with the `iroh` feature — the WASM build of this crate has no peer
 /// module — so without it nothing is ever treated as paired.
 #[cfg(feature = "iroh")]
-fn peer_is_paired(store: &Db, node_id: &str) -> bool {
-    crate::sync::peer::is_paired_peer(store, node_id)
+fn peer_is_paired(store: &Db, node_id: &str, remote_agent: &crate::agents::ForAgent) -> bool {
+    crate::sync::peer::peer_may_replicate_all(store, node_id, remote_agent)
 }
 
 #[cfg(not(feature = "iroh"))]
-fn peer_is_paired(_store: &Db, _node_id: &str) -> bool {
+fn peer_is_paired(_store: &Db, _node_id: &str, _remote_agent: &crate::agents::ForAgent) -> bool {
     false
 }
 
@@ -2116,7 +2116,7 @@ pub async fn collect_readable_snapshots(
 ) -> Vec<(String, Vec<u8>)> {
     // Resolved once: a paired peer's entitlement is "whatever we ourselves may
     // read", so it is our own identity that answers, not the peer's.
-    let own_agent = if paired_peer.is_some_and(|node| peer_is_paired(store, node)) {
+    let own_agent = if paired_peer.is_some_and(|node| peer_is_paired(store, node, agent)) {
         store
             .get_default_agent()
             .ok()

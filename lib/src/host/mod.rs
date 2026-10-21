@@ -170,7 +170,11 @@ mod attribution_fetch_tests {
             request.starts_with("get /history-attribution?subject=did%3aad%3aabc "),
             "{request}"
         );
-        for header in ["x-atomic-signature:", "x-atomic-public-key:", "x-atomic-timestamp:"] {
+        for header in [
+            "x-atomic-signature:",
+            "x-atomic-public-key:",
+            "x-atomic-timestamp:",
+        ] {
             assert!(request.contains(header), "{header} in {request}");
         }
     }

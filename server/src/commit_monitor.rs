@@ -1038,6 +1038,7 @@ impl Handler<LoroSyncUpdate> for CommitMonitor {
         // so there is no echo to guard against.
         if let Ok(agent) = self.store.get_default_agent() {
             atomic_lib::sync::peer::broadcast_ephemeral(
+ &self.store,
                 atomic_lib::sync::protocol::ephemeral_kind::DOC,
                 msg.subject.as_str(),
                 &agent.subject.to_string(),
@@ -1086,6 +1087,7 @@ impl Handler<LoroEphemeralUpdate> for CommitMonitor {
             // cursors forever).
             if let Ok(agent) = self.store.get_default_agent() {
                 atomic_lib::sync::peer::broadcast_ephemeral(
+ &self.store,
                     atomic_lib::sync::protocol::ephemeral_kind::LORO,
                     msg.subject.as_str(),
                     &agent.subject.to_string(),
@@ -1301,6 +1303,7 @@ impl CommitMonitor {
         // sender address), so there is no echo to guard against.
         if let Ok(agent) = self.store.get_default_agent() {
             atomic_lib::sync::peer::broadcast_ephemeral(
+ &self.store,
                 atomic_lib::sync::protocol::ephemeral_kind::PRESENCE,
                 drive.as_str(),
                 &agent.subject.to_string(),
