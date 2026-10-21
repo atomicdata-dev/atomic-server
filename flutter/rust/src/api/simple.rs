@@ -4,6 +4,8 @@ use flutter_rust_bridge::frb;
 #[cfg(not(target_arch = "wasm32"))]
 mod compaction_check;
 #[cfg(test)]
+mod dial_tests;
+#[cfg(test)]
 mod peer_tests;
 mod peer_search;
 pub(crate) mod state;
