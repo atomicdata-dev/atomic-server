@@ -5532,6 +5532,8 @@ export class Store {
 
   /** Drives whose "server lacks the parent" refusal was already reported. */
   private _notifiedMissingParentDrives = new Set<string>();
+  /** Resources already reported as refused for lack of rights, once each. */
+  private _notifiedNoRightSubjects = new Set<string>();
 
   private refusedDriveHandler: RefusedDriveHandler | undefined;
 
@@ -5681,6 +5683,39 @@ export class Store {
             `kept on this device and are not being retried. Once the drive ` +
             `is back on the server, syncing it sends them; if it is gone, ` +
             `discard them on the Sync page.`,
+        ),
+      );
+
+      return;
+    }
+
+    const missingRight = /\/properties\/(\w+) right has been found/.exec(
+      message,
+    )?.[1];
+
+    if (missingRight) {
+      // Say what happened in the person's terms: which item, what they may
+      // not do, that their work is safe, and what resolves it.
+      if (this._notifiedNoRightSubjects.has(subject)) return;
+
+      this._notifiedNoRightSubjects.add(subject);
+
+      const local = this.resources.get(this.normalizeSubject(subject));
+      const title =
+        local && local.title !== local.subject ? local.title : undefined;
+      const what = title ? `"${title}"` : 'a change';
+      const action =
+        missingRight === 'append'
+          ? 'add this here'
+          : missingRight === 'read'
+            ? 'view this'
+            : 'edit this';
+
+      this.notifyError(
+        new Error(
+          `You are not allowed to ${action}, so ${what} was not synced. ` +
+            `It is kept on this device. Ask the owner of the drive for ` +
+            `access, or move it somewhere you can edit.`,
         ),
       );
 
