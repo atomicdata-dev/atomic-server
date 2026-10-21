@@ -126,6 +126,56 @@ pub async fn list_activity(
     list_activity_with(store, recents, profiles, drive, limit, false).await
 }
 
+/// The feed's entries in paging order (newest first, ties by subject): those
+/// after `before` (an entry's `(at, subject)`), at most `limit`.
+fn activity_entries(
+    recents: &RecentsIndex,
+    own: Option<&str>,
+    drive: Option<&str>,
+    before: Option<(i64, &str)>,
+    limit: usize,
+    include_own: bool,
+) -> Vec<super::recents::Activity> {
+    let mut entries: Vec<_> = recents
+        .activity(usize::MAX)
+        .into_iter()
+        .filter(|a| {
+            let Some(actor) = a.actor.as_deref() else {
+                return false;
+            };
+            if !include_own && own.is_some_and(|own| same_agent(own, actor)) {
+                return false;
+            }
+            drive.is_none_or(|d| drive_key(&a.drive) == d)
+        })
+        .collect();
+    entries.sort_by(|a, b| b.at.cmp(&a.at).then_with(|| a.subject.cmp(&b.subject)));
+    entries
+        .into_iter()
+        .filter(|a| {
+            before.is_none_or(|(at, subject)| {
+                a.at < at || (a.at == at && a.subject.as_str() > subject)
+            })
+        })
+        .take(limit)
+        .collect()
+}
+
+/// One page of the full Activity feed: the entries after `before` (the
+/// `(at, subject)` of the last entry of the previous page; `None` for the
+/// newest), newest first, at most `limit`. A page shorter than `limit` is the
+/// end of the feed.
+pub async fn list_activity_page(
+    store: &Db,
+    recents: &RecentsIndex,
+    profiles: &AgentProfiles,
+    before: Option<(i64, &str)>,
+    limit: usize,
+    include_own: bool,
+) -> Vec<ActivityRow> {
+    list_activity_rows(store, recents, profiles, None, before, limit, include_own).await
+}
+
 /// [`list_activity`], with the person's own changes too when `include_own`
 /// (the feed's "Show mine"); those are by `You`.
 pub async fn list_activity_with(
@@ -136,25 +186,31 @@ pub async fn list_activity_with(
     limit: usize,
     include_own: bool,
 ) -> Vec<ActivityRow> {
+    list_activity_rows(store, recents, profiles, drive, None, limit, include_own).await
+}
+
+async fn list_activity_rows(
+    store: &Db,
+    recents: &RecentsIndex,
+    profiles: &AgentProfiles,
+    drive: Option<&str>,
+    before: Option<(i64, &str)>,
+    limit: usize,
+    include_own: bool,
+) -> Vec<ActivityRow> {
     let own = store
         .get_default_agent()
         .ok()
         .map(|a| a.subject.to_string());
     let drive = drive.map(drive_key);
-    let entries: Vec<_> = recents
-        .activity(usize::MAX)
-        .into_iter()
-        .filter(|a| {
-            let Some(actor) = a.actor.as_deref() else {
-                return false;
-            };
-            if !include_own && own.as_deref().is_some_and(|own| same_agent(own, actor)) {
-                return false;
-            }
-            drive.as_ref().is_none_or(|d| drive_key(&a.drive) == *d)
-        })
-        .take(limit)
-        .collect();
+    let entries = activity_entries(
+        recents,
+        own.as_deref(),
+        drive.as_deref(),
+        before,
+        limit,
+        include_own,
+    );
 
     let mut names: HashMap<String, Option<String>> = Default::default();
     for a in &entries {

@@ -554,8 +554,13 @@ impl RecentsIndex {
         if self.with(|s| s.recents.activity_scanned) {
             return;
         }
-        let known: std::collections::HashSet<String> =
-            self.with(|s| s.recents.activity.iter().map(|a| a.subject.clone()).collect());
+        let known: std::collections::HashSet<String> = self.with(|s| {
+            s.recents
+                .activity
+                .iter()
+                .map(|a| a.subject.clone())
+                .collect()
+        });
         let mut found: Vec<(i64, Resource)> = store
             .all_resources(false)
             .filter(|r| {
@@ -921,8 +926,14 @@ mod tests {
     ) {
         let mut authored = Resource::new(subject.to_string());
         for (prop, value) in [
-            (urls::PARENT, crate::Value::AtomicUrl(d.drive.as_str().into())),
-            (urls::DRIVE_PROP, crate::Value::AtomicUrl(d.drive.as_str().into())),
+            (
+                urls::PARENT,
+                crate::Value::AtomicUrl(d.drive.as_str().into()),
+            ),
+            (
+                urls::DRIVE_PROP,
+                crate::Value::AtomicUrl(d.drive.as_str().into()),
+            ),
             (urls::NAME, crate::Value::String(name.into())),
             (urls::CREATED_BY, crate::Value::AtomicUrl(creator.into())),
             (urls::CREATED_AT, crate::Value::Timestamp(created_at)),
@@ -950,10 +961,27 @@ mod tests {
     async fn what_others_made_days_ago_is_in_the_feed_when_it_syncs_in() {
         let d = Device::new().await;
         let mut rx = d.store.subscribe_events();
-        let bob = crate::agents::Agent::new(Some("Bob")).unwrap().subject.to_string();
+        let bob = crate::agents::Agent::new(Some("Bob"))
+            .unwrap()
+            .subject
+            .to_string();
         let now = crate::utils::now();
-        arrives_made_by(&d, "did:ad:old-by-bob", "Three days ago", &bob, now - 3 * DAY).await;
-        arrives_made_by(&d, "did:ad:older-by-bob", "A month ago", &bob, now - 30 * DAY).await;
+        arrives_made_by(
+            &d,
+            "did:ad:old-by-bob",
+            "Three days ago",
+            &bob,
+            now - 3 * DAY,
+        )
+        .await;
+        arrives_made_by(
+            &d,
+            "did:ad:older-by-bob",
+            "A month ago",
+            &bob,
+            now - 30 * DAY,
+        )
+        .await;
         arrives_made_by(&d, "did:ad:new-by-bob", "Today", &bob, now - 1_000).await;
         d.pump(&mut rx).await;
         let names: Vec<String> = feed(&d).into_iter().map(|(n, _)| n).collect();
@@ -965,10 +993,20 @@ mod tests {
     #[tokio::test]
     async fn a_scan_finds_what_synced_in_before_the_index_listened() {
         let d = Device::new().await;
-        let bob = crate::agents::Agent::new(Some("Bob")).unwrap().subject.to_string();
+        let bob = crate::agents::Agent::new(Some("Bob"))
+            .unwrap()
+            .subject
+            .to_string();
         let now = crate::utils::now();
         // Nobody listened when these arrived (an index from an older build).
-        arrives_made_by(&d, "did:ad:old-by-bob", "Three days ago", &bob, now - 3 * DAY).await;
+        arrives_made_by(
+            &d,
+            "did:ad:old-by-bob",
+            "Three days ago",
+            &bob,
+            now - 3 * DAY,
+        )
+        .await;
         arrives_made_by(&d, "did:ad:new-by-bob", "Today", &bob, now - 1_000).await;
         assert!(feed(&d).is_empty());
         d.recents.ensure_activity_scanned(&d.store).await;
@@ -985,6 +1023,54 @@ mod tests {
         let before = d.recents.activity(usize::MAX).len();
         d.recents.ensure_activity_scanned(&d.store).await;
         assert_eq!(d.recents.activity(usize::MAX).len(), before);
+    }
+
+    #[tokio::test]
+    async fn the_feed_pages_back_through_everything_newest_first() {
+        let d = Device::new().await;
+        let other = crate::agents::Agent::new(None).unwrap().subject.to_string();
+        let now = crate::utils::now();
+        d.recents.with(|s| {
+            // 130 entries over 65 days, two of them at one instant.
+            for i in 0..130i64 {
+                let mut e = entry(
+                    &format!("did:ad:r{i:03}"),
+                    ActivityKind::Changed,
+                    now - (i / 2) * DAY,
+                );
+                e.actor = Some(other.clone());
+                e.drive = d.drive.clone();
+                record_activity(&mut s.recents, e);
+            }
+        });
+        let profiles = crate::host::profiles::AgentProfiles::none();
+        let mut seen: Vec<(i64, String)> = Vec::new();
+        let mut before: Option<(i64, String)> = None;
+        let mut pages = 0;
+        loop {
+            let page = lists::list_activity_page(
+                &d.store,
+                &d.recents,
+                &profiles,
+                before.as_ref().map(|(at, s)| (*at, s.as_str())),
+                50,
+                false,
+            )
+            .await;
+            pages += 1;
+            seen.extend(page.iter().map(|a| (a.at, a.subject.clone())));
+            if page.len() < 50 {
+                break;
+            }
+            before = page.last().map(|a| (a.at, a.subject.clone()));
+        }
+        assert_eq!(pages, 3);
+        assert_eq!(seen.len(), 130, "no entry lost or repeated");
+        let mut sorted = seen.clone();
+        sorted.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+        assert_eq!(seen, sorted);
+        // The oldest is two months back, and in the feed.
+        assert!(seen.last().unwrap().0 < now - 60 * DAY);
     }
 
     #[test]
