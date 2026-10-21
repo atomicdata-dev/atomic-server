@@ -143,7 +143,8 @@ impl AgentProfiles {
 /// URL-safe base64 alphabet (with or without padding). `None` when the
 /// subject names no agent.
 pub fn agent_key(subject: &str) -> Option<String> {
-    let migrated = crate::agents::migrate_legacy_agent_subject(subject.trim());
+    let migrated =
+        crate::agents::migrate_legacy_agent_subject(subject.trim().trim_end_matches('/'));
     let key = crate::identifiers::agent_public_key(&migrated)?;
     let key: String = key
         .trim_end_matches('=')

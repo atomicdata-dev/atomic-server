@@ -531,10 +531,12 @@ fn members_of(conversation: &Resource) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// Whether two spellings name the same agent (`did:ad:agent:X`, `atomic:agent:X`).
+/// Whether two subjects name the same agent, in any spelling (`did:ad:agent:X`,
+/// `atomic:agent:X`, legacy `https://host/agents/X`, `internal:/agents/X`;
+/// standard or URL-safe base64, padded or not). The one comparison behind every
+/// `mine` flag and "is this me" check.
 pub(crate) fn same_agent(a: &str, b: &str) -> bool {
-    use crate::identifiers::agent_public_key;
-    a == b || matches!((agent_public_key(a), agent_public_key(b)), (Some(x), Some(y)) if x == y)
+    super::profiles::same_agent(a, b)
 }
 
 /// `vault_proof` of an agent: its signature over the fixed vault message, the
@@ -1166,6 +1168,46 @@ mod tests {
             .iter()
             .map(|m| m["text"].as_str().unwrap_or("<unopenable>").to_string())
             .collect()
+    }
+
+    /// `mine` holds for the device agent in every spelling (DID, legacy
+    /// `https://host/agents/K`, URL-safe base64, trailing slash) and not for
+    /// another agent.
+    #[tokio::test]
+    async fn mine_matches_the_device_agent_in_every_spelling() {
+        let d = Device::new().await;
+        let me = d.store.get_default_agent().unwrap();
+        let key = me.public_key.clone();
+        let url_safe = key.trim_end_matches('=').replace('+', "-").replace('/', "_");
+        let authors = [
+            me.subject.to_string(),
+            format!("https://example.test/agents/{key}"),
+            format!("https://example.test/agents/{key}/"),
+            format!("did:ad:agent:{url_safe}"),
+            format!("atomic:agent:{key}"),
+            "did:ad:agent:SomeoneElseEntirely".to_string(),
+        ];
+        let messages = authors
+            .iter()
+            .enumerate()
+            .map(|(i, a)| {
+                (
+                    i as i64,
+                    format!("did:ad:message{i}"),
+                    OpenedMessage {
+                        author: a.clone(),
+                        text: Some("x".into()),
+                        created_at: i as i64,
+                        reply_to: None,
+                    },
+                )
+            })
+            .collect();
+        let rows = conversations()
+            .rows(&d.store, &me.subject.to_string(), messages)
+            .await;
+        let mine: Vec<bool> = rows.iter().map(|r| r["mine"].as_bool().unwrap()).collect();
+        assert_eq!(mine, [true, true, true, true, true, false]);
     }
 
     /// A sends, B reads, B replies, A reads: first message and reply, each
