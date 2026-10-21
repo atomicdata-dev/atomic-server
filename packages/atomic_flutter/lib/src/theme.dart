@@ -297,3 +297,32 @@ class AppColors extends ThemeExtension<AppColors> {
 extension AppColorsExt on BuildContext {
   AppColors get appColors => Theme.of(this).extension<AppColors>()!;
 }
+
+/// The one section-header style of the app (Home's sections, Sync's
+/// sections): the title in the full text colour, 14 sp bold, on a faint band
+/// (the text colour at 6% over the page) that sets headers apart from the
+/// rows under them. Three levels read: header (strong, on the band), item
+/// title (normal), item caption ([AppColors.textSecondary]).
+extension SectionHeaderStyle on AppColors {
+  /// The surface of a section header: at least 1.08:1 off the page in both
+  /// themes.
+  Color get sectionBand =>
+      Color.alphaBlend(textPrimary.withValues(alpha: 0.06), bgBody);
+
+  /// The header's title.
+  TextStyle get sectionHeaderText => TextStyle(
+      color: textPrimary,
+      fontSize: 14,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.2);
+
+  /// The hairline above a section, in the border colour.
+  Color get sectionDivider => border;
+
+  /// The fill of the selected / highlighted row: the main colour at 10%
+  /// (light) / 16% (dark) over the page, like the search's top hit.
+  Color get rowHighlight => Color.alphaBlend(
+      main.withValues(
+          alpha: bgBody.computeLuminance() < 0.5 ? 0.16 : 0.10),
+      bgBody);
+}

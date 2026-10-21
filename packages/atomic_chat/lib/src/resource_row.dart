@@ -1,4 +1,5 @@
-import 'package:atomic_flutter/atomic_flutter.dart' show AppColorsExt;
+import 'package:atomic_flutter/atomic_flutter.dart'
+    show AppColorsExt, SectionHeaderStyle;
 import 'package:flutter/material.dart';
 
 import 'app_shell.dart';
@@ -158,17 +159,24 @@ class ResourceRow extends StatelessWidget {
 
   Widget _tile(BuildContext context, {bool selected = false}) {
     final c = context.appColors;
+    // Three levels: the item's title (full text colour), its caption (muted,
+    // 4.5:1 or better), under the section header (bold, on a band).
+    final titleColor = selected ? c.mainSelectedFg : c.textPrimary;
+    final captionColor = selected ? c.mainSelectedFg : c.textSecondary;
     return ListTile(
       leading: _leading(context),
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      titleTextStyle: TextStyle(
+          color: titleColor, fontSize: 15, fontWeight: FontWeight.w400),
       subtitle: detail == null || detail!.isEmpty ? null : Text(detail!),
+      subtitleTextStyle: TextStyle(color: captionColor, fontSize: 13),
       // A plain list of titles reads better tight.
       visualDensity: detail == null && !_hasLeading
           ? VisualDensity.compact
           : VisualDensity.standard,
       trailing: trailing,
       selected: selected,
-      selectedTileColor: c.mainSelectedBg,
+      selectedTileColor: c.rowHighlight,
       selectedColor: c.mainSelectedFg,
       onTap: onTap,
     );

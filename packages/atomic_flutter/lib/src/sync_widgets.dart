@@ -46,10 +46,8 @@ abstract final class SyncText {
       body(c).copyWith(fontWeight: FontWeight.w600);
   static TextStyle caption(AppColors c) =>
       TextStyle(fontSize: 13, height: 1.3, color: c.textSecondary);
-  static TextStyle header(AppColors c) => TextStyle(
-      fontSize: 15,
-      fontWeight: FontWeight.w600,
-      color: c.textPrimary.withValues(alpha: 0.85));
+  /// The app's section-header style (see [SectionHeaderStyle]).
+  static TextStyle header(AppColors c) => c.sectionHeaderText;
   static TextStyle title(AppColors c) => TextStyle(
       fontSize: 20, fontWeight: FontWeight.w600, color: c.textPrimary);
   static TextStyle chip(Color color) =>

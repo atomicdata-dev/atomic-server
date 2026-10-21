@@ -4,7 +4,13 @@
 library;
 
 export 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColors, AppColorsExt, HoldFan, HoldFanItem, HoldFanLayout;
+    show
+        AppColors,
+        AppColorsExt,
+        HoldFan,
+        HoldFanItem,
+        HoldFanLayout,
+        SectionHeaderStyle;
 
 // The seam to the host's store, and what goes through it.
 export 'src/assistant_api.dart';

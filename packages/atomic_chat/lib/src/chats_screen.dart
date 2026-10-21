@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColors, AppColorsExt, Perf;
+    show AppColors, AppColorsExt, Perf, SectionHeaderStyle;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderAbstractViewport;
@@ -683,7 +683,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
       );
 
   /// One section of the home, with the layout's fold state and hold menu.
-  Widget _sectionFor(HomeSection id, AppColors c) {
+  Widget _sectionFor(HomeSection id, AppColors c, {bool divider = false}) {
     final fold = (
       collapsed: _layout.collapsed.contains(id),
       onToggle: () {
@@ -700,6 +700,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
       case HomeSection.notifications:
         return _Section<NotificationItem>(
           key: key,
+          divider: divider,
           title: id.title,
           fold: fold,
           future: _notifications,
@@ -713,6 +714,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
       case HomeSection.drives:
         return _Section<DriveInfo>(
           key: key,
+          divider: divider,
           title: id.title,
           fold: fold,
           future: _drives,
@@ -724,6 +726,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
       case HomeSection.activity:
         return _Section<ActivityEntry>(
           key: key,
+          divider: divider,
           title: id.title,
           fold: fold,
           future: _activity,
@@ -744,6 +747,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
       case HomeSection.chats:
         return _Section<ChatSummary>(
           key: key,
+          divider: divider,
           title: id.title,
           fold: fold,
           future: _chats,
@@ -754,6 +758,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
       case HomeSection.favorites:
         return _Section<RecentResource>(
           key: key,
+          divider: divider,
           title: id.title,
           fold: fold,
           future: _favorites,
@@ -766,6 +771,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
       case HomeSection.messages:
         return _Section<ConversationRow>(
           key: key,
+          divider: divider,
           title: id.title,
           fold: fold,
           future: _conversations,
@@ -776,6 +782,19 @@ class _ChatsScreenState extends State<ChatsScreen> {
               _openAll(id, list.length, (i) => _conversationRow(list[i])),
         );
     }
+  }
+
+  /// The sections the home lists, a hairline above each but the first.
+  List<Widget> _shownSections(bool split) {
+    final c = context.appColors;
+    final ids = [
+      for (final id in _layout.visible)
+        if (!(split && id == HomeSection.activity)) id
+    ];
+    return [
+      for (var i = 0; i < ids.length; i++)
+        _sectionFor(ids[i], c, divider: i > 0),
+    ];
   }
 
   @override
@@ -806,9 +825,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                 physics: const ClampingScrollPhysics(),
                 children: [
                   // Next to the pages the activity is the detail pane's.
-                  for (final id in _layout.visible)
-                    if (!(split && id == HomeSection.activity))
-                      _sectionFor(id, c),
+                  ..._shownSections(split),
                   if (_layout.visible.isEmpty) _emptyHome(),
                 ],
               ),
@@ -887,7 +904,11 @@ class _Section<T> extends StatefulWidget {
     this.total,
     this.hideEmpty = false,
     this.badge,
+    this.divider = false,
   });
+
+  /// A hairline above the heading (every section but the first shown).
+  final bool divider;
 
   @override
   State<_Section<T>> createState() => _SectionState<T>();
@@ -957,7 +978,7 @@ class _SectionState<T> extends State<_Section<T>>
           height: 48,
           width: double.infinity,
           child: Material(
-            type: MaterialType.transparency,
+            color: c.sectionBand,
             child: InkWell(
               onTap: fold.onToggle,
               onLongPress: fold.onHold,
@@ -965,15 +986,12 @@ class _SectionState<T> extends State<_Section<T>>
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(children: [
                   Expanded(
-                    // A title in proportion to the rows and the bar's 24 dp
-                    // icons: 15 sp, nearly the text colour.
+                    // The app's section-header style: full-strength text on
+                    // the band, so headers read apart from the rows.
                     child: Text(widget.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: c.textPrimary.withValues(alpha: 0.85),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600)),
+                        style: c.sectionHeaderText),
                   ),
                   if (unread > 0) ...[
                     const SizedBox(width: 8),
@@ -1010,11 +1028,18 @@ class _SectionState<T> extends State<_Section<T>>
     );
   }
 
-  /// The heading row: 48 dp like the bar's buttons, with room above it
-  /// between sections.
-  Widget _headingRow(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: _foldHeading(context),
+  /// The heading row: 48 dp like the bar's buttons, on the header band, with
+  /// a hairline above it between sections (not before the first).
+  Widget _headingRow(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (widget.divider)
+            Container(
+                key: ValueKey('section-divider-${widget.fold.section.name}'),
+                height: 1,
+                color: context.appColors.sectionDivider),
+          _foldHeading(context),
+        ],
       );
 
   @override
