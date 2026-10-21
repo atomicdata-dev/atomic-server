@@ -33,6 +33,10 @@ android {
         targetSdk 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
+        // Store builds are "atomic.place"; every other build says which app it
+        // is, next to the Tauri and Kotlin ones. `-Patomic.storeRelease=true`.
+        manifestPlaceholders = [appLabel: project.hasProperty("atomic.storeRelease")
+                ? "atomic.place" : "atomic.place (flutter)"]
     }
 
     buildTypes {
