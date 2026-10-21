@@ -115,7 +115,8 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Map<String, int> sse_decode_Map_String_u_32_None(
-      SseDeserializer deserializer);
+    SseDeserializer deserializer,
+  );
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
@@ -128,7 +129,8 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BackgroundActivity sse_decode_background_activity(
-      SseDeserializer deserializer);
+    SseDeserializer deserializer,
+  );
 
   @protected
   bool sse_decode_bool(SseDeserializer deserializer);
@@ -141,7 +143,8 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   StoreRecovery sse_decode_box_autoadd_store_recovery(
-      SseDeserializer deserializer);
+    SseDeserializer deserializer,
+  );
 
   @protected
   int sse_decode_i_32(SseDeserializer deserializer);
@@ -154,7 +157,8 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ActivityEntry> sse_decode_list_activity_entry(
-      SseDeserializer deserializer);
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
@@ -164,25 +168,29 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<(String, int)> sse_decode_list_record_string_u_32(
-      SseDeserializer deserializer);
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<VersionMetadata> sse_decode_list_version_metadata(
-      SseDeserializer deserializer);
+    SseDeserializer deserializer,
+  );
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
   AgentInfo? sse_decode_opt_box_autoadd_agent_info(
-      SseDeserializer deserializer);
+    SseDeserializer deserializer,
+  );
 
   @protected
   PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
 
   @protected
   StoreRecovery? sse_decode_opt_box_autoadd_store_recovery(
-      SseDeserializer deserializer);
+    SseDeserializer deserializer,
+  );
 
   @protected
   Uint8List? sse_decode_opt_list_prim_u_8_strict(SseDeserializer deserializer);
@@ -213,7 +221,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_Map_String_u_32_None(
-      Map<String, int> self, SseSerializer serializer);
+    Map<String, int> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_String(String self, SseSerializer serializer);
@@ -226,22 +236,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_background_activity(
-      BackgroundActivity self, SseSerializer serializer);
+    BackgroundActivity self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_agent_info(
-      AgentInfo self, SseSerializer serializer);
+    AgentInfo self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_box_autoadd_i_64(
-      PlatformInt64 self, SseSerializer serializer);
+    PlatformInt64 self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_box_autoadd_store_recovery(
-      StoreRecovery self, SseSerializer serializer);
+    StoreRecovery self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
@@ -254,45 +272,63 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_activity_entry(
-      List<ActivityEntry> self, SseSerializer serializer);
+    List<ActivityEntry> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_prim_u_8_strict(
-      Uint8List self, SseSerializer serializer);
+    Uint8List self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_record_string_u_32(
-      List<(String, int)> self, SseSerializer serializer);
+    List<(String, int)> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_list_version_metadata(
-      List<VersionMetadata> self, SseSerializer serializer);
+    List<VersionMetadata> self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_box_autoadd_agent_info(
-      AgentInfo? self, SseSerializer serializer);
+    AgentInfo? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_box_autoadd_i_64(
-      PlatformInt64? self, SseSerializer serializer);
+    PlatformInt64? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_box_autoadd_store_recovery(
-      StoreRecovery? self, SseSerializer serializer);
+    StoreRecovery? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_list_prim_u_8_strict(
-      Uint8List? self, SseSerializer serializer);
+    Uint8List? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_record_string_u_32(
-      (String, int) self, SseSerializer serializer);
+    (String, int) self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_setup_result(SetupResult self, SseSerializer serializer);
@@ -314,7 +350,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_version_metadata(
-      VersionMetadata self, SseSerializer serializer);
+    VersionMetadata self,
+    SseSerializer serializer,
+  );
 }
 
 // Section: wire_class

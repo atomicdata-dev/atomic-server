@@ -8,10 +8,10 @@ use super::{
     recents::{ActivityKind, RecentsIndex},
     rows::{
         emoji_of, first_class, name_of, picture_fields, resource_row, row_resource, with_icon,
-        DriveCache,
+        DriveCache, AI_CHAT,
     },
 };
-use crate::{errors::AtomicResult, urls, Db, Storelike, Subject};
+use crate::{errors::AtomicResult, urls, Db, Resource, Storelike, Subject};
 use serde_json::{json, Value as Json};
 use std::collections::HashMap;
 
@@ -448,6 +448,101 @@ pub async fn list_recent_resources(
     out
 }
 
+/// What the web sidebar leaves out of a drive's child list: the standard
+/// folders a drive points at (default ontology, Comments, AI Chats, Inbox,
+/// Trash), AI chats and meetings (their own panels reach them) and a private
+/// note about an agent. `browser/data-browser/src/hooks/useVisibleDriveChildren.ts`.
+fn hidden_from_children(parent: &Resource) -> std::collections::HashSet<String> {
+    [
+        urls::DEFAULT_ONTOLOGY,
+        urls::COMMENTS_FOLDER,
+        urls::TRASH_FOLDER,
+        AI_CHATS_FOLDER,
+        super::notifications::INBOX,
+    ]
+    .iter()
+    .filter_map(|p| parent.get(p).ok().map(|v| v.to_string()))
+    .filter(|s| !s.is_empty())
+    .map(|s| crate::identifiers::canonicalize_scheme(&s))
+    .collect()
+}
+
+/// `ai.properties.aiChatsFolder` (`browser/lib/src/ontologies/ai.ts`).
+const AI_CHATS_FOLDER: &str =
+    "https://atomicdata.dev/01jtjxtsa9syxmfca2zx5gcnmj/property/ai-chats-folder";
+
+/// Classes whose children the web sidebar does not unfold: they show them in
+/// their own page (table rows, messages, classes, results).
+fn keeps_own_children(resource: &Resource) -> bool {
+    [
+        urls::TABLE,
+        urls::CHATROOM,
+        MEETING,
+        AI_CHAT,
+        urls::ONTOLOGY,
+        urls::FORM,
+    ]
+    .iter()
+    .any(|c| resource.has_class(c))
+}
+
+/// `dataBrowser.classes.meeting`.
+const MEETING: &str = "https://atomicdata.dev/classes/Meeting";
+
+/// The children of `parent` as the web app's sidebar lists them, in its
+/// order: by `sortOrder`, which falls back to `createdAt` (the query index
+/// files a resource without one under its creation time, as
+/// `browser/lib/src/child-order.ts` does client side), minus what
+/// [`hidden_from_children`] names. At most `limit` of the first children are
+/// read; `total` is how many there are. Rows are
+/// `{subject, title, class_name, expandable, emoji?, icon_file?, image_url?}`,
+/// read from local propvals only; a child this device does not hold is left out.
+pub async fn list_children(store: &Db, parent: &str, limit: usize) -> AtomicResult<Json> {
+    let mut query = crate::storelike::Query::new_prop_val(urls::PARENT, parent);
+    query.sort_by = Some(urls::SORT_ORDER.to_string());
+    query.limit = Some(limit.max(1));
+    let parent_resource = row_resource(store, &Subject::from(parent)).await;
+    // A sorted query is scoped to the drive the parent lives in (the parent
+    // itself when it is the drive).
+    let drive = parent_resource
+        .as_ref()
+        .map(|p| DriveCache::default().of(store, p))
+        .filter(|d| !d.is_empty())
+        .unwrap_or_else(|| parent.to_string());
+    query.drive = Some(Subject::from(drive.as_str()));
+    let found = store.query(&query).await?;
+    let hidden = match &parent_resource {
+        Some(p) => hidden_from_children(p),
+        None => Default::default(),
+    };
+    let mut rows = Vec::new();
+    for subject in &found.subjects {
+        let subject = subject.to_string();
+        if subject.starts_with("did:ad:commit:")
+            || hidden.contains(&crate::identifiers::canonicalize_scheme(&subject))
+        {
+            continue;
+        }
+        let Some(resource) = row_resource(store, &Subject::from(subject.as_str())).await else {
+            continue;
+        };
+        if resource.has_class(AI_CHAT) || resource.has_class(MEETING) {
+            continue;
+        }
+        let about = resource
+            .get(urls::ABOUT)
+            .map(|v| v.to_string())
+            .unwrap_or_default();
+        if resource.has_class(urls::PLAIN_TEXT) && about.starts_with("did:ad:agent:") {
+            continue;
+        }
+        let mut row = resource_row(store, &subject, &resource, ("expandable", json!(false))).await;
+        row["expandable"] = json!(!keeps_own_children(&resource));
+        rows.push(row);
+    }
+    Ok(json!({ "total": found.count, "children": rows }))
+}
+
 /// The subjects in a list property of the agent's private drive (the web
 /// app's "home index"), in stored order; empty when there is no such drive or
 /// list yet.
@@ -682,6 +777,40 @@ mod tests {
         assert_eq!(list[position(&new)]["name"], "Assistant new chat");
         assert_eq!(list[position(&new)]["last_activity"], 9_000);
         assert_eq!(list[position(&empty)]["last_activity"], 0);
+    }
+
+    #[tokio::test]
+    async fn children_follow_the_sidebar_order_and_skip_what_it_hides() {
+        let d = Device::new().await;
+        let make = |name: &'static str, class: &'static str| {
+            let d = &d;
+            async move {
+                d.store
+                    .create_resource(class, &d.drive, name, None)
+                    .await
+                    .unwrap()
+            }
+        };
+        let first = make("Zebra first", urls::FOLDER).await;
+        let second = make("Apple second", urls::FOLDER).await;
+        let third = make("Mango third", urls::CHATROOM).await;
+        let chat = d.new_chat("A chat").await;
+        // The user drags the third one to the top.
+        let mut r = d.store.get_resource(&third.as_str().into()).await.unwrap();
+        r.set_unsafe(urls::SORT_ORDER.into(), crate::Value::Float(1.0))
+            .unwrap();
+        r.save_locally(&d.store).await.unwrap();
+
+        let out = list_children(&d.store, &d.drive, 50).await.unwrap();
+        let rows = out["children"].as_array().unwrap();
+        let order: Vec<&str> = rows.iter().filter_map(|r| r["subject"].as_str()).collect();
+        let at = |s: &str| order.iter().position(|x| *x == s).unwrap();
+        assert!(at(&third) < at(&first), "{order:?}");
+        assert!(at(&first) < at(&second), "{order:?}");
+        assert!(!order.contains(&chat.as_str()), "AI chats are hidden");
+        assert_eq!(find(rows, &third)["expandable"], false);
+        assert_eq!(find(rows, &first)["expandable"], true);
+        assert_eq!(find(rows, &first)["title"], "Zebra first");
     }
 
     #[tokio::test]

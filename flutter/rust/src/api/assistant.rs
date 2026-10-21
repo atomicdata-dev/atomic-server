@@ -150,6 +150,18 @@ pub async fn list_recent_resources(drive: String, limit: u32) -> Result<String, 
     to_json(&lists::list_recent_resources(db()?, recents(), &drive, limit as usize).await)
 }
 
+/// The children of `parent` in the web sidebar's order, as JSON `{total,
+/// children: [{subject, title, class_name, expandable, emoji?, icon_file?,
+/// image_url?}]}`: the first `limit` by `sortOrder` (else creation time),
+/// without the standard folders, AI chats and meetings the web leaves out.
+pub async fn list_children(parent: String, limit: u32) -> Result<String, String> {
+    to_json(
+        &lists::list_children(db()?, &parent, limit as usize)
+            .await
+            .map_err(err)?,
+    )
+}
+
 /// The person's favorites (all drives), newest added first, as JSON
 /// `[{subject, title, class_name, opened_at}]` (`opened_at` is always 0).
 /// Favorites that are gone or unreadable are left out.
