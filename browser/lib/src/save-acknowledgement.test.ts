@@ -185,6 +185,32 @@ describe('explicit save acknowledgement', () => {
     store.setServerConnected(false);
   });
 
+  it('explains a missing append right in plain words, once per resource', async () => {
+    const { store } = await testStore();
+    const drive = await store.newResource({
+      isA: 'https://atomicdata.dev/classes/Drive',
+      noParent: true,
+    });
+    const refusal =
+      'Unauthorized. No https://atomicdata.dev/properties/append right has been found for atomic:agent:x in this resource or its parents';
+    const errors: string[] = [];
+    store.on(StoreEvents.Error, e => errors.push(e.message));
+    const notify = () =>
+      (
+        store as unknown as {
+          notifyBlockedSync(subject: string, message: string): void;
+        }
+      ).notifyBlockedSync(drive.subject, refusal);
+
+    notify();
+    notify();
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain('not allowed to add this here');
+    expect(errors[0]).not.toContain('right has been found');
+    store.setServerConnected(false);
+  });
+
   it('does not let an unrelated failure reject an acknowledged save', async () => {
     const { store, postCommitSpy } = await testStore();
     const rejected = await store.newResource({
