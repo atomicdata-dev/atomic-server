@@ -23,8 +23,9 @@ use crate::{db::DbEvent, errors::AtomicResult, urls, Db, Resource, Storelike, Su
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-/// Entries kept in the activity log.
-const ACTIVITY_CAP: usize = 200;
+/// Entries kept in the activity log. Generous: it holds weeks of a busy
+/// drive, and the full Activity page pages back through all of it.
+const ACTIVITY_CAP: usize = 2_000;
 /// Changes to one subject closer together than this share one entry (ms).
 const BURST_MS: i64 = 60_000;
 
@@ -82,6 +83,9 @@ struct Recents {
     chats: HashMap<String, i64>,
     /// Whether `chats` was filled from the store (and not only from events).
     chats_scanned: bool,
+    /// Whether `activity` was filled from the store's resources (and not only
+    /// from events seen while this index listened).
+    activity_scanned: bool,
     /// Opened resources, keyed by the drive's `pure_id`.
     drives: HashMap<String, DriveRecents>,
 }
@@ -259,9 +263,9 @@ const FRESH_ENVELOPE_MS: i64 = 2 * 60_000;
 ///
 /// - A change a commit made here (this device's own edit, or a commit frame)
 ///   is that commit's: its envelope is the newest one kept.
-/// - A resource first seen as plain state (the server's `UPDATE` frames carry
-///   no signer) and made a moment ago names its creator in its genesis
-///   change (`createdBy`).
+/// - A resource first seen as plain state (the server's `UPDATE` frames and
+///   `SYNC_PUSH` carry no signer), however old, names its creator in its
+///   genesis change (`createdBy`) and was made when `createdAt` says.
 /// - Any other change that arrived as plain state is only attributed when a
 ///   commit envelope came with it (a sync push carries them), i.e. the
 ///   newest kept envelope is fresh. An older envelope describes an earlier
@@ -292,9 +296,12 @@ fn attribute(
         .get(urls::CREATED_AT)
         .ok()
         .and_then(|v| v.to_int().ok());
-    let just_made =
-        is_new || (first_seen && created_at.is_some_and(|at| (now - at).abs() < FRESH_ENVELOPE_MS));
-    if just_made {
+    // A resource the log does not know yet names its creator, however old it
+    // is: it reaches a device that joined late (or has not looked in a while)
+    // as plain state, and its genesis is the one thing that says who made it
+    // and when. Judging it by how recent it is hid everything older than two
+    // minutes.
+    if is_new || first_seen {
         let creator = resource
             .get(urls::CREATED_BY)
             .ok()
@@ -360,6 +367,7 @@ impl RecentsIndex {
         resource: &Resource,
         is_new: bool,
         from_commit: bool,
+        only_named: bool,
     ) {
         let id = subject.to_string();
         if is_activity_noise(&id, resource) {
@@ -371,6 +379,9 @@ impl RecentsIndex {
         };
         let first_seen = self.with(|s| s.recents.activity.iter().all(|a| a.subject != id));
         let (actor, at, created) = attribute(store, &id, resource, is_new, from_commit, first_seen);
+        if only_named && actor.is_none() {
+            return;
+        }
         let new = Activity {
             subject: id,
             drive,
@@ -438,7 +449,7 @@ impl RecentsIndex {
                         self.bump_chat(&parent, page_last_activity(&resource));
                     }
                 } else {
-                    self.note_changed(store, &subject, &resource, is_new, from_commit)
+                    self.note_changed(store, &subject, &resource, is_new, from_commit, false)
                         .await;
                 }
             }
@@ -487,6 +498,9 @@ impl RecentsIndex {
                         if !self.with(|s| s.recents.chats_scanned) {
                             let _ = self.ensure_scanned(&store).await;
                         }
+                        if !self.with(|s| s.recents.activity_scanned) {
+                            self.ensure_activity_scanned(&store).await;
+                        }
                     }
                 }
                 if self.with(|s| s.dirty) {
@@ -524,6 +538,53 @@ impl RecentsIndex {
             s.dirty = true;
         });
         Ok(())
+    }
+
+    /// Fill the activity log from the resources the store already holds, the
+    /// first time (and after a lag): the log is otherwise only what changed
+    /// while this index listened, so everything that arrived earlier (a drive
+    /// synced before, an index file from an older build) was missing. Each
+    /// resource not in the log yet is entered as the store can attribute it
+    /// ([`attribute`]), the newest [`ACTIVITY_CAP`] of them.
+    pub async fn ensure_activity_scanned(&self, store: &Db) {
+        if self.with(|s| s.recents.activity_scanned) {
+            return;
+        }
+        let _scanning = self.scanning.lock().await;
+        if self.with(|s| s.recents.activity_scanned) {
+            return;
+        }
+        let known: std::collections::HashSet<String> =
+            self.with(|s| s.recents.activity.iter().map(|a| a.subject.clone()).collect());
+        let mut found: Vec<(i64, Resource)> = store
+            .all_resources(false)
+            .filter(|r| {
+                let subject = r.get_subject().to_string();
+                !subject.starts_with("did:ad:commit:")
+                    && !known.contains(&subject)
+                    && r.get(urls::DRIVE_PROP).is_ok()
+                    && !is_activity_noise(&subject, r)
+            })
+            .map(|r| {
+                let created = r
+                    .get(urls::CREATED_AT)
+                    .ok()
+                    .and_then(|v| v.to_int().ok())
+                    .unwrap_or(0);
+                (created, r)
+            })
+            .collect();
+        found.sort_by_key(|(created, _)| std::cmp::Reverse(*created));
+        found.truncate(ACTIVITY_CAP);
+        for (_, resource) in found {
+            let subject = resource.get_subject().clone();
+            self.note_changed(store, &subject, &resource, false, false, true)
+                .await;
+        }
+        self.with(|s| {
+            s.recents.activity_scanned = true;
+            s.dirty = true;
+        });
     }
 
     /// The `limit` newest chats as `(subject, name, last_activity)`.
@@ -847,6 +908,83 @@ mod tests {
             .iter()
             .any(|a| a.subject == subject && a.name == "Bob's folder"));
         assert!(list.iter().all(|a| a.subject != anonymous));
+    }
+
+    /// A resource as the server's sync delivers it: plain state whose genesis
+    /// names `creator` and the time it was made.
+    async fn arrives_made_by(
+        d: &Device,
+        subject: &str,
+        name: &str,
+        creator: &str,
+        created_at: i64,
+    ) {
+        let mut authored = Resource::new(subject.to_string());
+        for (prop, value) in [
+            (urls::PARENT, crate::Value::AtomicUrl(d.drive.as_str().into())),
+            (urls::DRIVE_PROP, crate::Value::AtomicUrl(d.drive.as_str().into())),
+            (urls::NAME, crate::Value::String(name.into())),
+            (urls::CREATED_BY, crate::Value::AtomicUrl(creator.into())),
+            (urls::CREATED_AT, crate::Value::Timestamp(created_at)),
+        ] {
+            authored.set_unsafe(prop.into(), value).unwrap();
+        }
+        let state = authored.build_state_doc().unwrap().export_snapshot();
+        crate::sync::ws_apply::apply_state_update(&d.store, subject, &state)
+            .await
+            .unwrap();
+    }
+
+    fn feed(d: &Device) -> Vec<(String, i64)> {
+        d.recents
+            .activity(usize::MAX)
+            .into_iter()
+            .filter(|a| a.actor.is_some())
+            .map(|a| (a.name, a.at))
+            .collect()
+    }
+
+    const DAY: i64 = 86_400_000;
+
+    #[tokio::test]
+    async fn what_others_made_days_ago_is_in_the_feed_when_it_syncs_in() {
+        let d = Device::new().await;
+        let mut rx = d.store.subscribe_events();
+        let bob = crate::agents::Agent::new(Some("Bob")).unwrap().subject.to_string();
+        let now = crate::utils::now();
+        arrives_made_by(&d, "did:ad:old-by-bob", "Three days ago", &bob, now - 3 * DAY).await;
+        arrives_made_by(&d, "did:ad:older-by-bob", "A month ago", &bob, now - 30 * DAY).await;
+        arrives_made_by(&d, "did:ad:new-by-bob", "Today", &bob, now - 1_000).await;
+        d.pump(&mut rx).await;
+        let names: Vec<String> = feed(&d).into_iter().map(|(n, _)| n).collect();
+        assert_eq!(names, ["Today", "Three days ago", "A month ago"]);
+        // At the time they were made, not when this device got them.
+        assert!(feed(&d)[1].1 < now - 2 * DAY);
+    }
+
+    #[tokio::test]
+    async fn a_scan_finds_what_synced_in_before_the_index_listened() {
+        let d = Device::new().await;
+        let bob = crate::agents::Agent::new(Some("Bob")).unwrap().subject.to_string();
+        let now = crate::utils::now();
+        // Nobody listened when these arrived (an index from an older build).
+        arrives_made_by(&d, "did:ad:old-by-bob", "Three days ago", &bob, now - 3 * DAY).await;
+        arrives_made_by(&d, "did:ad:new-by-bob", "Today", &bob, now - 1_000).await;
+        assert!(feed(&d).is_empty());
+        d.recents.ensure_activity_scanned(&d.store).await;
+        let names: Vec<String> = feed(&d).into_iter().map(|(n, _)| n).collect();
+        assert!(names.contains(&"Today".to_string()), "{names:?}");
+        assert!(names.contains(&"Three days ago".to_string()), "{names:?}");
+        // The commits and the drive itself are bookkeeping, not activity.
+        assert!(d
+            .recents
+            .activity(usize::MAX)
+            .iter()
+            .all(|a| !a.subject.contains("commit:")));
+        // Scanning again adds nothing.
+        let before = d.recents.activity(usize::MAX).len();
+        d.recents.ensure_activity_scanned(&d.store).await;
+        assert_eq!(d.recents.activity(usize::MAX).len(), before);
     }
 
     #[test]
