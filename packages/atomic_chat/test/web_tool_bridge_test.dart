@@ -73,12 +73,11 @@ class _Bridge implements WebToolBridge {
         parameters: {'type': 'object', 'properties': {}},
       ),
     ],
-    this.prompt = 'WEB PROMPT',
     this.onRun,
   });
 
   final List<ToolDef> tools;
-  final String prompt;
+  final String prompt = 'WEB PROMPT';
   Object? listError;
   Object? promptError;
   final Future<String> Function(String name, Map<String, dynamic> args)? onRun;
