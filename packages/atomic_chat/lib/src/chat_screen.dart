@@ -153,11 +153,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     idOf: (m) => m.id,
     onOlderPage: (ms, n) => Perf.span('chat older page $n', ms),
   );
-  late final _keeper = ChatScrollKeeper(_window,
-      // While an answer streams in and its top is held (or the person
-      // scrolled away), growth at the bottom must not move what is shown.
-      controller: HoldingScrollController(
-          () => _sending && (_pinned || !_follow)));
+  late final _keeper = ChatScrollKeeper(_window);
 
   // Following an answer as it streams in (see [_settle]): the list follows
   // the growing answer at the bottom while the answer's top is in view;
@@ -184,6 +180,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// growing under it; that room is part of the answer's own layout, so a
   /// new section never moves the question.
   double _sentHeight = 0;
+  double? _answerHeight;
   bool _settleQueued = false;
   List<ChatEntry> get _messages => _window.items;
   Object? get _loadError => _window.error;
@@ -817,19 +814,22 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final answer = _boxOf(_answerKey);
     if (list == null || answer == null) return;
     final pos = _keeper.controller.position;
+    final h = answer.size.height;
+    final grew = _answerHeight == null ? 0.0 : h - _answerHeight!;
+    _answerHeight = h;
     final sent = _boxOf(_sentKey);
     if (sent != null && (sent.size.height - _sentHeight).abs() > 0.5) {
       setState(() => _sentHeight = sent.size.height);
       return;
     }
-    // Growth while pinned or scrolled away is held in layout, see
-    // [HoldingScrollController].
     if (_follow && !_pinned) {
       final top = answer.localToGlobal(Offset.zero).dy;
       if (top < list.$2 - 0.5) {
         _pinned = true;
         pos.jumpTo(pos.pixels + list.$2 - top);
       }
+    } else if (grew.abs() > 0.01 && pos.pixels > 0.5) {
+      pos.jumpTo(math.min(pos.maxScrollExtent, pos.pixels + grew));
     }
   }
 
@@ -1077,6 +1077,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _follow = true;
       _pinned = false;
       _sentHeight = 0;
+      _answerHeight = null;
     });
     // Written in: New makes another chat from now on, also while the chat
     // itself is still being created.
@@ -1359,8 +1360,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             final first = index == 0 || shown[index - 1].role != m.role;
             final last =
                 index == shown.length - 1 || shown[index + 1].role != m.role;
+            // Room under the question for the answer being sent (see
+            // [_sentHeight]); none when opening a chat.
+            final room = m.id == _answerId && _sentId != null && _sentHeight > 0
+                ? math.max(0.0, box.maxHeight - 32 - _sentHeight)
+                : 0.0;
             final bubble = Align(
-              alignment: mine ? Alignment.topRight : Alignment.topLeft,
+              alignment: mine
+                  ? Alignment.centerRight
+                  : room > 0
+                      ? Alignment.topLeft
+                      : Alignment.centerLeft,
               child: Container(
                 margin: EdgeInsets.only(top: ChatTextStyles.gapAbove(first)),
                 padding: ChatTextStyles.bubblePadding,
@@ -1382,10 +1392,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ? KeyedSubtree(
                     key: _answerKey,
                     child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                          minHeight: _sentId == null || _sentHeight <= 0
-                              ? 0
-                              : math.max(0.0, box.maxHeight - 32 - _sentHeight)),
+                      constraints: BoxConstraints(minHeight: room),
                       child: bubble,
                     ))
                 : m.id == _sentId

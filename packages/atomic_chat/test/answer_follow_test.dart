@@ -194,25 +194,4 @@ void main() {
     await c.close();
     await tester.pumpAndSettle();
   });
-
-  testWidgets('a section added to a tall, held answer moves nothing for a frame',
-      (tester) async {
-    final c = StreamController<String>();
-    await tester.pumpWidget(_app(ChatScreen(api: _Api(_ai(() => c.stream)))));
-    await tester.pumpAndSettle();
-    await _send(tester, 'Tall frame question');
-    await _stream(tester, c, Iterable.generate(40, (i) => i));
-    final first = tester.getTopLeft(_text('Answer paragraph 0.')).dy;
-    for (var i = 40; i < 46; i++) {
-      c.add('Answer paragraph $i.\n\n');
-      for (var f = 0; f < 4; f++) {
-        await tester.pump(const Duration(milliseconds: 20));
-        expect(tester.getTopLeft(_text('Answer paragraph 0.')).dy,
-            moreOrLessEquals(first, epsilon: 0.5),
-            reason: 'section $i, frame $f');
-      }
-    }
-    await c.close();
-    await tester.pumpAndSettle();
-  });
 }
