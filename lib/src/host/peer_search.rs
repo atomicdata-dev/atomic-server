@@ -130,8 +130,15 @@ pub struct PeerSearchSchedule {
 impl Default for PeerSearchSchedule {
     fn default() -> Self {
         PeerSearchSchedule {
-            idle: [5, 10, 15, 30, 60].map(Duration::from_secs).to_vec(),
-            connected: Duration::from_secs(60),
+            // Quick first rounds so a freshly opened app finds its devices
+            // within seconds, then slowly: every round asks the public
+            // directory, and after ~4 minutes without a result another round
+            // every 5 minutes is plenty (anything explicit still dials at
+            // once and starts over, see `search_again`).
+            idle: [5, 10, 15, 30, 60, 120, 300]
+                .map(Duration::from_secs)
+                .to_vec(),
+            connected: Duration::from_secs(300),
             dead_node: Duration::from_secs(30),
         }
     }
@@ -175,6 +182,9 @@ pub struct PeerSearch {
     /// Set by [`Self::search_again`]: the next round dials every device, the
     /// ones that did not answer recently too.
     forced: std::sync::atomic::AtomicBool,
+    /// The app is in the background: [`Self::run`] makes no directory call
+    /// (no lookup, no announce) until [`Self::set_paused`] says otherwise.
+    paused: std::sync::atomic::AtomicBool,
     dead: Mutex<HashMap<String, DeadNode>>,
 }
 
@@ -204,6 +214,7 @@ impl PeerSearch {
             started: tokio::sync::Mutex::new(None),
             running: false.into(),
             forced: false.into(),
+            paused: false.into(),
             dead: Mutex::new(HashMap::new()),
         })
     }
@@ -233,6 +244,23 @@ impl PeerSearch {
     pub fn search_again(&self) {
         self.forced.store(true, std::sync::atomic::Ordering::SeqCst);
         self.wake.notify_one();
+    }
+
+    /// Pause (the app went to the background) or resume the loop of
+    /// [`Self::run`]. While paused it asks the directory nothing and
+    /// announces nothing; live connections are not touched. Resuming looks
+    /// again at once, like [`Self::search_again`].
+    pub fn set_paused(&self, paused: bool) {
+        let was = self
+            .paused
+            .swap(paused, std::sync::atomic::Ordering::SeqCst);
+        if was && !paused {
+            self.search_again();
+        }
+    }
+
+    pub fn is_paused(&self) -> bool {
+        self.paused.load(std::sync::atomic::Ordering::SeqCst)
     }
 
     /// Start the transport once. A caller that comes while a start is under
@@ -283,6 +311,10 @@ impl PeerSearch {
         announce: bool,
     ) -> RoundOutcome {
         let forced = self.forced.swap(false, std::sync::atomic::Ordering::SeqCst);
+        if forced {
+            // Asked for: start over with the quick rounds.
+            self.status.lock().unwrap().attempts = 0;
+        }
         self.set(PeerSearchState::Searching, None, false);
         let me = norm(me);
         let mut drives: Vec<&String> = drives.iter().collect();
@@ -450,6 +482,11 @@ impl PeerSearch {
         }
         let mut last_announce: Option<Instant> = None;
         loop {
+            // In the background: no directory traffic at all. A resume (or
+            // anything else that wakes the loop) is noticed here.
+            while self.is_paused() {
+                self.wake.notified().await;
+            }
             let announce = last_announce.is_none_or(|t| t.elapsed() >= announce_every);
             let list = drives();
             let wait = if list.is_empty() {
@@ -764,7 +801,81 @@ mod tests {
         assert_eq!(status.attempts, 2);
         search.search_again();
         tokio::time::sleep(Duration::from_millis(100)).await;
-        assert_eq!(directory.lookups.load(Ordering::SeqCst), 3);
+        // Cut short, and the backoff starts over (the quick 10 ms round follows).
+        assert!(directory.lookups.load(Ordering::SeqCst) >= 3);
+        run.abort();
+    }
+
+    #[test]
+    fn the_default_schedule_backs_off_to_five_minutes() {
+        let schedule = PeerSearchSchedule::default();
+        let waits: Vec<u64> = (0..10).map(|r| schedule.idle_wait(r).as_secs()).collect();
+        assert_eq!(waits, vec![5, 10, 15, 30, 60, 120, 300, 300, 300, 300]);
+        assert_eq!(schedule.idle_wait(u32::MAX).as_secs(), 300);
+        assert_eq!(schedule.connected.as_secs(), 300);
+        // The quick rounds come first: within the first minute, five rounds.
+        let first_minute: u64 = waits.iter().take(4).sum();
+        assert!(first_minute <= 60);
+    }
+
+    #[tokio::test]
+    async fn search_again_starts_over_with_the_quick_rounds() {
+        let search = PeerSearch::new(PeerSearchSchedule {
+            idle: [Duration::from_millis(10), Duration::from_secs(3600)].to_vec(),
+            connected: Duration::from_secs(3600),
+            dead_node: Duration::from_secs(60),
+        });
+        let directory = FakeDirectory::answering(vec![Ok(vec![ME])]);
+        let dialer = FakeDialer::reaching(&[]);
+        let run = tokio::spawn(search.clone().run(
+            ME.into(),
+            drives,
+            directory.clone(),
+            dialer.clone(),
+            Duration::from_secs(3600),
+        ));
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        // Backed off to an hour after two rounds.
+        assert_eq!(directory.lookups.load(Ordering::SeqCst), 2);
+        assert!(search.status().attempts >= 2);
+        search.search_again();
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        // The asked-for round, then the quick 10 ms round again, then the hour.
+        assert_eq!(directory.lookups.load(Ordering::SeqCst), 4);
+        run.abort();
+    }
+
+    #[tokio::test]
+    async fn paused_makes_no_directory_calls_and_resume_looks_at_once() {
+        let search = PeerSearch::new(fast());
+        search.set_paused(true);
+        let directory = FakeDirectory::answering(vec![Ok(vec![ME])]);
+        let dialer = FakeDialer::reaching(&[]);
+        let run = tokio::spawn(search.clone().run(
+            ME.into(),
+            drives,
+            directory.clone(),
+            dialer.clone(),
+            Duration::from_secs(3600),
+        ));
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        // Not even when asked: a wake in the background changes nothing.
+        search.search_again();
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        assert_eq!(directory.lookups.load(Ordering::SeqCst), 0);
+        assert_eq!(directory.announces.load(Ordering::SeqCst), 0);
+
+        search.set_paused(false);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(directory.lookups.load(Ordering::SeqCst) >= 1, "looked at once");
+        assert_eq!(directory.announces.load(Ordering::SeqCst), 1);
+
+        // Paused again: the rounds already scheduled stop.
+        search.set_paused(true);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let seen = directory.lookups.load(Ordering::SeqCst);
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert_eq!(directory.lookups.load(Ordering::SeqCst), seen);
         run.abort();
     }
 
