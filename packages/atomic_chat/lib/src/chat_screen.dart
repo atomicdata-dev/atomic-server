@@ -19,6 +19,7 @@ import 'chat_parts.dart';
 import 'chat_window.dart';
 import 'scroll_to_bottom_button.dart';
 import 'markdown_view.dart';
+import 'chat_bubbles.dart';
 import 'chat_text_styles.dart';
 import 'tool_step.dart';
 import 'native_views.dart';
@@ -1097,6 +1098,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (route != null) ShellScope.maybeOf(context)?.setKind(route, null);
   }
 
+  String get _headerTitle => widget.title.isEmpty
+      ? (_chat == null
+          ? (widget.voiceMode ? 'Voice chat' : 'New chat')
+          : 'Untitled chat')
+      : widget.title;
+
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
@@ -1106,11 +1113,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             child: Scaffold(
               backgroundColor: c.bgBody,
               appBar: AppTopBar(
-                title: widget.title.isEmpty
-                    ? (_chat == null
-                        ? (widget.voiceMode ? 'Voice chat' : 'New chat')
-                        : 'Untitled chat')
-                    : widget.title,
+                compact: true,
+                title: _headerTitle,
+                titleWidget: ChatHeader(
+                  title: _headerTitle,
+                  subtitle: 'AI assistant',
+                  icon: Icons.auto_awesome_outlined,
+                ),
               ),
               body: ListAndField(list: _list(c), field: _composer(c)),
             )));
@@ -1143,7 +1152,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           physics: chatScrollPhysics,
           scrollCacheExtent: const ScrollCacheExtent.viewport(1.5),
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + _spacer),
+          padding: EdgeInsets.fromLTRB(
+              ChatTextStyles.gutter, 8, ChatTextStyles.gutter, 8 + _spacer),
           itemCount: shown.length + (_window.hasOlder ? 1 : 0),
           findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
           itemBuilder: (context, i) {
@@ -1167,23 +1177,22 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     index > 0 &&
                         shown[index - 1].createdAt > 0 &&
                         otherDay(shown[index - 1].createdAt, m.createdAt));
+            final first = index == 0 || shown[index - 1].role != m.role;
+            final last =
+                index == shown.length - 1 || shown[index + 1].role != m.role;
             final bubble = Align(
               alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
               child: Container(
-                margin: EdgeInsets.only(
-                    top: ChatTextStyles.gapAbove(
-                        index == 0 || shown[index - 1].role != m.role)),
+                margin: EdgeInsets.only(top: ChatTextStyles.gapAbove(first)),
                 padding: ChatTextStyles.bubblePadding,
                 constraints: BoxConstraints(
                   // An answer may hold code and tables: a little wider.
-                  maxWidth: ChatTextStyles.bubbleMaxWidth(box.maxWidth - 32,
+                  maxWidth: ChatTextStyles.bubbleMaxWidth(
+                      box.maxWidth - 2 * ChatTextStyles.gutter,
                       answer: !mine),
                 ),
-                decoration: BoxDecoration(
-                  color: mine ? c.mainSelectedBg : c.bg1,
-                  borderRadius:
-                      BorderRadius.circular(ChatTextStyles.bubbleRadius),
-                ),
+                decoration: ChatTextStyles.bubbleDecoration(c,
+                    mine: mine, joinAbove: !first, joinBelow: !last),
                 child: _bubble(c, m, mine),
               ),
             );
@@ -1275,6 +1284,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ? ChatTextStyles.of(context).bodyMine
                 : ChatTextStyles.of(context).body,
             onLink: _openLink,
+            linkColor: mine ? ChatTextStyles.onOwn : null,
           ),
         ToolPart() =>
           ToolStepRow(p, key: ValueKey(p.toolCallId), titles: titles),
@@ -1596,121 +1606,106 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ),
       );
     }
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  _error!,
-                  style: TextStyle(
-                      color: c.alert, fontSize: ChatTextStyles.metaSize),
-                ),
+    return ChatComposerFrame(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                _error!,
+                style: TextStyle(
+                    color: c.alert, fontSize: ChatTextStyles.metaSize),
               ),
-            if (_files.isNotEmpty ||
-                (_attached.isNotEmpty &&
-                    (_messages.isNotEmpty ||
-                        _attached.any((a) => _fromDrive.contains(a.subject)))))
-              _chips(c),
-            if (widget.voiceMode) _voiceBar(c),
-            if (_listening) _Waveform(levels: _levels),
-            Row(
-              children: [
-                IconButton(
-                  key: const Key('chat-attach'),
-                  tooltip: 'Attach',
-                  onPressed: ai == null || _transcribing ? null : _attach,
-                  icon: const Icon(Icons.add_circle_outline),
-                ),
-                Expanded(
-                  child: TextField(
-                    controller: _input,
-                    focusNode: _focus,
-                    minLines: 1,
-                    maxLines: 5,
-                    textInputAction: TextInputAction.send,
-                    // Stays enabled while a reply streams (`_send` ignores a
-                    // second send), and submitting keeps focus: the keyboard
-                    // stays open for the next message.
-                    enabled: ai != null,
-                    readOnly: _transcribing,
-                    onEditingComplete: () {},
-                    onSubmitted: (_) => _send(),
-                    style: ChatTextStyles.of(context).composer,
-                    decoration: InputDecoration(
-                      hintText: 'Message',
-                      hintStyle: ChatTextStyles.of(context).composerHint,
-                      filled: true,
-                      fillColor: c.bg1,
-                      border: OutlineInputBorder(
-                        borderRadius:
-                            BorderRadius.circular(ChatTextStyles.bubbleRadius),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                ),
-                _MicButton(
-                  listening: _listening,
-                  level: _level,
-                  locale: _activeLocale,
-                  transcribing: _transcribing,
-                  onLongPress:
-                      ai == null || _transcribing ? null : _openVoiceSheet,
-                  onPressed: ai == null ? null : _toggleListening,
-                ),
-                if (_sending)
-                  IconButton.filled(
-                    key: const Key('chat-stop'),
-                    tooltip: 'Stop',
-                    onPressed: _stopAnswer,
-                    icon: const Icon(Icons.stop),
-                  )
-                else
-                  IconButton.filled(
-                    key: _listening ? const Key('chat-stop-and-send') : null,
-                    // While dictating, this is stop and send in one tap.
-                    tooltip: _listening ? 'Stop and send' : 'Send',
-                    onPressed: _transcribing || _finalising || ai == null
-                        ? null
-                        : _listening
-                            ? (_voiceLoop ? null : _stopAndSend)
-                            : !(_hadText || _files.isNotEmpty)
-                                ? null
-                                : _send,
-                    icon: const Icon(Icons.arrow_upward),
-                  ),
-              ],
             ),
-            if (_voiceNote != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  _voiceNote!,
-                  key: const Key('voice-note'),
-                  style: TextStyle(
-                      color: c.textSecondary,
-                      fontSize: ChatTextStyles.metaSize),
+          if (_files.isNotEmpty ||
+              (_attached.isNotEmpty &&
+                  (_messages.isNotEmpty ||
+                      _attached.any((a) => _fromDrive.contains(a.subject)))))
+            _chips(c),
+          if (widget.voiceMode) _voiceBar(c),
+          if (_listening) _Waveform(levels: _levels),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              IconButton(
+                key: const Key('chat-attach'),
+                tooltip: 'Attach',
+                onPressed: ai == null || _transcribing ? null : _attach,
+                icon: const Icon(Icons.add_circle_outline),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: _input,
+                  focusNode: _focus,
+                  minLines: 1,
+                  maxLines: 5,
+                  textInputAction: TextInputAction.send,
+                  // Stays enabled while a reply streams (`_send` ignores a
+                  // second send), and submitting keeps focus: the keyboard
+                  // stays open for the next message.
+                  enabled: ai != null,
+                  readOnly: _transcribing,
+                  onEditingComplete: () {},
+                  onSubmitted: (_) => _send(),
+                  style: ChatTextStyles.of(context).composer,
+                  decoration: chatFieldDecoration(context),
                 ),
               ),
-            if (_noSpeechHint && !_listening)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  "Didn't hear anything. Check the language (long-press the "
-                  'mic) and try again.',
-                  key: const Key('voice-hint'),
-                  style: TextStyle(
-                      color: c.textSecondary,
-                      fontSize: ChatTextStyles.metaSize),
-                ),
+              _MicButton(
+                listening: _listening,
+                level: _level,
+                locale: _activeLocale,
+                transcribing: _transcribing,
+                onLongPress:
+                    ai == null || _transcribing ? null : _openVoiceSheet,
+                onPressed: ai == null ? null : _toggleListening,
               ),
-          ],
-        ),
+              if (_sending)
+                ChatSendButton(
+                  key: const Key('chat-stop'),
+                  tooltip: 'Stop',
+                  onPressed: _stopAnswer,
+                  icon: Icons.stop,
+                )
+              else
+                ChatSendButton(
+                  key: _listening ? const Key('chat-stop-and-send') : null,
+                  // While dictating, this is stop and send in one tap.
+                  tooltip: _listening ? 'Stop and send' : 'Send',
+                  onPressed: _transcribing || _finalising || ai == null
+                      ? null
+                      : _listening
+                          ? (_voiceLoop ? null : _stopAndSend)
+                          : !(_hadText || _files.isNotEmpty)
+                              ? null
+                              : _send,
+                ),
+            ],
+          ),
+          if (_voiceNote != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                _voiceNote!,
+                key: const Key('voice-note'),
+                style: TextStyle(
+                    color: c.textSecondary, fontSize: ChatTextStyles.metaSize),
+              ),
+            ),
+          if (_noSpeechHint && !_listening)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                "Didn't hear anything. Check the language (long-press the "
+                'mic) and try again.',
+                key: const Key('voice-hint'),
+                style: TextStyle(
+                    color: c.textSecondary, fontSize: ChatTextStyles.metaSize),
+              ),
+            ),
+        ],
       ),
     );
   }

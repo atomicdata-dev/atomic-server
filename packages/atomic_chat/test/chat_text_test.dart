@@ -100,7 +100,7 @@ void main() {
     final label = width < 600 ? 'phone' : 'tablet';
     // The widest a message's text can be: the bubble less its padding.
     double cap({bool answer = false}) =>
-        ChatTextStyles.bubbleMaxWidth(width - 32, answer: answer) - 28;
+        ChatTextStyles.bubbleMaxWidth(width - 24, answer: answer) - 28;
 
     testWidgets('AI chat text is readable and wraps ($label)', (tester) async {
       _view(tester, width);
@@ -144,13 +144,13 @@ void main() {
         expect(_selSize(tester, f), greaterThanOrEqualTo(16));
         expect(tester.getSize(f).height, greaterThan(60), reason: 'wraps');
         expect(_textWidth(tester, f),
-            lessThanOrEqualTo(cap() - (t == 'Hello' ? 34 : 0)));
+            lessThanOrEqualTo(cap()));
       }
       expect(_fieldSize(tester), greaterThanOrEqualTo(16));
       expect(_size(tester, find.byKey(const Key('message-time')).first),
           greaterThanOrEqualTo(12));
       expect(_size(tester, find.byKey(const Key('message-author'))),
-          greaterThanOrEqualTo(14));
+          greaterThanOrEqualTo(12.5));
       expect(_size(tester, find.byKey(const Key('day-separator'))),
           greaterThanOrEqualTo(12.5));
     });
@@ -176,7 +176,7 @@ void main() {
       expect(_size(tester, find.byKey(const Key('message-time')).first),
           greaterThanOrEqualTo(12));
       expect(_size(tester, find.byKey(const Key('message-author')).first),
-          greaterThanOrEqualTo(14));
+          greaterThanOrEqualTo(12.5));
     });
   }
 
@@ -203,7 +203,7 @@ void main() {
       expect(s.body.fontSize, greaterThanOrEqualTo(16));
       expect(s.body.height, 1.4);
       expect(s.composer.fontSize, greaterThanOrEqualTo(16));
-      expect(s.sender.fontSize, 14);
+      expect(s.sender.fontSize, inInclusiveRange(12.5, 13));
       expect(s.sender.fontWeight, FontWeight.w600);
       expect(s.meta.fontSize, inInclusiveRange(12, 12.5));
       expect(s.daySeparator.fontSize, inInclusiveRange(12.5, 13));

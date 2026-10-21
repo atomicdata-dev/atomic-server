@@ -47,7 +47,7 @@ Finder _text(String t) => find.textContaining(t, findRichText: true);
 
 /// The top of the chat list (below its padding).
 double _listTop(WidgetTester tester) =>
-    tester.getTopLeft(find.byType(ListView)).dy + 16;
+    tester.getTopLeft(find.byType(ListView)).dy + 8;
 
 double _listBottom(WidgetTester tester) =>
     tester.getBottomLeft(find.byType(ListView)).dy;
@@ -75,7 +75,7 @@ void main() {
     await _stream(tester, c, [0, 1]);
     // The question sits at the top, the answer under it, all in view.
     expect(tester.getTopLeft(_text('Short question')).dy,
-        closeTo(_listTop(tester) + 14, 16));
+        closeTo(_listTop(tester) + 38, 16));
     expect(tester.getBottomLeft(_text('Answer paragraph 1')).dy,
         lessThan(_listBottom(tester)));
     expect(_pos(tester).pixels, 0);
@@ -150,7 +150,7 @@ void main() {
         subject: 'did:ad:chat')));
     await tester.pumpAndSettle();
     expect(tester.getTopLeft(_text('Long answer paragraph 0.')).dy,
-        moreOrLessEquals(_listTop(tester) + 10, epsilon: 12));
+        moreOrLessEquals(_listTop(tester) + 32, epsilon: 12));
     expect(tester.getTopLeft(_text('Long answer paragraph 59')).dy,
         greaterThan(_listBottom(tester)));
   });

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'app_top_bar.dart';
 import 'home_sections.dart' show HomeSection;
+import 'chat_bubbles.dart';
 import 'chat_text_styles.dart';
 import 'chat_window.dart';
 import 'scroll_to_bottom_button.dart';
@@ -194,9 +195,25 @@ class _ConversationScreenState extends State<ConversationScreen>
             child: Scaffold(
               backgroundColor: c.bgBody,
               appBar: AppTopBar(
-                  title: widget.title.isEmpty ? 'Conversation' : widget.title),
+                compact: true,
+                title: widget.title.isEmpty ? 'Conversation' : widget.title,
+                titleWidget: ChatHeader(
+                  title: widget.title.isEmpty ? 'Conversation' : widget.title,
+                  subtitle: _subtitle,
+                ),
+              ),
               body: ListAndField(list: _list(c), field: _composer(c)),
             )));
+  }
+
+  /// Who is in it: a direct message, or the people seen in a group so far.
+  String get _subtitle {
+    final others = {
+      for (final m in _window.items)
+        if (!m.mine) m.author,
+    };
+    if (others.length > 1) return '${others.length + 1} members';
+    return 'Direct message';
   }
 
   Widget _list(AppColors c) {
@@ -247,7 +264,8 @@ class _ConversationScreenState extends State<ConversationScreen>
               physics: chatScrollPhysics,
               scrollCacheExtent: const ScrollCacheExtent.viewport(1.5),
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(
+                  ChatTextStyles.gutter, 8, ChatTextStyles.gutter, 8),
               itemCount: shown.length + (_window.hasOlder ? 1 : 0),
               findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
               itemBuilder: (context, i) {
@@ -271,11 +289,17 @@ class _ConversationScreenState extends State<ConversationScreen>
                 final newDay = index == 0 && !_window.hasOlder ||
                     index > 0 &&
                         otherDay(shown[index - 1].createdAt, m.createdAt);
-                final bubble = _bubble(c, m,
-                    name: group && !m.mine && first ? _nameOf(m) : null,
-                    time: last ? messageTime(m.createdAt) : null,
-                    gapAbove: first,
-                    listWidth: box.maxWidth - 32);
+                final bubble = MessageRow(
+                  mine: m.mine,
+                  first: first,
+                  last: last,
+                  name: group && !m.mine && first ? _nameOf(m) : null,
+                  avatarOf: m.mine ? null : m.authorName,
+                  time: last ? clockTime(m.createdAt) : null,
+                  sending: m.id.startsWith('pending-'),
+                  listWidth: box.maxWidth - 2 * ChatTextStyles.gutter,
+                  content: _text(c, m),
+                );
                 return KeyedSubtree(
                   key: ValueKey(m.id),
                   child: RowEntrance(
@@ -301,113 +325,55 @@ class _ConversationScreenState extends State<ConversationScreen>
   String _nameOf(ConversationMessage m) =>
       m.authorName.isEmpty ? 'Unknown member' : m.authorName;
 
-  Widget _bubble(AppColors c, ConversationMessage m,
-      {String? name,
-      String? time,
-      required bool gapAbove,
-      required double listWidth}) {
-    final mine = m.mine;
-    final readable = m.text != null;
-    return Align(
-      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: EdgeInsets.only(top: ChatTextStyles.gapAbove(gapAbove)),
-        constraints: BoxConstraints(
-          maxWidth: ChatTextStyles.bubbleMaxWidth(listWidth),
-        ),
-        child: Column(
-          crossAxisAlignment:
-              mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          children: [
-            if (name != null)
-              Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 2),
-                child: Text(name,
-                    key: const Key('message-author'),
-                    style: ChatTextStyles.of(context).sender),
-              ),
-            Container(
-              padding: ChatTextStyles.bubblePadding,
-              decoration: BoxDecoration(
-                color: mine ? c.mainSelectedBg : c.bg1,
-                borderRadius:
-                    BorderRadius.circular(ChatTextStyles.bubbleRadius),
-              ),
-              child: readable
-                  ? SelectableText(
-                      m.text!,
-                      style: mine
-                          ? ChatTextStyles.of(context).bodyMine
-                          : ChatTextStyles.of(context).body,
-                    )
-                  : Text(
-                      "This message can't be opened",
-                      style: ChatTextStyles.of(context).body.copyWith(
-                            color: c.textSecondary,
-                            fontStyle: FontStyle.italic,
-                          ),
-                    ),
+  Widget _text(AppColors c, ConversationMessage m) {
+    final styles = ChatTextStyles.of(context);
+    return m.text != null
+        ? SelectableText(m.text!, style: m.mine ? styles.bodyMine : styles.body)
+        : Text(
+            "This message can't be opened",
+            style: styles.body.copyWith(
+              color: m.mine ? ChatTextStyles.onOwnMuted : c.textSecondary,
+              fontStyle: FontStyle.italic,
             ),
-            if (time != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 2, left: 4, right: 4),
-                child: Text(time,
-                    key: const Key('message-time'),
-                    style: ChatTextStyles.of(context).meta),
-              ),
-          ],
-        ),
-      ),
-    );
+          );
   }
 
-  Widget _composer(AppColors c) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(_error!,
-                      style: TextStyle(
-                          color: c.alert, fontSize: ChatTextStyles.metaSize)),
-                ),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _input,
-                      focusNode: _focus,
-                      minLines: 1,
-                      maxLines: 5,
-                      textInputAction: TextInputAction.send,
-                      onEditingComplete: () {},
-                      onSubmitted: (_) => _send(),
-                      style: ChatTextStyles.of(context).composer,
-                      decoration: InputDecoration(
-                        hintText: 'Message',
-                        hintStyle: ChatTextStyles.of(context).composerHint,
-                        filled: true,
-                        fillColor: c.bg1,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                              ChatTextStyles.bubbleRadius),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                  IconButton.filled(
-                    tooltip: 'Send',
-                    onPressed: _hadText ? _send : null,
-                    icon: const Icon(Icons.arrow_upward),
-                  ),
-                ],
+  Widget _composer(AppColors c) => ChatComposerFrame(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(_error!,
+                    style: TextStyle(
+                        color: c.alert, fontSize: ChatTextStyles.metaSize)),
               ),
-            ],
-          ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _input,
+                    focusNode: _focus,
+                    minLines: 1,
+                    maxLines: 5,
+                    textCapitalization: TextCapitalization.sentences,
+                    textInputAction: TextInputAction.send,
+                    onEditingComplete: () {},
+                    onSubmitted: (_) => _send(),
+                    style: ChatTextStyles.of(context).composer,
+                    decoration: chatFieldDecoration(context),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: ChatSendButton(onPressed: _hadText ? _send : null),
+                ),
+              ],
+            ),
+          ],
         ),
       );
 }

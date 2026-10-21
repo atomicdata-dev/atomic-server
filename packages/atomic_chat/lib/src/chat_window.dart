@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:atomic_flutter/atomic_flutter.dart' show AppScrollPhysics;
+import 'package:atomic_flutter/atomic_flutter.dart'
+    show AppColorsExt, AppScrollPhysics;
 import 'package:flutter/material.dart';
 
 import 'chat_text_styles.dart';
@@ -525,8 +526,8 @@ String dayLabel(int ms, {DateTime? now}) {
   if (diff.inDays == 0) return 'Today';
   if (diff.inDays == 1) return 'Yesterday';
   const months = [
-    'January', 'February', 'March', 'April', 'May', 'June', 'July', //
-    'August', 'September', 'October', 'November', 'December',
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', //
+    'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
   final date = '${at.day} ${months[at.month - 1]}';
   return at.year == today.year ? date : '$date ${at.year}';
@@ -546,16 +547,27 @@ class DaySeparator extends StatelessWidget {
   const DaySeparator(this.label, {super.key, required this.color});
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Center(
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    return Padding(
+      padding: const EdgeInsets.only(top: 14, bottom: 4),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: c.bg1,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: ChatTextStyles.hairline(c)),
+          ),
           child: Text(label,
               key: const Key('day-separator'),
               style: ChatTextStyles.of(context)
                   .daySeparator
                   .copyWith(color: color)),
         ),
-      );
+      ),
+    );
+  }
 }
 
 /// For a reversed `ListView.builder` over [ids] (oldest first): the

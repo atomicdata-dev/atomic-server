@@ -23,12 +23,17 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   /// Overrides the automatic back button.
   final Widget? leading;
 
+  /// A title that starts right after the back arrow (a chat header with a
+  /// picture), not after the usual 56 dp of room for it.
+  final bool compact;
+
   const AppTopBar({
     super.key,
     this.title,
     this.titleWidget,
     this.actions = const [],
     this.leading,
+    this.compact = false,
   }) : assert(title != null || titleWidget != null);
 
   @override
@@ -44,7 +49,8 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       scrolledUnderElevation: 0,
       toolbarHeight: height,
       centerTitle: false,
-      titleSpacing: 16,
+      titleSpacing: compact ? 4 : 16,
+      leadingWidth: compact ? 48 : null,
       leading: leading ?? back,
       automaticallyImplyLeading: true,
       title: titleWidget ??

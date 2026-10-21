@@ -31,6 +31,10 @@ class MarkdownView extends StatefulWidget {
   final bool inline;
   final MarkdownLinkHandler? onLink;
 
+  /// Links in this colour instead of the brand colour (on an accent bubble
+  /// the brand colour would vanish).
+  final Color? linkColor;
+
   /// Wraps the blocks in a [SelectionArea]; off when an ancestor has one.
   final bool selectable;
 
@@ -41,6 +45,7 @@ class MarkdownView extends StatefulWidget {
     this.streaming = false,
     this.inline = false,
     this.onLink,
+    this.linkColor,
     this.selectable = true,
   });
 
@@ -68,13 +73,15 @@ class _MarkdownViewState extends State<MarkdownView> {
       base,
       MediaQuery.textScalerOf(context),
       widget.onLink,
-      widget.streaming
+      widget.streaming,
+      widget.linkColor
     );
     if (key != _builtFor) {
       _built.clear();
       _builtFor = key;
     }
     final r = _Renderer(c, base, widget.onLink,
+        linkColor: widget.linkColor,
         scale: MediaQuery.textScalerOf(context).scale(1));
     Widget body;
     if (widget.inline) {
@@ -135,8 +142,9 @@ class _Renderer {
 
   /// The text scale: room for list numbers grows with the text.
   final double scale;
+  final Color? linkColor;
 
-  _Renderer(this.c, this.base, this.onLink, {this.scale = 1});
+  _Renderer(this.c, this.base, this.onLink, {this.scale = 1, this.linkColor});
 
   double get _size => base.fontSize ?? 16;
 
@@ -324,9 +332,9 @@ class _Renderer {
             final r = onLink == null ? null : tap(url);
             return TextSpan(
               style: TextStyle(
-                color: c.main,
+                color: linkColor ?? c.main,
                 decoration: TextDecoration.underline,
-                decorationColor: c.main.withValues(alpha: 0.5),
+                decorationColor: (linkColor ?? c.main).withValues(alpha: 0.5),
               ),
               children: [
                 if (image) TextSpan(text: '🖼 ', recognizer: r),

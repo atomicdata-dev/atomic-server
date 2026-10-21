@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 
 import 'app_top_bar.dart';
 import 'home_sections.dart' show HomeSection;
+import 'chat_bubbles.dart';
 import 'chat_text_styles.dart';
 import 'chat_window.dart';
 import 'scroll_to_bottom_button.dart';
@@ -261,7 +262,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
             child: Scaffold(
               backgroundColor: c.bgBody,
               appBar: AppTopBar(
+                compact: true,
                 title: _title.isEmpty ? 'Chat' : _title,
+                titleWidget: ChatHeader(
+                  title: _title.isEmpty ? 'Chat' : _title,
+                  subtitle: _subtitle,
+                  icon: Icons.forum_outlined,
+                ),
                 actions: [
                   IconButton(
                     tooltip: 'Rename',
@@ -272,6 +279,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
               ),
               body: ListAndField(list: _list(c), field: _composer(c)),
             )));
+  }
+
+  /// The room, and how many people have spoken in it.
+  String get _subtitle {
+    final people = {
+      for (final m in _window.items)
+        if (m.kind == ChatRoomKind.text) m.mine ? 'me' : m.author,
+    };
+    return people.length > 1 ? '${people.length} members' : 'Chat room';
   }
 
   Widget _list(AppColors c) {
@@ -320,7 +336,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
               physics: chatScrollPhysics,
               scrollCacheExtent: const ScrollCacheExtent.viewport(1.5),
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(
+                  ChatTextStyles.gutter, 8, ChatTextStyles.gutter, 8),
               itemCount: shown.length + (_window.hasOlder ? 1 : 0),
               findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
               itemBuilder: (context, i) {
@@ -345,11 +362,20 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
                   final first = index == 0 || !sameGroup(shown[index - 1], m);
                   final last = index == shown.length - 1 ||
                       !sameGroup(m, shown[index + 1]);
-                  row = _bubble(c, m,
-                      header: first,
-                      time: last ? messageTime(m.createdAt) : null,
-                      gapAbove: first,
-                      listWidth: box.maxWidth - 32);
+                  row = MessageRow(
+                    mine: m.mine,
+                    first: first,
+                    last: last,
+                    name: !m.mine && first ? _nameOf(m) : null,
+                    avatarOf: m.mine ? null : m.authorName,
+                    time: last ? clockTime(m.createdAt) : null,
+                    sending: m.id.startsWith('pending-'),
+                    listWidth: box.maxWidth - 2 * ChatTextStyles.gutter,
+                    content: SelectableText(m.text,
+                        style: m.mine
+                            ? ChatTextStyles.of(context).bodyMine
+                            : ChatTextStyles.of(context).body),
+                  );
                 }
                 final newDay = index == 0 && !_window.hasOlder ||
                     index > 0 &&
@@ -426,133 +452,42 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
         : KeyedSubtree(key: const Key('event-row'), child: row);
   }
 
-  Widget _avatar(AppColors c, ChatRoomMessage m) {
-    final name = m.authorName.trim();
-    final initial = name.isEmpty
-        ? '?'
-        : String.fromCharCode(name.runes.first).toUpperCase();
-    return CircleAvatar(
-      key: const Key('message-avatar'),
-      radius: 14,
-      backgroundColor: c.bg2,
-      child: Text(initial,
-          style:
-              ChatTextStyles.of(context).sender.copyWith(color: c.textPrimary)),
-    );
-  }
-
-  Widget _bubble(AppColors c, ChatRoomMessage m,
-      {required bool header,
-      String? time,
-      required bool gapAbove,
-      required double listWidth}) {
-    final mine = m.mine;
-    final content = Column(
-      crossAxisAlignment:
-          mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-      children: [
-        if (header && !mine)
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 2),
-            child: Text(_nameOf(m),
-                key: const Key('message-author'),
-                style: ChatTextStyles.of(context).sender),
-          ),
-        Container(
-          padding: ChatTextStyles.bubblePadding,
-          decoration: BoxDecoration(
-            color: mine ? c.mainSelectedBg : c.bg1,
-            borderRadius: BorderRadius.circular(ChatTextStyles.bubbleRadius),
-          ),
-          child: SelectableText(
-            m.text,
-            style: mine
-                ? ChatTextStyles.of(context).bodyMine
-                : ChatTextStyles.of(context).body,
-          ),
-        ),
-        if (time != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 2, left: 4, right: 4),
-            child: Text(time,
-                key: const Key('message-time'),
-                style: ChatTextStyles.of(context).meta),
-          ),
-      ],
-    );
-    return Align(
-      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: EdgeInsets.only(top: ChatTextStyles.gapAbove(gapAbove)),
-        constraints:
-            BoxConstraints(maxWidth: ChatTextStyles.bubbleMaxWidth(listWidth)),
-        child: mine
-            ? content
-            : Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // The avatar sits beside the first bubble of a group; the
-                  // others keep the space so the bubbles line up.
-                  SizedBox(
-                    width: 28,
-                    child: header ? _avatar(c, m) : null,
-                  ),
-                  const SizedBox(width: 6),
-                  Flexible(child: content),
-                ],
+  Widget _composer(AppColors c) => ChatComposerFrame(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(_error!,
+                    style: TextStyle(
+                        color: c.alert, fontSize: ChatTextStyles.metaSize)),
               ),
-      ),
-    );
-  }
-
-  Widget _composer(AppColors c) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(_error!,
-                      style: TextStyle(
-                          color: c.alert, fontSize: ChatTextStyles.metaSize)),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _input,
+                    focusNode: _focus,
+                    minLines: 1,
+                    maxLines: 5,
+                    textCapitalization: TextCapitalization.sentences,
+                    textInputAction: TextInputAction.send,
+                    onEditingComplete: () {},
+                    onSubmitted: (_) => _send(),
+                    style: ChatTextStyles.of(context).composer,
+                    decoration: chatFieldDecoration(context),
+                  ),
                 ),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _input,
-                      focusNode: _focus,
-                      minLines: 1,
-                      maxLines: 5,
-                      textInputAction: TextInputAction.send,
-                      onEditingComplete: () {},
-                      onSubmitted: (_) => _send(),
-                      style: ChatTextStyles.of(context).composer,
-                      decoration: InputDecoration(
-                        hintText: 'Message',
-                        hintStyle: ChatTextStyles.of(context).composerHint,
-                        filled: true,
-                        fillColor: c.bg1,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(
-                              ChatTextStyles.bubbleRadius),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                  IconButton.filled(
-                    tooltip: 'Send',
-                    onPressed: _hadText ? _send : null,
-                    icon: const Icon(Icons.arrow_upward),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: ChatSendButton(onPressed: _hadText ? _send : null),
+                ),
+              ],
+            ),
+          ],
         ),
       );
 }
