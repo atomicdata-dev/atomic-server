@@ -667,9 +667,16 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   late final Widget _navigator = Navigator(
     key: _shell.navigatorKey,
     observers: [_observer],
-    onGenerateRoute: (_) => MaterialPageRoute<void>(
+    // Not a MaterialPageRoute: the home never animates itself, and the
+    // platform's page transition (predictive back on Android) applied to it
+    // as the page under a closing one left its bottom corners rounded and
+    // black after a swipe back from search.
+    onGenerateRoute: (_) => PageRouteBuilder<void>(
       settings: const RouteSettings(name: ShellPage.home),
-      builder: (_) => CoveredInsetsFreeze(child: _HomeSlot(home: _home)),
+      transitionDuration: Duration.zero,
+      reverseTransitionDuration: Duration.zero,
+      pageBuilder: (_, __, ___) =>
+          CoveredInsetsFreeze(child: _HomeSlot(home: _home)),
     ),
   );
 
