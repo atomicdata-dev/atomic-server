@@ -167,4 +167,52 @@ void main() {
     expect(_pos(tester).pixels, 0);
     expect(_text('Hello there'), findsOneWidget);
   });
+
+  testWidgets('a new section of the answer does not move the bubble for a frame',
+      (tester) async {
+    final c = StreamController<String>();
+    await tester.pumpWidget(_app(ChatScreen(api: _Api(_ai(() => c.stream)))));
+    await tester.pumpAndSettle();
+    await _send(tester, 'Frame question');
+    await _stream(tester, c, [0]);
+    final question = tester.getTopLeft(_text('Frame question')).dy;
+    final answer = tester.getTopLeft(_text('Answer paragraph 0.')).dy;
+    // One frame at a time: the question and the answer's start stay put
+    // in every frame, also the one in which a section is added.
+    for (var i = 1; i < 6; i++) {
+      c.add('Answer paragraph $i.\n\n');
+      for (var f = 0; f < 4; f++) {
+        await tester.pump(const Duration(milliseconds: 20));
+        expect(tester.getTopLeft(_text('Frame question')).dy,
+            moreOrLessEquals(question, epsilon: 0.5),
+            reason: 'section $i, frame $f');
+        expect(tester.getTopLeft(_text('Answer paragraph 0.')).dy,
+            moreOrLessEquals(answer, epsilon: 0.5),
+            reason: 'section $i, frame $f');
+      }
+    }
+    await c.close();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('a section added to a tall, held answer moves nothing for a frame',
+      (tester) async {
+    final c = StreamController<String>();
+    await tester.pumpWidget(_app(ChatScreen(api: _Api(_ai(() => c.stream)))));
+    await tester.pumpAndSettle();
+    await _send(tester, 'Tall frame question');
+    await _stream(tester, c, Iterable.generate(40, (i) => i));
+    final first = tester.getTopLeft(_text('Answer paragraph 0.')).dy;
+    for (var i = 40; i < 46; i++) {
+      c.add('Answer paragraph $i.\n\n');
+      for (var f = 0; f < 4; f++) {
+        await tester.pump(const Duration(milliseconds: 20));
+        expect(tester.getTopLeft(_text('Answer paragraph 0.')).dy,
+            moreOrLessEquals(first, epsilon: 0.5),
+            reason: 'section $i, frame $f');
+      }
+    }
+    await c.close();
+    await tester.pumpAndSettle();
+  });
 }

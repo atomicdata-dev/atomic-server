@@ -153,7 +153,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     idOf: (m) => m.id,
     onOlderPage: (ms, n) => Perf.span('chat older page $n', ms),
   );
-  late final _keeper = ChatScrollKeeper(_window);
+  late final _keeper = ChatScrollKeeper(_window,
+      // While an answer streams in and its top is held (or the person
+      // scrolled away), growth at the bottom must not move what is shown.
+      controller: HoldingScrollController(
+          () => _sending && (_pinned || !_follow)));
 
   // Following an answer as it streams in (see [_settle]): the list follows
   // the growing answer at the bottom while the answer's top is in view;
@@ -174,10 +178,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// The answer's top reached the top of the list: held there.
   bool _pinned = false;
 
-  /// Room below the answer so the question can sit at the top of the list
-  /// with the answer growing under it.
-  double _spacer = 0;
-  double? _answerHeight;
+  /// Height of the question just sent (measured after layout, it does not
+  /// change while the answer streams). The answer is at least as tall as
+  /// the list minus this, so the question sits at the top with the answer
+  /// growing under it; that room is part of the answer's own layout, so a
+  /// new section never moves the question.
+  double _sentHeight = 0;
   bool _settleQueued = false;
   List<ChatEntry> get _messages => _window.items;
   Object? get _loadError => _window.error;
@@ -811,27 +817,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final answer = _boxOf(_answerKey);
     if (list == null || answer == null) return;
     final pos = _keeper.controller.position;
-    final h = answer.size.height;
-    final grew = _answerHeight == null ? 0.0 : h - _answerHeight!;
-    _answerHeight = h;
+    final sent = _boxOf(_sentKey);
+    if (sent != null && (sent.size.height - _sentHeight).abs() > 0.5) {
+      setState(() => _sentHeight = sent.size.height);
+      return;
+    }
+    // Growth while pinned or scrolled away is held in layout, see
+    // [HoldingScrollController].
     if (_follow && !_pinned) {
-      final sent = _boxOf(_sentKey);
-      if (sent != null && pos.pixels <= 0.5) {
-        final span = answer.localToGlobal(Offset(0, h)).dy -
-            sent.localToGlobal(Offset.zero).dy;
-        final want = math.max(0.0, list.$1.size.height - 32 - span);
-        if ((want - _spacer).abs() > 0.5) {
-          setState(() => _spacer = want);
-          return;
-        }
-      }
       final top = answer.localToGlobal(Offset.zero).dy;
       if (top < list.$2 - 0.5) {
         _pinned = true;
         pos.jumpTo(pos.pixels + list.$2 - top);
       }
-    } else if (grew.abs() > 0.01 && pos.pixels > 0.5) {
-      pos.jumpTo(math.min(pos.maxScrollExtent, pos.pixels + grew));
     }
   }
 
@@ -1078,7 +1076,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _answerId = 'partial';
       _follow = true;
       _pinned = false;
-      _answerHeight = null;
+      _sentHeight = 0;
     });
     // Written in: New makes another chat from now on, also while the chat
     // itself is still being created.
@@ -1334,7 +1332,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: readableHorizontalPadding(box.maxWidth,
                   gutter: ChatTextStyles.gutter)
-              .copyWith(top: 8, bottom: 8 + _spacer),
+              .copyWith(top: 8, bottom: 8),
           itemCount: shown.length + (_window.hasOlder ? 1 : 0),
           findChildIndexCallback: (key) => reversedIndexOf(key, ids, at),
           itemBuilder: (context, i) {
@@ -1362,7 +1360,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             final last =
                 index == shown.length - 1 || shown[index + 1].role != m.role;
             final bubble = Align(
-              alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+              alignment: mine ? Alignment.topRight : Alignment.topLeft,
               child: Container(
                 margin: EdgeInsets.only(top: ChatTextStyles.gapAbove(first)),
                 padding: ChatTextStyles.bubblePadding,
@@ -1381,7 +1379,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               ),
             );
             final keyed = m.id == _answerId
-                ? KeyedSubtree(key: _answerKey, child: bubble)
+                ? KeyedSubtree(
+                    key: _answerKey,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                          minHeight: _sentId == null || _sentHeight <= 0
+                              ? 0
+                              : math.max(0.0, box.maxHeight - 32 - _sentHeight)),
+                      child: bubble,
+                    ))
                 : m.id == _sentId
                     ? KeyedSubtree(key: _sentKey, child: bubble)
                     : bubble;

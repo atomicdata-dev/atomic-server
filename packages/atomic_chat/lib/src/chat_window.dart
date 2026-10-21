@@ -372,6 +372,58 @@ class ChatWindow<T> extends ChangeNotifier {
   }
 }
 
+/// A controller of a reversed list that, while [hold] says so, keeps what is
+/// on screen where it is when the content grows at the bottom (the newest
+/// message getting longer). It corrects the offset inside the viewport's
+/// layout, so the frame in which the content grew is already drawn in the
+/// right place; a correction after the frame shows one frame at the old
+/// offset.
+class HoldingScrollController extends ScrollController {
+  final bool Function() hold;
+
+  HoldingScrollController(this.hold);
+
+  @override
+  ScrollPosition createScrollPosition(ScrollPhysics physics,
+      ScrollContext context, ScrollPosition? oldPosition) {
+    return _HoldingPosition(hold,
+        physics: physics,
+        context: context,
+        initialPixels: initialScrollOffset,
+        keepScrollOffset: keepScrollOffset,
+        oldPosition: oldPosition,
+        debugLabel: debugLabel);
+  }
+}
+
+class _HoldingPosition extends ScrollPositionWithSingleContext {
+  final bool Function() _hold;
+
+  _HoldingPosition(
+    this._hold, {
+    required super.physics,
+    required super.context,
+    super.initialPixels,
+    super.keepScrollOffset,
+    super.oldPosition,
+    super.debugLabel,
+  });
+
+  @override
+  bool applyContentDimensions(double minScrollExtent, double maxScrollExtent) {
+    if (hasContentDimensions && hasPixels && _hold() && pixels > 0.5) {
+      final grew = maxScrollExtent - this.maxScrollExtent;
+      if (grew > 0.01) {
+        correctPixels(pixels + grew);
+        super.applyContentDimensions(minScrollExtent, maxScrollExtent);
+        // Lay out again at the corrected offset.
+        return false;
+      }
+    }
+    return super.applyContentDimensions(minScrollExtent, maxScrollExtent);
+  }
+}
+
 /// The same scroll physics on every chat list.
 const chatScrollPhysics = AppScrollPhysics();
 
@@ -381,12 +433,13 @@ const chatScrollPhysics = AppScrollPhysics();
 /// window bounded, and tells whether the person is at the bottom.
 class ChatScrollKeeper {
   final ChatWindow<dynamic> window;
-  final ScrollController controller = ScrollController();
+  final ScrollController controller;
 
   /// About how many items from either end a page is read.
   final int edge;
 
-  ChatScrollKeeper(this.window, {this.edge = 15}) {
+  ChatScrollKeeper(this.window, {this.edge = 15, ScrollController? controller})
+      : controller = controller ?? ScrollController() {
     controller.addListener(_scrolled);
   }
 
