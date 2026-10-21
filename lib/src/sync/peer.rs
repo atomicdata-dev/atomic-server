@@ -134,6 +134,7 @@ fn load_or_create_secret_key(store: &Db) -> iroh::SecretKey {
 /// Waits for the relay connection to be established before returning,
 /// so that other peers can discover and connect to us immediately.
 pub async fn start(store: Db) -> anyhow::Result<(NodeId, Router)> {
+    crate::client::install_default_crypto_provider();
     let secret_key = load_or_create_secret_key(&store);
     let endpoint: Endpoint = Endpoint::builder()
         .secret_key(secret_key)

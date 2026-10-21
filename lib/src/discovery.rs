@@ -438,6 +438,7 @@ fn drive_did_to_pkarr_keypair(drive_did: &str) -> AtomicResult<pkarr::Keypair> {
 }
 
 fn build_client() -> AtomicResult<pkarr::Client> {
+    crate::client::install_default_crypto_provider();
     let mut builder = pkarr::Client::builder();
     builder.no_default_network();
     builder

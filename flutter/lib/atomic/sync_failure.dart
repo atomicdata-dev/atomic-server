@@ -15,6 +15,14 @@ class SyncFailure {
   static const _noDevice = 'No other device answered. Open the app on a '
       'device that has your drive and keep it on the same network.';
 
+  /// The summary lines `sync_connectivity_now` puts first in its message.
+  static const _hostSummaries = [
+    _noDevice,
+    'Could not look for your devices. Check your internet connection and try '
+        'again.',
+    'Could not reach your other devices.',
+  ];
+
   /// Split a multi-line error report into a friendly summary plus the raw
   /// lines. Never returns raw exception text or URLs in [summary].
   static SyncFailure parse(String raw) {
@@ -23,8 +31,19 @@ class SyncFailure {
         .map((l) => l.trim())
         .where((l) => l.isNotEmpty)
         .toList();
-    final all = details.join('\n');
     const title = 'Couldn’t reach your devices';
+    // The host (Rust) already leads with a plain summary line, then the raw
+    // lines: take that as it is.
+    for (final known in _hostSummaries) {
+      if (details.isNotEmpty && details.first == known) {
+        return SyncFailure(
+          title: title,
+          summary: known,
+          details: details.skip(1).toList(),
+        );
+      }
+    }
+    final all = details.join('\n');
     String summary;
     if (RegExp(r'None of the \d+ devices?|timed out|No devices?',
             caseSensitive: false)

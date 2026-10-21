@@ -183,6 +183,7 @@ impl WsClient {
     /// Connect to an AtomicServer WebSocket endpoint.
     /// The URL should be `ws://` or `wss://` (e.g. `ws://localhost:9883/ws`).
     pub async fn connect(url: &str) -> AtomicResult<Self> {
+        super::install_default_crypto_provider();
         #[cfg(target_os = "android")]
         let connected = tokio_tungstenite::connect_async_tls_with_config(
             url,

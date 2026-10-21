@@ -446,6 +446,8 @@ class AtomicClient {
       livePeers: (m['live_peers'] as num?)?.toInt() ?? 0,
       message: m['message'] as String? ?? '',
       server: m['server'] as String?,
+      details: [for (final d in (m['details'] as List? ?? const [])) '$d'],
+      kind: m['kind'] as String?,
     );
   }
 
@@ -486,8 +488,7 @@ class AtomicClient {
                 .replace(queryParameters: {'subject': drive}))
           ..followRedirects = false
           ..headers['Accept'] = 'application/ad+json';
-        final response = await http.Response.fromStream(
-            await http_.send(request).timeout(timeout));
+        final response = await _sendWithRetry(http_, request, timeout);
         ok = response.statusCode == 200 &&
             (verifies ?? _verifies)(response.body, drive);
         if (!ok) {
@@ -559,6 +560,25 @@ class AtomicClient {
       if (client == null) http_.close();
     }
   }
+
+  /// One quick retry when the connection is closed before a response: a
+  /// pooled keep-alive connection the server already dropped fails this way
+  /// ("Connection closed before full header was received") and works again on
+  /// a fresh one.
+  static Future<http.Response> _sendWithRetry(
+      http.Client c, http.Request request, Duration timeout) async {
+    Future<http.Response> once() async => http.Response.fromStream(
+        await c.send(_copy(request)).timeout(timeout));
+    try {
+      return await once();
+    } on http.ClientException {
+      return once();
+    }
+  }
+
+  static http.Request _copy(http.Request r) => http.Request(r.method, r.url)
+    ..followRedirects = r.followRedirects
+    ..headers.addAll(r.headers);
 
   static String _short(Object e) {
     final text = '$e'.replaceFirst('Exception: ', '');
@@ -839,11 +859,20 @@ class SyncConnectivityReport {
   /// The server the drive was found on through pkarr, when it was.
   final String? server;
 
+  /// The raw lines behind a failure [message] (which starts with a short
+  /// summary line), for a "Details" panel. Empty when nothing failed.
+  final List<String> details;
+
+  /// `no_peers_answered`, `lookup_failed`, or null.
+  final String? kind;
+
   const SyncConnectivityReport({
     required this.imported,
     required this.livePeers,
     required this.message,
     this.server,
+    this.details = const [],
+    this.kind,
   });
 }
 

@@ -345,6 +345,10 @@ async fn catch_up_search_index(store: std::sync::Arc<atomic_lib::Db>) {
 
 #[frb(init)]
 pub fn init_app() {
+    // Before any TLS use: rustls panics without a process default when both of
+    // its backends are compiled in (they are: ring and aws-lc-rs).
+    #[cfg(not(target_family = "wasm"))]
+    atomic_lib::client::install_default_crypto_provider();
     // Not `setup_default_user_utils`: that forwards the `log` crate to logcat
     // at Trace (rustls, reqwest and iroh wrote ~800 formatted lines per app
     // start) and sets RUST_BACKTRACE=1, which also makes every `anyhow` error
@@ -815,6 +819,17 @@ fn short_id(node_id: &str) -> &str {
     &node_id[..node_id.len().min(12)]
 }
 
+/// The one-line, non-technical summary of a failed sync attempt.
+fn failure_summary(peers_failed: bool, lookup_failed: bool) -> &'static str {
+    if peers_failed {
+        "No other device answered. Open the app on a device that has your drive and keep it on the same network."
+    } else if lookup_failed {
+        "Could not look for your devices. Check your internet connection and try again."
+    } else {
+        "Could not reach your other devices."
+    }
+}
+
 /// The report's message when the lookup worked and named no other device.
 /// The app keeps it quiet (no toast): it is the normal state of a new account.
 const NO_OTHER_DEVICE_YET: &str =
@@ -828,6 +843,14 @@ pub struct SyncConnectivityReport {
     /// The server the drive was found on through pkarr, when it was.
     #[serde(default)]
     pub server: Option<String>,
+    /// The raw lines behind a failure `message`, one per device or lookup that
+    /// failed (technical, for a collapsible "Details"). `message` starts with
+    /// a short summary line; these lines also follow it, newline separated.
+    #[serde(default)]
+    pub details: Vec<String>,
+    /// `no_peers_answered`, `lookup_failed`, or null when nothing failed.
+    #[serde(default)]
+    pub kind: Option<String>,
 }
 
 /// Start Iroh, sync known peers (then pkarr). Returns JSON [`SyncConnectivityReport`].
@@ -850,6 +873,8 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
 
     let mut imported: i32 = 0;
     let mut errors: Vec<String> = Vec::new();
+    let mut peers_failed = false;
+    let mut lookup_failed = false;
 
     // Known peers first (fast path after QR pairing)
     let peers_json = get_known_peers();
@@ -873,9 +898,11 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
             }
             Ok(Err(e)) => {
                 tracing::warn!("[sync_now] peer {} failed: {e}", node_id);
+                peers_failed = true;
                 errors.push(format!("{}: {e}", &node_id[..node_id.len().min(12)]));
             }
             Err(_) => {
+                peers_failed = true;
                 errors.push(format!(
                     "{}: timed out after {}s",
                     &node_id[..node_id.len().min(12)],
@@ -933,15 +960,38 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
                         .map_err(|e| format!("{}: {e}", short_id(node_id)))
                     })
                 });
-                match futures::future::select_ok(attempts).await {
-                    Ok((count, _)) => imported += count as i32,
-                    Err(last) => errors.push(format!(
-                        "None of the {tried} devices that announced your drive answered ({last})"
-                    )),
+                // The first that answers wins; the failures before it are only
+                // kept when none does.
+                let mut pending: futures::stream::FuturesUnordered<_> = attempts.collect();
+                let mut failures: Vec<String> = Vec::new();
+                let mut won = false;
+                while let Some(result) = futures::StreamExt::next(&mut pending).await {
+                    match result {
+                        Ok(count) => {
+                            imported += count as i32;
+                            won = true;
+                            break;
+                        }
+                        Err(e) => failures.push(e),
+                    }
+                }
+                if !won {
+                    peers_failed = true;
+                    errors.push(format!(
+                        "{tried} device{} announced your drive; none answered",
+                        if tried == 1 { "" } else { "s" }
+                    ));
+                    errors.extend(failures);
                 }
             }
-            Ok(Err(e)) => errors.push(format!("Could not look for devices: {e}")),
-            Err(_) => errors.push("Could not look for devices: the directory (pkarr) timed out".into()),
+            Ok(Err(e)) => {
+                lookup_failed = true;
+                errors.push(format!("Could not look for devices: {e}"));
+            }
+            Err(_) => {
+                lookup_failed = true;
+                errors.push("Could not look for devices: the directory (pkarr) timed out".into());
+            }
         }
     }
 
@@ -985,14 +1035,22 @@ async fn sync_connectivity_inner(store: &atomic_lib::Db) -> Result<SyncConnectiv
         // loop keeps looking (`peer_search_status`).
         NO_OTHER_DEVICE_YET.to_string()
     } else {
-        errors.join(" · ")
+        // A short summary, then the raw lines (also in `details`).
+        let summary = failure_summary(peers_failed, lookup_failed);
+        format!("{summary}\n{}", errors.join("\n"))
     };
+    let failed = live == 0 && imported == 0 && !errors.is_empty();
+    let kind = failed.then(|| {
+        if peers_failed { "no_peers_answered" } else { "lookup_failed" }.to_string()
+    });
 
     Ok(SyncConnectivityReport {
         imported,
         live_peers: live,
         message,
         server: None,
+        details: if failed { errors } else { Vec::new() },
+        kind,
     })
 }
 

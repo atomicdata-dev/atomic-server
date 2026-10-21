@@ -214,6 +214,7 @@ fn android_roots() -> &'static [reqwest::Certificate] {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn http_client_builder() -> reqwest::ClientBuilder {
+    super::install_default_crypto_provider();
     let builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(10));
     #[cfg(target_os = "android")]
     let builder = builder.tls_certs_only(android_roots().iter().cloned());

@@ -11,6 +11,15 @@ use std::sync::OnceLock;
 
 use rustls::{ClientConfig, RootCertStore};
 
+/// See [`super::install_default_crypto_provider`].
+pub(crate) fn install_default_provider() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        // Err means another provider is already installed: fine.
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+}
+
 /// Trust roots: the bundled Mozilla set, plus the system's CA certificates on
 /// Android. The bundled set is always added, so an empty or unreadable system
 /// store still yields a working client. Unparsable system certificates are
@@ -60,7 +69,18 @@ mod tests {
 
     #[test]
     fn config_builds_without_default_provider() {
-        assert!(rustls::crypto::CryptoProvider::get_default().is_none());
         build_client_config().expect("config builds with explicit ring provider");
+    }
+
+    /// The panic seen on macOS: with both `ring` and `aws-lc-rs` enabled,
+    /// `ClientConfig::builder()` panics unless a default provider is installed.
+    #[test]
+    fn default_builder_works_after_install() {
+        crate::client::install_default_crypto_provider();
+        crate::client::install_default_crypto_provider();
+        assert!(rustls::crypto::CryptoProvider::get_default().is_some());
+        let _ = ClientConfig::builder()
+            .with_root_certificates(root_store())
+            .with_no_client_auth();
     }
 }
