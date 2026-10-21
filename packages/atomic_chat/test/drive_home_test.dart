@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:atomic_chat/atomic_chat.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:atomic_chat/src/sidebar_metrics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -61,6 +62,34 @@ FakeApi _api({Map<String, List<DriveChild>>? children}) => FakeApi(
         (subject: 'did:ad:chat', name: 'A chat', lastActivity: 0, emoji: null)
       ],
     );
+
+FakeApi _manyFavorites() => FakeApi(
+      driveList: const [_alpha],
+      favoriteList: [for (var i = 0; i < 30; i++) _res('did:ad:f$i', 'Fav $i')],
+      chatList: [
+        for (var i = 0; i < 30; i++)
+          (subject: 'did:ad:c$i', name: 'Chat $i', lastActivity: 0, emoji: null)
+      ],
+      childrenOf: {
+        'did:ad:a': [
+          _child('did:ad:z', 'Zebra notes'),
+          _child('did:ad:m', 'Mango plan'),
+          _child('did:ad:f', 'Apple folder', className: 'folder'),
+        ],
+        'did:ad:f': [_child('did:ad:f1', 'Inside the folder')],
+      },
+    );
+
+double _maxScroll(WidgetTester tester, Finder body) => tester
+    .state<ScrollableState>(
+        find.descendant(of: body, matching: find.byType(Scrollable)).first)
+    .position
+    .maxScrollExtent;
+
+/// A test on macOS: the desktop density.
+void macTest(String name, Future<void> Function(WidgetTester) body) =>
+    testWidgets(name, body,
+        variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
 void _size(WidgetTester tester, Size size, {double bottom = 0}) {
   tester.view.devicePixelRatio = 1;
@@ -587,24 +616,186 @@ void main() {
       expect(find.text('Starred doc'), findsNothing);
     });
 
-    testWidgets('open panels scroll inside and never push the headers off',
+    testWidgets('an open panel shows its four rows without scrolling',
         (tester) async {
       _size(tester, const Size(393, 851), bottom: 20);
-      final many = FakeApi(
-        driveList: const [_alpha],
-        favoriteList: [
-          for (var i = 0; i < 30; i++) _res('did:ad:f$i', 'Fav $i')
-        ],
-        childrenOf: const {},
-      );
-      await _home(tester, many);
+      await _home(tester, _manyFavorites());
+      final treeBefore = tester.getRect(find.byKey(const Key('drive-tree')));
       await tester.tap(_panel('favorites'));
       await tester.pumpAndSettle();
       expect(tester.getRect(_panel('chats')).bottom, 851 - 20);
-      final panels = tester.getRect(find.byKey(const Key('home-panels')));
-      expect(panels.height, lessThanOrEqualTo(851 * 0.5 + 1));
-      expect(find.byKey(const ValueKey('home-panel-body-favorites')),
-          findsOneWidget);
+      final body = find.byKey(const ValueKey('home-panel-body-favorites'));
+      final bodyRect = tester.getRect(body);
+      for (var i = 0; i < 4; i++) {
+        final r = tester.getRect(find.text('Fav $i'));
+        expect(r.top, greaterThanOrEqualTo(bodyRect.top));
+        expect(r.bottom, lessThanOrEqualTo(bodyRect.bottom));
+      }
+      expect(find.text('Show all (30)'), findsOneWidget);
+      expect(_maxScroll(tester, body), 0);
+      // The tree yields.
+      expect(tester.getRect(find.byKey(const Key('drive-tree'))).height,
+          lessThan(treeBefore.height));
+      expect(tester.takeException(), isNull);
+    });
+
+    macTest('on a wide window several open panels all show four rows',
+        (tester) async {
+      _size(tester, const Size(1400, 900));
+      HomeLayout.accordionOverride = false;
+      await _home(tester, _manyFavorites());
+      await tester.tap(_panel('favorites'));
+      await tester.pumpAndSettle();
+      await tester.tap(_panel('chats'));
+      await tester.pumpAndSettle();
+      for (final name in ['favorites', 'chats']) {
+        final body = find.byKey(ValueKey('home-panel-body-$name'));
+        expect(_maxScroll(tester, body), 0, reason: name);
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a very short window falls back to scrolling inside',
+        (tester) async {
+      _size(tester, const Size(393, 500), bottom: 20);
+      await _home(tester, _manyFavorites());
+      await tester.tap(_panel('favorites'));
+      await tester.pumpAndSettle();
+      final body = find.byKey(const ValueKey('home-panel-body-favorites'));
+      expect(_maxScroll(tester, body), greaterThan(0));
+      expect(tester.getRect(_panel('chats')).bottom, 500 - 20);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('desktop density', () {
+    Future<void> desktop(WidgetTester tester, {Brightness? b}) async {
+      _size(tester, const Size(1400, 900));
+      HomeLayout.accordionOverride = false;
+      await _home(tester, _manyFavorites(), brightness: b);
+      await tester.tap(_panel('favorites'));
+      await tester.pumpAndSettle();
+      await tester
+          .tap(find.byKey(const ValueKey('drive-tree-toggle-did:ad:f')));
+      await tester.pumpAndSettle();
+    }
+
+    Finder row(String text) =>
+        find.ancestor(of: find.text(text), matching: find.byType(SidebarRow));
+    double left(WidgetTester t, Finder f) => t.getTopLeft(f).dx;
+
+    macTest('rows are tight and the text is still legible', (tester) async {
+      await desktop(tester);
+      for (final t in [
+        'Zebra notes',
+        'Apple folder',
+        'Inside the folder',
+        'New',
+        'Fav 0'
+      ]) {
+        expect(tester.getSize(row(t)).height, lessThanOrEqualTo(32), reason: t);
+        expect(tester.getSize(row(t)).height, greaterThanOrEqualTo(24));
+        final text = tester
+            .widget<Text>(find.descendant(of: row(t), matching: find.text(t)));
+        expect(text.style!.fontSize, greaterThanOrEqualTo(13), reason: t);
+      }
+      expect(tester.getSize(_panel('favorites')).height, lessThanOrEqualTo(34));
+      expect(
+          tester.getSize(find.byKey(const Key('current-drive-header'))).height,
+          inInclusiveRange(40, 44));
+    });
+
+    macTest('all row kinds sit on one grid', (tester) async {
+      await desktop(tester);
+      const m = SidebarMetrics.desktop;
+      // Rows of one kind are equally high.
+      expect(tester.getSize(row('Zebra notes')).height,
+          tester.getSize(row('Mango plan')).height);
+      expect(tester.getSize(row('Zebra notes')).height,
+          tester.getSize(row('Fav 0')).height);
+      expect(tester.getSize(row('Zebra notes')).height,
+          tester.getSize(row('New')).height);
+      // Tint is full-bleed.
+      expect(
+          tester.getSize(row('Zebra notes')).width,
+          1400 > 0
+              ? tester.getSize(find.byKey(const Key('drive-tree'))).width
+              : 0);
+      // Icon centres: level 0 equal, level 1 + indent.
+      double iconX(Finder r, {bool add = false}) => tester
+          .getCenter(find.descendant(
+              of: r,
+              matching: add ? find.byIcon(Icons.add) : find.byType(RowLeading)))
+          .dx;
+      final x0 = iconX(row('Zebra notes'));
+      expect(iconX(row('Apple folder')), x0);
+      expect(iconX(row('Fav 0')), x0);
+      expect(iconX(row('New'), add: true), x0);
+      expect(iconX(row('Inside the folder')), x0 + m.indent);
+      expect(x0, m.hPad + m.iconSlot / 2);
+      // Titles share x at a level.
+      final t0 = left(tester, find.text('Zebra notes'));
+      expect(left(tester, find.text('Apple folder')), t0);
+      expect(left(tester, find.text('New')), t0);
+      expect(left(tester, find.text('Fav 0')), t0);
+      expect(left(tester, find.text('Show all (30)')), t0);
+      expect(left(tester, find.text('Inside the folder')), t0 + m.indent);
+      expect(t0, m.titleX(0));
+      // Header titles start at the icon column.
+      expect(left(tester, find.text('Favorites')), m.hPad);
+      // Chevrons end at the same x.
+      final tree = tester
+          .getRect(find.byKey(const ValueKey('drive-tree-toggle-did:ad:f')));
+      final panel =
+          tester.getRect(find.byKey(const Key('panel-chevron')).first);
+      expect(tree.right, panel.right);
+      expect(
+          tree.right,
+          1400 -
+              m.hPad -
+              (1400 -
+                  tester.getRect(find.byKey(const Key('drive-tree'))).right));
+    });
+
+    for (final entry in {
+      'light': (Brightness.light, AppColors.light),
+      'dark': (Brightness.dark, AppColors.dark),
+    }.entries) {
+      macTest('${entry.key}: the small text reads at 4.5:1',
+          (tester) async {
+        final (b, c) = entry.value;
+        await desktop(tester, b: b);
+        for (final t in [
+          'Zebra notes',
+          'Inside the folder',
+          'New',
+          'Fav 0'
+        ]) {
+          final text = tester.widget<Text>(
+              find.descendant(of: row(t), matching: find.text(t)));
+          expect(_contrast(text.style!.color!, c.bgBody),
+              greaterThanOrEqualTo(4.5),
+              reason: t);
+        }
+        final h = tester.widget<Text>(find.text('Favorites'));
+        expect(_contrast(h.style!.color!, c.sectionBand),
+            greaterThanOrEqualTo(4.5));
+        final more = tester.widget<Text>(find.text('Show all (30)'));
+        expect(
+            _contrast(more.style!.color!, c.bgBody), greaterThanOrEqualTo(4.5));
+      });
+    }
+
+    testWidgets('a phone keeps the touch sizes', (tester) async {
+      _size(tester, const Size(393, 851));
+      await _home(tester, _manyFavorites());
+      expect(find.byType(SidebarRow), findsNothing);
+      expect(
+          tester
+              .getSize(find.byKey(const ValueKey('drive-tree-row-did:ad:z')))
+              .height,
+          greaterThanOrEqualTo(44));
+      expect(tester.getSize(_panel('favorites')).height, 48);
     });
   });
 

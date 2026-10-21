@@ -6,6 +6,7 @@ import 'app_shell.dart';
 import 'app_sidebar_icons.dart';
 import 'models.dart';
 import 'row_leading.dart';
+import 'sidebar_metrics.dart';
 
 /// The icon of a class, by the class's name as the rows carry it (the class's
 /// own name, or the last part of its subject), as the web app's
@@ -118,6 +119,9 @@ class ResourceRow extends StatelessWidget {
   /// The name the initial comes from; the title by default.
   final String? label;
 
+  /// The tree level (compact sidebar rows indent by it).
+  final int depth;
+
   const ResourceRow({
     super.key,
     this.subject,
@@ -132,6 +136,7 @@ class ResourceRow extends StatelessWidget {
     this.shape = RowShape.square,
     this.showInitial = false,
     this.label,
+    this.depth = 0,
   });
 
   bool get _hasEmoji => emoji != null && emoji!.isNotEmpty;
@@ -155,7 +160,11 @@ class ResourceRow extends StatelessWidget {
             data: img.data,
             baseUrl: img.baseUrl,
             emoji: _hasEmoji ? emoji : img.emoji);
+    final m = SidebarMetrics.of(context);
     return RowLeading(
+      size: m.compact ? m.iconSlot : 32,
+      iconSize: m.compact ? m.iconSize : 20,
+      cornerRadius: m.compact ? 4 : 8,
       image: source,
       fallbackLabel: label ?? title,
       fallbackIcon: icon ?? Icons.description_outlined,
@@ -170,6 +179,21 @@ class ResourceRow extends StatelessWidget {
     // 4.5:1 or better), under the section header (bold, on a band).
     final titleColor = selected ? c.mainSelectedFg : c.textPrimary;
     final captionColor = selected ? c.mainSelectedFg : c.textSecondary;
+    final m = SidebarMetrics.of(context);
+    if (m.compact) {
+      // Desktop sidebar: one tight line on the shared grid; the caption
+      // becomes the tooltip.
+      return SidebarRow(
+        depth: depth,
+        icon: _leading(context),
+        title: title,
+        titleStyle: SidebarRow.text(titleColor, m.textSize),
+        tooltip: detail,
+        trailing: trailing,
+        selected: selected,
+        onTap: onTap,
+      );
+    }
     return ListTile(
       leading: _leading(context),
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),

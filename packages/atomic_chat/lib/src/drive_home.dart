@@ -12,6 +12,7 @@ import 'models.dart';
 import 'app_sidebar_icons.dart';
 import 'resource_row.dart';
 import 'row_leading.dart';
+import 'sidebar_metrics.dart';
 
 /// Below this width the drive switcher is a bottom sheet, from it a popover
 /// under the header.
@@ -56,6 +57,7 @@ class CurrentDriveHeader extends StatelessWidget {
     final c = context.appColors;
     final d = drive;
     final name = d == null ? 'Drive' : driveTitle(d);
+    final m = SidebarMetrics.of(context);
     return Semantics(
       button: true,
       label: 'Current drive: $name. Switch drive',
@@ -66,26 +68,38 @@ class CurrentDriveHeader extends StatelessWidget {
         mouseCursor: WidgetStateMouseCursor.clickable,
         borderRadius: BorderRadius.circular(8),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            if (SidebarIconsScope.of(context)) ...[
-              DriveAvatar(drive: d),
-              const SizedBox(width: 10),
-            ],
-            Flexible(
-              child: Text(name,
-                  key: const Key('current-drive-name'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      color: c.textPrimary,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700)),
-            ),
-            const SizedBox(width: 4),
-            Icon(Icons.unfold_more, size: 20, color: c.textSecondary),
-          ]),
+        child: ConstrainedBox(
+          constraints:
+              BoxConstraints(minHeight: m.compact ? m.driveHeaderHeight : 0),
+          child: Padding(
+            // Compact: the avatar sits at the rows' icon column (the bar's
+            // title spacing is 4).
+            padding: m.compact
+                ? EdgeInsets.symmetric(vertical: 4, horizontal: m.hPad - 4)
+                : const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (SidebarIconsScope.of(context)) ...[
+                DriveAvatar(drive: d, size: m.compact ? m.driveAvatar : 28),
+                SizedBox(width: m.compact ? m.gap : 10),
+              ],
+              Flexible(
+                child: Text(name,
+                    key: const Key('current-drive-name'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    strutStyle:
+                        m.compact ? SidebarRow.strut(m.driveNameSize) : null,
+                    style: TextStyle(
+                        color: c.textPrimary,
+                        fontSize: m.compact ? m.driveNameSize : 20,
+                        height: m.compact ? 1.2 : null,
+                        fontWeight: FontWeight.w700)),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.unfold_more,
+                  size: m.compact ? m.chevronSize : 20, color: c.textSecondary),
+            ]),
+          ),
         ),
       ),
     );
@@ -641,10 +655,13 @@ class DriveTreeState extends State<DriveTree> {
     final child = item.child;
     final lead = leadingOf(child.picture, child.emoji, child.className);
     final open = _open.contains(child.subject);
+    final m = SidebarMetrics.of(context);
     return Padding(
       key: ValueKey('drive-tree-row-${child.subject}'),
-      padding: EdgeInsets.only(left: 16.0 * item.depth),
+      // Compact rows indent themselves (full-bleed tint, same icon grid).
+      padding: EdgeInsets.only(left: m.compact ? 0 : 16.0 * item.depth),
       child: ResourceRow(
+        depth: item.depth,
         subject: child.subject,
         icon: lead.icon,
         image: lead.image,
@@ -657,11 +674,22 @@ class DriveTreeState extends State<DriveTree> {
                 mouseCursor: WidgetStateMouseCursor.clickable,
                 tooltip: open ? 'Collapse' : 'Expand',
                 visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                iconSize: m.compact ? m.chevronSize : 24,
+                constraints: m.compact
+                    ? BoxConstraints.tightFor(
+                        width: m.chevronSlot, height: m.chevronSlot)
+                    : null,
+                style: m.compact
+                    ? IconButton.styleFrom(
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap)
+                    : null,
                 icon: AnimatedRotation(
                   turns: open ? 0 : -0.25,
                   duration: const Duration(milliseconds: 120),
-                  child:
-                      Icon(Icons.expand_more, size: 22, color: c.textSecondary),
+                  child: Icon(Icons.expand_more,
+                      size: m.compact ? m.chevronSize : 22,
+                      color: c.textSecondary),
                 ),
                 onPressed: () => _toggle(child.subject),
               )
@@ -684,7 +712,10 @@ class DriveTreeState extends State<DriveTree> {
 
   Widget _status(_StatusItem s) {
     final c = context.appColors;
-    final pad = EdgeInsets.only(left: 16.0 + 16.0 * s.depth, right: 16);
+    final m = SidebarMetrics.of(context);
+    final pad = m.compact
+        ? EdgeInsets.only(left: m.titleX(s.depth, icon: false), right: m.hPad)
+        : EdgeInsets.only(left: 16.0 + 16.0 * s.depth, right: 16);
     if (s.error != null) {
       return Padding(
         key: ValueKey('drive-tree-error-${s.parent}'),
@@ -713,6 +744,16 @@ class DriveTreeState extends State<DriveTree> {
 
   Widget _newRow() {
     final c = context.appColors;
+    final m = SidebarMetrics.of(context);
+    if (m.compact) {
+      return SidebarRow(
+        key: const Key('drive-new-row'),
+        icon: Icon(Icons.add, size: m.iconSize, color: c.textSecondary),
+        title: 'New',
+        titleStyle: SidebarRow.text(c.textSecondary, m.textSize),
+        onTap: widget.onNew,
+      );
+    }
     return InkWell(
       key: const Key('drive-new-row'),
       mouseCursor: WidgetStateMouseCursor.clickable,

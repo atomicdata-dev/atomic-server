@@ -184,6 +184,10 @@ class RowLeading extends StatefulWidget {
   final String fallbackLabel;
   final IconData fallbackIcon;
   final double size;
+
+  /// The generic icon's size and the corners of a square picture.
+  final double iconSize;
+  final double cornerRadius;
   final RowShape shape;
 
   /// Fall back to the initial of [fallbackLabel] on a colour from its name
@@ -199,6 +203,8 @@ class RowLeading extends StatefulWidget {
     this.fallbackLabel = '',
     required this.fallbackIcon,
     this.size = 32,
+    this.iconSize = 20,
+    this.cornerRadius = 8,
     this.shape = RowShape.square,
     this.showInitial = false,
     this.debounce = const Duration(milliseconds: 120),
@@ -297,9 +303,10 @@ class _RowLeadingState extends State<RowLeading> {
               height: 1));
     } else {
       if (circle) background = c.mainSelectedBg;
-      base = Icon(widget.fallbackIcon, size: 20, color: c.main);
+      base = Icon(widget.fallbackIcon, size: widget.iconSize, color: c.main);
     }
-    final radius = BorderRadius.circular(circle ? size / 2 : 8);
+    final radius =
+        BorderRadius.circular(circle ? size / 2 : widget.cornerRadius);
     return SizedBox(
       width: size,
       height: size,

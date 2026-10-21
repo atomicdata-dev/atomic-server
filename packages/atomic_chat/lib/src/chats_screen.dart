@@ -23,6 +23,7 @@ import 'chat_screen.dart';
 import 'drive_home.dart';
 import 'resource_row.dart';
 import 'row_leading.dart';
+import 'sidebar_metrics.dart';
 import 'resource_view.dart';
 import 'native_views.dart';
 import 'new_document_sheet.dart';
@@ -237,7 +238,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   void _noteCount(HomeSection id, int n) {
     if (_counts[id] == n) return;
+    final emptied = ((_counts[id] ?? 0) > 0) != (n > 0);
     _counts[id] = n;
+    // A panel that appears or goes away changes how the room is shared.
+    if (emptied && mounted) setState(() {});
     _publishSections();
   }
 
@@ -864,7 +868,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         return _Section<NotificationItem>(
           key: key,
           divider: divider,
-          bodyMax: _bodyMax,
+          bodyMax: _bodyMaxes[id] ?? 200,
           title: id.title,
           fold: fold,
           future: _notifications,
@@ -879,7 +883,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         return _Section<DriveInfo>(
           key: key,
           divider: divider,
-          bodyMax: _bodyMax,
+          bodyMax: _bodyMaxes[id] ?? 200,
           title: id.title,
           fold: fold,
           future: _drives,
@@ -892,7 +896,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         return _Section<ActivityEntry>(
           key: key,
           divider: divider,
-          bodyMax: _bodyMax,
+          bodyMax: _bodyMaxes[id] ?? 200,
           title: id.title,
           fold: fold,
           future: _activity,
@@ -905,7 +909,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         return _Section<ChatSummary>(
           key: key,
           divider: divider,
-          bodyMax: _bodyMax,
+          bodyMax: _bodyMaxes[id] ?? 200,
           title: id.title,
           fold: fold,
           future: _chats,
@@ -917,7 +921,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         return _Section<RecentResource>(
           key: key,
           divider: divider,
-          bodyMax: _bodyMax,
+          bodyMax: _bodyMaxes[id] ?? 200,
           title: id.title,
           fold: fold,
           future: _favorites,
@@ -931,7 +935,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
         return _Section<ConversationRow>(
           key: key,
           divider: divider,
-          bodyMax: _bodyMax,
+          bodyMax: _bodyMaxes[id] ?? 200,
           title: id.title,
           fold: fold,
           future: _conversations,
@@ -943,6 +947,15 @@ class _ChatsScreenState extends State<ChatsScreen> {
         );
     }
   }
+
+  /// Whether the panel is on screen: these three are left out while empty.
+  bool _takesRoom(HomeSection id) =>
+      !const {
+        HomeSection.notifications,
+        HomeSection.favorites,
+        HomeSection.messages
+      }.contains(id) ||
+      (_counts[id] ?? 0) > 0;
 
   /// The sections the home lists, a hairline above each but the first.
   List<HomeSection> _panelIds(bool split) => [
@@ -971,7 +984,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   /// How tall a panel's rows may get before they scroll inside it.
-  double _bodyMax = 200;
+  final Map<HomeSection, double> _bodyMaxes = {};
 
   /// Compact window: of several open panels only the one opened last stays.
   void _enforceAccordion() {
@@ -1068,13 +1081,15 @@ class _ChatsScreenState extends State<ChatsScreen> {
     final split = ShellScope.layoutOf(context) == ShellLayout.split;
     // "Show icons in the sidebar" off: the rows below are text only.
     _enforceAccordion();
-    return SidebarIconsScope(
-        child: FutureBuilder<List<DriveInfo>>(
+    return SidebarMetricsScope(
+        child: SidebarIconsScope(
+            child: FutureBuilder<List<DriveInfo>>(
       future: _drives,
       builder: (context, snapshot) {
         return Scaffold(
           backgroundColor: c.bgBody,
           appBar: AppTopBar(
+            compact: SidebarMetrics.of(context).compact,
             titleWidget: Builder(
               builder: (headerContext) => Align(
                 alignment: Alignment.centerLeft,
@@ -1101,15 +1116,49 @@ class _ChatsScreenState extends State<ChatsScreen> {
                     if (!_layout.collapsed.contains(s)) s
                 ];
                 final room = box.maxHeight.isFinite ? box.maxHeight : 600.0;
-                final headers = 49.0 * shown.length;
-                final openCount = math.max(1, open.length);
-                // Half the column at most, but room for a couple of rows in
-                // every open panel (never more than 80%).
-                final cap = math.min(room * 0.8,
-                    math.max(room * 0.5, headers + 96.0 * open.length));
-                // The open panels share what is left of the cap and scroll
-                // their rows inside.
-                _bodyMax = math.max(0.0, (cap - headers) / openCount);
+                final m = SidebarMetrics.of(context);
+                final scale =
+                    math.max(1.0, MediaQuery.textScalerOf(context).scale(1));
+                // Upper bounds of what a panel needs: its heading, up to
+                // _homeItems rows (two lines with a caption on touch) and a
+                // "Show all" row. A panel this tall never scrolls.
+                final headerH = (m.compact ? m.headerHeight : 48.0) * scale + 1;
+                final rowH = (m.compact ? m.rowHeight : 72.0) * scale;
+                final showAllH = (m.compact ? m.rowHeight : 48.0) * scale;
+                final natural = rowH * _homeItems + showAllH;
+                final headers = headerH * shown.where(_takesRoom).length;
+                // The panels come first; the tree keeps at least three rows.
+                final minTree = (m.compact ? m.rowHeight : 56.0) * 3;
+                final bottomPad = MediaQuery.paddingOf(context).bottom;
+                final cap = math.max(0.0, room - minTree);
+                final avail = math.max(0.0, cap - headers - bottomPad);
+                _bodyMaxes.clear();
+                final taking = open.where(_takesRoom).toList();
+                for (final s in open) {
+                  _bodyMaxes[s] = natural;
+                }
+                if (taking.isNotEmpty) {
+                  if (natural * taking.length <= avail) {
+                    // Everything fits: each panel is as tall as its rows.
+                  } else {
+                    // Short window: the panel opened last keeps its whole
+                    // content, the others share what is left (and scroll).
+                    final last = _openOrder.lastWhere(taking.contains,
+                        orElse: () => taking.last);
+                    final others = taking.length - 1;
+                    final lastMax = others == 0
+                        ? math.min(natural, avail)
+                        : math.min(
+                            natural, math.max(0.0, avail - others * rowH));
+                    _bodyMaxes[last] = lastMax;
+                    for (final s in taking) {
+                      if (s != last) {
+                        _bodyMaxes[s] =
+                            math.max(0.0, (avail - lastMax) / others);
+                      }
+                    }
+                  }
+                }
                 return Column(children: [
                   // The tree takes what the panels leave; it scrolls itself.
                   Expanded(child: _driveTree()),
@@ -1129,7 +1178,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
           ),
         );
       },
-    ));
+    )));
   }
 }
 
@@ -1311,6 +1360,69 @@ class _SectionState<T> extends State<_Section<T>>
     final fold = widget.fold;
     final label = '${widget.title}${unread > 0 ? ', $unread unread' : ''}, '
         '${fold.collapsed ? 'collapsed' : 'expanded'}';
+    final m = SidebarMetrics.of(context);
+    final compact = m.compact;
+    final titleStyle = compact
+        ? c.sectionHeaderText.copyWith(fontSize: m.headerTextSize, height: 1.2)
+        : c.sectionHeaderText;
+    final chevron = RotationTransition(
+      turns: Tween<double>(begin: -0.25, end: 0).animate(_shape),
+      child: Icon(Icons.expand_more,
+          size: compact ? m.chevronSize : 22, color: c.textSecondary),
+    );
+    final content = Row(children: [
+      Expanded(
+        // The app's section-header style: full-strength text on
+        // the band, so headers read apart from the rows.
+        child: Text(widget.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            strutStyle: compact ? SidebarRow.strut(m.headerTextSize) : null,
+            style: titleStyle),
+      ),
+      if (unread > 0) ...[
+        const SizedBox(width: 8),
+        Container(
+          key: const Key('notifications-badge'),
+          constraints: BoxConstraints(
+              minWidth: compact ? 16 : 20, minHeight: compact ? 16 : 20),
+          padding: EdgeInsets.symmetric(horizontal: compact ? 5 : 6),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+              color: c.main,
+              borderRadius: BorderRadius.circular(compact ? 8 : 10)),
+          child: Text(unread > 99 ? '99+' : '$unread',
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  height: 1.1,
+                  fontWeight: FontWeight.w600)),
+        ),
+      ],
+      SizedBox(width: compact ? 4 : 4),
+      if (compact)
+        SizedBox(
+            key: const Key('panel-chevron'),
+            width: m.chevronSlot,
+            height: m.chevronSlot,
+            child: Center(child: chevron))
+      else
+        chevron,
+    ]);
+    final band = Material(
+      color: c.sectionBand,
+      child: InkWell(
+        mouseCursor: WidgetStateMouseCursor.clickable,
+        onTap: fold.onToggle,
+        onLongPress: fold.onHold,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+              horizontal: compact ? m.hPad : 16, vertical: compact ? 2 : 0),
+          child: content,
+        ),
+      ),
+    );
+    final key = ValueKey('home-panel-${fold.section.name}');
     return Semantics(
       container: true,
       button: true,
@@ -1319,57 +1431,13 @@ class _SectionState<T> extends State<_Section<T>>
       onTap: fold.onToggle,
       onLongPress: fold.onHold,
       child: ExcludeSemantics(
-        child: SizedBox(
-          key: ValueKey('home-panel-${fold.section.name}'),
-          height: 48,
-          width: double.infinity,
-          child: Material(
-            color: c.sectionBand,
-            child: InkWell(
-              mouseCursor: WidgetStateMouseCursor.clickable,
-              onTap: fold.onToggle,
-              onLongPress: fold.onHold,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(children: [
-                  Expanded(
-                    // The app's section-header style: full-strength text on
-                    // the band, so headers read apart from the rows.
-                    child: Text(widget.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: c.sectionHeaderText),
-                  ),
-                  if (unread > 0) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      key: const Key('notifications-badge'),
-                      constraints:
-                          const BoxConstraints(minWidth: 20, minHeight: 20),
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                          color: c.main,
-                          borderRadius: BorderRadius.circular(10)),
-                      child: Text(unread > 99 ? '99+' : '$unread',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              height: 1.1,
-                              fontWeight: FontWeight.w600)),
-                    ),
-                  ],
-                  const SizedBox(width: 4),
-                  RotationTransition(
-                    turns: Tween<double>(begin: -0.25, end: 0).animate(_shape),
-                    child: Icon(Icons.expand_more,
-                        size: 22, color: c.textSecondary),
-                  ),
-                ]),
-              ),
-            ),
-          ),
-        ),
+        child: compact
+            ? ConstrainedBox(
+                key: key,
+                constraints: BoxConstraints(minHeight: m.headerHeight),
+                child: band)
+            : SizedBox(
+                key: key, height: 48, width: double.infinity, child: band),
       ),
     );
   }
@@ -1483,24 +1551,35 @@ class _ShowAllRow extends StatelessWidget {
   const _ShowAllRow({super.key, required this.count, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => InkWell(
-        mouseCursor: WidgetStateMouseCursor.clickable,
+  Widget build(BuildContext context) {
+    final m = SidebarMetrics.of(context);
+    final c = context.appColors;
+    if (m.compact) {
+      return SidebarRow(
+        title: 'Show all ($count)',
+        slot: SidebarIconsScope.of(context),
+        titleStyle:
+            SidebarRow.text(c.main, m.textSize, weight: FontWeight.w600),
         onTap: onTap,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 48),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text('Show all ($count)',
-                  style: TextStyle(
-                      color: context.appColors.main,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600)),
-            ),
+      );
+    }
+    return InkWell(
+      mouseCursor: WidgetStateMouseCursor.clickable,
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text('Show all ($count)',
+                style: TextStyle(
+                    color: c.main, fontSize: 14, fontWeight: FontWeight.w600)),
           ),
         ),
-      );
+      ),
+    );
+  }
 }
 
 /// A full-height page listing everything of one section: [count] rows, each
@@ -1936,10 +2015,19 @@ class _Empty extends StatelessWidget {
   /// centred block with 32 px around it made an empty section taller than a
   /// full one.
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-        child: Text(text, style: TextStyle(color: c.textSecondary)),
+  Widget build(BuildContext context) {
+    final m = SidebarMetrics.of(context);
+    if (m.compact) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(m.hPad, 4, m.hPad, 8),
+        child: Text(text, style: SidebarRow.text(c.textSecondary, m.textSize)),
       );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      child: Text(text, style: TextStyle(color: c.textSecondary)),
+    );
+  }
 }
 
 /// [chats] (newest first) under small headings by how long ago they were
