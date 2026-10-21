@@ -78,7 +78,7 @@ const defaultAgents: AIAgent[] = [
   },
 ];
 
-const getDefaultAgent = (agentId: string) =>
+export const getDefaultAgent = (agentId: string) =>
   defaultAgents.find(agent => agent.id === agentId);
 
 const mergeDefaultAgentFields = (agent: AIAgent): AIAgent => {

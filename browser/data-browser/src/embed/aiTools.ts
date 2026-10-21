@@ -92,8 +92,12 @@ export function registerAiTools(next: AiToolsSource | undefined): void {
   }
 }
 
-/** How long a call waits for the host component to mount. */
-export const AI_READY_TIMEOUT_MS = 15_000;
+/**
+ * How long a call waits for the host component to mount and register: its
+ * lazy chunk, then the web search server (up to `MCP_SETTLE_MS` in the host).
+ * As long as the app waits for the page (`HostedAi.webSetupTimeout`, 30 s).
+ */
+export const AI_READY_TIMEOUT_MS = 30_000;
 
 function ready(): Promise<AiToolsSource> {
   if (source) return Promise.resolve(source);

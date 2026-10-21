@@ -4,6 +4,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { TOOL_NAMES } from '../chunks/AI/useAtomicTools';
 import {
+  AI_READY_TIMEOUT_MS,
   aiCall,
   aiRunTool,
   aiToolList,
@@ -117,7 +118,7 @@ describe('aiRunTool', () => {
 
     const pending = aiRunTool('echo', '{}');
 
-    await vi.advanceTimersByTimeAsync(20_000);
+    await vi.advanceTimersByTimeAsync(AI_READY_TIMEOUT_MS + 1000);
     vi.useRealTimers();
 
     expect(JSON.parse(await pending).error).toMatch(/not available/);

@@ -95,6 +95,9 @@ void main() {
   testWidgets(
       'the first chunk shows within 500 ms and the request goes out while '
       'saving and the tool bridge each take 5 s', (tester) async {
+    final previous = HostedAi.webGrace;
+    HostedAi.webGrace = const Duration(milliseconds: 150);
+    addTearDown(() => HostedAi.webGrace = previous);
     final slow = Completer<void>();
     Timer(const Duration(seconds: 5), slow.complete);
     final bridge = _SlowBridge(slow);
@@ -130,6 +133,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     expect(requests, hasLength(1));
     expect(find.textContaining('First words'), findsWidgets);
+    // The chat says the web tools are missing from this answer.
+    expect(find.textContaining('Web tools and search are unavailable'),
+        findsWidgets);
     expect(api.saved, isEmpty);
     // Sent with the short prompt: the page is not up.
     expect(requests.single.$3, isNot('WEB PROMPT'));
@@ -138,8 +144,11 @@ void main() {
   });
 
   group('HostedAi with a bridge that is still starting', () {
-    test('the request goes out at once; the web tools join the next step',
-        () async {
+    test('the request goes out after the grace; the web tools join the next '
+        'step', () async {
+      final previous = HostedAi.webGrace;
+      HostedAi.webGrace = const Duration(milliseconds: 150);
+      addTearDown(() => HostedAi.webGrace = previous);
       final boot = Completer<void>();
       final bridge = _SlowBridge(boot);
       final seen = <(List<String>, String)>[];
@@ -182,6 +191,32 @@ void main() {
       expect(seen[1].$1, ['web_tool', 'local']);
       expect(seen[1].$2, 'WEB PROMPT');
       expect(sw.elapsedMilliseconds, lessThan(1000));
+      expect((await events).whereType<AiNotice>(), hasLength(1));
+    });
+
+    test('the first request waits for a page that comes up in time', () async {
+      final boot = Completer<void>();
+      Timer(const Duration(milliseconds: 100), boot.complete);
+      final bridge = _SlowBridge(boot);
+      final seen = <(List<String>, String)>[];
+      final ai = HostedAi(
+        status: {'enabled': true, 'consent': true, 'model': 'm'},
+        completions: (messages, model, tools) {
+          seen.add((
+            [for (final t in tools ?? const []) t['function']['name']],
+            messages.first['content'] as String,
+          ));
+          return Stream.value(_text('done'));
+        },
+        enable: () async => {},
+      );
+      final events = await ai.run([
+        ChatEntry.text((id: 'u', role: 'user', text: 'hi', createdAt: 0)),
+      ], bridge: bridge).toList();
+      expect(seen.single, (['web_tool'], 'WEB PROMPT'));
+      // This bridge has no web search tool.
+      expect(events.whereType<AiNotice>().single.text,
+          HostedAi.webUnavailableNotice);
     });
 
     test('warmWeb reads the page once; the answer then finds it ready',

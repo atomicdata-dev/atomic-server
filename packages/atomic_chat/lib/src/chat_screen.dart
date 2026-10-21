@@ -195,7 +195,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (widget.tools != null) return null;
     if (!_bridgeMade) {
       _bridgeMade = true;
+      // The drive the person is in, when the shell knows it.
+      final shell = ShellScope.maybeOf(context);
       _ownBridge = ChatScreen.defaultToolBridge(widget.api, () async {
+        final current = shell?.drive.value ?? '';
+        if (current.isNotEmpty) return current;
         try {
           final drives = visibleDrives(await widget.api.drives());
           return drives.isEmpty ? '' : drives.first.subject;
@@ -1123,6 +1127,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 parts.add(TextPart(text));
               }
               _showLater(parts);
+            case AiNotice(:final text):
+              parts.add(TextPart('_${text}_\n\n'));
+              _showNow(parts);
             case AiToolStarted(:final part):
               parts.add(part);
               _showNow(parts);

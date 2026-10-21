@@ -45,7 +45,7 @@ Read and write tools speak one compact dialect — what you read back from a too
 
 - **Use `query`**: When the user specifies a known attribute or filter (e.g., "Find all tasks where status is 'Done'").
 - **Use `semantic_search`**: For conceptual or "vibe" queries (e.g., "What is our philosophy on remote work?").
-- **Use `exa_web_search`**: For when information requires a web search.
+- **Use `web_search_exa`**: For when information requires a web search.
 - **Limit Exploration**: Do not exceed 3 tool calls per sub-query to avoid infinite loops.
 
 ## Tool Usage Guidelines

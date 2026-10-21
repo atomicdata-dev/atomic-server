@@ -92,6 +92,13 @@ class AiTextDelta extends AiEvent {
   const AiTextDelta(this.text);
 }
 
+/// Something the person should know about this answer (shown in the chat,
+/// not sent to the model): the web tools could not be used.
+class AiNotice extends AiEvent {
+  final String text;
+  const AiNotice(this.text);
+}
+
 /// The model called a tool; it runs now ([part] is `input-available`).
 class AiToolStarted extends AiEvent {
   final ToolPart part;
@@ -149,10 +156,20 @@ class HostedAi {
   static Duration webSetupTimeout = const Duration(seconds: 30);
 
   /// How long the first model request waits for the web app's tools and
-  /// prompt when they are not ready yet. The request must not wait for a
-  /// hidden page to boot: after this it goes with the short prompt and the
-  /// built-in tools, and the web ones are used from the next step or answer on.
-  static Duration webGrace = const Duration(milliseconds: 150);
+  /// prompt when they are not ready yet (the chat warms the page when it
+  /// opens, so this is only felt on a cold page). After this the request goes
+  /// with the short prompt and the built-in tools, an [AiNotice] says the
+  /// web tools are missing, and the web ones are used from the next step or
+  /// answer on if they come up.
+  static Duration webGrace = const Duration(seconds: 10);
+
+  /// The web chat's search tool: when the web app lacks it, the answer has
+  /// no internet.
+  static const webSearchTool = 'web_search_exa';
+
+  /// The note shown when the web app's tools or its search are not there.
+  static const webUnavailableNotice =
+      'Web tools and search are unavailable for this answer.';
 
   /// The most of an attached text file sent to the model.
   static const maxFileChars = 20000;
@@ -222,6 +239,9 @@ class HostedAi {
         webPrompt = web.prompt;
         usedWeb = true;
         webReady = true;
+      }
+      if (web == null || !web.tools.any((t) => t.name == webSearchTool)) {
+        yield const AiNotice(webUnavailableNotice);
       }
     }
     final system = [
