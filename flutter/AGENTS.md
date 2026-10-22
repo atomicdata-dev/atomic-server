@@ -75,7 +75,8 @@ lib/
 
 ## Gotchas
 
-- `flutter_rust_bridge` auto-generates files in `lib/src/rust/` — don't edit those manually
-- After `flutter_rust_bridge_codegen generate`, reset `pubspec.yaml`/`pubspec.lock`/`rust/Cargo.*` to HEAD and keep the `flutter_rust_bridge` version the repo pins (the codegen rewrites the version header in the generated files)
+- `flutter_rust_bridge` auto-generates files in `lib/src/rust/` and `rust/src/frb_generated.rs` — don't edit those manually. Regenerate with `flutter_rust_bridge_codegen generate` (version 2.12.0, as pinned); CI (`bridge-codegen` job in `.github/workflows/atomic-flutter.yml`) fails when the committed files differ from a fresh run. Delete a generated Dart file by hand when its Rust module is gone: the codegen leaves stale ones.
+- Rust enums with fields need `freezed` in Dart; use a struct plus a unit enum instead
+- New generic bridge functions go in `rust/src/api/resources.rs` with `AtomicError`; the Dart face is `packages/atomic_store` (README layers in `README.md`)
 - `atomic_lib` path dependency means you need `atomicdata-dev` checked out alongside this repo
 - On web, `dart:ffi` is unavailable — the bridge handles this but any new Rust bindings must be tested on web too

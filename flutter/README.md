@@ -93,7 +93,48 @@ NodeIDs are persistent (stored in the local DB), so a QR code stays valid across
 
 ## Architecture
 
-The Dart client code in `lib/atomic/` (`AtomicClient`, `session.dart`, FRB bridge) is a general-purpose Atomic Data SDK wrapping `atomic_lib` via `flutter_rust_bridge`. Once the API stabilizes, it should be extracted to `atomic-server/dart/` (or `sdk/dart/`) as a reusable Dart package, keeping this app as a thin UI layer on top.
+Three layers, each usable without the next:
+
+1. **The bridge** (`rust/src/api/`, generated glue in `lib/src/rust/`): thin
+   `flutter_rust_bridge` bindings over `atomic_lib`.
+   - `api/simple/` holds the older flat functions by domain: `agent`, `drive`,
+     `resource`, `files`, `store` (open/flush/stats), `sync` (server) and
+     `peers` (Iroh). Many return JSON strings and `String` errors; they stay
+     as they are until a screen is moved off them.
+   - `api/error.rs` + `api/resources.rs` are the typed generic API: `AtomicError`
+     (`kind` + `message`), `AtomicValue`, `ResourceData`,
+     `get_resource_data`, `save_resource_changes`, `create_resource_with_values`,
+     `search_resources`, `get_child_subjects`, `wait_for_resource_event`.
+     New bridge functions should look like these.
+   - `api/assistant.rs` holds the app-shaped functions (home lists, chats).
+2. **`packages/atomic_store`**: a pure Dart `Store`/`Resource` that rhymes with
+   `@tomic/lib` (see its README), over an injectable `StoreBackend`. The app's
+   backend is `lib/atomic/bridge_store_backend.dart`.
+3. **App-specific APIs**: `AssistantApi` (`packages/atomic_chat`, implemented
+   in `lib/assistant/atomic_assistant_api.dart`) for the screens, and
+   `AtomicClient` (`lib/atomic/`) for sign-in, servers and sync.
+
+The generated bridge files are checked in and CI regenerates them with the
+pinned codegen (`flutter_rust_bridge_codegen` 2.12.0, same as the
+`flutter_rust_bridge` dependency) and fails on any diff:
+
+```bash
+cd flutter && flutter_rust_bridge_codegen generate
+```
+
+Enums with fields would make the codegen require `freezed`; use a struct plus
+a unit enum instead (`AtomicError`/`ErrorKind`, `AtomicValue`/`Datatype`).
+
+### Next step: no globals
+
+The bridge still holds one open store and one active agent and drive per
+process (`api/simple/state.rs`, `Db::set_active_drive`). `atomic_store` takes
+its drive explicitly, but a second `Store` over the bridge shares the
+signing agent and the open database. Removing that means an opaque store
+handle (`#[frb(opaque)] AtomicStore`) that owns the `Db`, agent and active
+drive, with the functions above as its methods, and `BridgeStoreBackend`
+holding the handle. The sync, peer and assistant functions read the global
+store too (`db()`), so they move along with it; it is a change of its own.
 
 ## App identity
 
