@@ -4,9 +4,7 @@ import { createPortal } from 'react-dom';
 import {
   Agent,
   JSCryptoProvider,
-  agentPublicKey,
   agentSubject,
-  core,
   dataBrowser,
   useStore,
 } from '@tomic/react';
@@ -15,6 +13,7 @@ import { isOriginWithoutNode } from '../helpers/originNode';
 import { isRunningInTauri } from '../helpers/tauri';
 import { useSettings } from '../helpers/AppSettings';
 import { saveAgentToIDB } from '../helpers/agentStorage';
+import { saveAgentResource } from '../helpers/startLocalIdentity';
 import { reopenRestoredDrive } from '../helpers/driveData';
 import { useNavigateWithTransition } from '../hooks/useNavigateWithTransition';
 import { constructOpenURL } from '../helpers/navigation';
@@ -235,20 +234,11 @@ export function NewIdentitySection({
         throw new Error('No agent set');
       }
 
-      // Set the display name on the agent resource
-      const agentResource = store.getResourceLoading(identity.agentSubject, {
-        newResource: true,
-      });
-      const publicKey = agentPublicKey(identity.agentSubject) ?? '';
-
-      await agentResource.set(core.properties.publicKey, publicKey);
-      await agentResource.set(core.properties.isA, [core.classes.agent]);
-
-      if (username) {
-        await agentResource.set(core.properties.name, username);
-      }
-
-      await agentResource.save();
+      const agentResource = await saveAgentResource(
+        store,
+        identity.agentSubject,
+        username,
+      );
 
       // The agent exists on the server only from the save above, so the
       // picture goes up after it. A failed upload must not cost the account:

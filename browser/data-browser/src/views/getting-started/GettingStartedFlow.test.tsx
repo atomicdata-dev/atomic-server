@@ -16,6 +16,9 @@ import { buildTheme } from '../../styling';
 const state = vi.hoisted(() => ({
   portal: 'https://portal.example',
   hosted: false,
+  unavailable: false,
+  startLocalIdentity: vi.fn(),
+  nudge: vi.fn(),
   navigate: vi.fn(),
   setAgent: vi.fn(),
   setDrive: vi.fn(),
@@ -84,7 +87,11 @@ vi.mock('../../helpers/managedServer', () => ({
   fetchManagedInfo: async () => null,
   isHostedDistribution: () => state.hosted,
   accountCreationTarget: () =>
-    state.portal ? { kind: 'portal', url: state.portal } : { kind: 'local' },
+    state.unavailable
+      ? { kind: 'unavailable' }
+      : state.portal
+        ? { kind: 'portal', url: state.portal }
+        : { kind: 'local' },
 }));
 vi.mock('../../helpers/managed/recovery', () => ({
   getUnlockableRecoverySecret: () => state.recovery(),
@@ -124,6 +131,12 @@ vi.mock('../../helpers/driveData', () => ({
 }));
 vi.mock('../../helpers/originNode', () => ({
   isOriginWithoutNode: () => false,
+}));
+vi.mock('../../helpers/startLocalIdentity', () => ({
+  startLocalIdentity: state.startLocalIdentity,
+}));
+vi.mock('../../helpers/privateHomeNudge', () => ({
+  privateHomeNudge: state.nudge,
 }));
 vi.mock('../../helpers/navigation', () => ({
   constructOpenURL: (subject: string) => `/app/show?subject=${subject}`,
@@ -186,6 +199,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.portal = 'https://portal.example';
   state.hosted = false;
+  state.unavailable = false;
+  state.startLocalIdentity.mockResolvedValue({
+    agent: { subject: 'did:ad:agent:new' },
+    drive: 'did:ad:newhome',
+  });
   state.recovery.mockResolvedValue(null);
   state.account = null;
   state.hasData = true;
@@ -209,17 +227,47 @@ it('keeps secret sign-in reachable when a portal is configured', async () => {
   expect(await screen.findByLabelText('Agent secret')).toBeTruthy();
 });
 
-it('opens a hosted build on sign-in, without the welcome choice', async () => {
-  state.hosted = true;
+it.each([true, false])(
+  'offers exactly Get started and Sign in (hosted: %s)',
+  async hosted => {
+    state.hosted = hosted;
+    state.portal = hosted ? 'https://portal.example' : '';
+    await show();
+    expect(
+      screen.getAllByRole('button').map(button => button.textContent),
+    ).toEqual(['Get started', 'Sign in']);
+  },
+);
+
+it('starts with a real local identity and opens its drive, without a nudge', async () => {
   await show();
-  expect(screen.getByLabelText('Agent secret')).toBeTruthy();
-  expect(screen.queryByRole('button', { name: 'Create account' })).toBeNull();
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Get started' }));
+  });
+  expect(state.startLocalIdentity).toHaveBeenCalledWith(state.store);
+  expect(state.setAgent).toHaveBeenCalledWith({ subject: 'did:ad:agent:new' });
+  expect(state.setDrive).toHaveBeenCalledWith('did:ad:newhome');
+  expect(state.navigate).toHaveBeenCalledWith(
+    '/app/show?subject=did:ad:newhome',
+  );
+  expect(state.nudge).not.toHaveBeenCalled();
 });
 
-it('keeps a self-hosted welcome usable', async () => {
-  state.portal = '';
+it('shows the error and keeps the choice when starting fails', async () => {
+  state.startLocalIdentity.mockRejectedValue(new Error('No storage'));
   await show();
-  expect(screen.getByRole('button', { name: 'Create account' })).toBeTruthy();
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Get started' }));
+  });
+  expect(screen.getByRole('alert').textContent).toBe('No storage');
+  expect(screen.getByRole('button', { name: 'Get started' })).toBeTruthy();
+  expect(state.navigate).not.toHaveBeenCalled();
+});
+
+it('offers no Get started on a node that has an owner', async () => {
+  state.unavailable = true;
+  await show();
+  expect(screen.queryByRole('button', { name: 'Get started' })).toBeNull();
   expect(screen.getByRole('button', { name: 'Sign in' })).toBeTruthy();
 });
 

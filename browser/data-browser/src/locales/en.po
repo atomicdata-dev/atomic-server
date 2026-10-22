@@ -1494,7 +1494,6 @@ msgid "Turtle / N-triples / N3"
 msgstr "Turtle / N-triples / N3"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
-#: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Create account"
 msgstr "Create account"
 
@@ -3937,10 +3936,6 @@ msgstr "Join {0} — led by {1}"
 #: src/components/Presence/MeetingBanner.tsx
 msgid "Join"
 msgstr "Join"
-
-#: src/views/getting-started/GettingStartedFlow.tsx
-msgid "Try the live demo"
-msgstr "Try the live demo"
 
 #: src/routes/DemoRoute.tsx
 msgid "The demo needs the local database, which is disabled in this browser. Enable it on the Sync page and try again."
@@ -11044,6 +11039,7 @@ msgid "Data"
 msgstr "Data"
 
 #: src/components/MetaSetter.tsx
+#: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Get started"
 msgstr "Get started"
 
@@ -13224,3 +13220,7 @@ msgstr "The next backup from that browser or app adds them"
 #: src/components/ConnectDrivePicker.tsx
 msgid "All drives"
 msgstr "All drives"
+
+#: src/views/getting-started/WorkspaceLoading.tsx
+msgid "Setting up your workspace on this device…"
+msgstr "Setting up your workspace on this device…"

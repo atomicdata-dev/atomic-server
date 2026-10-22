@@ -26,6 +26,7 @@ import { fetchPrivateDriveSubject } from '../../helpers/privateDrive';
 import { connectHostedDrive, shortDid } from '../../helpers/managed/reconcile';
 import { deviceHasDriveData } from '../../helpers/driveData';
 import { discoverHomeServerForApp } from '../../helpers/discoverHomeServer';
+import { startLocalIdentity } from '../../helpers/startLocalIdentity';
 import { openPrivateHome } from '../../helpers/openPrivateHome';
 import { privateHomeNudge } from '../../helpers/privateHomeNudge';
 import { withDeadline } from '../../helpers/withDeadline';
@@ -44,7 +45,6 @@ import {
   fetchManagedInfo,
   accountCreationTarget,
   type AccountCreationTarget,
-  isHostedDistribution,
 } from '../../helpers/managedServer';
 import {
   ensureVaultBackup,
@@ -248,13 +248,7 @@ export function GettingStartedFlow({
       ? 'create'
       : inviteToken
         ? 'restore'
-        : nextDrive ||
-            returnPath ||
-            signInRequested ||
-            // Hosted builds have no Create/Sign-in/Demo choice: creating an
-            // account happens in the portal, so signed-out people get the
-            // sign-in options directly.
-            (isHostedDistribution() && initialStep === 'welcome')
+        : nextDrive || returnPath || signInRequested
           ? 'signin'
           : initialStep,
   );
@@ -263,7 +257,7 @@ export function GettingStartedFlow({
   // Account creation and the explicit Back action can still open the portal.
   const [loading, setLoading] = useState(false);
   const [workspaceStage, setWorkspaceStage] = useState<
-    'identity' | 'local' | 'backup'
+    'identity' | 'local' | 'backup' | 'setup'
   >('identity');
   const [error, setError] = useState<Error | undefined>();
   // The drive a freshly signed-in device is missing, handed to the
@@ -886,6 +880,27 @@ export function GettingStartedFlow({
   }
 
   /**
+   * Start without an account: a real key on this device and its own drive,
+   * opened at once. No profile, secret or email; those come later, if wanted.
+   */
+  async function handleGetStarted() {
+    setError(undefined);
+    setWorkspaceStage('setup');
+    setStep('opening-workspace');
+
+    try {
+      const { agent, drive } = await startLocalIdentity(store);
+
+      setAgent(agent);
+      setDrive(drive);
+      navigate(constructOpenURL(drive));
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
+      setStep('welcome');
+    }
+  }
+
+  /**
    * "Sign in" tries the passkey straight away when this device holds exactly
    * one account, so the common case is a single click → fingerprint → in,
    * with no intermediate screen. Several accounts means we can't know which,
@@ -1049,37 +1064,14 @@ export function GettingStartedFlow({
                 </CardSubtitle>
               ) : (
                 <CtaButton
-                  key='create'
+                  key='start'
                   type='button'
-                  disabled={!createTarget}
-                  onClick={() => {
-                    // Belt and braces with `disabled`: the button is unclickable
-                    // until `/server` answers, so this only guards a
-                    // programmatic call.
-                    if (!createTarget) return;
-
-                    // Hosted build or managed node → create the account on the
-                    // portal (email verification). FOSS node → local identity.
-                    if (createTarget.kind === 'portal') {
-                      const url = safePortalUrl(createTarget.url);
-
-                      if (url) window.location.assign(url);
-                    } else {
-                      setStep('create');
-                    }
-                  }}
+                  disabled={!createTarget || loading}
+                  onClick={() => void handleGetStarted()}
                 >
-                  Create account
+                  Get started
                 </CtaButton>
               )}
-              {/* No account-less create path in a hosted build. It minted a
-                  second identity that the portal then swapped away the
-                  moment its owner signed in with an email that already had
-                  one (staging, 2026-09-03). One email, one identity: the
-                  hosted welcome creates through the portal or signs in with
-                  an existing secret — nothing in between. A FOSS build's
-                  "Create account" is the local path, and someone with their
-                  own secret has Sign in below. */}
               <CtaButton
                 key='signin'
                 type='button'
@@ -1088,18 +1080,6 @@ export function GettingStartedFlow({
                 onClick={handleSignInClick}
               >
                 {loading ? 'Waiting for your passkey…' : 'Sign in'}
-              </CtaButton>
-              <CtaButton
-                key='demo'
-                type='button'
-                subtle
-                onClick={() => {
-                  // No account needed: the demo mints a throwaway
-                  // guest agent and runs entirely on this device.
-                  navigate(paths.demo);
-                }}
-              >
-                Try the live demo
               </CtaButton>
             </ButtonStack>
             {/* Below the buttons on purpose: what this node offers comes
@@ -1372,9 +1352,6 @@ export function GettingStartedFlow({
                     window.location.assign(
                       new URL('/dashboard', knownPortalUrl).toString(),
                     );
-                  } else if (isHostedDistribution() && knownPortalUrl) {
-                    // No welcome step in a hosted build; Back leaves for the portal.
-                    window.location.assign(knownPortalUrl);
                   } else {
                     setStep('welcome');
                   }
