@@ -25,6 +25,8 @@ pub async fn setup(name: String) -> Result<SetupResult, String> {
 /// Returns "needs_sync" if the drive doesn't exist locally (needs QR pairing).
 /// Returns the agent subject if everything is available.
 pub async fn load_agent(secret: String) -> Result<String, String> {
+    // A new sign-in: drives a server refused before are asked again.
+    state::default_store()?.sync.clear_denied();
     let loaded = state::default_store()?
         .load_agent(secret)
         .await

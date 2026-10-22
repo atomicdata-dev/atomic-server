@@ -9,6 +9,8 @@
 #[cfg(all(feature = "iroh", feature = "db"))]
 pub mod call;
 #[cfg(feature = "iroh")]
+pub mod dial_gate;
+#[cfg(feature = "iroh")]
 pub mod discover;
 #[cfg(feature = "db")]
 pub mod engine;

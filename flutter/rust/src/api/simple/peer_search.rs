@@ -89,6 +89,7 @@ pub(crate) fn search_again_now() {
 pub(crate) fn set_foreground(foreground: bool) {
     PEER_SEARCH.set_paused(!foreground);
     if foreground {
+        atomic_lib::sync::dial_gate::reset_unreachable_peers();
         search_again_now();
     }
 }

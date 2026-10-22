@@ -211,6 +211,8 @@ pub struct SyncConnectivityReport {
 /// Start Iroh, sync known peers (then pkarr). Returns JSON [`SyncConnectivityReport`].
 pub async fn sync_connectivity_now() -> Result<String, String> {
     let store = db()?;
+    // The user asked: every known device is tried again.
+    atomic_lib::sync::dial_gate::reset_unreachable_peers();
     let _busy = busy(Kind::Sync);
     let report = tokio::time::timeout(
         std::time::Duration::from_secs(50),

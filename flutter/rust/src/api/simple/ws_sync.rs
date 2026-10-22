@@ -1,6 +1,8 @@
 //! WebSocket sync session for Flutter — mirrors browser `WSClient` + drive SUB.
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use atomic_lib::{
     client::ws::{WsClient, WsMessage},
@@ -57,6 +59,8 @@ pub(crate) struct SyncSession {
     sink: Mutex<Option<Arc<dyn CommitSink>>>,
     task: Mutex<Option<tokio::task::JoinHandle<()>>>,
     origin: Mutex<Option<String>>,
+    /// Drives a server refused (401/403) for an agent: not asked again.
+    denied: Mutex<DeniedDrives>,
 }
 
 /// `http://host:9883` → `ws://host:9883/ws`
@@ -219,17 +223,52 @@ impl SyncSession {
         if store.get_resource(&subject).await.is_ok() {
             return Ok(());
         }
+        let (agent, origin) = self.access_key(store);
+        if let Some(why) = self.denied_lock().check(&agent, drive, &origin, Instant::now()) {
+            return Err(why);
+        }
         tracing::info!(
             "[ws_sync] drive missing locally, fetching {}",
             &drive[..drive.len().min(32)]
         );
-        let bytes = self.fetch_resource_state(drive).await?;
+        let bytes = match self.fetch_resource_state(drive).await {
+            Ok(b) => b,
+            Err(e) => {
+                if is_access_denied(&e) {
+                    self.denied_lock().deny(&agent, drive, &origin, Instant::now());
+                }
+                return Err(e);
+            }
+        };
         if bytes.is_empty() {
             return Err("Drive not found on server".into());
         }
         ws_apply::apply_state_update(store, drive, &bytes)
             .await
             .map_err(err)
+    }
+
+    fn denied_lock(&self) -> std::sync::MutexGuard<'_, DeniedDrives> {
+        self.denied.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn access_key(&self, store: &atomic_lib::Db) -> (String, String) {
+        let agent = store
+            .get_default_agent()
+            .map(|a| a.subject.to_string())
+            .unwrap_or_default();
+        (agent, self.origin().unwrap_or_default())
+    }
+
+    /// Forget which drives were refused (the user signed in, the agent changed).
+    pub(crate) fn clear_denied(&self) {
+        self.denied_lock().clear();
+    }
+
+    /// Whether any server refused this agent the drive: for the drive list.
+    pub(crate) fn is_drive_denied(&self, store: &atomic_lib::Db, drive: &str) -> bool {
+        let (agent, _) = self.access_key(store);
+        self.denied_lock().is_denied_anywhere(&agent, drive, Instant::now())
     }
 
     async fn fetch_resource_state(&self, subject: &str) -> Result<Vec<u8>, String> {
@@ -306,8 +345,16 @@ impl SyncSession {
         drive: &str,
     ) -> Result<(), String> {
         let client = self.client()?;
-        client.subscribe_drive(drive).await.map_err(err)?;
-        self.ensure_drive_materialized(store, drive).await
+        // A drive lives on the host in its URL; this session is one server.
+        if let Some(origin) = self.origin() {
+            if !drive_belongs_to_origin(drive, &origin) {
+                return Err(format!("{drive} is hosted elsewhere, not on {origin}"));
+            }
+        }
+        // Fetch before subscribing: a refusal then costs one request, not a
+        // SUB and a GET that both fail.
+        self.ensure_drive_materialized(store, drive).await?;
+        client.subscribe_drive(drive).await.map_err(err)
     }
 
     /// Ask the server for what `store` lacks of `drive`: a `SYNC` with its
@@ -441,4 +488,113 @@ async fn handle_ws_message(store: &atomic_lib::Db, msg: WsMessage) -> Result<(),
         _ => {}
     }
     Ok(())
+}
+
+// ── Drives a server refused ────────────────────────────────────────────────
+
+/// How long a 401/403 for a (drive, server) is remembered.
+const DENIED_TTL: Duration = Duration::from_secs(6 * 60 * 60);
+
+/// Whether a server's error text is a refusal of access (not a missing drive
+/// or a dropped connection).
+pub(crate) fn is_access_denied(message: &str) -> bool {
+    let m = message.to_lowercase();
+    m.contains("401") || m.contains("403") || m.contains("unauthorized")
+        || m.contains("forbidden") || m.contains("not publicly readable")
+}
+
+fn host_of(subject: &str) -> Option<String> {
+    let rest = subject.split_once("://")?.1;
+    let host = rest.split(['/', '?', '#']).next()?;
+    (!host.is_empty()).then(|| host.to_lowercase())
+}
+
+/// A drive named by an http(s) URL is hosted at that URL's host; any other
+/// subject (a DID) can be anywhere.
+pub(crate) fn drive_belongs_to_origin(drive: &str, origin: &str) -> bool {
+    if !(drive.starts_with("http://") || drive.starts_with("https://")) {
+        return true;
+    }
+    match (host_of(drive), host_of(origin)) {
+        (Some(d), Some(o)) => d == o,
+        _ => true,
+    }
+}
+
+/// (agent, drive, origin) refusals with the time they were seen.
+#[derive(Default)]
+pub(crate) struct DeniedDrives {
+    seen: HashMap<(String, String, String), Instant>,
+}
+
+impl DeniedDrives {
+    fn key(agent: &str, drive: &str, origin: &str) -> (String, String, String) {
+        (agent.to_string(), drive.to_string(), origin.trim_end_matches('/').to_string())
+    }
+
+    pub(crate) fn deny(&mut self, agent: &str, drive: &str, origin: &str, now: Instant) {
+        self.seen.insert(Self::key(agent, drive, origin), now);
+    }
+
+    /// `Some(reason)` while the refusal is remembered.
+    pub(crate) fn check(&mut self, agent: &str, drive: &str, origin: &str, now: Instant) -> Option<String> {
+        let key = Self::key(agent, drive, origin);
+        match self.seen.get(&key) {
+            Some(at) if now.saturating_duration_since(*at) < DENIED_TTL => {
+                tracing::debug!("[ws_sync] {drive} on {origin}: refused before, not asked again");
+                Some(format!("{drive} is not readable on {origin} (401/403, remembered)"))
+            }
+            Some(_) => {
+                self.seen.remove(&key);
+                None
+            }
+            None => None,
+        }
+    }
+
+    pub(crate) fn is_denied_anywhere(&self, agent: &str, drive: &str, now: Instant) -> bool {
+        self.seen.iter().any(|((a, d, _), at)| {
+            a == agent && d == drive && now.saturating_duration_since(*at) < DENIED_TTL
+        })
+    }
+
+    pub(crate) fn clear(&mut self) {
+        self.seen.clear();
+    }
+}
+
+#[cfg(test)]
+mod denied_tests {
+    use super::*;
+
+    #[test]
+    fn detects_refusals() {
+        assert!(is_access_denied("Status: 401 Unauthorized, not publicly readable"));
+        assert!(!is_access_denied("GET timed out"));
+    }
+
+    #[test]
+    fn drive_is_tried_on_its_own_host_only() {
+        let d = "https://atomicdata.dev/drive/0PXBdxdX";
+        assert!(drive_belongs_to_origin(d, "https://atomicdata.dev"));
+        assert!(!drive_belongs_to_origin(d, "https://staging.atomicdata.dev/"));
+        assert!(drive_belongs_to_origin("did:ad:abc", "https://staging.atomicdata.dev"));
+    }
+
+    #[test]
+    fn refusal_is_remembered_per_agent_drive_origin_until_ttl_or_clear() {
+        let mut m = DeniedDrives::default();
+        let t0 = Instant::now();
+        let (d, o) = ("https://atomicdata.dev/drive/x", "https://atomicdata.dev");
+        assert!(m.check("me", d, o, t0).is_none());
+        m.deny("me", d, o, t0);
+        assert!(m.check("me", d, o, t0 + Duration::from_secs(60)).is_some());
+        assert!(m.check("other", d, o, t0).is_none(), "another agent asks again");
+        assert!(m.check("me", d, "https://elsewhere", t0).is_none());
+        assert!(m.is_denied_anywhere("me", d, t0));
+        assert!(m.check("me", d, o, t0 + DENIED_TTL + Duration::from_secs(1)).is_none());
+        m.deny("me", d, o, t0);
+        m.clear();
+        assert!(m.check("me", d, o, t0).is_none());
+    }
 }

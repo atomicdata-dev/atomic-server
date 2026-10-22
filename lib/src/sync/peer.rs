@@ -1880,8 +1880,33 @@ pub async fn sync_drive_with_peer_using_outcome(
     // Prefer a stored relay/address hint over a bare node id, so a re-dial does
     // not hinge on a pkarr lookup that fails behind restrictive NAT.
     let dial = dial_target(store, node_id);
+    // A peer that just failed to answer is not dialled again by automatic
+    // callers until its backoff passes, and never twice at once.
+    use super::dial_gate::{Skip, DIAL_GATE};
+    let attempt = match DIAL_GATE.begin(&remote_key, std::time::Instant::now(), force) {
+        Ok(a) => a,
+        Err(Skip::Backoff(left)) => {
+            tracing::debug!("[sync] not dialling {remote_short}: unreachable, retry in {}s", left.as_secs());
+            return Err(format!(
+                "Iroh connect to {remote_short} skipped: recently unreachable (retry in {}s)",
+                left.as_secs()
+            )
+            .into());
+        }
+        Err(Skip::InFlight) => {
+            tracing::debug!("[sync] not dialling {remote_short}: an attempt is already running");
+            return Err(format!("Iroh connect to {remote_short} skipped: already connecting").into());
+        }
+    };
+    let connected =
+        tokio::time::timeout(CONNECT_TIMEOUT, endpoint.connect(dial, ATOMIC_ALPN)).await;
+    drop(attempt);
+    match &connected {
+        Ok(Ok(_)) => DIAL_GATE.record_success(&remote_key),
+        _ => DIAL_GATE.record_failure(&remote_key, std::time::Instant::now()),
+    }
     let conn =
-        match tokio::time::timeout(CONNECT_TIMEOUT, endpoint.connect(dial, ATOMIC_ALPN)).await {
+        match connected {
             Ok(Ok(c)) => c,
             Ok(Err(e)) => {
                 tracing::error!("[sync] connect failed to {remote_short}: {e}");

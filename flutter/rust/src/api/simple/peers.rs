@@ -59,6 +59,8 @@ pub fn peer_search_status() -> String {
 /// recently too.
 #[frb(sync)]
 pub fn peer_search_again() {
+    // A button or a network change: unreachable peers get another chance.
+    atomic_lib::sync::dial_gate::reset_unreachable_peers();
     peer_search::search_again_now();
 }
 

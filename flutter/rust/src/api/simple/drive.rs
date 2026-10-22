@@ -50,9 +50,16 @@ pub async fn list_drives_with_names() -> Result<String, String> {
     let mut rows = serde_json::to_value(&drives).map_err(|e| e.to_string())?;
     if let Some(rows) = rows.as_array_mut() {
         for row in rows {
-            let Some(subject) = row["subject"].as_str() else {
+            let Some(subject) = row["subject"].as_str().map(str::to_string) else {
                 continue;
             };
+            let subject = subject.as_str();
+            // A server refused this agent the drive: say so rather than hide it.
+            if let Ok(default) = super::state::default_store() {
+                if default.sync.is_drive_denied(&default.db, subject) {
+                    row["unreadable"] = true.into();
+                }
+            }
             if let Some(drive) = atomic_lib::host::rows::row_resource(store, &subject.into()).await
             {
                 *row = atomic_lib::host::rows::with_icon(store, row.take(), &drive);
