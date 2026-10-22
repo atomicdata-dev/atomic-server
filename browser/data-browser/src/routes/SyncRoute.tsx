@@ -8,7 +8,10 @@ import {
 } from '../helpers/knownPeers';
 import { resumePeerLinks } from '../helpers/browserPeerSync';
 import { syncSummary, showSavedServer } from '../helpers/syncPresentation';
-import { driveBillingUrl } from '../helpers/driveBillingUrl';
+import {
+  cloudServerSalesUrl,
+  driveBillingUrl,
+} from '../helpers/driveBillingUrl';
 import { reportUserFacingFailure } from '../helpers/sentry';
 import {
   deriveNodeStatuses,
@@ -1498,13 +1501,12 @@ function SyncPage() {
           return;
         }
 
-        const billingUrl = new URL('/billing', accountPortalUrl);
-        billingUrl.searchParams.set('drive', drive);
+        const salesUrl = cloudServerSalesUrl(accountPortalUrl, drive);
 
         if (isRunningInTauri()) {
-          await openExternal(billingUrl.toString());
+          await openExternal(salesUrl);
         } else {
-          window.location.assign(billingUrl.toString());
+          window.location.assign(salesUrl);
         }
       } else {
         store.notifyError(e as Error);
@@ -1727,7 +1729,9 @@ function SyncPage() {
           <Button
             data-testid='cloud-server-upgrade'
             onClick={() =>
-              void openExternal(driveBillingUrl(accountPortalUrl, status.drive))
+              void openExternal(
+                cloudServerSalesUrl(accountPortalUrl, status.drive),
+              )
             }
           >
             Upgrade to Cloud Server
