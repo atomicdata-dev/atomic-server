@@ -1,0 +1,10 @@
+{
+  "description": "Fixed vector for the identity hand-back seal (planning/flutter-secret-handback.md). All binary values are unpadded base64url. ciphertext includes the 16-byte GCM tag.",
+  "app_private": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA",
+  "app_key": "B6N8vBQgk8i3VdwbEOhstCY3StFqqFPtC9_AsrhtHHw",
+  "sender_private": "ZWZnaGlqa2xtbm9wcXJzdHV2d3h5ent8fX5_gIGCg4Q",
+  "epk": "VxR2nRFr92Q2rnS8eT0sMK0ZA8WaxSc4BcfiaYtBDDY",
+  "nonce": "ycrLzM3Oz9DR0tPU",
+  "plaintext": "{\"secret\":\"eyJwcml2YXRlS2V5IjoiZml4dHVyZSIsInN1YmplY3QiOiJkaWQ6YWQ6YWdlbnQ6Zml4dHVyZSJ9\",\"subject\":\"did:ad:agent:fixture-public-key\",\"drive\":\"did:ad:fixturedrive\"}",
+  "ciphertext": "KnTqmxO8pqau6shzXIvOUrkEzxcRVRcFT-ZG0pjHq8g5sHtDnkb7MCETcMUSSI0Vg-p36DC-LxScab7wDglXQr4SpknEYYo19vUintHrHFpqByWPEevuyTRk6u5M4pprEigGbF2v6h3vSBm4MWbVaTDTfPnKjwOZTkouofT57vQ_hxinv9rWqjXREnUJ2TMQ0xTVmikT9ID93Sh3kLHnJcWNEqW56L7UC1I3VSQc3a_rLtU"
+}

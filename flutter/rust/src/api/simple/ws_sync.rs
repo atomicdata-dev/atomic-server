@@ -8,7 +8,7 @@ use atomic_lib::{
     Storelike,
 };
 
-use super::state::{db, err};
+use super::state::{db, err, set_server_origin};
 
 static WS_TASK: OnceLock<Mutex<Option<tokio::task::JoinHandle<()>>>> = OnceLock::new();
 static WS_CLIENT: OnceLock<Mutex<Option<Arc<WsClient>>>> = OnceLock::new();
@@ -60,6 +60,7 @@ pub async fn open_ws_sync(server_origin: &str) -> Result<(), String> {
 
     let store = db()?.clone();
     store.set_base_url(server_origin.trim_end_matches('/'));
+    set_server_origin(server_origin);
 
     let client = Arc::new(WsClient::connect(&ws_url).await.map_err(err)?);
     let agent = store.get_default_agent().map_err(err)?;
@@ -107,6 +108,13 @@ pub async fn open_ws_sync(server_origin: &str) -> Result<(), String> {
     if let Some(drive) = store.get_active_drive() {
         if let Err(e) = ensure_drive_materialized(store.as_ref(), &drive).await {
             tracing::warn!("[ws_sync] drive fetch skipped: {e}");
+        } else {
+            // The session now knows a server: the person's other drives may
+            // be on it.
+            tokio::spawn(super::follow_listed_drives(drive));
+            // Conversations are drives of their own that nothing above
+            // lists: subscribe to them and catch up on what was said.
+            crate::api::assistant::follow_conversations_in_background();
         }
     }
 
@@ -122,7 +130,10 @@ pub async fn open_ws_sync(server_origin: &str) -> Result<(), String> {
 
 /// Fetch the active drive from the server when the agent secret references a drive
 /// that is not yet in the local DB (second device, same account).
-async fn ensure_drive_materialized(store: &atomic_lib::Db, drive: &str) -> Result<(), String> {
+pub(crate) async fn ensure_drive_materialized(
+    store: &atomic_lib::Db,
+    drive: &str,
+) -> Result<(), String> {
     let subject = atomic_lib::Subject::from_raw(drive, store.get_base_domain().as_deref());
     if store.get_resource(&subject).await.is_ok() {
         return Ok(());
@@ -148,6 +159,13 @@ async fn handle_ws_message(store: &atomic_lib::Db, msg: WsMessage) -> Result<(),
             ..
         } => {
             ws_apply::apply_state_update(store, &subject, &loro_bytes)
+                .await
+                .map_err(err)?;
+        }
+        // The answer to `catch_up_drive`: the state of what this device
+        // lacks or has an older version of.
+        WsMessage::SyncPush { entries, .. } => {
+            ws_apply::apply_state_updates(store, &entries, false)
                 .await
                 .map_err(err)?;
         }
@@ -237,16 +255,64 @@ pub async fn drain_outbox(store: &atomic_lib::Db) -> bool {
     }
 }
 
-/// Subscribe to live updates for a single canvas over WebSocket.
-pub async fn subscribe_canvas(subject: &str) -> Result<(), String> {
+/// Follow another drive of the person over the open WS session: fetch it when
+/// missing and subscribe to its commits. Fails when the server does not host it.
+pub(crate) async fn follow_drive(drive: &str) -> Result<(), String> {
     let client = ws_client_slot()
         .lock()
         .map_err(|e| e.to_string())?
         .clone()
         .ok_or_else(|| "WS session not open".to_string())?;
-    client.subscribe_resource(subject).await.map_err(err)?;
-    client.subscribe_loro_sync(subject).await.map_err(err)?;
-    Ok(())
+    let store = db()?;
+    client.subscribe_drive(drive).await.map_err(err)?;
+    ensure_drive_materialized(store.as_ref(), drive).await
+}
+
+/// Ask the server for what this device lacks of `drive`: a `SYNC` with this
+/// device's version vectors, which the server answers with the state of every
+/// resource it has newer (`SYNC_PUSH`, applied by the session's message loop).
+/// A `SUB` only delivers what happens from then on, so a drive this device
+/// already holds needs this to get what was said while it was closed or
+/// offline. Does not wait for the answer.
+pub(crate) async fn catch_up_drive(drive: &str) -> Result<(), String> {
+    use std::collections::HashMap;
+    let client = ws_client_slot()
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone()
+        .ok_or_else(|| "WS session not open".to_string())?;
+    let store = db()?;
+    let subject = atomic_lib::Subject::from(drive);
+    let subjects = atomic_lib::sync::engine::collect_drive_subjects(store.as_ref(), &subject).await;
+    let vvs = atomic_lib::sync::engine::build_drive_vvs(store.as_ref(), &subjects);
+    let mut peers: Vec<String> = Vec::new();
+    for vv in vvs.values() {
+        for peer in vv.keys() {
+            if !peers.contains(peer) {
+                peers.push(peer.clone());
+            }
+        }
+    }
+    let resources: HashMap<String, Vec<i32>> = vvs
+        .iter()
+        .map(|(subject, vv)| {
+            let counters = peers
+                .iter()
+                .map(|p| vv.get(p).copied().unwrap_or(0))
+                .collect();
+            (subject.clone(), counters)
+        })
+        .collect();
+    // An empty hash never matches the server's, so it always compares.
+    client
+        .send_binary(protocol::encode_sync(
+            &subject.pure_id(),
+            "",
+            &peers,
+            &resources,
+        ))
+        .await
+        .map_err(err)
 }
 
 /// Post a commit JSON-AD over the open WS session (falls back to error if closed).

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older. The secure storage preferences are encrypted with a
+     keystore key that never leaves the device: restored onto another one they
+     cannot be read (nor written) and the person was signed out with no word
+     why. Left out of backups; the app asks for the secret instead. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+</full-backup-content>

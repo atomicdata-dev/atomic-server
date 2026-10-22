@@ -29,6 +29,11 @@ import {
 import { presetColors } from '../styling';
 import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
 import { FaMagnifyingGlass, FaXmark } from 'react-icons/fa6';
+import {
+  showAppearanceOption,
+  showSettingsHeader,
+  showSettingsSection,
+} from '../embed/settings';
 
 /** Touch screens: focusing a field there raises the keyboard. */
 const isTouchDevice = () =>
@@ -65,6 +70,8 @@ const AppSettings: React.FunctionComponent = () => {
     setSidebarKeyboardDndEnabled,
     hideTemplates,
     setHideTemplates,
+    showSidebarIcons,
+    setShowSidebarIcons,
     navbarTop,
     setNavbarTop,
   } = useSettings();
@@ -89,192 +96,245 @@ const AppSettings: React.FunctionComponent = () => {
     }
   };
 
+  // In the Flutter embed only part of the page applies (embed/settings.ts).
+  const show = showAppearanceOption;
+
   const searchContext = useMemo(
     () => ({ query: searchQuery, parentMatched: false }),
     [searchQuery],
   );
 
+  const header = showSettingsHeader();
+
   return (
     <Main>
       <ContainerNarrow>
-        <h1>Settings</h1>
-        <SettingsSearchWrapper hasPrefix>
-          <FaMagnifyingGlass />
-          <InputStyled
-            type='text'
-            placeholder='Search settings...'
-            aria-label='Search settings'
-            // Ready to type on arrival. Not on touch screens, where focusing
-            // pops the keyboard over the settings you came to look at.
-            autoFocus={!isTouchDevice()}
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <ClearButton
-              type='button'
-              onClick={() => setSearchQuery('')}
-              title='Clear search'
-            >
-              <FaXmark />
-            </ClearButton>
-          )}
-        </SettingsSearchWrapper>
+        {header && <h1>Settings</h1>}
+        {header && (
+          <SettingsSearchWrapper hasPrefix>
+            <FaMagnifyingGlass />
+            <InputStyled
+              type='text'
+              placeholder='Search settings...'
+              aria-label='Search settings'
+              // Ready to type on arrival. Not on touch screens, where focusing
+              // pops the keyboard over the settings you came to look at.
+              autoFocus={!isTouchDevice()}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <ClearButton
+                type='button'
+                onClick={() => setSearchQuery('')}
+                title='Clear search'
+              >
+                <FaXmark />
+              </ClearButton>
+            )}
+          </SettingsSearchWrapper>
+        )}
         <SettingsSearchProvider value={searchContext}>
           <SettingsGroup>
-            <SettingsSection
-              label='Appearance'
-              childSearchKeywords='language locale panels messages favorites shared with me templates ontology aichats hide templates'
-            >
-              <Column gap='1rem'>
-                <Column gap='0.5rem'>
-                  <SubLabel>Theme</SubLabel>
-                  <Row>
-                    <Button
-                      subtle={!(darkModeSetting === DarkModeOption.auto)}
-                      onClick={() => setDarkMode(undefined)}
-                      title="Use the browser's / OS dark mode settings"
-                    >
-                      Auto
-                    </Button>
-                    <Button
-                      subtle={!(darkModeSetting === DarkModeOption.always)}
-                      onClick={() => setDarkMode(true)}
-                    >
-                      Dark
-                    </Button>
-                    <Button
-                      subtle={!(darkModeSetting === DarkModeOption.never)}
-                      onClick={() => setDarkMode(false)}
-                    >
-                      Light
-                    </Button>
-                  </Row>
-                </Column>
-                <Column gap='0.5rem'>
-                  <SubLabel>NavBar position</SubLabel>
-                  <Row>
-                    <Button
-                      subtle={!navbarTop}
-                      onClick={() => setNavbarTop(true)}
-                    >
-                      Top
-                    </Button>
-                    <Button
-                      subtle={navbarTop}
-                      onClick={() => setNavbarTop(false)}
-                    >
-                      Bottom
-                    </Button>
-                  </Row>
-                </Column>
-                <Column gap='0.5rem'>
-                  <SubLabel>Main color</SubLabel>
-                  <MainColorPicker />
-                </Column>
-                <CheckboxLabel>
-                  <Checkbox checked={colorfulMode} onChange={setColorfulMode} />{' '}
-                  <span>Colorful mode</span>
-                </CheckboxLabel>
-                <Column gap='0.5rem'>
-                  <label htmlFor='settings-language'>Language</label>
-                  <BasicSelect
-                    id='settings-language'
-                    value={locale}
-                    onChange={e => setLocale(e.target.value)}
+            {showSettingsSection('appearance') && (
+              <SettingsSection
+                label='Appearance'
+                // The only section in the embed: open from the start.
+                {...(header ? {} : { open: true, initialState: true })}
+                childSearchKeywords='sidebar icons pictures avatars language locale panels messages favorites shared with me templates ontology aichats hide templates'
+              >
+                <Column gap='1rem'>
+                  {show('theme') && (
+                    <Column gap='0.5rem'>
+                      <SubLabel>Theme</SubLabel>
+                      <Row>
+                        <Button
+                          subtle={!(darkModeSetting === DarkModeOption.auto)}
+                          onClick={() => setDarkMode(undefined)}
+                          title="Use the browser's / OS dark mode settings"
+                        >
+                          Auto
+                        </Button>
+                        <Button
+                          subtle={!(darkModeSetting === DarkModeOption.always)}
+                          onClick={() => setDarkMode(true)}
+                        >
+                          Dark
+                        </Button>
+                        <Button
+                          subtle={!(darkModeSetting === DarkModeOption.never)}
+                          onClick={() => setDarkMode(false)}
+                        >
+                          Light
+                        </Button>
+                      </Row>
+                    </Column>
+                  )}
+                  {show('navbarPosition') && (
+                    <Column gap='0.5rem'>
+                      <SubLabel>NavBar position</SubLabel>
+                      <Row>
+                        <Button
+                          subtle={!navbarTop}
+                          onClick={() => setNavbarTop(true)}
+                        >
+                          Top
+                        </Button>
+                        <Button
+                          subtle={navbarTop}
+                          onClick={() => setNavbarTop(false)}
+                        >
+                          Bottom
+                        </Button>
+                      </Row>
+                    </Column>
+                  )}
+                  {show('mainColor') && (
+                    <Column gap='0.5rem'>
+                      <SubLabel>Main color</SubLabel>
+                      <MainColorPicker />
+                    </Column>
+                  )}
+                  {show('colorfulMode') && (
+                    <CheckboxLabel>
+                      <Checkbox
+                        checked={colorfulMode}
+                        onChange={setColorfulMode}
+                      />{' '}
+                      <span>Colorful mode</span>
+                    </CheckboxLabel>
+                  )}
+                  {show('sidebarIcons') && (
+                    <CheckboxLabel>
+                      <Checkbox
+                        checked={showSidebarIcons}
+                        onChange={setShowSidebarIcons}
+                      />{' '}
+                      <span>
+                        Show icons in the sidebar
+                        <SettingHint>
+                          Show icons and pictures next to items in the sidebar
+                        </SettingHint>
+                      </span>
+                    </CheckboxLabel>
+                  )}
+                  {show('language') && (
+                    <Column gap='0.5rem'>
+                      <label htmlFor='settings-language'>Language</label>
+                      <BasicSelect
+                        id='settings-language'
+                        value={locale}
+                        onChange={e => setLocale(e.target.value)}
+                      >
+                        {SUPPORTED_LOCALES.map(locale_code => (
+                          <option key={locale_code} value={locale_code}>
+                            {getLocaleName(locale_code)}
+                          </option>
+                        ))}
+                      </BasicSelect>
+                    </Column>
+                  )}
+                  <SettingsSection
+                    label={show('panels') ? 'Panels & Templates' : 'Templates'}
                   >
-                    {SUPPORTED_LOCALES.map(locale_code => (
-                      <option key={locale_code} value={locale_code}>
-                        {getLocaleName(locale_code)}
-                      </option>
-                    ))}
-                  </BasicSelect>
+                    <Column gap='0.5rem'>
+                      {show('panels') && (
+                        <>
+                          <CheckboxLabel>
+                            <Checkbox
+                              checked={enabledPanels.has(Panel.Messages)}
+                              onChange={changePanelPref(Panel.Messages)}
+                            />{' '}
+                            <span>Show Messages panel</span>
+                          </CheckboxLabel>
+                          <CheckboxLabel>
+                            <Checkbox
+                              checked={enabledPanels.has(Panel.Favorites)}
+                              onChange={changePanelPref(Panel.Favorites)}
+                            />{' '}
+                            <span>Show Favorites panel</span>
+                          </CheckboxLabel>
+                          <CheckboxLabel>
+                            <Checkbox
+                              checked={enabledPanels.has(Panel.SharedWithMe)}
+                              onChange={changePanelPref(Panel.SharedWithMe)}
+                            />{' '}
+                            <span>Show Shared with me panel</span>
+                          </CheckboxLabel>
+                          <CheckboxLabel>
+                            <Checkbox
+                              checked={enabledPanels.has(Panel.Ontologies)}
+                              onChange={changePanelPref(Panel.Ontologies)}
+                            />{' '}
+                            <span>Enable Ontology panel</span>
+                          </CheckboxLabel>
+                          <CheckboxLabel>
+                            <Checkbox
+                              checked={enabledPanels.has(Panel.AIChats)}
+                              onChange={changePanelPref(Panel.AIChats)}
+                            />{' '}
+                            <span>Enable AI Chats panel</span>
+                          </CheckboxLabel>
+                        </>
+                      )}
+                      {show('hideTemplates') && (
+                        <CheckboxLabel>
+                          <Checkbox
+                            checked={hideTemplates}
+                            onChange={setHideTemplates}
+                          />{' '}
+                          <span>Hide templates on new resource page</span>
+                        </CheckboxLabel>
+                      )}
+                    </Column>
+                  </SettingsSection>
                 </Column>
-                <SettingsSection label='Panels & Templates'>
-                  <Column gap='0.5rem'>
-                    <CheckboxLabel>
-                      <Checkbox
-                        checked={enabledPanels.has(Panel.Messages)}
-                        onChange={changePanelPref(Panel.Messages)}
-                      />{' '}
-                      <span>Show Messages panel</span>
-                    </CheckboxLabel>
-                    <CheckboxLabel>
-                      <Checkbox
-                        checked={enabledPanels.has(Panel.Favorites)}
-                        onChange={changePanelPref(Panel.Favorites)}
-                      />{' '}
-                      <span>Show Favorites panel</span>
-                    </CheckboxLabel>
-                    <CheckboxLabel>
-                      <Checkbox
-                        checked={enabledPanels.has(Panel.SharedWithMe)}
-                        onChange={changePanelPref(Panel.SharedWithMe)}
-                      />{' '}
-                      <span>Show Shared with me panel</span>
-                    </CheckboxLabel>
-                    <CheckboxLabel>
-                      <Checkbox
-                        checked={enabledPanels.has(Panel.Ontologies)}
-                        onChange={changePanelPref(Panel.Ontologies)}
-                      />{' '}
-                      <span>Enable Ontology panel</span>
-                    </CheckboxLabel>
-                    <CheckboxLabel>
-                      <Checkbox
-                        checked={enabledPanels.has(Panel.AIChats)}
-                        onChange={changePanelPref(Panel.AIChats)}
-                      />{' '}
-                      <span>Enable AI Chats panel</span>
-                    </CheckboxLabel>
-                    <CheckboxLabel>
-                      <Checkbox
-                        checked={hideTemplates}
-                        onChange={setHideTemplates}
-                      />{' '}
-                      <span>Hide templates on new resource page</span>
-                    </CheckboxLabel>
-                  </Column>
-                </SettingsSection>
-              </Column>
-            </SettingsSection>
-            <SettingsSection
-              label='Accessibility'
-              childSearchKeywords='enable disable page transition animations view transitions motion'
-            >
-              <Column gap='0.5rem'>
-                <CheckboxLabel>
-                  <Checkbox
-                    checked={viewTransitionsEnabled}
-                    onChange={checked => setViewTransitionsEnabled(checked)}
-                  />{' '}
-                  <span>
-                    Enable page transition animations (experimental, known to
-                    misbehave outside Chromium on desktop)
-                  </span>
-                </CheckboxLabel>
-                <CheckboxLabel>
-                  <Checkbox
-                    checked={sidebarKeyboardDndEnabled}
-                    onChange={checked => setSidebarKeyboardDndEnabled(checked)}
-                  />{' '}
-                  <span>Enable keyboard drag & drop in sidebar</span>
-                </CheckboxLabel>
-              </Column>
-            </SettingsSection>
-            <SettingsSection
-              label='Notifications'
-              childSearchKeywords='notify notifications alerts messages comments replies push'
-            >
-              <NotificationSettings />
-            </SettingsSection>
-            {isVirtualDriveAvailable() && (
-              <SettingsSection label='Virtual drive'>
-                <VirtualDriveSettings />
               </SettingsSection>
             )}
-            <AISettings />
-            <IntegrationSettings />
+            {showSettingsSection('accessibility') && (
+              <SettingsSection
+                label='Accessibility'
+                childSearchKeywords='enable disable page transition animations view transitions motion'
+              >
+                <Column gap='0.5rem'>
+                  <CheckboxLabel>
+                    <Checkbox
+                      checked={viewTransitionsEnabled}
+                      onChange={checked => setViewTransitionsEnabled(checked)}
+                    />{' '}
+                    <span>
+                      Enable page transition animations (experimental, known to
+                      misbehave outside Chromium on desktop)
+                    </span>
+                  </CheckboxLabel>
+                  <CheckboxLabel>
+                    <Checkbox
+                      checked={sidebarKeyboardDndEnabled}
+                      onChange={checked =>
+                        setSidebarKeyboardDndEnabled(checked)
+                      }
+                    />{' '}
+                    <span>Enable keyboard drag & drop in sidebar</span>
+                  </CheckboxLabel>
+                </Column>
+              </SettingsSection>
+            )}
+            {showSettingsSection('notifications') && (
+              <SettingsSection
+                label='Notifications'
+                childSearchKeywords='notify notifications alerts messages comments replies push'
+              >
+                <NotificationSettings />
+              </SettingsSection>
+            )}
+            {showSettingsSection('virtualDrive') &&
+              isVirtualDriveAvailable() && (
+                <SettingsSection label='Virtual drive'>
+                  <VirtualDriveSettings />
+                </SettingsSection>
+              )}
+            {showSettingsSection('ai') && <AISettings />}
+            {showSettingsSection('integration') && <IntegrationSettings />}
           </SettingsGroup>
         </SettingsSearchProvider>
       </ContainerNarrow>
@@ -372,6 +432,12 @@ const ClearButton = styled.button`
   &:hover {
     color: ${p => p.theme.colors.text};
   }
+`;
+
+const SettingHint = styled.span`
+  display: block;
+  font-size: 0.85rem;
+  color: ${p => p.theme.colors.textLight};
 `;
 
 const SubLabel = styled.span`

@@ -134,6 +134,7 @@ fn load_or_create_secret_key(store: &Db) -> iroh::SecretKey {
 /// Waits for the relay connection to be established before returning,
 /// so that other peers can discover and connect to us immediately.
 pub async fn start(store: Db) -> anyhow::Result<(NodeId, Router)> {
+    crate::client::install_default_crypto_provider();
     let secret_key = load_or_create_secret_key(&store);
     let endpoint: Endpoint = Endpoint::builder()
         .secret_key(secret_key)
@@ -369,6 +370,10 @@ struct LivePeer {
     /// The peer listed `canonical-scheme`: live frames carry `atomic:`
     /// subjects. A peer that predates the rename gets `did:ad:`.
     canonical_scheme: bool,
+    /// The identity this connection proved with AUTH; `ForAgent::Public` when
+    /// it never did. Decides which subjects the live push may send to it. A
+    /// late AUTH frame updates it (see the read loop).
+    agent: ForAgent,
     /// Never read; held so the QUIC connection stays open exactly as long
     /// as the registration does.
     _connection: Option<iroh::endpoint::Connection>,
@@ -412,6 +417,30 @@ pub fn live_peer_count() -> usize {
 /// Returns the node IDs of currently connected live peers.
 pub fn live_peer_ids() -> Vec<String> {
     live_peers().keys().cloned().collect()
+}
+
+/// Live peers that are not in the known (paired) list, with the name each gave
+/// over HELLO: devices that dialed us, e.g. by scanning our QR. For display
+/// only. Nothing is saved, so the connection is the whole relationship.
+pub fn live_unsaved_peers(store: &Db) -> Vec<(String, Option<String>)> {
+    unsaved_peers(live_peer_ids(), &get_known_peers(store))
+}
+
+fn unsaved_peers(live: Vec<String>, known: &[KnownPeer]) -> Vec<(String, Option<String>)> {
+    let known: std::collections::HashSet<String> = known
+        .iter()
+        .map(|p| normalize_node_id(&p.node_id))
+        .collect();
+    let mut out: Vec<(String, Option<String>)> = live
+        .into_iter()
+        .filter(|id| !known.contains(&normalize_node_id(id)))
+        .map(|id| {
+            let name = live_peer_name(&id);
+            (id, name)
+        })
+        .collect();
+    out.sort();
+    out
 }
 
 type CommitWaiter =
@@ -665,12 +694,51 @@ fn own_agent_update_frame(store: &Db, wire: super::engine::WireScheme) -> Option
     Some(encode_live_update_wire_msg(&key, &snapshot, wire))
 }
 
+/// The live links `subject` may be pushed to: those whose proven agent can
+/// read it (`check_read`). A paired node is judged like any other: by the
+/// agent it proved. The resource is resolved once; each peer is
+/// judged on its own agent. Fails closed: a subject that does not resolve to a
+/// resource can't be rights-checked, so nobody gets it.
+///
+/// Snapshots the peer list first so no lock is held across an await.
+async fn readable_live_peers(
+    store: &Db,
+    subject: &str,
+) -> std::collections::HashSet<(String, u64)> {
+    let candidates: Vec<(String, u64, ForAgent)> = live_peers()
+        .iter()
+        .map(|(id, p)| (id.clone(), p.generation, p.agent.clone()))
+        .collect();
+    let mut allowed = std::collections::HashSet::new();
+    if candidates.is_empty() {
+        return allowed;
+    }
+    let subj = crate::Subject::from_raw(subject, store.get_base_domain().as_deref());
+    let Ok(resource) = store.get_resource(&subj).await else {
+        return allowed;
+    };
+    for (id, generation, agent) in candidates {
+        if crate::hierarchy::check_read(store, &resource, &agent)
+            .await
+            .is_ok()
+        {
+            allowed.insert((id, generation));
+        }
+    }
+    allowed
+}
+
 /// Fan an UPDATE out to live peers, except `skip_peer` — the peer an imported
 /// update came from. Sending it back is what made two idle nodes trade the same
 /// snapshot indefinitely.
+///
+/// `allowed` is the set of `(node id, generation)` links that may receive this
+/// frame (see [`readable_live_peers`]). There is deliberately no "send to
+/// everyone" form: every live frame carries content of some subject.
 fn send_live_update_wire_msg_except(
     build: &dyn Fn(super::engine::WireScheme) -> Vec<u8>,
     skip_peer: Option<&str>,
+    allowed: &std::collections::HashSet<(String, u64)>,
 ) {
     let mut dead_peers = Vec::new();
     let peers = live_peers();
@@ -688,6 +756,9 @@ fn send_live_update_wire_msg_except(
             },
         ) in peers.iter()
         {
+            if !allowed.contains(&(peer_id.clone(), *generation)) {
+                continue;
+            }
             if skip_peer.is_some_and(|skip| normalize_node_id(skip) == *peer_id) {
                 continue;
             }
@@ -737,7 +808,13 @@ fn send_live_update_wire_msg_except(
 /// is dropped, on the grounds that a stale cursor is better than a delayed
 /// document — and that a dropped op costs a moment of divergence, which the
 /// sender's next save repairs with a full snapshot.
+///
+/// `drive` names what the state is scoped to (the drive for presence, the
+/// resource otherwise); only peers that may read it receive the frame. The
+/// check is async, so the send happens on a spawned task: frames for one
+/// subject can in principle reorder, which the above already tolerates.
 pub fn broadcast_ephemeral(
+    store: &Db,
     kind: u8,
     drive: &str,
     agent: &str,
@@ -748,35 +825,56 @@ pub fn broadcast_ephemeral(
         return;
     }
 
-    // The drive and agent identifiers ride in the frame header, so they
-    // follow the peer's scheme like every other subject on the link.
-    send_live_update_wire_msg_except(
-        &|wire| {
-            let frame = super::protocol::encode_ephemeral(
-                kind,
-                &wire.subject(drive),
-                &wire.subject(agent),
-                payload,
-            );
-            let len = frame.len() as u32;
-            let mut msg = Vec::with_capacity(4 + frame.len());
-            msg.extend_from_slice(&len.to_be_bytes());
-            msg.extend_from_slice(&frame);
-            msg
-        },
-        skip_peer,
-    );
+    if live_peers().is_empty() {
+        return;
+    }
+    let store = store.clone();
+    let drive = drive.to_string();
+    let agent = agent.to_string();
+    let payload = payload.to_vec();
+    let skip_peer = skip_peer.map(str::to_string);
+    tokio::spawn(async move {
+        let allowed = readable_live_peers(&store, &drive).await;
+        let (drive, agent, payload) = (&drive, &agent, &payload);
+        // The drive and agent identifiers ride in the frame header, so they
+        // follow the peer's scheme like every other subject on the link.
+        send_live_update_wire_msg_except(
+            &|wire| {
+                let frame = super::protocol::encode_ephemeral(
+                    kind,
+                    &wire.subject(drive),
+                    &wire.subject(agent),
+                    payload,
+                );
+                let len = frame.len() as u32;
+                let mut msg = Vec::with_capacity(4 + frame.len());
+                msg.extend_from_slice(&len.to_be_bytes());
+                msg.extend_from_slice(&frame);
+                msg
+            },
+            skip_peer.as_deref(),
+            &allowed,
+        );
+    });
 }
 
 /// Push an UPDATE frame to all connected live peers immediately (e.g. after a stroke save).
-pub fn broadcast_live_update(subject_key: &str, loro_bytes: &[u8]) {
-    if loro_bytes.is_empty() || super::ws_apply::is_importing() {
+/// Only peers that may read the subject receive it.
+pub fn broadcast_live_update(store: &Db, subject_key: &str, loro_bytes: &[u8]) {
+    if loro_bytes.is_empty() || super::ws_apply::is_importing() || live_peers().is_empty() {
         return;
     }
-    send_live_update_wire_msg_except(
-        &|wire| encode_live_update_wire_msg(subject_key, loro_bytes, wire),
-        None,
-    );
+    let store = store.clone();
+    let subject_key = subject_key.to_string();
+    let loro_bytes = loro_bytes.to_vec();
+    tokio::spawn(async move {
+        let allowed = readable_live_peers(&store, &subject_key).await;
+        send_live_update_wire_msg_except(
+            &|wire| encode_live_update_wire_msg(&subject_key, &loro_bytes, wire),
+            None,
+            &allowed,
+        );
+    });
 }
 
 /// Start the live sync system. Watches for local changes and pushes to all connected peers.
@@ -833,15 +931,28 @@ fn start_live_sync(store: Db) {
                 // cascades there too.
                 crate::DbEvent::Destroyed {
                     commit_json: Some(commit_json),
+                    drive,
                     ..
                 } => {
+                    // The destroyed resource is gone, so its own rights can't
+                    // be read. The drive it belonged to still is: only peers
+                    // that may read that drive hear about the removal. No
+                    // drive, or an unresolvable one, means nobody does.
+                    let allowed = match drive {
+                        Some(drive) => readable_live_peers(&store, &drive.pure_id()).await,
+                        None => Default::default(),
+                    };
                     let frame = super::protocol::encode_commit(0, commit_json);
                     let len = frame.len() as u32;
                     let mut msg = Vec::with_capacity(4 + frame.len());
                     msg.extend_from_slice(&len.to_be_bytes());
                     msg.extend_from_slice(&frame);
                     // Signed JSON: the same bytes whatever the peer speaks.
-                    send_live_update_wire_msg_except(&|_| msg.clone(), from_peer.as_deref());
+                    send_live_update_wire_msg_except(
+                        &|_| msg.clone(),
+                        from_peer.as_deref(),
+                        &allowed,
+                    );
                     continue;
                 }
                 crate::DbEvent::Destroyed {
@@ -857,9 +968,12 @@ fn start_live_sync(store: Db) {
             };
 
             if let Some(bytes) = loro_bytes {
+                // Resolved once per event, judged per peer.
+                let allowed = readable_live_peers(&store, &subject_key).await;
                 send_live_update_wire_msg_except(
                     &|wire| encode_live_update_wire_msg(&subject_key, &bytes, wire),
                     from_peer.as_deref(),
+                    &allowed,
                 );
             }
         }
@@ -1043,6 +1157,7 @@ fn register_live_peer(
                 generation,
                 tx,
                 canonical_scheme: wire.is_canonical(),
+                agent: agent.clone(),
                 _connection: connection,
             },
         );
@@ -1508,6 +1623,14 @@ fn register_live_peer(
                 &agent_before_frame,
                 &mut drive_cache,
             );
+            if agent != agent_before_frame {
+                // The live push judges this link by the identity it proved.
+                if let Some(entry) = live_peers().get_mut(&read_peer_id) {
+                    if entry.generation == generation {
+                        entry.agent = agent.clone();
+                    }
+                }
+            }
             for response in responses {
                 let mut framed = Vec::with_capacity(4 + response.len());
                 framed.extend_from_slice(&(response.len() as u32).to_be_bytes());
@@ -2004,7 +2127,6 @@ pub async fn sync_drive_with_peer_using_outcome(
                                 store,
                                 &remote_agent,
                                 &diff.pull,
-                                Some(&remote_key),
                             )
                             .await;
                             if !entries.is_empty() {
@@ -2088,7 +2210,6 @@ pub async fn sync_drive_with_peer_using_outcome(
                         store,
                         &remote_agent,
                         &pull_subjects,
-                        Some(&remote_key),
                     )
                     .await;
                     if !entries.is_empty() {
@@ -3327,7 +3448,6 @@ mod initiator_trust_tests {
             &db,
             &ForAgent::Public,
             std::slice::from_ref(&child),
-            None,
         )
         .await;
         assert!(
@@ -3341,7 +3461,6 @@ mod initiator_trust_tests {
             &db,
             &ForAgent::AgentSubject(alice.subject.clone()),
             std::slice::from_ref(&child),
-            None,
         )
         .await;
         assert_eq!(
@@ -3366,7 +3485,6 @@ mod initiator_trust_tests {
             &db,
             &ForAgent::AgentSubject(mallory.subject.clone()),
             &[child],
-            None,
         )
         .await;
         assert!(
@@ -3385,45 +3503,34 @@ mod initiator_trust_tests {
     /// Pairing is already an authenticated choice by the owner; this treats it
     /// as one.
     #[tokio::test]
-    async fn a_paired_replica_receives_what_the_owner_can_read() {
+    async fn a_paired_node_is_served_by_the_agent_it_authenticated_as() {
         let db = Db::init_temp("paired_replica_serves").await.unwrap();
         let alice = crate::agents::Agent::new(Some("Alice")).unwrap();
         db.set_default_agent(alice.clone());
         let (_drive, child) = private_drive_with_child(&db, &alice).await;
 
-        // The replica's own identity: a node agent, granted nothing.
+        // Paired, but authenticated as a different agent that was granted
+        // nothing: pairing widens nothing, so it gets nothing.
         let replica_node = "aaaabbbbccccddddeeeeffff0000111122223333444455556666777788889999";
-        let replica_agent = db.create_agent(Some("Replica")).await.unwrap();
-        let as_replica = ForAgent::AgentSubject(replica_agent.subject.clone());
-
-        // Not paired yet — rights only, so nothing is served.
-        let unpaired = crate::sync::engine::collect_readable_snapshots(
+        add_known_peer(&db, replica_node, "Replica");
+        let other = db.create_agent(Some("Replica")).await.unwrap();
+        let as_other = ForAgent::AgentSubject(other.subject.clone());
+        let served = crate::sync::engine::collect_readable_snapshots(
             &db,
-            &as_replica,
+            &as_other,
             std::slice::from_ref(&child),
-            Some(replica_node),
         )
         .await;
         assert!(
-            unpaired.is_empty(),
-            "a node the owner never dialled must not be served"
+            served.is_empty(),
+            "a paired node is not entitled by pairing"
         );
 
-        // The owner pairs with it.
-        add_known_peer(&db, replica_node, "Replica");
-
-        let paired = crate::sync::engine::collect_readable_snapshots(
-            &db,
-            &as_replica,
-            &[child],
-            Some(replica_node),
-        )
-        .await;
-        assert_eq!(
-            paired.len(),
-            1,
-            "a paired replica must receive what the owner can read"
-        );
+        // Authenticated as the owner's own agent: served.
+        let as_owner = ForAgent::AgentSubject(alice.subject.clone());
+        let served =
+            crate::sync::engine::collect_readable_snapshots(&db, &as_owner, &[child]).await;
+        assert_eq!(served.len(), 1, "the owner's own agent is served");
     }
 
     /// A peer we dialed that isn't admitted for the drive must NOT be able to
@@ -3612,7 +3719,6 @@ mod accept_gate_tests {
             db,
             &ForAgent::AgentSubject(owner.subject.clone()),
             &[child.to_string()],
-            None,
         )
         .await;
         assert_eq!(snapshots.len(), 1, "owner can read its own child");
@@ -4055,6 +4161,7 @@ mod live_peer_registry_tests {
                 generation,
                 tx,
                 canonical_scheme: true,
+                agent: ForAgent::Public,
                 _connection: None,
             },
         );
@@ -4144,4 +4251,103 @@ fn same_drive(store: &Db, a: &str, b: &str) -> bool {
     let base = store.get_base_domain();
     crate::Subject::from_raw(a, base.as_deref()).pure_id()
         == crate::Subject::from_raw(b, base.as_deref()).pure_id()
+}
+
+#[cfg(test)]
+mod unsaved_peers_tests {
+    use super::*;
+
+    #[test]
+    fn lists_only_live_peers_missing_from_known() {
+        let known: Vec<KnownPeer> =
+            serde_json::from_str(r#"[{"node_id":"aaaa","name":"Paired"}]"#).unwrap();
+        set_live_peer_name("bbbb_unsaved_test", "Visitor");
+        let got = unsaved_peers(
+            vec!["aaaa".into(), "bbbb_unsaved_test".into(), "cccc_unsaved_test".into()],
+            &known,
+        );
+        assert_eq!(
+            got,
+            vec![
+                ("bbbb_unsaved_test".to_string(), Some("Visitor".to_string())),
+                ("cccc_unsaved_test".to_string(), None),
+            ]
+        );
+    }
+}
+
+#[cfg(test)]
+mod live_push_read_filter_tests {
+    use super::initiator_trust_tests::private_drive_with_child;
+    use super::*;
+
+    fn register_as(key: &str, agent: ForAgent) -> (u64, tokio::sync::mpsc::Receiver<Vec<u8>>) {
+        let generation =
+            LIVE_PEER_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+        let (tx, rx) = tokio::sync::mpsc::channel(8);
+        live_peers().insert(
+            normalize_node_id(key),
+            LivePeer {
+                generation,
+                tx,
+                canonical_scheme: true,
+                agent,
+                _connection: None,
+            },
+        );
+
+        (generation, rx)
+    }
+
+    fn allowed(set: &std::collections::HashSet<(String, u64)>, key: &str, g: u64) -> bool {
+        set.contains(&(normalize_node_id(key), g))
+    }
+
+    /// A live peer without read rights gets nothing for a private subject,
+    /// paired or not; one proving an agent with read rights (the owner's own
+    /// included) gets it. Fails
+    /// closed for a subject that does not resolve.
+    #[tokio::test]
+    async fn live_push_only_reaches_peers_that_may_read() {
+        let db = Db::init_temp("live_push_filter").await.unwrap();
+        let alice = crate::agents::Agent::new(Some("Alice")).unwrap();
+        db.set_default_agent(alice.clone());
+        let (_drive, child) = private_drive_with_child(&db, &alice).await;
+        let mallory = db.create_agent(Some("Mallory")).await.unwrap();
+
+        let stranger = "1111aaaa00000000000000000000000000000000000000000000000000000001";
+        let public = "1111aaaa00000000000000000000000000000000000000000000000000000002";
+        let reader = "1111aaaa00000000000000000000000000000000000000000000000000000003";
+        let paired = "1111aaaa00000000000000000000000000000000000000000000000000000004";
+
+        let (g_stranger, mut rx_stranger) =
+            register_as(stranger, ForAgent::AgentSubject(mallory.subject.clone()));
+        let (g_public, _rx_public) = register_as(public, ForAgent::Public);
+        let (g_reader, mut rx_reader) =
+            register_as(reader, ForAgent::AgentSubject(alice.subject.clone()));
+        // Paired, but proving another agent: pairing grants nothing.
+        let (g_paired, mut rx_paired) =
+            register_as(paired, ForAgent::AgentSubject(mallory.subject.clone()));
+        add_known_peer(&db, paired, "Replica");
+
+        let set = readable_live_peers(&db, &child).await;
+        assert!(!allowed(&set, stranger, g_stranger));
+        assert!(!allowed(&set, public, g_public));
+        assert!(allowed(&set, reader, g_reader));
+        assert!(!allowed(&set, paired, g_paired));
+
+        // The send itself honours the set.
+        send_live_update_wire_msg_except(&|_| vec![1, 2, 3], None, &set);
+        assert!(rx_stranger.try_recv().is_err(), "stranger got private data");
+        assert_eq!(rx_reader.try_recv().unwrap(), vec![1, 2, 3]);
+        assert!(rx_paired.try_recv().is_err(), "pairing alone must not leak");
+
+        // A subject that is not a resource we hold: nobody, not even a reader.
+        let missing = readable_live_peers(&db, "did:ad:doesnotexist").await;
+        assert!(!allowed(&missing, reader, g_reader));
+
+        for k in [stranger, public, reader, paired] {
+            live_peers().remove(&normalize_node_id(k));
+        }
+    }
 }

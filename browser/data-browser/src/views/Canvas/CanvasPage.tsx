@@ -36,6 +36,7 @@ import {
   transformSelection,
   unionBounds,
 } from './canvas-elements';
+import { useEmbedGestures } from '../../embed/gestures';
 import { useStore, type Store } from '@tomic/react';
 import { FilePickerDialog } from '@components/forms/FilePicker/FilePickerDialog';
 import { useUpload } from '../../hooks/useUpload';
@@ -222,6 +223,8 @@ function isEditableKeyboardTarget(target: EventTarget | null): boolean {
 export const CanvasPage: React.FC<ResourcePageProps> = ({ resource }) => {
   const [darkMode] = useDarkMode();
   const store = useStore();
+  // Drawing needs horizontal drags; in the app the swipe-back strip narrows.
+  useEmbedGestures('horizontal');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 

@@ -9,6 +9,7 @@ import { checkOnboardingStorage } from '../../helpers/onboardingStorage';
 import { getLocalServerOrigin, isRunningInTauri } from '../../helpers/tauri';
 import { styled, css } from 'styled-components';
 import { Button } from '../../components/Button';
+import { isEmbedded } from '../../helpers/embedMode';
 import '@tomic/service-ui/background.css';
 
 export function Shell({ children, ...props }: ComponentProps<'div'>) {
@@ -79,7 +80,8 @@ export function Shell({ children, ...props }: ComponentProps<'div'>) {
 }
 
 const ShellSurface = styled.div.attrs(({ theme }) => ({
-  className: 'atomic-product-background',
+  // The app's web view has the app's plain surface, not the gradient + grid.
+  className: isEmbedded() ? undefined : 'atomic-product-background',
   'data-product-theme': theme.darkMode ? 'dark' : 'light',
 }))`
   /* A concrete viewport height (not 100%): nothing in the html/body/#root
@@ -114,8 +116,13 @@ const ShellSurface = styled.div.attrs(({ theme }) => ({
      ends up half-hidden behind the nav bar (the welcome buttons were
      unreachable on a phone). The safe-area insets (needs viewport-fit=cover,
      set in index.html) pad the content back into the visible region. */
-  padding: calc(1.5rem + env(safe-area-inset-top, 0px)) ${p => p.theme.size(5)}
-    calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  padding: ${p =>
+    isEmbedded()
+      ? // The app's web view: the page fills the pane, no margin around it.
+        `0 ${p.theme.size(4)} ${p.theme.size(4)}`
+      : `calc(1.5rem + env(safe-area-inset-top, 0px)) ${p.theme.size(5)}
+    calc(5.5rem + env(safe-area-inset-bottom, 0px))`};
+  ${p => isEmbedded() && `background: ${p.theme.colors.bg};`}
   box-sizing: border-box;
 `;
 

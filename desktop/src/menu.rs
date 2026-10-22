@@ -44,7 +44,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
       app,
       None,
       Some(AboutMetadata {
-        name: Some("Atomic Server".into()),
+        name: Some("atomic.place".into()),
         authors: Some(vec!["Joep Meindertsma".into()]),
         copyright: Some("MIT License".into()),
         license: Some("MIT".into()),
@@ -54,7 +54,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     )?;
     let app_menu = Submenu::with_items(
       app,
-      "Atomic Server",
+      "atomic.place",
       true,
       &[
         &about,

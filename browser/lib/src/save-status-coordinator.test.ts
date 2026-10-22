@@ -44,6 +44,30 @@ afterEach(() => {
 });
 
 describe('SaveStatusCoordinator', () => {
+  it('flushAll runs every waiting debounced save now and waits for it', async () => {
+    vi.useFakeTimers();
+    const { coordinator, pending } = setup();
+    const a = new Resource('did:ad:a');
+    const b = new Resource('did:ad:b');
+    const saveA = vi.spyOn(a, 'save').mockResolvedValue('persisted');
+    const saveB = vi.spyOn(b, 'save').mockResolvedValue('persisted');
+    coordinator.createScheduler(a).schedule(10_000);
+    coordinator.createScheduler(b).schedule(10_000);
+    const idle = coordinator.createScheduler(a);
+    expect(pending()).toBe(2);
+
+    // No timer has fired: a page about to close cannot wait for them.
+    await coordinator.flushAll();
+
+    expect(saveA).toHaveBeenCalledTimes(1);
+    expect(saveB).toHaveBeenCalledTimes(1);
+    expect(pending()).toBe(0);
+    // Nothing left: a second flush saves nothing again.
+    idle.cancel();
+    await coordinator.flushAll();
+    expect(saveA).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps another owner pending when an observer disposes and one scheduler cancels', async () => {
     vi.useFakeTimers();
     const { coordinator, pending } = setup();

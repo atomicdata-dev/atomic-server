@@ -1,6 +1,8 @@
 /// This is copied from Cargokit (which is the official way to use it currently)
 /// Details: https://fzyzcjy.github.io/flutter_rust_bridge/manual/integrate/builtin
 
+import 'dart:io';
+
 import 'package:collection/collection.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path;
@@ -139,7 +141,16 @@ class RustBuilder {
   CargoBuildOptions? get _buildOptions =>
       environment.crateOptions.cargo[environment.configuration];
 
-  String get _toolchain => _buildOptions?.toolchain.name ?? 'stable';
+  /// The options' toolchain, else the one the repo pins in
+  /// `rust-toolchain.toml` (looked up from the manifest directory upwards),
+  /// else `stable`. `rustup run <name>` ignores the pin file, so without this
+  /// the app was built with whatever `stable` is, not what CI and the host
+  /// tests use (std 1.95 has no `File::try_lock` on Android: redb's lock was
+  /// silently missing).
+  String get _toolchain =>
+      _buildOptions?.toolchain?.name ??
+      pinnedToolchain(environment.manifestDir) ??
+      'stable';
 
   /// Returns the path of directory containing build artifacts.
   Future<String> build() async {
@@ -206,4 +217,34 @@ class RustBuilder {
       return env.buildEnvironment();
     }
   }
+}
+
+/// The `channel` of the nearest `rust-toolchain.toml` (or `rust-toolchain`)
+/// at or above [dir], or null if there is none.
+String? pinnedToolchain(String dir) {
+  var current = path.normalize(path.absolute(dir));
+  while (true) {
+    for (final name in ['rust-toolchain.toml', 'rust-toolchain']) {
+      final file = File(path.join(current, name));
+      if (file.existsSync()) {
+        return parsePinnedChannel(file.readAsStringSync());
+      }
+    }
+    final parent = path.dirname(current);
+    if (parent == current) return null;
+    current = parent;
+  }
+}
+
+/// `channel = "1.98.1"` of a toolchain file (TOML), or a bare channel name in
+/// the legacy one-line format.
+String? parsePinnedChannel(String contents) {
+  final toml = RegExp(r"""^\s*channel\s*=\s*["']([^"']+)["']""", multiLine: true)
+      .firstMatch(contents);
+  if (toml != null) return toml.group(1);
+  final legacy = contents.trim();
+  if (legacy.isNotEmpty && !legacy.contains(RegExp(r'[\s=\[]'))) {
+    return legacy;
+  }
+  return null;
 }

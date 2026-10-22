@@ -1442,6 +1442,8 @@ dependencies = [
  "rio_api",
  "rio_turtle",
  "rmp-serde",
+ "rustls",
+ "rustls-native-certs",
  "serde",
  "serde_jcs",
  "serde_json",
@@ -1460,6 +1462,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",
+ "webpki-roots 1.0.7",
  "x25519-dalek",
 ]
 

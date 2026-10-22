@@ -299,6 +299,7 @@ async fn e2e_presence_crosses_the_link_without_being_stored() {
 
     let payload = b"cursor-position-blob".to_vec();
     crate::sync::peer::broadcast_ephemeral(
+        &pair.db_a,
         crate::sync::protocol::ephemeral_kind::PRESENCE,
         &pair.drive,
         "did:ad:agent:someone",
@@ -671,27 +672,44 @@ async fn e2e_managed_node_replicates_missing_drive() {
     );
 }
 
-/// Pushing a workspace to a device that has none imports nothing — and that is
-/// the whole point of doing it. This is a phone sending its workspace to an
+/// Pushing a workspace to a device that has none imports nothing until that
+/// device's agent may read it. This is a phone sending its workspace to an
 /// always-on device, which is how it reaches a browser.
 ///
-/// A check that counted only imports called this a failure, and told the owner
-/// their own workspace belonged to "a different account".
+/// Without rights the server is a stranger: the push reports "nothing synced"
+/// and the server holds nothing (the closed leak). Once the phone grants the
+/// server's agent read on the drive, the workspace lands. Until a "my server"
+/// relation exists, that grant is what makes a server a destination.
+///
+/// A check that counted only imports called the granted push a failure, and
+/// told the owner their own workspace belonged to "a different account".
 #[tokio::test]
 async fn pushing_a_workspace_to_an_empty_device_is_not_a_failure() {
     use crate::sync::peer;
 
     // The always-on device: its own account, and nothing of Alice's on it.
     let db_server = Db::init_temp("push_server").await.unwrap();
-    db_server.setup("Server").await.unwrap();
+    let (server_agent, _) = db_server.setup("Server").await.unwrap();
 
     // Alice's phone, holding the only copy of her workspace.
     let db_phone = Db::init_temp("push_phone").await.unwrap();
-    let (_agent, drive) = db_phone.setup("Alice").await.unwrap();
+    let (agent_phone, drive) = db_phone.setup("Alice").await.unwrap();
     db_phone
         .create_resource(crate::urls::FOLDER, &drive, "notes", None)
         .await
         .unwrap();
+
+    // Private to Alice: the server's agent has no rights yet.
+    let mut drive_resource = db_phone.get_resource(&drive.clone().into()).await.unwrap();
+    drive_resource
+        .set(
+            crate::urls::READ.into(),
+            vec![agent_phone.subject.to_string()].into(),
+            &db_phone,
+        )
+        .await
+        .unwrap();
+    drive_resource.save(&db_phone).await.unwrap();
 
     let (node_id, router) = peer::start(db_server.clone()).await.unwrap();
     let ep_phone = iroh::Endpoint::builder()
@@ -704,6 +722,33 @@ async fn pushing_a_workspace_to_an_empty_device_is_not_a_failure() {
         .add_node_addr(router.endpoint().node_addr().await.unwrap())
         .unwrap();
 
+    let err =
+        peer::sync_drive_with_peer_using(&ep_phone, &node_id.to_string(), &drive, &db_phone, true)
+            .await
+            .expect_err("without rights the push must report nothing synced");
+    assert!(err.to_string().contains("nothing synced"), "got: {err}");
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    assert!(
+        !db_server.has_resource_locally(&drive),
+        "a server with no rights must not receive the workspace"
+    );
+
+    // Grant the server's agent read on the drive; now it is a destination.
+    let mut drive_resource = db_phone.get_resource(&drive.clone().into()).await.unwrap();
+    drive_resource
+        .set(
+            crate::urls::READ.into(),
+            vec![
+                agent_phone.subject.to_string(),
+                server_agent.subject.to_string(),
+            ]
+            .into(),
+            &db_phone,
+        )
+        .await
+        .unwrap();
+    drive_resource.save(&db_phone).await.unwrap();
+
     peer::sync_drive_with_peer_using(&ep_phone, &node_id.to_string(), &drive, &db_phone, true)
         .await
         .expect("pushing a workspace up must not be reported as a failure");
@@ -715,7 +760,10 @@ async fn pushing_a_workspace_to_an_empty_device_is_not_a_failure() {
     })
     .await;
 
-    assert!(landed, "the workspace should land on the always-on device");
+    assert!(
+        landed,
+        "the workspace should land once the server may read it"
+    );
 }
 
 /// Two devices, two different accounts, and nothing shared between them. The
@@ -839,7 +887,7 @@ async fn a_device_hands_its_agent_resource_to_a_different_account_server() {
 
     // The server: its own account.
     let db_server = Db::init_temp("agentx_server").await.unwrap();
-    db_server.setup("Server").await.unwrap();
+    let (server_agent, _) = db_server.setup("Server").await.unwrap();
 
     // The phone: a named account with a drive, whose agent resource carries the
     // name and drive pointer a fresh reader needs.
@@ -857,6 +905,24 @@ async fn a_device_hands_its_agent_resource_to_a_different_account_server() {
     ep_phone
         .add_node_addr(router.endpoint().node_addr().await.unwrap())
         .unwrap();
+
+    // The drive is the server's to read (it is the destination), so the sync
+    // completes and the live link, which carries the agent resource, opens. A
+    // refused drive reports "nothing synced" and opens no link.
+    let mut drive_resource = db_phone.get_resource(&_drive.clone().into()).await.unwrap();
+    drive_resource
+        .set(
+            crate::urls::READ.into(),
+            vec![
+                phone_agent_subject.clone(),
+                server_agent.subject.to_string(),
+            ]
+            .into(),
+            &db_phone,
+        )
+        .await
+        .unwrap();
+    drive_resource.save(&db_phone).await.unwrap();
 
     peer::sync_drive_with_peer_using(&ep_phone, &node_id.to_string(), &_drive, &db_phone, true)
         .await
@@ -978,4 +1044,82 @@ async fn a_completed_peer_sync_names_the_drive_to_reconnect_to() {
         Some(drive.as_str()),
         "after syncing a drive, the device must know to dial back for it"
     );
+}
+
+/// A device signed in with the secret (not paired) knows no other device: it
+/// finds them through the directory the devices announce in. Here the
+/// directory is a fake that names this device and the other one, and the
+/// search dials the other over real Iroh and syncs the drive: the resource
+/// made on A is on B after one round, and A is live.
+#[tokio::test]
+async fn a_fresh_device_finds_the_other_through_the_peer_search() {
+    use crate::host::peer_search::{
+        PeerDialer, PeerDirectory, PeerSearch, PeerSearchSchedule, PeerSearchState,
+    };
+    use async_trait::async_trait;
+
+    struct Directory(Vec<String>);
+    #[async_trait]
+    impl PeerDirectory for Directory {
+        async fn announced(&self, _drive: &str) -> Result<Vec<String>, String> {
+            Ok(self.0.clone())
+        }
+        async fn announce(&self, _drive: &str, _me: &str) -> Result<(), String> {
+            Ok(())
+        }
+    }
+    struct Dialer<'a> {
+        ep: &'a iroh::Endpoint,
+        db: &'a Db,
+    }
+    #[async_trait]
+    impl PeerDialer for Dialer<'_> {
+        async fn dial(&self, node_id: &str, drive: &str) -> Result<(), String> {
+            crate::sync::peer::sync_drive_with_peer_using(self.ep, node_id, drive, self.db, false)
+                .await
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        }
+        fn live(&self) -> Vec<String> {
+            crate::sync::peer::live_peer_ids()
+        }
+    }
+
+    let pair = setup_pair("peer_search").await;
+    let page = pair
+        .db_a
+        .create_resource(CANVAS_CLASS, &pair.drive, "Made on A", None)
+        .await
+        .unwrap();
+    let me = pair.ep_b.node_id().to_string();
+
+    let search = PeerSearch::new(PeerSearchSchedule::default());
+    // The record names B itself first (it announced last), then A.
+    let directory = Directory(vec![me.clone(), pair.node_id_a.clone()]);
+    let dialer = Dialer {
+        ep: &pair.ep_b,
+        db: &pair.db_b,
+    };
+    let outcome = search
+        .search_once(
+            &me,
+            std::slice::from_ref(&pair.drive),
+            &directory,
+            &dialer,
+            false,
+        )
+        .await;
+
+    assert_eq!(outcome.dialled, vec![pair.node_id_a.to_lowercase()]);
+    // Both ends live in this process and share the live-peer table, so A's
+    // side of the link counts as well: connected, to one or two.
+    assert!(
+        matches!(search.status().state, PeerSearchState::Connected { .. }),
+        "{:?}",
+        search.status()
+    );
+    pair.db_b
+        .get_resource(&page.as_str().into())
+        .await
+        .expect("B has the page made on A");
 }

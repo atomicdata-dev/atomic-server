@@ -1,5 +1,5 @@
-name: atomiccanvas_flutter
-description: Atomic Canvas - infinite drawing canvas
+name: atomic_app
+description: atomic.place
 
 publish_to: 'none'
 
@@ -9,21 +9,29 @@ environment:
   sdk: ">=3.4.0 <4.0.0"
 
 dependencies:
+  atomic_chat:
+    path: ../packages/atomic_chat
   atomic_flutter:
     path: ../packages/atomic_flutter
+  atomic_store:
+    path: ../packages/atomic_store
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
   path_provider: ^2.1.5
-  rust_lib_atomiccanvas_flutter:
+  atomic_flutter_rust:
     path: rust_builder
-  flutter_rust_bridge: ^2.12.0
+  flutter_rust_bridge: 2.12.0
   http: ^1.3.0
   ed25519_edwards: ^0.3.1
   shared_preferences: ^2.3.3
   flutter_secure_storage: ^9.2.4
   qr_flutter: ^4.1.0
   mobile_scanner: ^6.0.0
+  webview_flutter: ^4.14.1
+  url_launcher: ^6.3.0
+  file_selector: ^1.1.0
+  share_plus: ^12.0.2
 
 dev_dependencies:
   integration_test:
@@ -34,3 +42,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    # The embedded renderer, built by scripts/build_embed.sh; atomic_chat's
+    # EmbedServer serves it from here (EmbedServer.assetRoot).
+    - assets/embed/
+    - assets/embed/assets/

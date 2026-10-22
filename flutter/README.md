@@ -1,24 +1,6 @@
-# Atomic Canvas
+# Atomic
 
-- An android app note taking / infinite canvas drawing / vector app with pen & draw support
-- Extremely snappy, no-nonsense
-- Uses a CRDT (Loro) to sync notes and brush strokes. Full history playback and versioning.
-- Uses modern android standards and APIs. research conventions.
-- Easy & fast management with folders
-- Smart gestures, controls, pen support
-  - if using a pencil, fingers pan (single finger drag) & undo (double finger tap) & select (single finger hold)
-  - if using fingers, fingers pan, but user can quickly toggle draw mode
-  - Manu items have hold & drag interactions for fast gestures
-- Simple, clean, minimal UI, a couple of buttons at the buttom:
-  - Tutorial (starts tutorial, shows UX)
-  - Color selector (drag, a fan pops up, let go to select color. Tap to go back to previous color)
-  - Size adjust (same UX: drag & hold to select, tap to go to previous)
-  - History scrubber. Tap to undo, scrub to navigate history. You can even open "forgotten" branches of undo history, so nothing is ever lost
-  - New canvas button
-  - Gallery / back
-  - Eraser
-  - Reset view /zoom scrubber (tap to fit all content, or tap again to go back to previous view)
-  - Place image
+The Atomic app for Android, iOS and the web: a local-first Flutter client for Atomic Data that signs in, syncs with an Atomic Server and pairs with other devices.
 
 ## Development
 
@@ -66,6 +48,39 @@ make analyze    # Static analysis
 
 To update the Android device IDs, edit `dev.sh` (`ANDROID1_ID` = tablet, `ANDROID2_ID` = phone).
 
+### Building the Android app
+
+The Rust library is built by cargokit (`rust_builder/cargokit`) during the Gradle build, with the toolchain pinned in the repo's `rust-toolchain.toml` (cargokit used to use rustup's `stable`: std 1.95 has no `File::try_lock` on Android, so redb's file lock silently did nothing). rustup installs that toolchain and the Android targets itself on first use; to do it up front:
+
+```bash
+# from the repo root, so rustup picks up rust-toolchain.toml
+rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+```
+
+Debug builds keep every ABI (x86_64 emulators). Release and profile APKs are **arm64-v8a only** (the other ABIs' libraries are excluded from the package, `android/app/build.gradle`). Also pass the platform so cargokit builds only that Rust target:
+
+```bash
+flutter build apk --release --target-platform android-arm64
+```
+
+For another ABI, name it and lift the exclusion:
+
+```bash
+flutter build apk --release --target-platform android-arm,android-x64 \
+  --android-project-arg=atomic.allAbis=true
+```
+
+(`--split-per-abi` also works together with `atomic.allAbis`.)
+
+To put a release build on your own devices, keeping their data:
+
+```bash
+scripts/deploy_release.sh SERIAL...          # adb devices -l for the serials
+scripts/deploy_release.sh --no-build SERIAL  # the APK that is there
+```
+
+It builds the arm64 release APK (cargokit builds the Rust library with `--release`: fat LTO, one codegen unit), refuses an APK with `kernel_blob.bin` (a debug build), installs with `adb install -r`, starts the app and checks it is not `DEBUGGABLE`. Release builds are signed with the debug key, so they replace a debug install from the same machine in place; a device with the app signed by another key fails the install, and the script never uninstalls (that would wipe the store and identity). A debug build is much slower: on the Tablet_A35 emulator a cold start took 1.7 s to the painted home in debug and 0.95 s in a profile build, each Home list read 240 ms against 11-18 ms (`scripts/perf_android.sh --only cold,scroll`).
+
 ### Sync / Pairing
 
 Devices sync via [Iroh](https://iroh.computer) (QUIC peer-to-peer, works through NAT).
@@ -76,19 +91,77 @@ Devices sync via [Iroh](https://iroh.computer) (QUIC peer-to-peer, works through
 
 NodeIDs are persistent (stored in the local DB), so a QR code stays valid across app restarts.
 
-### Zoom / pan
-
-| Input | Action |
-|---|---|
-| Trackpad pinch | Zoom |
-| Ctrl + scroll | Zoom |
-| Two-finger scroll | Pan |
-| Middle mouse drag | Pan |
-
-### Stylus / pen input
-
-When a stylus or pen is detected, **finger touches pan the canvas** instead of drawing. This matches the behaviour of the Kotlin version: use the pen to draw, fingers to navigate.
-
 ## Architecture
 
-The Dart client code in `lib/atomic/` (`AtomicClient`, `session.dart`, FRB bridge) is not canvas-specific — it's a general-purpose Atomic Data SDK wrapping `atomic_lib` via `flutter_rust_bridge`. Once the API stabilizes, it should be extracted to `atomic-server/dart/` (or `sdk/dart/`) as a reusable Dart package, keeping this app as a thin UI layer on top.
+Three layers, each usable without the next:
+
+1. **The bridge** (`rust/src/api/`, generated glue in `lib/src/rust/`): thin
+   `flutter_rust_bridge` bindings over `atomic_lib`.
+   - `api/simple/` holds the older flat functions by domain: `agent`, `drive`,
+     `resource`, `files`, `store` (open/flush/stats), `sync` (server) and
+     `peers` (Iroh). Many return JSON strings and `String` errors; they stay
+     as they are until a screen is moved off them.
+   - `api/error.rs` + `api/resources.rs` are the typed generic API: `AtomicError`
+     (`kind` + `message`), `AtomicValue`, `ResourceData`,
+     `get_resource_data`, `save_resource_changes`, `create_resource_with_values`,
+     `search_resources`, `get_child_subjects`, `wait_for_resource_event`.
+     New bridge functions should look like these.
+   - `api/assistant.rs` holds the app-shaped functions (home lists, chats).
+2. **`packages/atomic_store`**: a pure Dart `Store`/`Resource` that rhymes with
+   `@tomic/lib` (see its README), over an injectable `StoreBackend`. The app's
+   backend is `lib/atomic/bridge_store_backend.dart`.
+3. **App-specific APIs**: `AssistantApi` (`packages/atomic_chat`, implemented
+   in `lib/assistant/atomic_assistant_api.dart`) for the screens, and
+   `AtomicClient` (`lib/atomic/`) for sign-in, servers and sync.
+
+The generated bridge files are checked in and CI regenerates them with the
+pinned codegen (`flutter_rust_bridge_codegen` 2.12.0, same as the
+`flutter_rust_bridge` dependency) and fails on any diff:
+
+```bash
+cd flutter && flutter_rust_bridge_codegen generate
+```
+
+Enums with fields would make the codegen require `freezed`; use a struct plus
+a unit enum instead (`AtomicError`/`ErrorKind`, `AtomicValue`/`Datatype`).
+
+### Store handles
+
+`AtomicStore` (`api/resources.rs`, opaque in Dart) is an open store with the
+agent that signs its writes and the drive it works in. The typed functions
+above are its methods; the free functions are the same calls on the default
+store, which `open_db` opens and `load_agent` signs for, so screens that have
+not moved keep working.
+
+```dart
+final handle = await AtomicStore.open(
+    path: dir, agentSecret: secret, drive: driveSubject); // or setup(name)
+final store = Store(backend: BridgeStoreBackend(handle), drive: handle.drive());
+```
+
+- A file is opened once per process (Android recreates the activity in the
+  same process, and a second open of a redb file damaged stores). A second
+  handle on a path, including the one `open_db` opened, shares that `Db`
+  (`sharesStoreWith`) and differs in agent and drive only
+  (`atomic_lib::Db::with_own_agent`).
+- Only the default store syncs: the process has one server session and one
+  Iroh peer. A write through another handle is signed, stored and queued in
+  its outbox.
+- Still global: `open_db`, `load_agent`, `setup`, the sync, peer and
+  assistant functions read the default store (`state::db()`); moving them
+  onto the handle is the remaining step. The active drive is also stored in
+  the file (`Db::set_active_drive`), so handles on one file fall back to the
+  same one unless a drive is set on the handle.
+
+## App identity
+
+The app is **atomic.place**. Its permanent iOS bundle identifier and Android
+application ID are both `io.ontola.atomic`, following the `io.ontola.*` naming
+used by the other Ontola apps. This is the main app, not a separate Flutter
+edition. The product owner approved replacing the development identifiers on
+2026-10-20 before the first store release.
+
+The Dart package is `atomic_app` and the Rust crate is `atomic_flutter_rust`.
+Android's internal Kotlin namespace remains `com.ontola.atomiccanvas_flutter`;
+it is not the installed application ID. Existing development installs with the
+old application IDs remain separate and their local data is not migrated.

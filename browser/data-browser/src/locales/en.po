@@ -1024,6 +1024,7 @@ msgstr "Chat input"
 
 #: src/chunks/RTE/AIChatInput/AsyncAIChatInput.tsx
 #: src/components/Share/ShareDialog.tsx
+#: src/routes/SendIdentityRoute.tsx
 #: src/views/ChatRoom/ChatRoomView.tsx
 msgid "Send"
 msgstr "Send"
@@ -1371,6 +1372,7 @@ msgstr "Alt text"
 msgid "Save"
 msgstr "Save"
 
+#: src/routes/AppSettings.tsx
 #: src/routes/NewResource/NewRoute.tsx
 msgid "Templates"
 msgstr "Templates"
@@ -2247,6 +2249,7 @@ msgstr "Accept Changes"
 msgid "Share"
 msgstr "Share"
 
+#: src/components/BreadCrumbs.tsx
 #: src/components/NavBar.tsx
 msgid "Breadcrumbs"
 msgstr "Breadcrumbs"
@@ -3419,6 +3422,7 @@ msgstr "Could not back up your secret. You can still save it yourself."
 msgid "Back up your secret?"
 msgstr "Back up your secret?"
 
+#: src/routes/SendIdentityRoute.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Recovery password"
@@ -4602,6 +4606,8 @@ msgstr "Enter the recovery code you saved for {0}."
 #: src/components/AccountRecoveryCard.tsx
 #: src/components/AccountRecoveryCard.tsx
 #: src/components/AccountRecoveryCard.tsx
+#: src/routes/SendIdentityRoute.tsx
+#: src/routes/SendIdentityRoute.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Recovery code"
@@ -4663,6 +4669,7 @@ msgid "Checking what this device supports…"
 msgstr "Checking what this device supports…"
 
 #: src/components/NewIdentitySection.tsx
+#: src/routes/SendIdentityRoute.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
@@ -4685,6 +4692,7 @@ msgstr "Atomic account"
 msgid "Could not unlock with your passkey."
 msgstr "Could not unlock with your passkey."
 
+#: src/routes/SendIdentityRoute.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Unlock with your passkey"
@@ -4712,6 +4720,7 @@ msgstr "Could not show your secret."
 
 #: src/components/AccountRecoveryCard.tsx
 #: src/components/AccountRecoveryCard.tsx
+#: src/routes/SendIdentityRoute.tsx
 msgid "Unlocking…"
 msgstr "Unlocking…"
 
@@ -5494,7 +5503,9 @@ msgstr "Not connected"
 msgid "Switch"
 msgstr "Switch"
 
+#. 0: accountAddress(phase.account)
 #. 0: managedAccount.email
+#: src/routes/SendIdentityRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Signed in as {0}."
 msgstr "Signed in as {0}."
@@ -6536,6 +6547,7 @@ msgstr "Use {0} template"
 #: src/chunks/PluginRuns/PluginRunHistory.tsx
 #: src/components/AppSetup/AppSetupForm.tsx
 #: src/routes/NewResource/NewRoute.tsx
+#: src/routes/SendIdentityRoute.tsx
 msgid "Loading…"
 msgstr "Loading…"
 
@@ -8454,6 +8466,7 @@ msgstr "<0/> Copy link"
 
 #: src/chunks/FormBuilder/ConditionsEditor.tsx
 #: src/components/Share/ShareDialog.tsx
+#: src/routes/SendIdentityRoute.tsx
 msgid "Done"
 msgstr "Done"
 
@@ -8724,6 +8737,7 @@ msgid "Add a note for the people you're inviting"
 msgstr "Add a note for the people you're inviting"
 
 #: src/components/Share/ShareDialog.tsx
+#: src/routes/SendIdentityRoute.tsx
 msgid "Sending…"
 msgstr "Sending…"
 
@@ -12118,6 +12132,7 @@ msgid "Add a device"
 msgstr "Add a device"
 
 #: src/components/Spinner.tsx
+#: src/components/Spinner.tsx
 msgid "Loading"
 msgstr "Loading"
 
@@ -13224,3 +13239,105 @@ msgstr "The next backup from that browser or app adds them"
 #: src/components/ConnectDrivePicker.tsx
 msgid "All drives"
 msgstr "All drives"
+
+#: src/embed/MeetingChatOverlay.tsx
+msgid "Close chat"
+msgstr "Close chat"
+
+#: src/embed/mockHost.ts
+msgid "Mock drive"
+msgstr "Mock drive"
+
+#: src/embed/mockHost.ts
+msgid "A drive that only exists in this page."
+msgstr "A drive that only exists in this page."
+
+#: src/embed/mockHost.ts
+msgid "A folder"
+msgstr "A folder"
+
+#: src/embed/mockHost.ts
+msgid "A resource inside the folder"
+msgstr "A resource inside the folder"
+
+#: src/embed/mockHost.ts
+msgid "Rendered by ResourcePage, with nothing around it."
+msgstr "Rendered by ResourcePage, with nothing around it."
+
+#: src/routes/AppSettings.tsx
+msgid "Show icons in the sidebar <0>Show icons and pictures next to items in the sidebar</0>"
+msgstr "Show icons in the sidebar <0>Show icons and pictures next to items in the sidebar</0>"
+
+#: src/routes/SendIdentityRoute.tsx
+msgid "This link has no code. Start again from your device."
+msgstr "This link has no code. Start again from your device."
+
+#: src/routes/SendIdentityRoute.tsx
+msgid "That device did not ask for your identity."
+msgstr "That device did not ask for your identity."
+
+#: src/routes/SendIdentityRoute.tsx
+msgid "This code was already used. Ask the device for a new one."
+msgstr "This code was already used. Ask the device for a new one."
+
+#: src/routes/SendIdentityRoute.tsx
+msgid "Could not look up that code."
+msgstr "Could not look up that code."
+
+#: src/routes/SendIdentityRoute.tsx
+msgid "Could not unlock your backup."
+msgstr "Could not unlock your backup."
+
+#: src/routes/SendIdentityRoute.tsx
+msgid "Could not send your identity."
+msgstr "Could not send your identity."
+
+#: src/routes/SendIdentityRoute.tsx
+msgid "This account has no backup yet. Create it in the web app first."
+msgstr "This account has no backup yet. Create it in the web app first."
+
+#: src/routes/SendIdentityRoute.tsx
+msgid "This backup cannot be opened here. Restore it in the web app first."
+msgstr "This backup cannot be opened here. Restore it in the web app first."
+
+#: src/routes/SendIdentityRoute.tsx
+msgid "Could not read your backup."
+msgstr "Could not read your backup."
+
+#: src/routes/SendIdentityRoute.tsx
+msgid "No account service is known here."
+msgstr "No account service is known here."
+
+#: src/routes/SendIdentityRoute.tsx
+msgid "Sign in to continue"
+msgstr "Sign in to continue"
+
+#: src/routes/SendIdentityRoute.tsx
+msgid "Sign in to your account to send your identity to your device."
+msgstr "Sign in to your account to send your identity to your device."
+
+#. 0: phase.link.deviceName
+#: src/routes/SendIdentityRoute.tsx
+msgid "Send your identity to {0}?"
+msgstr "Send your identity to {0}?"
+
+#. 0: code
+#: src/routes/SendIdentityRoute.tsx
+msgid "Only continue if you started this on your own device just now and it shows code {0}."
+msgstr "Only continue if you started this on your own device just now and it shows code {0}."
+
+#: src/routes/SendIdentityRoute.tsx
+msgid "Send with this code"
+msgstr "Send with this code"
+
+#: src/routes/SendIdentityRoute.tsx
+msgid "Unlock your backup"
+msgstr "Unlock your backup"
+
+#: src/routes/SendIdentityRoute.tsx
+msgid "Go back to your device."
+msgstr "Go back to your device."
+
+#: src/routes/SendIdentityRoute.tsx
+msgid "Could not send your identity"
+msgstr "Could not send your identity"

@@ -260,8 +260,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "atomic_flutter_rust"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "atomic_lib",
+ "flutter_rust_bridge",
+ "futures",
+ "getrandom 0.3.4",
+ "log",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-android",
+ "tracing-subscriber",
+ "urlencoding",
+]
+
+[[package]]
 name = "atomic_lib"
-version = "0.41.0-beta.7"
+version = "0.41.0-beta.8"
 dependencies = [
  "anyhow",
  "argon2",
@@ -270,6 +289,7 @@ dependencies = [
  "blake3",
  "chacha20poly1305",
  "ed25519-dalek",
+ "evalexpr",
  "futures",
  "getrandom 0.4.2",
  "hex",
@@ -277,12 +297,15 @@ dependencies = [
  "iroh",
  "js-sys",
  "loro",
+ "miniz_oxide",
  "pkarr",
  "rand 0.8.5",
  "redb",
  "regex",
  "reqwest 0.13.4",
  "rmp-serde",
+ "rustls",
+ "rustls-native-certs",
  "serde",
  "serde_jcs",
  "serde_json",
@@ -297,6 +320,8 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",
+ "webpki-roots 1.0.6",
+ "x25519-dalek",
 ]
 
 [[package]]
@@ -1134,6 +1159,12 @@ dependencies = [
  "libc",
  "windows-sys 0.61.2",
 ]
+
+[[package]]
+name = "evalexpr"
+version = "13.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25929004897f2bbab309121a60400d36992f6d911d09baa6c172f6cc55706601"
 
 [[package]]
 name = "fallible-iterator"
@@ -2643,8 +2674,6 @@ dependencies = [
 [[package]]
 name = "netdev"
 version = "0.31.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f901362e84cd407be6f8cd9d3a46bccf09136b095792785401ea7d283c79b91d"
 dependencies = [
  "dlopen2",
  "ipnet",
@@ -3727,21 +3756,6 @@ checksum = "72f81bee8c8ef9b577d1681a70ebbc962c232461e397b22c208c43c04b67a155"
 dependencies = [
  "rmp",
  "serde",
-]
-
-[[package]]
-name = "rust_lib_atomiccanvas_flutter"
-version = "0.1.0"
-dependencies = [
- "atomic_lib",
- "flutter_rust_bridge",
- "getrandom 0.3.4",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-android",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -5635,6 +5649,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "x25519-dalek"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7e468321c81fb07fa7f4c636c3972b9100f0346e5b6a9f2bd0603a52f7ed277"
+dependencies = [
+ "curve25519-dalek",
+ "rand_core 0.6.4",
+ "serde",
+ "zeroize",
+]
+
+[[package]]
 name = "x509-parser"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5762,6 +5788,20 @@ name = "zeroize"
 version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b97154e67e32c85465826e8bcc1c59429aaaf107c1e4a9e53c8d8ccd5eff88d0"
+dependencies = [
+ "zeroize_derive",
+]
+
+[[package]]
+name = "zeroize_derive"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c50655cbb0fe3fc43170059e702f1ce5e19b84cec58dc87b037a09935c2f328"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
 
 [[package]]
 name = "zerotrie"

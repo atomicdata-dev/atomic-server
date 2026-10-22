@@ -1,0 +1,11 @@
+name: atomic_store
+description: A Store and Resource API for Atomic Data in Dart that rhymes with @tomic/lib, over an injectable backend (the Flutter bridge in the app, a fake in tests).
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.0

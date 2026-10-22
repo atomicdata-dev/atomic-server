@@ -22,7 +22,9 @@ use crate::{
 };
 use futures::{SinkExt, StreamExt};
 use tokio::sync::{broadcast, mpsc, watch};
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+#[cfg(not(target_os = "android"))]
+use tokio_tungstenite::connect_async;
+use tokio_tungstenite::tungstenite::Message;
 
 /// A message received from the server over WebSocket.
 #[derive(Clone, Debug)]
@@ -181,9 +183,29 @@ impl WsClient {
     /// Connect to an AtomicServer WebSocket endpoint.
     /// The URL should be `ws://` or `wss://` (e.g. `ws://localhost:9883/ws`).
     pub async fn connect(url: &str) -> AtomicResult<Self> {
-        let (ws_stream, _response) = connect_async(url)
-            .await
-            .map_err(|e| format!("WebSocket connection failed to {}: {}", url, e))?;
+        super::install_default_crypto_provider();
+        #[cfg(target_os = "android")]
+        let connected = tokio_tungstenite::connect_async_tls_with_config(
+            url,
+            None,
+            false,
+            Some(tokio_tungstenite::Connector::Rustls(
+                super::tls::client_config(),
+            )),
+        )
+        .await;
+        // `connect_async` builds its TLS config from the process default
+        // provider, and rustls won't pick one itself when both ring and
+        // aws-lc-rs are compiled in: it panics. The server installs ring at
+        // boot; an embedding app (Flutter on macOS and iOS) may not have. An
+        // error only means a provider is already installed.
+        #[cfg(not(target_os = "android"))]
+        let connected = {
+            let _ = rustls::crypto::ring::default_provider().install_default();
+            connect_async(url).await
+        };
+        let (ws_stream, _response) =
+            connected.map_err(|e| format!("WebSocket connection failed to {}: {}", url, e))?;
 
         let origin = http_origin_of_ws_url(url);
         let server_capabilities = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));

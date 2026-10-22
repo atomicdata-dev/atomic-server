@@ -1,6 +1,7 @@
 import { styled } from 'styled-components';
 import { Logo } from './Logo';
 import type { JSX, ReactNode } from 'react';
+import { isEmbedded } from '../helpers/embedMode';
 
 /** Height of the bar; the layout below it reserves the same space. */
 export const SETUP_BAR_HEIGHT = '3.5rem';
@@ -19,10 +20,14 @@ export function SetupBar({
   title: ReactNode;
   children?: ReactNode;
 }): JSX.Element {
+  // In the app's web view the bar is the page's own top row: no logo (the app
+  // has its own chrome), no tinted band, no rule under it.
+  const embedded = isEmbedded();
+
   return (
-    <Bar role='region' aria-label='Setup'>
-      <BarLogo />
-      <Title>{title}</Title>
+    <Bar $embedded={embedded} role='region' aria-label='Setup'>
+      {!embedded && <BarLogo />}
+      <Title $embedded={embedded}>{title}</Title>
       <Actions>{children}</Actions>
     </Bar>
   );
@@ -44,15 +49,16 @@ export function ShortLabel({
   );
 }
 
-const Bar = styled.div`
+const Bar = styled.div<{ $embedded?: boolean }>`
   display: flex;
   align-items: center;
   gap: 1rem;
   height: ${SETUP_BAR_HEIGHT};
   box-sizing: border-box;
   padding: 0.5rem 1rem;
-  background: ${p => p.theme.colors.bg1};
-  border-bottom: 1px solid ${p => p.theme.colors.bg2};
+  background: ${p => (p.$embedded ? p.theme.colors.bg : p.theme.colors.bg1)};
+  border-bottom: ${p =>
+    p.$embedded ? 'none' : `1px solid ${p.theme.colors.bg2}`};
   button {
     white-space: nowrap;
   }
@@ -70,10 +76,11 @@ const BarLogo = styled(Logo)`
   min-width: 4.5rem;
 `;
 
-const Title = styled.div`
+const Title = styled.div<{ $embedded?: boolean }>`
   flex: 1;
-  padding-left: 1rem;
-  border-left: 1px solid ${p => p.theme.colors.bg2};
+  padding-left: ${p => (p.$embedded ? '0' : '1rem')};
+  border-left: ${p =>
+    p.$embedded ? 'none' : `1px solid ${p.theme.colors.bg2}`};
   min-width: 0;
   font-weight: 600;
   overflow: hidden;

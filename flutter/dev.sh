@@ -16,8 +16,8 @@ case $TARGET in
   *) echo "Usage: $0 web|tablet|phone|emu"; exit 1 ;;
 esac
 
-FIFO="/tmp/atomiccanvas_${TARGET}_pipe"
-WRITER_PID_FILE="/tmp/atomiccanvas_${TARGET}_writer.pid"
+FIFO="/tmp/atomic_app_${TARGET}_pipe"
+WRITER_PID_FILE="/tmp/atomic_app_${TARGET}_writer.pid"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Clean up from any previous run
@@ -46,7 +46,7 @@ fi
 if [ "$TARGET" = "web" ]; then
   FLUTTER_PORT=65423
   PROXY_PORT=8080
-  PROXY_PID_FILE="/tmp/atomiccanvas_web_proxy.pid"
+  PROXY_PID_FILE="/tmp/atomic_app_web_proxy.pid"
   kill "$(cat "$PROXY_PID_FILE" 2>/dev/null)" 2>/dev/null || true
   "$DART" run "$SCRIPT_DIR/web_proxy.dart" "$FLUTTER_PORT" "$PROXY_PORT" &
   echo $! > "$PROXY_PID_FILE"
@@ -85,5 +85,5 @@ done
 
 # Cleanup on exit
 kill "$(cat "$WRITER_PID_FILE" 2>/dev/null)" 2>/dev/null || true
-kill "$(cat /tmp/atomiccanvas_web_proxy.pid 2>/dev/null)" 2>/dev/null || true
-rm -f "$FIFO" "$WRITER_PID_FILE" /tmp/atomiccanvas_web_proxy.pid
+kill "$(cat /tmp/atomic_app_web_proxy.pid 2>/dev/null)" 2>/dev/null || true
+rm -f "$FIFO" "$WRITER_PID_FILE" /tmp/atomic_app_web_proxy.pid

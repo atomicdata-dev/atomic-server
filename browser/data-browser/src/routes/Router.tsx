@@ -24,6 +24,7 @@ import { HistoryRoute } from './History/HistoryRoute';
 import { InviteRoute } from './InviteRoute';
 import { AuthorizeMcpRoute } from './AuthorizeMcpRoute';
 import { ConnectAgentRoute } from './ConnectAgentRoute';
+import { SendIdentityRoute } from './SendIdentityRoute';
 import { LinkOpenRouter } from './LinkOpenRouter';
 import { OnboardingRoute } from './OnboardingRoute';
 import { WelcomeRoute } from './WelcomeRoute';
@@ -101,6 +102,7 @@ const routeTree = rootRoute.addChildren({
     DemoRoute,
     InviteRoute,
     ConnectAgentRoute,
+    SendIdentityRoute,
     AuthorizeMcpRoute,
     LinkOpenRouter,
   }),

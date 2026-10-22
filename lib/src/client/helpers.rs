@@ -160,13 +160,69 @@ mod ssrf_guard {
     }
 }
 
+/// The system's CA certificates as DER, read once from the places Android keeps
+/// them: the conscrypt APEX (Android 14+) and the older system directory. The
+/// usual loaders (`rustls-native-certs`, `openssl-probe`) look in neither on a
+/// current phone and find no roots at all. Each file is one PEM certificate.
+#[cfg(target_os = "android")]
+pub(crate) fn android_root_ders() -> &'static [Vec<u8>] {
+    use base64::Engine;
+    static ROOTS: std::sync::OnceLock<Vec<Vec<u8>>> = std::sync::OnceLock::new();
+    ROOTS.get_or_init(|| {
+        let mut ders = Vec::new();
+        for dir in [
+            "/apex/com.android.conscrypt/cacerts",
+            "/system/etc/security/cacerts",
+        ] {
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let Ok(text) = std::fs::read_to_string(entry.path()) else {
+                    continue;
+                };
+                let Some(start) = text.find("-----BEGIN CERTIFICATE-----") else {
+                    continue;
+                };
+                let body = &text[start + "-----BEGIN CERTIFICATE-----".len()..];
+                let Some(end) = body.find("-----END CERTIFICATE-----") else {
+                    continue;
+                };
+                let b64: String = body[..end].split_whitespace().collect();
+                if let Ok(der) = base64::engine::general_purpose::STANDARD.decode(b64) {
+                    ders.push(der);
+                }
+            }
+            if !ders.is_empty() {
+                break;
+            }
+        }
+        ders
+    })
+}
+
+#[cfg(target_os = "android")]
+fn android_roots() -> &'static [reqwest::Certificate] {
+    static ROOTS: std::sync::OnceLock<Vec<reqwest::Certificate>> = std::sync::OnceLock::new();
+    ROOTS.get_or_init(|| {
+        android_root_ders()
+            .iter()
+            .filter_map(|der| reqwest::Certificate::from_der(der).ok())
+            .collect()
+    })
+}
+
 #[cfg(not(target_arch = "wasm32"))]
-fn http_client_builder() -> reqwest::ClientBuilder {
-    reqwest::Client::builder().timeout(std::time::Duration::from_secs(10))
+pub(crate) fn http_client_builder() -> reqwest::ClientBuilder {
+    super::install_default_crypto_provider();
+    let builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(10));
+    #[cfg(target_os = "android")]
+    let builder = builder.tls_certs_only(android_roots().iter().cloned());
+    builder
 }
 
 #[cfg(target_arch = "wasm32")]
-fn http_client_builder() -> reqwest::ClientBuilder {
+pub(crate) fn http_client_builder() -> reqwest::ClientBuilder {
     reqwest::Client::builder()
 }
 
@@ -344,6 +400,69 @@ pub async fn fetch_body(
         .map_err(|e| format!("Could not build HTTP client: {}", e))?;
 
     fetch_body_with_client(&client, url, content_type, client_agent, None).await
+}
+
+/// Bytes from a URL the system itself determined (a server it is connected
+/// to), with the content type the server gave.
+#[derive(Debug, Clone)]
+pub struct FetchedBytes {
+    pub bytes: Vec<u8>,
+    pub content_type: Option<String>,
+}
+
+/// Fetches raw bytes from a URL the system determined, signing the request
+/// with the agent when the URL is on the agent's own server (like
+/// [`fetch_body`]). The body is read as a stream and refused as soon as it
+/// passes `max_bytes`. Errors name the HTTP status (`Status: 403`) so a caller
+/// can log why a file did not come.
+#[tracing::instrument(skip_all)]
+pub async fn fetch_bytes(
+    url: &str,
+    max_bytes: usize,
+    client_agent: Option<&Agent>,
+) -> AtomicResult<FetchedBytes> {
+    if !url.starts_with("http") {
+        return Err(format!("Could not fetch url '{}', must start with http.", url).into());
+    }
+    let client = http_client_builder()
+        .build()
+        .map_err(|e| format!("Could not build HTTP client: {}", e))?;
+    let mut req = client.get(url);
+    if let Some(agent) = client_agent {
+        if should_sign_request(url, agent) {
+            for (key, value) in get_authentication_headers(url, agent)? {
+                req = req.header(key, value);
+            }
+        }
+    }
+    let resp = req
+        .send()
+        .await
+        .map_err(|e| format!("Error when fetching {}: {}", url, e))?;
+    let status = resp.status().as_u16();
+    if status != 200 {
+        let message = format!("Could not fetch url '{}'. Status: {}", url, status);
+        return Err(if status == 404 || status == 410 {
+            AtomicError {
+                message,
+                error_type: AtomicErrorType::NotFoundError,
+                subject: Some(url.to_string()),
+            }
+        } else {
+            message.into()
+        });
+    }
+    let content_type = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.split(';').next().unwrap_or(v).trim().to_ascii_lowercase());
+    let bytes = read_body_bounded(resp, url, max_bytes).await?;
+    crate::metrics::external_fetch();
+    Ok(FetchedBytes {
+        bytes,
+        content_type,
+    })
 }
 
 /// Largest body `fetch_body_untrusted` will read: a caller-supplied URL

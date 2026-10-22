@@ -43,7 +43,7 @@ interface SideBarDriveProps {
  */
 export function SideBarDrive({ onItemClick }: SideBarDriveProps): JSX.Element {
   const store = useStore();
-  const { drive, agent } = useSettings();
+  const { drive, agent, showSidebarIcons } = useSettings();
   const driveResource = useResource(drive);
   const {
     subjects: subResources,
@@ -90,13 +90,15 @@ export function SideBarDrive({ onItemClick }: SideBarDriveProps): JSX.Element {
             navigate(constructOpenURL(drive));
           }}
         >
-          <DriveGlyph aria-hidden>
-            {!hasCustomGlyph && isPrivateDrive ? (
-              '🏠'
-            ) : (
-              <ResourceGlyph resource={driveResource} />
-            )}
-          </DriveGlyph>
+          {showSidebarIcons && (
+            <DriveGlyph aria-hidden>
+              {!hasCustomGlyph && isPrivateDrive ? (
+                '🏠'
+              ) : (
+                <ResourceGlyph resource={driveResource} />
+              )}
+            </DriveGlyph>
+          )}
           <DriveTitle data-testid='current-drive-title'>{driveName}</DriveTitle>
         </TitleButton>
         <DriveSwitcher Trigger={DriveSwitcherTrigger} />

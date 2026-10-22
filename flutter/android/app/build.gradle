@@ -13,6 +13,12 @@ if (localPropertiesFile.exists()) {
 def flutterVersionCode = localProperties.getProperty("flutter.versionCode", "1")
 def flutterVersionName = localProperties.getProperty("flutter.versionName", "1.0")
 
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
 android {
     namespace "com.ontola.atomiccanvas_flutter"
     compileSdk 36
@@ -28,20 +34,55 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.ontola.atomiccanvas_flutter"
+        applicationId "io.ontola.atomic"
         minSdkVersion flutter.minSdkVersion
         targetSdk 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
-        ndk {
-            // only build for joep's local android devices
-            abiFilters 'arm64-v8a'
+        // Store builds are "atomic.place"; every other build says which app it
+        // is, next to the Tauri and Kotlin ones. `-Patomic.storeRelease=true`.
+        manifestPlaceholders = [appLabel: project.hasProperty("atomic.storeRelease")
+                ? "atomic.place" : "atomic.place (flutter)"]
+    }
+
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
         }
     }
 
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
+            // A store build must never silently use the debug certificate; a
+            // local release build (deploy_release.sh to a test device) has no
+            // upload key and stays debug-signed, so it still installs.
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            } else if (project.hasProperty("atomic.storeRelease")) {
+                throw new GradleException("A store build needs android/key.properties (see android/PLAY.md)")
+            } else {
+                signingConfig signingConfigs.debug
+            }
+        }
+    }
+}
+
+// Release and profile APKs carry arm64-v8a only. The Flutter plugin resets
+// `abiFilters` to arm64 + armeabi-v7a + x86_64 when it is applied, and an
+// `ndk { abiFilters }` block here only adds to that list, so third-party
+// prebuilt libraries (mobile_scanner's barhopper: 9 MB) stayed in. Excluding
+// the other ABIs' libraries from the packaged APK is independent of that.
+// Debug keeps every ABI (x86_64 emulators, `flutter run` on any device).
+// Other ABIs for a release: `-Patomic.allAbis=true` (see flutter/README.md).
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        if (variant.buildType != "debug" && !project.hasProperty("atomic.allAbis")) {
+            variant.packaging.jniLibs.excludes.addAll("**/x86_64/**", "**/armeabi-v7a/**", "**/x86/**")
         }
     }
 }

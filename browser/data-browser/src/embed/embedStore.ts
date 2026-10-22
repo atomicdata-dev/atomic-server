@@ -1,0 +1,87 @@
+import {
+  Agent,
+  NativeClientDb,
+  NativeCryptoProvider,
+  Store,
+  type ClientDbWorker,
+  server,
+  type NativeChannel,
+} from '@tomic/react';
+import { registerCustomCreateActions } from '../components/forms/NewForm/CustomCreateActions';
+import { registerCustomDeleteDialogs } from '../components/ResourceContextMenu/customDeleteDialogs';
+
+/**
+ * The embed's store: the host app (Rust `atomic_lib`) is its only database and
+ * holds the agent's key. There is no server, so nothing is fetched over HTTP
+ * and no auth cookie is made (`noServer`): the host signs commits of its agent
+ * and nothing else, and a refused signature used to fail the very resource the
+ * page had just read. Edits go to the host (`commitTransport`), which keeps and
+ * syncs them.
+ */
+export async function createEmbedStore(
+  channel: NativeChannel,
+): Promise<{ store: Store; db: NativeClientDb }> {
+  const db = new NativeClientDb(channel);
+  const agentSubject = (await channel
+    .call('agent', [])
+    .catch(() => undefined)) as string | undefined;
+
+  const store = new Store({
+    // Never used: nothing here connects. A valid origin is all the store wants.
+    serverUrl: 'https://embed.invalid',
+    connect: false,
+    noServer: true,
+    agent: agentSubject
+      ? new Agent(new NativeCryptoProvider(channel), agentSubject)
+      : undefined,
+    // Without this the store, having no server, would only ever save edits
+    // offline, into a page database nobody keeps: the typing was gone once
+    // the page closed.
+    commitTransport: db.commitTransport,
+  });
+
+  store.setClientDb(db as unknown as ClientDbWorker);
+  await db.waitForInit();
+
+  return { store, db };
+}
+
+/**
+ * What the web app registers at start (`App.tsx`) and the page needs too.
+ * Without the create actions, "Document" (and Folder, Table, the native New
+ * → Other page) opened the bare property form of a new resource instead of
+ * making one and opening its editor.
+ */
+export function registerEmbedActions(): void {
+  registerCustomCreateActions();
+  registerCustomDeleteDialogs();
+}
+
+/**
+ * Makes the drive of `subject` the store's current drive. A table (or any
+ * list narrowed by a second constraint, like the rows of its class) asks the
+ * host's index, which is kept per drive: with no current drive the page
+ * skipped the host, found no server (`noServer`) and listed no rows at all,
+ * so a table looked empty. The web app sets it from its stored choice; this
+ * page has none, so it follows what it shows.
+ */
+export async function adoptDriveOf(
+  store: Pick<Store, 'getResource' | 'getResourceAncestry' | 'getDrive'> & {
+    setDrive(drive: string): void;
+  },
+  subject: string,
+): Promise<void> {
+  try {
+    const resource = await store.getResource(subject);
+    const ancestry = await store.getResourceAncestry(resource);
+    const top = ancestry.at(-1);
+
+    if (!top || top === store.getDrive()) return;
+
+    const root = await store.getResource(top);
+
+    if (root.hasClasses(server.classes.drive)) store.setDrive(top);
+  } catch {
+    // The page still shows the resource; only its lists can come up short.
+  }
+}

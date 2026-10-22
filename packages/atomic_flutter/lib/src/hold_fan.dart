@@ -1,0 +1,962 @@
+import 'dart:async';
+import 'dart:math' as math;
+
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
+
+import 'click_cursor.dart';
+import 'theme.dart';
+
+/// One choice of a [HoldFan]: a short label, optionally led by an emoji (or,
+/// in the menu card of [HoldFan.tapOpensMenu], by an [icon]).
+@immutable
+class HoldFanItem<T> {
+  final String label;
+  final String? emoji;
+  final IconData? icon;
+  final T value;
+
+  /// Drawn quieter (the choice is there but has nothing behind it, or is
+  /// switched off), still selectable.
+  final bool muted;
+
+  /// A short note after the label ("hidden", "0"), in the muted tone.
+  final String? hint;
+
+  const HoldFanItem(this.label, this.value,
+      {this.emoji, this.icon, this.muted = false, this.hint});
+
+  String get text => emoji == null ? label : '$emoji $label';
+
+  /// What assistive technology reads.
+  String get semanticLabel => hint == null ? label : '$label, $hint';
+}
+
+/// How a [HoldFan] arranges its choices. Always one straight column.
+enum HoldFanLayout {
+  /// Stacked straight above (or, with no room above, below) the button: for
+  /// choices taken from a list (drives, recent resources, chats, new).
+  list,
+}
+
+/// A button with more than one action. Touching and holding (a short moment,
+/// with a haptic tick) opens [items] as a vertical list next to the button,
+/// and the finger, still down, slides onto one (a tick on each change) and
+/// lets go to pick it ([onSelected]). Letting go anywhere else, or the touch
+/// being cancelled, closes the list without a choice. Letting go where the
+/// hold started (the finger never went anywhere, as after a plain long press)
+/// keeps the list open as a menu: a tap on an item picks it, a tap anywhere
+/// else closes it.
+///
+/// A tap does [onTap], the default action, or, with [tapOpensMenu], opens that
+/// same list as a menu (a rounded card, an icon and a label per row) that
+/// stays until an item is tapped, or a tap elsewhere or back closes it.
+///
+/// The list is drawn in the root [Overlay], over everything, with the page
+/// dimmed a little; the button itself does not move. It stays inside the
+/// screen.
+///
+/// For assistive technology the button has a long-press action
+/// ([menuLabel]) that lists the same choices in a plain menu.
+///
+/// [child] is what the button shows (an icon); [HoldFan] is the tap target.
+class HoldFan<T> extends StatefulWidget {
+  final Widget child;
+
+  /// The default action; null leaves the button without a tap (the list
+  /// still opens on hold).
+  final VoidCallback? onTap;
+
+  /// A tap opens the list (instead of doing [onTap]) as a menu card, the
+  /// rows each an icon and a label, and a hold opens that same card.
+  final bool tapOpensMenu;
+
+  /// Draw the list as the menu card (an icon and a label per row) also
+  /// when a tap does [onTap]: a hold opens the card, a drag picks a row.
+  final bool cardMenu;
+
+  /// The bottom bar's gesture (one for Home, Search and New): the card
+  /// opens at once when the finger moves more than [holdFanDragSlop] (a
+  /// swipe), or after [holdDuration] of a finger held still. Then it drags
+  /// through the rows (the one under it marked) and letting go picks one,
+  /// or, off the rows, closes the card; letting go without moving leaves it
+  /// open for a tap. A lift before the swipe or the delay is a tap: it opens
+  /// the card with [tapOpensMenu], else does [onTap]. For a button that is
+  /// not in anything that scrolls (the bottom bar).
+  final bool opensOnDown;
+
+  final List<HoldFanItem<T>> items;
+  final ValueChanged<T> onSelected;
+
+  /// The item marked as the default (what a tap does), or null. Drawn with
+  /// a stronger outline in the pill list.
+  final int? defaultIndex;
+
+  /// The button's tooltip and accessible name.
+  final String? tooltip;
+
+  /// How the choices are laid out.
+  final HoldFanLayout layout;
+
+  /// How long to hold before the list opens.
+  final Duration holdDuration;
+
+  /// Called as the list opens, before it is laid out from [items].
+  final VoidCallback? onOpen;
+
+  /// The accessible long-press action and the menu's title.
+  final String menuLabel;
+
+  /// Shown as the current page: drawn as is, and marked selected.
+  final bool selected;
+
+  /// Side of the square tap target (its height when [width] is set).
+  final double size;
+
+  /// Width of the tap target when it is not square (`double.infinity` fills
+  /// the space it is given): for a heading or a row that opens a list.
+  final double? width;
+
+  /// A press shows a wash of this rounded rectangle over the target (a
+  /// heading, a label) instead of the round ink of an icon button. With it
+  /// and no [width] the target is as wide as [child].
+  final BorderRadius? borderRadius;
+
+  const HoldFan({
+    super.key,
+    required this.child,
+    required this.items,
+    required this.onSelected,
+    this.onTap,
+    this.tapOpensMenu = false,
+    this.cardMenu = false,
+    this.opensOnDown = false,
+    this.defaultIndex = 0,
+    this.tooltip,
+    this.layout = HoldFanLayout.list,
+    this.holdDuration = HoldMenuStyle.holdDelay,
+    this.onOpen,
+    this.menuLabel = 'More options',
+    this.selected = false,
+    this.size = 48,
+    this.width,
+    this.borderRadius,
+  });
+
+  /// Back: closes the list that is open, if any, and says whether there was
+  /// one. The shell asks before it pops a page.
+  static bool dismissOpenMenu() {
+    final open = _openList;
+    if (open == null || !open._open) return false;
+    open._close();
+    return true;
+  }
+
+  @override
+  State<HoldFan<T>> createState() => _HoldFanState<T>();
+}
+
+/// Where the pills of a vertical menu go: one above the other, all as wide as
+/// the widest, centred on [anchor]'s x (kept inside [bounds]). The first
+/// is nearest the button: above it, going up, or, when [bounds] has no room
+/// above, below it, going down.
+List<Rect> holdFanListLayout({
+  required Offset anchor,
+  required List<Size> sizes,
+  required Rect bounds,
+  double lift = 40,
+  double gap = 8,
+}) {
+  if (sizes.isEmpty) return const [];
+  final width = sizes.map((s) => s.width).reduce(math.max);
+  final total =
+      sizes.fold<double>(0, (a, s) => a + s.height) + gap * (sizes.length - 1);
+  final above = anchor.dy - lift - total >= bounds.top;
+  var left = anchor.dx - width / 2;
+  left = left.clamp(bounds.left, math.max(bounds.left, bounds.right - width));
+  final rects = <Rect>[];
+  if (above) {
+    var bottom = anchor.dy - lift;
+    for (final s in sizes) {
+      rects.add(Rect.fromLTWH(left, bottom - s.height, width, s.height));
+      bottom -= s.height + gap;
+    }
+  } else {
+    var top = anchor.dy + lift;
+    for (final s in sizes) {
+      rects.add(Rect.fromLTWH(left, top, width, s.height));
+      top += s.height + gap;
+    }
+    // Never past the bottom edge.
+    final over = rects.last.bottom - bounds.bottom;
+    if (over > 0) {
+      for (var i = 0; i < rects.length; i++) {
+        rects[i] = rects[i].shift(Offset(0, -over));
+      }
+    }
+  }
+  return rects;
+}
+
+/// The pill under [point], or null: a pill counts a little beyond its edges,
+/// and of two candidates the one whose centre is nearer wins.
+int? holdFanHit(List<Rect> rects, Offset point, {double slop = 10}) {
+  int? best;
+  var bestDistance = double.infinity;
+  for (var i = 0; i < rects.length; i++) {
+    if (!rects[i].inflate(slop).contains(point)) continue;
+    final d = (rects[i].center - point).distance;
+    if (d < bestDistance) {
+      bestDistance = d;
+      best = i;
+    }
+  }
+  return best;
+}
+
+const _pillStyle = TextStyle(fontSize: 15, fontWeight: FontWeight.w600);
+const _pillPadding = EdgeInsets.symmetric(horizontal: 18, vertical: 11);
+const _pillMinHeight = 44.0;
+
+/// The widest the pill's outline gets (the default pill's): the decoration
+/// takes it off the room for the label, so the pill must be that much bigger.
+const _pillBorder = 1.5;
+
+/// The one hold menu of the bottom bar's buttons (Home, Search, New): the
+/// same hold delay, drag slop, animation, haptics and card, so they feel alike.
+abstract final class HoldMenuStyle {
+  /// How long a finger stays still on the button before the menu opens. A
+  /// swipe opens it at once ([dragSlop]); a lift before either is a tap.
+  static const holdDelay = Duration(milliseconds: 150);
+
+  /// How far the finger moves before it is a swipe that opens the menu now.
+  static const dragSlop = 8.0;
+
+  /// The card fading and scaling in, and out.
+  static const animation = Duration(milliseconds: 80);
+  static const curve = Curves.easeOutCubic;
+  static const startScale = 0.92;
+
+  /// The card.
+  static const cardPadding = 6.0;
+  static const cardRadius = 16.0;
+  static const cardElevation = 8.0;
+
+  /// A row: at least this high, an icon and a label, the one under the
+  /// finger tinted.
+  static const rowMinHeight = 48.0;
+  static const rowMinWidth = 176.0;
+  static const rowRadius = 12.0;
+  static const rowPadding = EdgeInsets.symmetric(horizontal: 16);
+  static const rowIcon = 24.0;
+  static const rowGap = 14.0;
+  static const hoverAlpha = 0.14;
+
+  /// A tick as the menu opens and on each row the finger reaches.
+  static void haptic() => HapticFeedback.selectionClick();
+}
+
+const _cardPad = HoldMenuStyle.cardPadding;
+const _rowPadding = HoldMenuStyle.rowPadding;
+const _rowIcon = HoldMenuStyle.rowIcon;
+const _rowGap = HoldMenuStyle.rowGap;
+const _rowMinWidth = HoldMenuStyle.rowMinWidth;
+
+/// How far a finger that went down on an [HoldFan.opensOnDown] button moves
+/// before it is a swipe through the rows rather than a tap.
+const holdFanDragSlop = HoldMenuStyle.dragSlop;
+
+/// The list that is open now, if any (there is one at a time).
+_HoldFanState<dynamic>? _openList;
+
+class _HoldFanState<T> extends State<HoldFan<T>>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _anim = AnimationController(
+      vsync: this,
+      duration: HoldMenuStyle.animation,
+    );
+  }
+
+  OverlayEntry? _entry;
+  RenderBox? _overlayBox;
+  List<HoldFanItem<T>> _shown = const [];
+  List<Rect> _rects = const [];
+
+  /// The menu card behind the rows (with [HoldFan.tapOpensMenu]), or null.
+  Rect? _card;
+  TextStyle _style = _pillStyle;
+  Offset _anchor = Offset.zero;
+  final ValueNotifier<int?> _hover = ValueNotifier(null);
+
+  /// Where the hold started, and whether the finger has left it since.
+  Offset _downAt = Offset.zero;
+  bool _wandered = false;
+
+  /// The list stays open after the finger lifted and waits for a tap.
+  bool _sticky = false;
+
+  /// The list is open and follows the finger.
+  bool get _open => _entry != null && _anim.status != AnimationStatus.reverse;
+
+  @override
+  void dispose() {
+    _cancelPending();
+    _removeEntry();
+    _anim.dispose();
+    _hover.dispose();
+    super.dispose();
+  }
+
+  void _removeEntry() {
+    if (identical(_openList, this)) _openList = null;
+    _entry?.remove();
+    _entry?.dispose();
+    _entry = null;
+  }
+
+  void _start(LongPressStartDetails details) =>
+      _show(finger: details.globalPosition, sticky: false);
+
+  void _tapOpen() => _show(finger: null, sticky: true);
+
+  bool get _onDown => widget.opensOnDown && widget.items.isNotEmpty;
+
+  /// Waiting to see whether the touch is a tap, a swipe or a hold.
+  Timer? _holdTimer;
+  bool _pending = false;
+
+  /// Finger or button down on the face: it sinks a little, flat, no ripple.
+  bool _pressed = false;
+  void _look(bool down) {
+    if (_pressed != down && mounted) setState(() => _pressed = down);
+  }
+
+  Offset _pendingAt = Offset.zero;
+
+  void _cancelPending() {
+    _holdTimer?.cancel();
+    _holdTimer = null;
+    _pending = false;
+  }
+
+  /// [HoldFan.opensOnDown]: the finger is down; the card follows once it
+  /// swipes or the hold delay has passed.
+  void _down(PointerDownEvent event) {
+    if (_open) return;
+    _cancelPending();
+    _pending = true;
+    _pendingAt = event.position;
+    _holdTimer = Timer(widget.holdDuration, () {
+      if (!_pending) return;
+      _pending = false;
+      _show(finger: _pendingAt, sticky: false);
+    });
+  }
+
+  void _pendingMove(PointerMoveEvent event) {
+    if ((event.position - _pendingAt).distance <= HoldMenuStyle.dragSlop) {
+      return;
+    }
+    _cancelPending();
+    _show(finger: _pendingAt, sticky: false);
+    _move(event);
+  }
+
+  /// Lifted before a swipe or the delay: a tap.
+  void _pendingUp() {
+    _cancelPending();
+    if (widget.tapOpensMenu) {
+      _tapOpen();
+    } else {
+      widget.onTap?.call();
+    }
+  }
+
+  void _show({required Offset? finger, required bool sticky}) {
+    widget.onOpen?.call();
+    final items = widget.items;
+    if (items.isEmpty || !mounted) return;
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    final box = context.findRenderObject() as RenderBox?;
+    final overlayBox = overlay?.context.findRenderObject() as RenderBox?;
+    if (overlay == null || box == null || overlayBox == null) return;
+    _removeEntry();
+    _overlayBox = overlayBox;
+    _shown = List.of(items);
+    _anchor = overlayBox
+        .globalToLocal(box.localToGlobal(box.size.center(Offset.zero)));
+    // A wide target (a heading): the menu opens over the finger, not over the
+    // middle of the row.
+    if (widget.width != null && finger != null) {
+      _anchor = Offset(overlayBox.globalToLocal(finger).dx, _anchor.dy);
+    }
+    _downAt = finger ?? box.localToGlobal(box.size.center(Offset.zero));
+    _wandered = false;
+    _sticky = sticky;
+    // The overlay's, not the button's: inside a Scaffold body the top
+    // padding is already taken off, and a menu then went under the status
+    // bar.
+    final media = MediaQuery.of(overlay.context);
+    final scaler = MediaQuery.textScalerOf(context);
+    // The overlay's Material styles the pill text with the theme's body
+    // style, so measure with that same style or the pills come out too
+    // narrow for their labels.
+    _style = (Theme.of(context).textTheme.bodyMedium ?? const TextStyle())
+        .merge(_pillStyle);
+    final bounds = (Offset.zero & overlayBox.size).deflate(8);
+    final area = Rect.fromLTRB(
+      bounds.left + media.padding.left,
+      bounds.top + media.padding.top,
+      bounds.right - media.padding.right,
+      bounds.bottom,
+    );
+    final card = widget.tapOpensMenu || widget.cardMenu || widget.opensOnDown;
+    final sizes = [
+      for (final item in _shown)
+        card
+            ? _rowSize(item, scaler, _style, area.width - _cardPad * 2)
+            : _pillSize(item.text, scaler, _style, area.width),
+    ];
+    if (card) {
+      // One height for every row, so the column lines up with the rects.
+      final h = sizes.map((s) => s.height).reduce(math.max);
+      for (var i = 0; i < sizes.length; i++) {
+        sizes[i] = Size(sizes[i].width, h);
+      }
+    }
+    final gap = card ? 0.0 : 8.0;
+    _rects = switch (widget.layout) {
+      HoldFanLayout.list => holdFanListLayout(
+          anchor: _anchor, sizes: sizes, bounds: area, gap: gap),
+    };
+    _card = null;
+    if (card && _rects.isNotEmpty) {
+      // Read top to bottom in the order of the items, also when the list
+      // opens upwards (where the first is the nearest to the button).
+      if (_rects.length > 1 && _rects.first.top > _rects.last.top) {
+        _rects = _rects.reversed.toList();
+      }
+      _card = _rects
+          .reduce((a, b) => a.expandToInclude(b))
+          .inflate(_cardPad.toDouble());
+    }
+    _hover.value = null;
+    _entry = OverlayEntry(builder: _buildFan);
+    overlay.insert(_entry!);
+    _openList = this;
+    _anim.forward(from: 0);
+    HoldMenuStyle.haptic();
+  }
+
+  /// A row of the menu card: an icon, the label, 48 high at least.
+  Size _rowSize(
+      HoldFanItem<T> item, TextScaler scaler, TextStyle style, double max) {
+    final painter = TextPainter(
+      text: TextSpan(
+          text: item.hint == null ? item.label : '${item.label}   ${item.hint}',
+          style: style),
+      textDirection: Directionality.of(context),
+      textScaler: scaler,
+      maxLines: 1,
+    )..layout();
+    final size = Size(
+      math.min(
+          max,
+          math.max(
+              _rowMinWidth,
+              painter.width.ceilToDouble() +
+                  _rowPadding.horizontal +
+                  _rowIcon +
+                  _rowGap)),
+      math.max(HoldMenuStyle.rowMinHeight, painter.height + 24),
+    );
+    painter.dispose();
+    return size;
+  }
+
+  Size _pillSize(String text, TextScaler scaler, TextStyle style, double max) {
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: Directionality.of(context),
+      textScaler: scaler,
+      maxLines: 1,
+    )..layout();
+    final size = Size(
+      math.min(
+          max,
+          painter.width.ceilToDouble() +
+              _pillPadding.horizontal +
+              _pillBorder * 2),
+      math.max(_pillMinHeight,
+          painter.height + _pillPadding.vertical + _pillBorder * 2),
+    );
+    painter.dispose();
+    return size;
+  }
+
+  double get _slop => _card == null ? 10 : 0;
+
+  void _move(PointerMoveEvent event) {
+    final box = _overlayBox;
+    if (!_open || box == null) return;
+    final slop = _onDown ? HoldMenuStyle.dragSlop : kTouchSlop;
+    if ((event.position - _downAt).distance > slop) _wandered = true;
+    final local = box.globalToLocal(event.position);
+    final hit = holdFanHit(_rects, local, slop: _slop);
+    if (hit != _hover.value) {
+      _hover.value = hit;
+      if (hit != null) HoldMenuStyle.haptic();
+    }
+  }
+
+  void _up(PointerUpEvent event) {
+    if (_pending) return _pendingUp();
+    if (!_open || _sticky) return;
+    final box = _overlayBox;
+    final hit = box == null
+        ? _hover.value
+        : holdFanHit(_rects, box.globalToLocal(event.position), slop: _slop);
+    if (hit == null && !_wandered) {
+      // A plain long press: keep the menu up for a tap.
+      _sticky = true;
+      _entry?.markNeedsBuild();
+      return;
+    }
+    _pick(hit);
+  }
+
+  void _pick(int? hit) {
+    final items = _shown;
+    _close();
+    if (hit != null && hit < items.length) widget.onSelected(items[hit].value);
+  }
+
+  /// A tap while the list waits as a menu: an item picks it, elsewhere closes.
+  void _tapSticky(TapUpDetails details) {
+    if (!_sticky) return;
+    final box = _overlayBox;
+    _pick(box == null
+        ? null
+        : holdFanHit(_rects, box.globalToLocal(details.globalPosition),
+            slop: 0));
+  }
+
+  void _close() {
+    if (_entry == null) return;
+    _sticky = false;
+    _hover.value = null;
+    _anim.reverse().whenCompleteOrCancel(() {
+      if (mounted && _anim.status == AnimationStatus.dismissed) _removeEntry();
+    });
+  }
+
+  /// The same choices as a plain menu, for assistive technology.
+  Future<void> _openMenu() async {
+    final items = widget.items;
+    if (items.isEmpty) return;
+    final picked = await showModalBottomSheet<HoldFanItem<T>>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Text(
+                widget.tooltip == null
+                    ? widget.menuLabel
+                    : '${widget.tooltip}: ${widget.menuLabel.toLowerCase()}',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            for (final item in items)
+              ListTile(
+                leading: item.emoji == null ? null : Text(item.emoji!),
+                title: Text(item.label),
+                onTap: () => Navigator.of(context).pop(item),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (picked != null && mounted) widget.onSelected(picked.value);
+  }
+
+  Widget _buildFan(BuildContext context) {
+    final card = _card;
+    final c = context.appColors;
+    return IgnorePointer(
+      ignoring: !_sticky,
+      child: GestureDetector(
+        key: const ValueKey('hold-fan-menu'),
+        behavior: HitTestBehavior.opaque,
+        onTapUp: _tapSticky,
+        child: Material(
+          type: MaterialType.transparency,
+          child: AnimatedBuilder(
+            animation: _anim,
+            builder: (context, _) {
+              final t = HoldMenuStyle.curve.transform(_anim.value);
+              if (card != null) return _buildCard(context, card, t);
+              return Stack(
+                children: [
+                  Positioned.fill(
+                    child: Opacity(
+                      opacity: t,
+                      child: ColoredBox(color: c.overlayDim),
+                    ),
+                  ),
+                  for (var i = 0; i < _rects.length; i++)
+                    Positioned.fromRect(
+                      rect: _rects[i],
+                      child: Transform.translate(
+                        offset: (_anchor - _rects[i].center) * (1 - t),
+                        child: Transform.scale(
+                          scale: 0.6 + 0.4 * t,
+                          child: Opacity(
+                            opacity: t,
+                            child: ValueListenableBuilder<int?>(
+                              valueListenable: _hover,
+                              builder: (context, hover, _) => _Pill(
+                                key: ValueKey('hold-fan-item-$i'),
+                                text: _shown[i].text,
+                                style: _style,
+                                hovered: hover == i,
+                                isDefault: widget.defaultIndex == i,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The menu card: one rounded surface, a row per item.
+  Widget _buildCard(BuildContext context, Rect card, double t) {
+    final c = context.appColors;
+    final alignment = Alignment(
+      ((_anchor.dx - card.center.dx) / (card.width / 2)).clamp(-1.0, 1.0),
+      ((_anchor.dy - card.center.dy) / (card.height / 2)).clamp(-1.0, 1.0),
+    );
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Opacity(opacity: t, child: ColoredBox(color: c.overlayDim)),
+        ),
+        Positioned.fromRect(
+          rect: card,
+          child: Opacity(
+            opacity: t,
+            child: Transform.scale(
+              scale:
+                  HoldMenuStyle.startScale + (1 - HoldMenuStyle.startScale) * t,
+              alignment: alignment,
+              child: Material(
+                key: const ValueKey('hold-fan-card'),
+                color: c.barSurface,
+                elevation: HoldMenuStyle.cardElevation,
+                shadowColor: c.panelShadow,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(HoldMenuStyle.cardRadius),
+                  side: BorderSide(color: c.border),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(HoldMenuStyle.cardPadding),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < _rects.length; i++)
+                        SizedBox(
+                          width: _rects[i].width,
+                          height: _rects[i].height,
+                          child: ValueListenableBuilder<int?>(
+                            valueListenable: _hover,
+                            builder: (context, hover, _) => _MenuRow(
+                              key: ValueKey('hold-fan-item-$i'),
+                              item: _shown[i],
+                              style: _style,
+                              hovered: hover == i,
+                              onTap: () => _pick(i),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hold = widget.items.isNotEmpty;
+    final onDown = _onDown;
+    // Opened on the way down: no tap, no hold to wait for.
+    final onTap = onDown
+        ? null
+        : widget.tapOpensMenu && widget.items.isNotEmpty
+            ? _tapOpen
+            : widget.onTap;
+    final rounded = widget.borderRadius;
+    Widget target = rounded != null
+        // A label: the wash hugs it, rounded, and no ripple spreads from the
+        // finger.
+        ? InkWell(
+          mouseCursor: WidgetStateMouseCursor.clickable,
+            onTap: onTap,
+            onTapDown: onDown ? (_) {} : null,
+            borderRadius: rounded,
+            splashFactory: NoSplash.splashFactory,
+            child: SizedBox(
+              width: widget.width,
+              height: widget.size,
+              child: widget.child,
+            ),
+          )
+        : InkResponse(
+          mouseCursor: WidgetStateMouseCursor.clickable,
+            onTap: onTap,
+            splashFactory: NoSplash.splashFactory,
+            // The tap itself is the Listener's; this only shows the press.
+            onTapDown: onDown ? (_) {} : null,
+            radius: widget.size / 2,
+            child: SizedBox(
+              width: widget.width ?? widget.size,
+              height: widget.size,
+              child: widget.width == null
+                  ? Center(child: widget.child)
+                  : widget.child,
+            ),
+          );
+    final calm = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    target = Listener(
+      onPointerDown: (_) => _look(true),
+      onPointerUp: (_) => _look(false),
+      onPointerCancel: (_) => _look(false),
+      child: AnimatedScale(
+        scale: _pressed && !calm ? 0.94 : 1,
+        duration: calm ? Duration.zero : const Duration(milliseconds: 90),
+        child: target,
+      ),
+    );
+    if (widget.tooltip != null) {
+      target = Tooltip(
+        message: widget.tooltip,
+        // A hold opens the list, not the tooltip.
+        triggerMode: TooltipTriggerMode.manual,
+        excludeFromSemantics: true,
+        child: target,
+      );
+    }
+    if (onDown) {
+      // A raw pointer: nothing in the gesture arena to wait for.
+      target = Listener(
+        behavior: HitTestBehavior.opaque,
+        onPointerDown: _down,
+        onPointerMove: (e) => _pending ? _pendingMove(e) : _move(e),
+        onPointerUp: (e) {
+          if (!_pending && !_open) return;
+          _up(e);
+        },
+        onPointerCancel: (_) {
+          _cancelPending();
+          if (!_sticky) _close();
+        },
+        child: target,
+      );
+    } else if (hold) {
+      target = Listener(
+        onPointerMove: _move,
+        onPointerUp: _up,
+        onPointerCancel: (_) {
+          if (!_sticky) _close();
+        },
+        child: RawGestureDetector(
+          excludeFromSemantics: true,
+          gestures: {
+            LongPressGestureRecognizer: GestureRecognizerFactoryWithHandlers<
+                LongPressGestureRecognizer>(
+              () => LongPressGestureRecognizer(
+                  duration: widget.holdDuration, debugOwner: this),
+              (r) => r.onLongPressStart = _start,
+            ),
+          },
+          child: target,
+        ),
+      );
+    }
+    target = ClickCursor(
+      enabled: onTap != null || onDown || hold,
+      child: target,
+    );
+    return Semantics(
+      container: true,
+      button: true,
+      selected: widget.selected,
+      label: widget.tooltip,
+      onTap: onDown ? (widget.tapOpensMenu ? _tapOpen : widget.onTap) : null,
+      onLongPress: hold ? _openMenu : null,
+      onLongPressHint: hold ? widget.menuLabel : null,
+      customSemanticsActions: hold
+          ? {CustomSemanticsAction(label: widget.menuLabel): _openMenu}
+          : null,
+      child: target,
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  final String text;
+  final TextStyle style;
+  final bool hovered;
+  final bool isDefault;
+
+  const _Pill({
+    super.key,
+    required this.text,
+    required this.style,
+    required this.hovered,
+    required this.isDefault,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    return AnimatedScale(
+      scale: hovered ? 1.1 : 1,
+      duration: const Duration(milliseconds: 90),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 90),
+        alignment: Alignment.center,
+        padding: _pillPadding,
+        decoration: ShapeDecoration(
+          color: hovered ? c.main : c.panelBg,
+          shape: StadiumBorder(
+            side: BorderSide(
+              color: hovered
+                  ? c.main
+                  : isDefault
+                      ? c.main.withValues(alpha: 0.7)
+                      : c.border,
+              width: isDefault && !hovered ? 1.5 : 1,
+            ),
+          ),
+          shadows: [
+            BoxShadow(
+              color: hovered ? c.hoverShadow : c.panelShadow,
+              blurRadius: hovered ? 14 : 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        // The pill is as wide as its label; only a label wider than the
+        // screen is shrunk (never cut).
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            text,
+            maxLines: 1,
+            softWrap: false,
+            style: style.copyWith(
+              color: hovered ? Colors.white : c.textPrimary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One row of the menu card: an icon (or emoji) and a label, the one under
+/// the finger highlighted.
+class _MenuRow extends StatelessWidget {
+  final HoldFanItem<Object?> item;
+  final TextStyle style;
+  final bool hovered;
+  final VoidCallback onTap;
+
+  const _MenuRow({
+    super.key,
+    required this.item,
+    required this.style,
+    required this.hovered,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    final color = hovered
+        ? c.main
+        : item.muted
+            ? c.textSecondary
+            : c.textPrimary;
+    return Semantics(
+      button: true,
+      label: item.semanticLabel,
+      onTap: onTap,
+      excludeSemantics: true,
+      child: ClickCursor(
+        enabled: true,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: hovered
+                ? c.main.withValues(alpha: HoldMenuStyle.hoverAlpha)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(HoldMenuStyle.rowRadius),
+          ),
+          child: Padding(
+            padding: _rowPadding,
+            child: Row(children: [
+              SizedBox(
+                width: _rowIcon,
+                child: item.icon != null
+                    ? Icon(item.icon, size: 22, color: color)
+                    : item.emoji != null
+                        ? Text(item.emoji!,
+                            style: const TextStyle(fontSize: 18))
+                        : null,
+              ),
+              const SizedBox(width: _rowGap),
+              Expanded(
+                child: Text(
+                  item.label,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.ellipsis,
+                  style: style.copyWith(color: color),
+                ),
+              ),
+              if (item.hint != null) ...[
+                const SizedBox(width: 8),
+                Text(item.hint!,
+                    key: const Key('hold-fan-hint'),
+                    maxLines: 1,
+                    style: style.copyWith(
+                        color: c.textSecondary,
+                        fontSize: (style.fontSize ?? 16) * 0.8)),
+              ],
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}

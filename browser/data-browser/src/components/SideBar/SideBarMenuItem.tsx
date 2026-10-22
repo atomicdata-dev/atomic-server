@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react';
 import { styled } from 'styled-components';
+import { useSettings } from '../../helpers/AppSettings';
 import { AtomicLink } from '../AtomicLink';
 import { SideBarItem } from './SideBarItem';
 
@@ -27,7 +29,7 @@ export const SideBarMenuRowLabel = styled.span`
 `;
 
 /** Icon column for sidebar menu rows (account, Shared with me) (matches tree LeadingSlot). */
-export const SideBarMenuRowIcon = styled.span`
+const IconSlot = styled.span`
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -39,3 +41,17 @@ export const SideBarMenuRowIcon = styled.span`
     font-size: 0.8rem;
   }
 `;
+
+/**
+ * The icon column of a menu row. With "Show icons in the sidebar" off it is
+ * not rendered at all, so the label starts at the row's own padding.
+ */
+export function SideBarMenuRowIcon({
+  children,
+}: {
+  children: ReactNode;
+}): React.JSX.Element | null {
+  const { showSidebarIcons } = useSettings();
+
+  return showSidebarIcons ? <IconSlot>{children}</IconSlot> : null;
+}

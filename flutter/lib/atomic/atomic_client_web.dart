@@ -10,19 +10,13 @@ String? _publicKeyB64;
 String? _agentSubject;
 String? _driveSubject;
 
-const _strokeDataProp = 'https://atomicdata.dev/ontology/canvas/strokeData';
-const _canvasClass = 'https://atomicdata.dev/ontology/canvas/Canvas';
 const _isA = 'https://atomicdata.dev/properties/isA';
 const _name = 'https://atomicdata.dev/properties/name';
-const _parent = 'https://atomicdata.dev/properties/parent';
 const _subject = 'https://atomicdata.dev/properties/subject';
 const _createdAt = 'https://atomicdata.dev/properties/createdAt';
 const _signer = 'https://atomicdata.dev/properties/signer';
 const _signature = 'https://atomicdata.dev/properties/signature';
 const _isGenesis = 'https://atomicdata.dev/properties/isGenesis';
-const _previousCommit = 'https://atomicdata.dev/properties/previousCommit';
-const _lastCommit = 'https://atomicdata.dev/properties/lastCommit';
-const _destroy = 'https://atomicdata.dev/properties/destroy';
 const _read = 'https://atomicdata.dev/properties/read';
 const _write = 'https://atomicdata.dev/properties/write';
 const _publicAgent = 'https://atomicdata.dev/agents/publicAgent';
@@ -111,51 +105,6 @@ Future<String> _postGenesisCommit(Map<String, dynamic> properties) async {
   return did;
 }
 
-/// Post a commit to an existing resource.
-Future<void> _postCommit(String subject, Map<String, dynamic> setProps) async {
-  // Get previous commit
-  String? previousCommit;
-  try {
-    final res = await _getResource(subject);
-    previousCommit = res[_lastCommit] as String?;
-  } catch (_) {}
-
-  final commitMap = <String, dynamic>{
-    _subject: subject,
-    _signer: _agentSubject,
-    _createdAt: _now(),
-    if (previousCommit != null) _previousCommit: previousCommit,
-  };
-  for (final e in setProps.entries) {
-    commitMap[e.key] = e.value;
-  }
-
-  // Sign (without signature field)
-  final toSign = _jcs(commitMap);
-  final sig = _signMessage(toSign, _privateKeyB64!, _publicKeyB64!);
-  commitMap[_signature] = sig;
-
-  final body = Map<String, dynamic>.from(commitMap)..remove('@id');
-
-  final resp = await http.post(
-    Uri.parse('$_serverUrl/commit'),
-    headers: {'Content-Type': 'application/json'},
-    body: _jcs(body),
-  );
-  if (resp.statusCode != 200) {
-    throw Exception('Commit failed (${resp.statusCode}): ${resp.body}');
-  }
-}
-
-Future<Map<String, dynamic>> _getResource(String subject) async {
-  final resp = await http.get(
-    Uri.parse(subject),
-    headers: {'Accept': 'application/ad+json'},
-  );
-  if (resp.statusCode != 200) throw Exception('Failed: ${resp.statusCode}');
-  return jsonDecode(resp.body) as Map<String, dynamic>;
-}
-
 // ── Connection ─────────────────────────────────────────────────────────────
 
 Future<String> connect(String serverUrl, String agentSecret) async {
@@ -181,40 +130,3 @@ Future<String> createDrive(String name) async {
 
 void setDrive(String subject) => _driveSubject = subject;
 String? getDrive() => _driveSubject;
-
-// ── Canvas CRUD ────────────────────────────────────────────────────────────
-
-Future<String> createCanvas(String name) async {
-  final parent = _driveSubject ?? _serverUrl!;
-  return _postGenesisCommit({
-    _isA: [_canvasClass],
-    _name: name,
-    _parent: parent,
-    _strokeDataProp: '[]',
-  });
-}
-
-Future<String> loadCanvasStrokes(String subject) async {
-  final res = await _getResource(subject);
-  return res[_strokeDataProp]?.toString() ?? '[]';
-}
-
-Future<List<CanvasListItem>> listCanvases() async {
-  if (_driveSubject == null) return [];
-  try {
-    await _getResource(_driveSubject!);
-    // Children are listed in the drive's subResources or we query
-    // For now return empty — server doesn't expose children list easily via JSON-AD
-    return [];
-  } catch (_) {
-    return [];
-  }
-}
-
-Future<void> deleteCanvas(String subject) async {
-  await _postCommit(subject, {_destroy: true});
-}
-
-Future<void> renameCanvas(String subject, String name) async {
-  await _postCommit(subject, {_name: name});
-}

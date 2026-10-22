@@ -53,3 +53,16 @@ app.*.map.json
 
 # Generated Flutter Rust Bridge web package
 /web/pkg/
+assets/embed/*
+!assets/embed/.gitkeep
+!assets/embed/assets/
+assets/embed/assets/*
+!assets/embed/assets/.gitkeep
+
+# Ephemeral CI signing settings
+ios/Flutter/Signing.xcconfig
+
+# Android upload signing (local or ephemeral CI files)
+/android/key.properties
+*.jks
+*.keystore
