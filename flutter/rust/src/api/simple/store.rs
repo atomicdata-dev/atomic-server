@@ -47,19 +47,13 @@ pub async fn open_db(path: String) -> Result<(), String> {
         return Ok(());
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
-    let store = {
-        let (store, recovery) = open_native_store(std::path::Path::new(&path)).await?;
-        if let Some(recovery) = recovery {
-            state::set_store_recovery(recovery);
-        }
-        store
-    };
-
-    #[cfg(target_arch = "wasm32")]
-    let store = atomic_lib::Db::init_redb_opfs(None, "atomic.redb")
-        .await
-        .map_err(err)?;
+    let (store, recovery, _fresh) = open_shared(std::path::Path::new(&path)).await?;
+    if let Some(recovery) = recovery {
+        #[cfg(not(target_arch = "wasm32"))]
+        state::set_store_recovery(recovery);
+        #[cfg(target_arch = "wasm32")]
+        let _ = recovery;
+    }
 
     set_db(store);
     #[cfg(not(target_arch = "wasm32"))]
@@ -69,6 +63,40 @@ pub async fn open_db(path: String) -> Result<(), String> {
         crate::host::start_recents(std::path::Path::new(&path), db()?.clone());
     }
     Ok(())
+}
+
+/// The store at `path`, opened once per process: the `Db` another open of the
+/// same file made is shared, never opened again. The caller holds
+/// `state::OPEN_DB_LOCK` (not on wasm). The last value says the store was
+/// opened by this call (and a damaged one set aside, in the second).
+pub(crate) async fn open_shared(
+    path: &std::path::Path,
+) -> Result<(std::sync::Arc<atomic_lib::Db>, Option<StoreRecovery>, bool), String> {
+    #[cfg(not(target_arch = "wasm32"))]
+    let key = {
+        let _ = std::fs::create_dir_all(path);
+        std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+    };
+    #[cfg(target_arch = "wasm32")]
+    let key = std::path::PathBuf::from("opfs:atomic.redb");
+
+    if let Some(open) = state::registered_store(&key) {
+        return Ok((open, None, false));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    let (store, recovery) = open_native_store(path).await?;
+    #[cfg(target_arch = "wasm32")]
+    let (store, recovery) = (
+        atomic_lib::Db::init_redb_opfs(None, "atomic.redb")
+            .await
+            .map_err(err)?,
+        None,
+    );
+
+    let store = std::sync::Arc::new(store);
+    state::register_store(key, store.clone());
+    Ok((store, recovery, true))
 }
 
 /// Set when the last `open_db` had to set a damaged store aside.

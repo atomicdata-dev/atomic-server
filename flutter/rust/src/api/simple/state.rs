@@ -23,7 +23,7 @@ pub(crate) fn node() -> Result<atomic_lib::runtime::AtomicNode, String> {
 /// Serialises `open_db`: two engines starting at once must not both open
 /// the file.
 #[cfg(not(target_arch = "wasm32"))]
-pub(super) static OPEN_DB_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+pub(crate) static OPEN_DB_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 static STORE_RECOVERY: std::sync::Mutex<Option<super::StoreRecovery>> = std::sync::Mutex::new(None);
 
@@ -39,8 +39,32 @@ pub(super) fn store_recovery() -> Option<super::StoreRecovery> {
         .clone()
 }
 
-pub(super) fn set_db(store: atomic_lib::Db) {
-    let _ = DB.set(Arc::new(store));
+pub(super) fn set_db(store: Arc<atomic_lib::Db>) {
+    let _ = DB.set(store);
+}
+
+/// Every store opened in this process, by file. A file is opened once per
+/// process (a second open of a redb file damaged stores on Android, see
+/// `atomic_lib::db::recovery`), so a second handle on a path shares the
+/// first one's `Db`. Guarded by [`OPEN_DB_LOCK`] while opening.
+static OPEN_STORES: std::sync::Mutex<
+    Option<std::collections::HashMap<std::path::PathBuf, Arc<atomic_lib::Db>>>,
+> = std::sync::Mutex::new(None);
+
+pub(super) fn registered_store(key: &std::path::Path) -> Option<Arc<atomic_lib::Db>> {
+    OPEN_STORES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .as_ref()
+        .and_then(|m| m.get(key).cloned())
+}
+
+pub(super) fn register_store(key: std::path::PathBuf, store: Arc<atomic_lib::Db>) {
+    OPEN_STORES
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get_or_insert_with(Default::default)
+        .insert(key, store);
 }
 
 pub(crate) fn err(e: atomic_lib::AtomicError) -> String {

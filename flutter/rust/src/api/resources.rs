@@ -6,14 +6,13 @@
 //! take the same path as every other local write: a signed commit, queued in
 //! the outbox and pushed (`push_local_write`).
 //!
-//! The store and the signing agent are still the process-wide ones `open_db`
-//! and `load_agent` set; see `flutter/README.md` for what removing those
-//! globals takes.
+//! [`AtomicStore`] is an open store with its signing agent and drive. The
+//! free functions are the same calls on the process-wide default store that
+//! `open_db` and `load_agent` set.
 
 use super::error::{open_store, AtomicError};
 use super::error::ErrorKind;
 use super::simple::local_write::push_local_write;
-use super::simple::state::node;
 use atomic_lib::{
     commit::CommitBuilder, host::lists, resources::PropVals, values::SubResource, Commit, Storelike, Value,
 };
@@ -239,123 +238,317 @@ fn list_to_propvals(list: &[PropValue]) -> Result<PropVals, AtomicError> {
         .collect()
 }
 
-// ── Reads ──────────────────────────────────────────────────────────────────
+// ── The store handle ───────────────────────────────────────────────────────
 
-/// The resource `subject` as the local store holds it. [`AtomicError::NotFound`]
-/// when this device does not have it (sync first, or ask the server).
-pub async fn get_resource_data(subject: String) -> Result<ResourceData, AtomicError> {
-    let store = open_store()?;
-    let resource = store.get_resource(&subject.as_str().into()).await?;
-    Ok(ResourceData {
-        subject: resource.get_subject().to_string(),
-        props: propvals_to_list(resource.get_propvals()),
-    })
+/// An open store with the agent that signs its writes and the drive it works
+/// in: what `@tomic/lib`'s `Store` is to a page. Open one with
+/// [`AtomicStore::open`]; the functions below this struct without a handle
+/// (`get_resource_data`, ...) are the same calls on the app's default store,
+/// the one `open_db` and `load_agent` set up.
+///
+/// A file is opened once per process: two handles on one path share the
+/// store (reads, indexes, events) and differ in agent and drive only.
+///
+/// Only the default store syncs: the process has one server session and one
+/// Iroh peer, and they serve it. A write through any other handle is signed,
+/// stored and queued in that store's outbox, and goes out when something
+/// drains it.
+#[flutter_rust_bridge::frb(opaque)]
+pub struct AtomicStore {
+    db: std::sync::Arc<atomic_lib::Db>,
+    drive: std::sync::Mutex<Option<String>>,
 }
 
-/// The subjects under `parent`, in the order the sidebar shows them (at most
-/// `limit`), without the folders the web hides.
-pub async fn get_child_subjects(parent: String, limit: u32) -> Result<Vec<String>, AtomicError> {
-    let store = open_store()?;
-    let listed = lists::list_children(store, &parent, limit as usize).await?;
-    Ok(listed["children"]
-        .as_array()
-        .map(|rows| {
-            rows.iter()
-                .filter_map(|r| r["subject"].as_str().map(str::to_string))
-                .collect()
+impl AtomicStore {
+    /// Open the store in the directory `path` (created when missing) for
+    /// `agent_secret` (none: no agent yet, see [`AtomicStore::setup`]),
+    /// working in `drive` (none: the store's active drive).
+    pub async fn open(
+        path: String,
+        agent_secret: Option<String>,
+        drive: Option<String>,
+    ) -> Result<AtomicStore, AtomicError> {
+        use super::simple::state::OPEN_DB_LOCK;
+        #[cfg(not(target_arch = "wasm32"))]
+        let _opening = OPEN_DB_LOCK.lock().await;
+        let (shared, _recovery, fresh) =
+            super::simple::open_shared(std::path::Path::new(&path))
+                .await
+                .map_err(AtomicError::storage)?;
+        #[cfg(not(target_arch = "wasm32"))]
+        if fresh {
+            super::simple::catch_up_search_index(shared.clone()).await;
+        }
+        #[cfg(target_arch = "wasm32")]
+        let _ = fresh;
+        let agent = agent_secret
+            .map(|secret| atomic_lib::agents::Agent::from_secret(&secret))
+            .transpose()
+            .map_err(|e| AtomicError::invalid(e.to_string()))?;
+        Ok(AtomicStore {
+            db: std::sync::Arc::new(shared.with_own_agent(agent)),
+            drive: std::sync::Mutex::new(drive),
         })
-        .unwrap_or_default())
+    }
+
+    /// The default store, as `open_db` and `load_agent` left it. Shares the
+    /// process-wide agent, so `load_agent` after this is seen by it.
+    pub(crate) fn global() -> Result<AtomicStore, AtomicError> {
+        Ok(AtomicStore {
+            db: open_store()?.clone(),
+            drive: std::sync::Mutex::new(None),
+        })
+    }
+
+    /// Whether this handle is on the default store, the one that syncs.
+    fn is_default(&self) -> bool {
+        super::simple::state::db()
+            .map(|g| std::sync::Arc::ptr_eq(&g.kv, &self.db.kv))
+            .unwrap_or(false)
+    }
+
+    /// Whether both handles are on the same open store.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn shares_store_with(&self, other: &AtomicStore) -> bool {
+        std::sync::Arc::ptr_eq(&self.db.kv, &other.db.kv)
+    }
+
+    /// Create an agent named `name` and its private drive in this store, and
+    /// sign with that agent from now on, working in the new drive. Returns
+    /// the agent's secret (to keep) and the drive's subject.
+    pub async fn setup(&self, name: String) -> Result<StoreSetup, AtomicError> {
+        let (agent, drive) = self.db.setup(&name).await?;
+        *self.drive.lock().unwrap_or_else(|e| e.into_inner()) = Some(drive.clone());
+        Ok(StoreSetup {
+            agent_secret: agent.build_secret()?,
+            agent_subject: agent.subject.to_string(),
+            drive,
+        })
+    }
+
+    /// The subject of the agent that signs, if one is set.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn agent_subject(&self) -> Option<String> {
+        self.db.get_default_agent().ok().map(|a| a.subject.to_string())
+    }
+
+    /// The drive this handle works in: the one set on it, else the store's
+    /// active drive.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn drive(&self) -> Option<String> {
+        self.drive
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
+            .or_else(|| self.db.get_active_drive())
+    }
+
+    /// Work in `drive` from now on (this handle only).
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn set_drive(&self, drive: String) {
+        *self.drive.lock().unwrap_or_else(|e| e.into_inner()) = Some(drive);
+    }
+
+    // ── Reads ──
+
+    /// The resource `subject` as the local store holds it. [`AtomicError::NotFound`]
+    /// when this device does not have it (sync first, or ask the server).
+    pub async fn get_resource_data(&self, subject: String) -> Result<ResourceData, AtomicError> {
+        let resource = self.db.get_resource(&subject.as_str().into()).await?;
+        Ok(ResourceData {
+            subject: resource.get_subject().to_string(),
+            props: propvals_to_list(resource.get_propvals()),
+        })
+    }
+
+    /// The subjects under `parent`, in the order the sidebar shows them (at
+    /// most `limit`), without the folders the web hides.
+    pub async fn get_child_subjects(
+        &self,
+        parent: String,
+        limit: u32,
+    ) -> Result<Vec<String>, AtomicError> {
+        let listed = lists::list_children(&self.db, &parent, limit as usize).await?;
+        Ok(listed["children"]
+            .as_array()
+            .map(|rows| {
+                rows.iter()
+                    .filter_map(|r| r["subject"].as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default())
+    }
+
+    /// Full-text search, best first, across every drive or only in `drive`.
+    pub async fn search_resources(
+        &self,
+        query: String,
+        drive: Option<String>,
+        limit: u32,
+    ) -> Result<Vec<SearchHit>, AtomicError> {
+        let rows = lists::search(&self.db, drive.as_deref(), &query, limit as usize)?;
+        let text =
+            |row: &serde_json::Value, key: &str| row[key].as_str().unwrap_or_default().to_string();
+        Ok(rows
+            .iter()
+            .map(|row| SearchHit {
+                subject: text(row, "subject"),
+                title: text(row, "title"),
+                class_name: text(row, "class_name"),
+                drive: text(row, "drive"),
+                score: row["score"].as_f64().unwrap_or_default(),
+            })
+            .collect())
+    }
+
+    // ── Writes ──
+
+    fn node(&self) -> atomic_lib::runtime::AtomicNode {
+        atomic_lib::runtime::AtomicNode::from_db((*self.db).clone())
+    }
+
+    async fn push(&self, response: &atomic_lib::commit::CommitResponse) {
+        if self.is_default() {
+            push_local_write(response, self.db.as_ref()).await;
+        }
+    }
+
+    /// Set the `changes` properties and remove the `remove` ones of an
+    /// existing resource, as one signed commit by this handle's agent.
+    pub async fn save_resource_changes(
+        &self,
+        subject: String,
+        changes: Vec<PropValue>,
+        remove: Vec<String>,
+    ) -> Result<(), AtomicError> {
+        let mut resource = self.db.get_resource(&subject.as_str().into()).await?;
+        for p in &changes {
+            resource.set_unsafe(p.property.clone(), atomic_to_value(&p.value)?)?;
+        }
+        for property in &remove {
+            resource.remove_propval(property)?;
+        }
+        let response = self.node().save_locally(&mut resource).await?;
+        self.push(&response).await;
+        Ok(())
+    }
+
+    /// Create a resource with a new subject (a DID derived from the signed
+    /// genesis commit) holding `values`, signed by this handle's agent.
+    /// Returns its subject. `values` should include `isA` and `parent`.
+    pub async fn create_resource_with_values(
+        &self,
+        values: Vec<PropValue>,
+    ) -> Result<String, AtomicError> {
+        if values.is_empty() {
+            return Err(AtomicError::invalid("A new resource needs properties"));
+        }
+        let agent = self.db.get_default_agent()?;
+        let mut builder = CommitBuilder::new("placeholder".into());
+        for p in &values {
+            builder.set(p.property.clone(), atomic_to_value(&p.value)?);
+        }
+        let commit = Commit::create_did(builder, &agent, self.db.as_ref()).await?;
+        let subject = commit.subject.to_string();
+        let response = self
+            .node()
+            .apply_local_commit(commit, &atomic_lib::host::own_commit_opts())
+            .await?;
+        self.push(&response).await;
+        Ok(subject)
+    }
+
+    /// Create a drive named `name`, which this handle works in from now on.
+    /// Returns its subject.
+    pub async fn new_drive(&self, name: String) -> Result<String, AtomicError> {
+        let drive = self.db.create_drive(&name).await?;
+        *self.drive.lock().unwrap_or_else(|e| e.into_inner()) = Some(drive.clone());
+        Ok(drive)
+    }
+
+    // ── Watching ──
+
+    /// Wait until `subject` changes or is destroyed, or `timeout_ms` passes.
+    /// Call it in a loop (re-reading the resource on `Changed`) to watch a
+    /// resource.
+    pub async fn wait_for_resource_event(
+        &self,
+        subject: String,
+        timeout_ms: u32,
+    ) -> Result<ResourceEvent, AtomicError> {
+        Ok(super::simple::resource::wait_resource_event(
+            &self.db,
+            &subject,
+            std::time::Duration::from_millis(timeout_ms as u64),
+        )
+        .await)
+    }
 }
 
-/// Full-text search, best first, across every drive or only in `drive`.
+/// What [`AtomicStore::setup`] made.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoreSetup {
+    /// The agent's secret: keep it to open the store as this agent again.
+    pub agent_secret: String,
+    pub agent_subject: String,
+    /// The agent's private drive.
+    pub drive: String,
+}
+
+// ── The default store ──────────────────────────────────────────────────────
+//
+// The same calls on the store `open_db` opened and the agent `load_agent`
+// set, for the screens that have not moved to a handle.
+
+/// [`AtomicStore::get_resource_data`] on the default store.
+pub async fn get_resource_data(subject: String) -> Result<ResourceData, AtomicError> {
+    AtomicStore::global()?.get_resource_data(subject).await
+}
+
+/// [`AtomicStore::get_child_subjects`] on the default store.
+pub async fn get_child_subjects(parent: String, limit: u32) -> Result<Vec<String>, AtomicError> {
+    AtomicStore::global()?.get_child_subjects(parent, limit).await
+}
+
+/// [`AtomicStore::search_resources`] on the default store.
 pub async fn search_resources(
     query: String,
     drive: Option<String>,
     limit: u32,
 ) -> Result<Vec<SearchHit>, AtomicError> {
-    let store = open_store()?;
-    let rows = lists::search(store, drive.as_deref(), &query, limit as usize)?;
-    let text = |row: &serde_json::Value, key: &str| row[key].as_str().unwrap_or_default().to_string();
-    Ok(rows
-        .iter()
-        .map(|row| SearchHit {
-            subject: text(row, "subject"),
-            title: text(row, "title"),
-            class_name: text(row, "class_name"),
-            drive: text(row, "drive"),
-            score: row["score"].as_f64().unwrap_or_default(),
-        })
-        .collect())
+    AtomicStore::global()?.search_resources(query, drive, limit).await
 }
 
-// ── Writes ─────────────────────────────────────────────────────────────────
-
-/// Set the `changes` properties and remove the `remove` ones of an existing
-/// resource, as one signed commit by the active agent.
+/// [`AtomicStore::save_resource_changes`] on the default store.
 pub async fn save_resource_changes(
     subject: String,
     changes: Vec<PropValue>,
     remove: Vec<String>,
 ) -> Result<(), AtomicError> {
-    let store = open_store()?;
-    let mut resource = store.get_resource(&subject.as_str().into()).await?;
-    for p in &changes {
-        resource.set_unsafe(p.property.clone(), atomic_to_value(&p.value)?)?;
-    }
-    for property in &remove {
-        resource.remove_propval(property)?;
-    }
-    let node = node().map_err(AtomicError::storage)?;
-    let response = node.save_locally(&mut resource).await?;
-    push_local_write(&response, store.as_ref()).await;
-    Ok(())
+    AtomicStore::global()?
+        .save_resource_changes(subject, changes, remove)
+        .await
 }
 
-/// Create a resource with a new subject (a DID derived from the signed
-/// genesis commit) holding `values`, signed by the active agent. Returns its
-/// subject. `values` should include `isA` and `parent`.
+/// [`AtomicStore::create_resource_with_values`] on the default store.
 pub async fn create_resource_with_values(values: Vec<PropValue>) -> Result<String, AtomicError> {
-    if values.is_empty() {
-        return Err(AtomicError::invalid("A new resource needs properties"));
-    }
-    let store = open_store()?;
-    let agent = store.get_default_agent()?;
-    let mut builder = CommitBuilder::new("placeholder".into());
-    for p in &values {
-        builder.set(p.property.clone(), atomic_to_value(&p.value)?);
-    }
-    let commit = Commit::create_did(builder, &agent, store.as_ref()).await?;
-    let subject = commit.subject.to_string();
-    let node = node().map_err(AtomicError::storage)?;
-    let response = node
-        .apply_local_commit(commit, &atomic_lib::host::own_commit_opts())
-        .await?;
-    push_local_write(&response, store.as_ref()).await;
-    Ok(subject)
+    AtomicStore::global()?.create_resource_with_values(values).await
 }
 
-/// Create a drive named `name`. Returns its subject.
+/// [`AtomicStore::new_drive`] on the default store.
 pub async fn new_drive(name: String) -> Result<String, AtomicError> {
-    Ok(open_store()?.create_drive(&name).await?)
+    AtomicStore::global()?.new_drive(name).await
 }
 
-// ── Watching ───────────────────────────────────────────────────────────────
-
-/// Wait until `subject` changes or is destroyed, or `timeout_ms` passes. Call
-/// it in a loop (re-reading the resource on `Changed`) to watch a resource.
+/// [`AtomicStore::wait_for_resource_event`] on the default store.
 pub async fn wait_for_resource_event(
     subject: String,
     timeout_ms: u32,
 ) -> Result<ResourceEvent, AtomicError> {
-    let store = open_store()?;
-    Ok(super::simple::resource::wait_resource_event(
-        store,
-        &subject,
-        std::time::Duration::from_millis(timeout_ms as u64),
-    )
-    .await)
+    AtomicStore::global()?
+        .wait_for_resource_event(subject, timeout_ms)
+        .await
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -487,5 +680,114 @@ mod tests {
         )
         .await;
         assert_eq!(bad.unwrap_err().kind, ErrorKind::Invalid);
+    }
+
+    fn temp_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "atomic-bridge-handle-{name}-{}-{}",
+            std::process::id(),
+            super::super::simple::state::now_ms()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn folder(name: &str, parent: &str) -> Vec<PropValue> {
+        vec![
+            PropValue {
+                property: urls::IS_A.into(),
+                value: AtomicValue {
+                    items: vec![scalar(Datatype::Link, urls::FOLDER)],
+                    ..scalar(Datatype::Array, "")
+                },
+            },
+            text(urls::NAME, name),
+            PropValue {
+                property: urls::PARENT.into(),
+                value: scalar(Datatype::Link, parent),
+            },
+        ]
+    }
+
+    async fn open(dir: &std::path::Path) -> AtomicStore {
+        AtomicStore::open(dir.to_string_lossy().into_owned(), None, None)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn two_handles_on_different_files_have_their_own_agent_and_drive() {
+        let (dir_a, dir_b) = (temp_dir("a"), temp_dir("b"));
+        let (a, b) = (open(&dir_a).await, open(&dir_b).await);
+        assert!(!a.shares_store_with(&b));
+        let sa = a.setup("Alice".into()).await.unwrap();
+        let sb = b.setup("Bob".into()).await.unwrap();
+        assert_ne!(sa.agent_subject, sb.agent_subject);
+        assert_ne!(sa.drive, sb.drive);
+        assert_eq!(a.agent_subject(), Some(sa.agent_subject.clone()));
+        assert_eq!(b.drive(), Some(sb.drive.clone()));
+
+        let in_a = a
+            .create_resource_with_values(folder("Alice's", &sa.drive))
+            .await
+            .unwrap();
+        let in_b = b
+            .create_resource_with_values(folder("Bob's", &sb.drive))
+            .await
+            .unwrap();
+        assert_eq!(a.get_resource_data(in_a.clone()).await.unwrap().subject, in_a);
+        assert_eq!(
+            a.get_resource_data(in_b.clone()).await.unwrap_err().kind,
+            ErrorKind::NotFound
+        );
+        assert_eq!(a.get_child_subjects(sa.drive.clone(), 10).await.unwrap(), vec![in_a]);
+        assert_eq!(b.get_child_subjects(sb.drive.clone(), 10).await.unwrap(), vec![in_b]);
+
+        // Reopening with the secret signs as the same agent.
+        let again = AtomicStore::open(
+            dir_a.to_string_lossy().into_owned(),
+            Some(sa.agent_secret.clone()),
+            Some(sa.drive.clone()),
+        )
+        .await
+        .unwrap();
+        assert_eq!(again.agent_subject(), Some(sa.agent_subject));
+        assert!(again.shares_store_with(&a));
+        std::fs::remove_dir_all(dir_a).ok();
+        std::fs::remove_dir_all(dir_b).ok();
+    }
+
+    #[tokio::test]
+    async fn two_handles_on_one_path_share_the_store_not_the_agent() {
+        let dir = temp_dir("same");
+        let (a, b) = (open(&dir).await, open(&dir).await);
+        assert!(a.shares_store_with(&b), "the file is opened once");
+        let sa = a.setup("Alice".into()).await.unwrap();
+        assert_eq!(b.agent_subject(), None, "b has no agent of its own yet");
+        let sb = b.setup("Bob".into()).await.unwrap();
+        assert_eq!(a.agent_subject(), Some(sa.agent_subject.clone()));
+        assert_ne!(sa.agent_subject, sb.agent_subject);
+        assert_ne!(a.drive(), b.drive());
+
+        // One store: a's write is b's read, signed by a.
+        let subject = a
+            .create_resource_with_values(folder("Shared", &sa.drive))
+            .await
+            .unwrap();
+        let seen = b.get_resource_data(subject.clone()).await.unwrap();
+        assert_eq!(prop(&seen, urls::NAME), Some(&scalar(Datatype::String, "Shared")));
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[tokio::test]
+    async fn a_handle_on_the_default_path_shares_the_default_store() {
+        shared_drive().await;
+        let dir = super::super::simple::state::store_dir().unwrap();
+        let handle = open(&dir).await;
+        let default = AtomicStore::global().unwrap();
+        assert!(handle.shares_store_with(&default));
+        assert!(handle.is_default());
+        let other = open(&temp_dir("not-default")).await;
+        assert!(!other.is_default());
     }
 }

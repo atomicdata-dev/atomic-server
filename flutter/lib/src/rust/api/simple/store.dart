@@ -7,7 +7,7 @@ import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'types.dart';
 
-// These functions are ignored because they are not marked as `pub`: `catch_up_search_index`, `describe_file`, `open_native_store`, `open_store_catching`
+// These functions are ignored because they are not marked as `pub`: `catch_up_search_index`, `describe_file`, `open_native_store`, `open_shared`, `open_store_catching`
 
 /// Local-first Atomic Data SDK for Flutter.
 ///

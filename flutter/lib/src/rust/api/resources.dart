@@ -7,29 +7,26 @@ import '../frb_generated.dart';
 import 'error.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `atomic_to_sub_resource`, `atomic_to_value`, `list_to_propvals`, `parse`, `propvals_to_list`, `scalar`, `sub_resource_to_value`, `value_to_atomic`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `atomic_to_sub_resource`, `atomic_to_value`, `global`, `is_default`, `list_to_propvals`, `node`, `parse`, `propvals_to_list`, `push`, `scalar`, `sub_resource_to_value`, `value_to_atomic`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
-/// The resource `subject` as the local store holds it. [`AtomicError::NotFound`]
-/// when this device does not have it (sync first, or ask the server).
+/// [`AtomicStore::get_resource_data`] on the default store.
 Future<ResourceData> getResourceData({required String subject}) =>
     RustLib.instance.api.crateApiResourcesGetResourceData(subject: subject);
 
-/// The subjects under `parent`, in the order the sidebar shows them (at most
-/// `limit`), without the folders the web hides.
+/// [`AtomicStore::get_child_subjects`] on the default store.
 Future<List<String>> getChildSubjects(
         {required String parent, required int limit}) =>
     RustLib.instance.api
         .crateApiResourcesGetChildSubjects(parent: parent, limit: limit);
 
-/// Full-text search, best first, across every drive or only in `drive`.
+/// [`AtomicStore::search_resources`] on the default store.
 Future<List<SearchHit>> searchResources(
         {required String query, String? drive, required int limit}) =>
     RustLib.instance.api.crateApiResourcesSearchResources(
         query: query, drive: drive, limit: limit);
 
-/// Set the `changes` properties and remove the `remove` ones of an existing
-/// resource, as one signed commit by the active agent.
+/// [`AtomicStore::save_resource_changes`] on the default store.
 Future<void> saveResourceChanges(
         {required String subject,
         required List<PropValue> changes,
@@ -37,23 +34,84 @@ Future<void> saveResourceChanges(
     RustLib.instance.api.crateApiResourcesSaveResourceChanges(
         subject: subject, changes: changes, remove: remove);
 
-/// Create a resource with a new subject (a DID derived from the signed
-/// genesis commit) holding `values`, signed by the active agent. Returns its
-/// subject. `values` should include `isA` and `parent`.
+/// [`AtomicStore::create_resource_with_values`] on the default store.
 Future<String> createResourceWithValues({required List<PropValue> values}) =>
     RustLib.instance.api
         .crateApiResourcesCreateResourceWithValues(values: values);
 
-/// Create a drive named `name`. Returns its subject.
+/// [`AtomicStore::new_drive`] on the default store.
 Future<String> newDrive({required String name}) =>
     RustLib.instance.api.crateApiResourcesNewDrive(name: name);
 
-/// Wait until `subject` changes or is destroyed, or `timeout_ms` passes. Call
-/// it in a loop (re-reading the resource on `Changed`) to watch a resource.
+/// [`AtomicStore::wait_for_resource_event`] on the default store.
 Future<ResourceEvent> waitForResourceEvent(
         {required String subject, required int timeoutMs}) =>
     RustLib.instance.api.crateApiResourcesWaitForResourceEvent(
         subject: subject, timeoutMs: timeoutMs);
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<AtomicStore>>
+abstract class AtomicStore implements RustOpaqueInterface {
+  /// The subject of the agent that signs, if one is set.
+  String? agentSubject();
+
+  /// Create a resource with a new subject (a DID derived from the signed
+  /// genesis commit) holding `values`, signed by this handle's agent.
+  /// Returns its subject. `values` should include `isA` and `parent`.
+  Future<String> createResourceWithValues({required List<PropValue> values});
+
+  /// The drive this handle works in: the one set on it, else the store's
+  /// active drive.
+  String? drive();
+
+  /// The subjects under `parent`, in the order the sidebar shows them (at
+  /// most `limit`), without the folders the web hides.
+  Future<List<String>> getChildSubjects(
+      {required String parent, required int limit});
+
+  /// The resource `subject` as the local store holds it. [`AtomicError::NotFound`]
+  /// when this device does not have it (sync first, or ask the server).
+  Future<ResourceData> getResourceData({required String subject});
+
+  /// Create a drive named `name`, which this handle works in from now on.
+  /// Returns its subject.
+  Future<String> newDrive({required String name});
+
+  /// Open the store in the directory `path` (created when missing) for
+  /// `agent_secret` (none: no agent yet, see [`AtomicStore::setup`]),
+  /// working in `drive` (none: the store's active drive).
+  static Future<AtomicStore> open(
+          {required String path, String? agentSecret, String? drive}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreOpen(
+          path: path, agentSecret: agentSecret, drive: drive);
+
+  /// Set the `changes` properties and remove the `remove` ones of an
+  /// existing resource, as one signed commit by this handle's agent.
+  Future<void> saveResourceChanges(
+      {required String subject,
+      required List<PropValue> changes,
+      required List<String> remove});
+
+  /// Full-text search, best first, across every drive or only in `drive`.
+  Future<List<SearchHit>> searchResources(
+      {required String query, String? drive, required int limit});
+
+  /// Work in `drive` from now on (this handle only).
+  void setDrive({required String drive});
+
+  /// Create an agent named `name` and its private drive in this store, and
+  /// sign with that agent from now on, working in the new drive. Returns
+  /// the agent's secret (to keep) and the drive's subject.
+  Future<StoreSetup> setup({required String name});
+
+  /// Whether both handles are on the same open store.
+  bool sharesStoreWith({required AtomicStore other});
+
+  /// Wait until `subject` changes or is destroyed, or `timeout_ms` passes.
+  /// Call it in a loop (re-reading the resource on `Changed`) to watch a
+  /// resource.
+  Future<ResourceEvent> waitForResourceEvent(
+      {required String subject, required int timeoutMs});
+}
 
 /// A property value. `datatype` says which of the other fields carries it;
 /// the rest are empty. (One flat struct instead of an enum with fields:
@@ -237,4 +295,33 @@ class SearchHit {
           className == other.className &&
           drive == other.drive &&
           score == other.score;
+}
+
+/// What [`AtomicStore::setup`] made.
+class StoreSetup {
+  /// The agent's secret: keep it to open the store as this agent again.
+  final String agentSecret;
+  final String agentSubject;
+
+  /// The agent's private drive.
+  final String drive;
+
+  const StoreSetup({
+    required this.agentSecret,
+    required this.agentSubject,
+    required this.drive,
+  });
+
+  @override
+  int get hashCode =>
+      agentSecret.hashCode ^ agentSubject.hashCode ^ drive.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is StoreSetup &&
+          runtimeType == other.runtimeType &&
+          agentSecret == other.agentSecret &&
+          agentSubject == other.agentSubject &&
+          drive == other.drive;
 }

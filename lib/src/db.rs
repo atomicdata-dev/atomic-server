@@ -1533,6 +1533,16 @@ impl Db {
         Ok(())
     }
 
+    /// A handle on the same store (same key-value store, indexes, events and
+    /// outbox) with its own default agent, set to `agent`. Unlike `clone`,
+    /// which shares the agent, changing the agent of one does not change the
+    /// other. For hosts that serve several agents from one open file.
+    pub fn with_own_agent(&self, agent: Option<crate::agents::Agent>) -> Db {
+        let mut db = self.clone();
+        db.default_agent = Arc::new(Mutex::new(agent));
+        db
+    }
+
     /// Clear the default agent.
     pub fn clear_default_agent(&self) {
         self.default_agent.lock().unwrap().take();
