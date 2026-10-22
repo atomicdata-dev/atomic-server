@@ -34,7 +34,7 @@ Ed25519 keypairs (agents).
 - Rust source lives in `/rust/src/` (crate `atomic_flutter_rust`). Keep it thin: logic that another host
   (Tauri, a native shell, the CLI) could use goes in `atomic_lib::host`
   (`lib/src/host/`: lists, chats, conversations, recents, embed dispatcher) with
-  its tests; the bridge binds it to the global store (`rust/src/host.rs`).
+  its tests; the bridge binds it to the default store (`rust/src/host.rs`).
 - `atomic_lib` is referenced as a local path dependency: `../../../atomicdata-dev/atomic-server/lib`
 
 ### Package and identifier names

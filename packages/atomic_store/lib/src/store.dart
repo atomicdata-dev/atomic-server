@@ -17,8 +17,8 @@ import 'value.dart';
 /// ```
 class Store {
   /// [drive] is the default parent of [newResource] and the default scope of
-  /// [search]. Who signs a write is the backend's agent: the bridge still
-  /// holds one active agent per process (see `flutter/README.md`).
+  /// [search]. Who signs a write is the backend's agent (over the bridge, the
+  /// `AtomicStore` handle's; see `flutter/README.md`).
   Store({required this.backend, this.drive});
 
   final StoreBackend backend;

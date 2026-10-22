@@ -125,16 +125,33 @@ cd flutter && flutter_rust_bridge_codegen generate
 Enums with fields would make the codegen require `freezed`; use a struct plus
 a unit enum instead (`AtomicError`/`ErrorKind`, `AtomicValue`/`Datatype`).
 
-### Next step: no globals
+### Store handles
 
-The bridge still holds one open store and one active agent and drive per
-process (`api/simple/state.rs`, `Db::set_active_drive`). `atomic_store` takes
-its drive explicitly, but a second `Store` over the bridge shares the
-signing agent and the open database. Removing that means an opaque store
-handle (`#[frb(opaque)] AtomicStore`) that owns the `Db`, agent and active
-drive, with the functions above as its methods, and `BridgeStoreBackend`
-holding the handle. The sync, peer and assistant functions read the global
-store too (`db()`), so they move along with it; it is a change of its own.
+`AtomicStore` (`api/resources.rs`, opaque in Dart) is an open store with the
+agent that signs its writes and the drive it works in. The typed functions
+above are its methods; the free functions are the same calls on the default
+store, which `open_db` opens and `load_agent` signs for, so screens that have
+not moved keep working.
+
+```dart
+final handle = await AtomicStore.open(
+    path: dir, agentSecret: secret, drive: driveSubject); // or setup(name)
+final store = Store(backend: BridgeStoreBackend(handle), drive: handle.drive());
+```
+
+- A file is opened once per process (Android recreates the activity in the
+  same process, and a second open of a redb file damaged stores). A second
+  handle on a path, including the one `open_db` opened, shares that `Db`
+  (`sharesStoreWith`) and differs in agent and drive only
+  (`atomic_lib::Db::with_own_agent`).
+- Only the default store syncs: the process has one server session and one
+  Iroh peer. A write through another handle is signed, stored and queued in
+  its outbox.
+- Still global: `open_db`, `load_agent`, `setup`, the sync, peer and
+  assistant functions read the default store (`state::db()`); moving them
+  onto the handle is the remaining step. The active drive is also stored in
+  the file (`Db::set_active_drive`), so handles on one file fall back to the
+  same one unless a drive is set on the handle.
 
 ## App identity
 

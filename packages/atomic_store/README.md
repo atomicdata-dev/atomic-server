@@ -98,7 +98,15 @@ the typed functions of `flutter/rust/src/api/resources.rs`.
 ## Agent and drive
 
 The `Store` takes its drive explicitly (`drive:`: default parent and search
-scope). Who signs a write is the backend's: the bridge still holds one active
-agent and one open store per process (`open_db`, `load_agent`), so two
-`Store`s over the bridge share them. Passing an agent and a store handle into
-each bridge call is the next step; see `flutter/README.md`.
+scope). Who signs a write is the backend's. Over the bridge, open a handle
+that owns the store, the signing agent and the drive:
+
+```dart
+final handle = await AtomicStore.open(
+    path: dir, agentSecret: secret, drive: driveSubject);
+final store = Store(backend: BridgeStoreBackend(handle), drive: driveSubject);
+```
+
+`BridgeStoreBackend()` without a handle uses the app's default store (`open_db`,
+`load_agent`). Handles on the same path share one open database; see
+`flutter/README.md`.
