@@ -16,14 +16,14 @@ pub struct PluginMeta {
     /// untranslated `plugin.json` (no `schemaVersion`); the server translates
     /// it the first time it loads the plugin and writes the record back.
     pub manifest: serde_json::Value,
-    /// The release whose code is actually on disk, as its content-addressed id.
+    /// The release whose code the server loaded for this plugin, as its
+    /// content-addressed id.
     ///
-    /// This is what tells an activation that it has nothing to materialize.
-    /// The manifest cannot answer that: two releases of the same plugin differ
-    /// in their package bytes and agree on every manifest field, so comparing
-    /// manifests would skip the extraction and leave the previous code running
-    /// under the new release's id. `None` is a record written before this field
-    /// existed, which means "unknown", so materialize again and record it.
+    /// This is what tells an activation that the module already runs. The
+    /// manifest cannot answer that: two releases of the same plugin differ in
+    /// their package bytes and agree on every manifest field. `None` is a
+    /// record written before this field existed, which means "unknown", so
+    /// load again and record it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub release_id: Option<String>,
 }
