@@ -866,6 +866,7 @@ void main() {
             'did:ad:a': [
               _child('did:ad:m', 'Mango plan'),
               _child('did:ad:f', 'Apple folder', className: 'folder'),
+              _child('did:ad:r', 'Room talk', className: 'chatroom'),
             ],
             'did:ad:f': [_child('did:ad:f1', 'Inside the folder')],
           },
@@ -920,6 +921,15 @@ void main() {
 
       final lefts = <String, double>{
         'Mango plan (tree)': leadingLeft('Mango plan'),
+        'Folder (tree, depth 0)': leadingLeft('Apple folder'),
+        'Chat room (tree)': leadingLeft('Room talk'),
+        'Drive header': tester
+            .getRect(find.descendant(
+                of: find.descendant(
+                    of: find.byKey(const Key('current-drive-header')),
+                    matching: find.byType(RowLeading)),
+                matching: find.byType(Icon)))
+            .left,
         'Messages heading': titleLeft('messages', 'Messages'),
       };
       await open('messages');

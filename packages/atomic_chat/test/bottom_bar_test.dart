@@ -135,6 +135,57 @@ void main() {
     expect(find.byTooltip('Profile'), findsOneWidget);
   });
 
+  group('phone slots', () {
+    void phone(WidgetTester tester) {
+      tester.view.physicalSize = const Size(393, 851);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+    }
+
+    List<double> centers(WidgetTester tester, List<String> tooltips) => [
+          for (final t in tooltips)
+            tester
+                .getCenter(find.descendant(
+                    of: find.byType(AppBottomBar), matching: find.byTooltip(t)))
+                .dx
+        ];
+
+    void expectEqualSlots(List<double> xs, double width, int slots) {
+      final slot = (width - 16) / slots;
+      for (var i = 0; i < xs.length; i++) {
+        expect(xs[i], closeTo(8 + slot * (i + 0.5), 1), reason: '$xs');
+      }
+    }
+
+    testWidgets('without a More button the four buttons share the width',
+        (tester) async {
+      phone(tester);
+      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpAndSettle();
+      final bar = find.byType(AppBottomBar);
+      expect(find.descendant(of: bar, matching: find.byTooltip('More')),
+          findsNothing);
+      final width = tester.getSize(bar).width;
+      expectEqualSlots(
+          centers(tester, ['Home', 'Search', 'New', 'Profile']), width, 4);
+    });
+
+    testWidgets('a More button is a fifth equal slot, the others shift',
+        (tester) async {
+      phone(tester);
+      await tester.pumpWidget(_shell(_BarApi()));
+      await tester.pumpAndSettle();
+      final route = _controller(tester).top!;
+      _controller(tester).registerMenu(route, (_) {});
+      await tester.pumpAndSettle();
+      final width = tester.getSize(find.byType(AppBottomBar)).width;
+      expectEqualSlots(
+          centers(tester, ['Home', 'Search', 'New', 'Profile', 'More']),
+          width,
+          5);
+    });
+  });
+
   group('wide screen', () {
     void wide(WidgetTester tester) {
       tester.view.physicalSize = const Size(1800, 2880);

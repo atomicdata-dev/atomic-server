@@ -20,7 +20,15 @@ class DriveAvatar extends StatelessWidget {
   final DriveInfo? drive;
   final double size;
 
-  const DriveAvatar({super.key, required this.drive, this.size = 28});
+  /// Draw the folder fallback at the slot's left edge (see
+  /// [RowLeading.alignGlyphStart]).
+  final bool alignGlyphStart;
+
+  const DriveAvatar(
+      {super.key,
+      required this.drive,
+      this.size = 28,
+      this.alignGlyphStart = false});
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +41,7 @@ class DriveAvatar extends StatelessWidget {
         image: d == null ? null : ImageSource.of(d.picture, emoji: d.emoji),
         fallbackLabel: d == null ? '' : driveTitle(d),
         fallbackIcon: Icons.folder_outlined,
+        alignGlyphStart: alignGlyphStart,
       ),
     );
   }
@@ -92,13 +101,17 @@ class CurrentDriveHeader extends StatelessWidget {
               BoxConstraints(minHeight: m.compact ? m.driveHeaderHeight : 0),
           child: Padding(
             // Compact: the avatar sits at the rows' icon column (the bar's
-            // title spacing is 4).
+            // title spacing is 4). Touch: the bar's title spacing is already
+            // the rows' 16, so no side padding of our own.
             padding: m.compact
                 ? EdgeInsets.symmetric(vertical: 4, horizontal: m.hPad - 4)
-                : const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+                : const EdgeInsets.symmetric(vertical: 6),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               if (SidebarIconsScope.of(context)) ...[
-                DriveAvatar(drive: d, size: m.compact ? m.driveAvatar : 28),
+                DriveAvatar(
+                    drive: d,
+                    size: m.compact ? m.driveAvatar : 28,
+                    alignGlyphStart: !m.compact),
                 SizedBox(width: m.compact ? m.gap : 10),
               ],
               Flexible(

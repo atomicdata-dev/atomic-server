@@ -211,7 +211,7 @@ class AppBottomBar extends StatelessWidget {
                             activity: activity,
                             current: top == ShellPage.profile,
                             // Next to the pages every slot is the same.
-                            wide: roomy && !split,
+                            wide: roomy && !split && more == null,
                             onPressed: onUser,
                           ),
                         ),
@@ -223,29 +223,20 @@ class AppBottomBar extends StatelessWidget {
                             onPressed: () => shell.setListCollapsed(true),
                             icon: const Icon(Icons.menu_open),
                           )
-                        else
-                          // The only button that changes with the page.
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 200),
-                            child: more ??
-                                const SizedBox(
-                                    key: ValueKey('no-more'),
-                                    width: 48,
-                                    height: 48),
-                          ),
+                        else if (more != null)
+                          // The only button that changes with the page: it
+                          // takes a slot of its own only while the page has
+                          // one, and the others share the rest equally.
+                          more,
                       ];
-                      // Next to the pages: five equal slots (the four pages and
-                      // Close sidebar) across the sidebar, which fit its
-                      // narrowest width too; the same whatever is open.
-                      if (split) {
-                        return Row(children: [
-                          for (final b in buttons)
-                            Expanded(child: Center(child: b)),
-                        ]);
-                      }
-                      return Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: buttons);
+                      // Equal slots across the row: next to the pages five (the
+                      // four pages and Close sidebar, which fit the sidebar's
+                      // narrowest width too), on a phone four, and five while
+                      // the page on top has a "more" menu.
+                      return Row(children: [
+                        for (final b in buttons)
+                          Expanded(child: Center(child: b)),
+                      ]);
                     },
                   );
                 }),
@@ -549,7 +540,8 @@ class _ProfileButton extends StatelessWidget {
                           child: Row(mainAxisSize: MainAxisSize.min, children: [
                             avatar,
                             const SizedBox(width: 6),
-                            ConstrainedBox(
+                            Flexible(
+                                child: ConstrainedBox(
                               constraints: const BoxConstraints(
                                   maxWidth: _profileNameWidth),
                               child: Text(
@@ -563,7 +555,7 @@ class _ProfileButton extends StatelessWidget {
                                             .colorScheme
                                             .onSurfaceVariant),
                               ),
-                            ),
+                            )),
                           ]),
                         )
                       : avatar,

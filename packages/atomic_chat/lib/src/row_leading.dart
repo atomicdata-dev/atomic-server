@@ -309,7 +309,9 @@ class _RowLeadingState extends State<RowLeading> {
               fontSize: size * 0.45,
               height: 1));
     } else {
-      if (circle) background = c.mainSelectedBg;
+      // A bare glyph that starts at the slot's edge has no circle behind
+      // it: centred in one it would start 6 dp right of the pictures.
+      if (circle && !widget.alignGlyphStart) background = c.mainSelectedBg;
       base = Icon(widget.fallbackIcon, size: widget.iconSize, color: c.main);
     }
     final radius =
