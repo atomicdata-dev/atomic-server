@@ -2,7 +2,6 @@
 // base (same endpoint as the other managed helpers).
 import { getManagedAccount } from './managed/session';
 import { getManagedApiBase } from './managed/api';
-import { createManagedSyncEnrollment } from './managed/enrollment';
 
 export type ManagedUser = {
   email: string;
@@ -63,10 +62,3 @@ export async function getDriveUsage(
     quotaBytes: match.quota_bytes ?? null,
   };
 }
-
-/**
- * Enroll a drive for hosting. Delegates to `createManagedSyncEnrollment`, which
- * signs the control plane's challenge when given the agent, so there is only
- * one code path that talks to `POST /sync-enrollments`.
- */
-export const createManagedEnrollment = createManagedSyncEnrollment;

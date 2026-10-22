@@ -9,14 +9,3 @@ export const randomString = (length = 15) => {
 
   return result;
 };
-
-export const generateNonce = (length = 16) => {
-  const array = new Uint8Array(length);
-  window.crypto.getRandomValues(array);
-
-  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
-};
-
-export const randomSubject = (parent: string, prefix?: string) => {
-  return `${parent}${prefix ? `/${prefix}/` : ''}${randomString(15)}`;
-};

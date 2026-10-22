@@ -65,17 +65,6 @@ export function savePeerLink(store: Store, link: SavedPeerLink): void {
   window.dispatchEvent(new Event(PEER_LINK_CHANGED));
 }
 
-export function removePeerLink(store: Store, drive: string): void {
-  localStorage.setItem(
-    key(store),
-    JSON.stringify(savedPeerLinks(store).filter(link => link.drive !== drive)),
-  );
-  active.get(store)?.get(drive)?.close();
-  active.get(store)?.delete(drive);
-  statuses.delete(drive);
-  window.dispatchEvent(new Event(PEER_LINK_CHANGED));
-}
-
 export function resumePeerLinks(store: Store): void {
   if (!store.getAgent() || !store.getClientDb()) return;
   let links = active.get(store);
