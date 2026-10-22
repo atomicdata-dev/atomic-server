@@ -522,8 +522,9 @@ pub(crate) fn drive_belongs_to_origin(drive: &str, origin: &str) -> bool {
 }
 
 /// (agent, drive, origin) refusals with the time they were seen.
+#[flutter_rust_bridge::frb(ignore)]
 #[derive(Default)]
-pub(crate) struct DeniedDrives {
+struct DeniedDrives {
     seen: HashMap<(String, String, String), Instant>,
 }
 
@@ -532,12 +533,12 @@ impl DeniedDrives {
         (agent.to_string(), drive.to_string(), origin.trim_end_matches('/').to_string())
     }
 
-    pub(crate) fn deny(&mut self, agent: &str, drive: &str, origin: &str, now: Instant) {
+    fn deny(&mut self, agent: &str, drive: &str, origin: &str, now: Instant) {
         self.seen.insert(Self::key(agent, drive, origin), now);
     }
 
     /// `Some(reason)` while the refusal is remembered.
-    pub(crate) fn check(&mut self, agent: &str, drive: &str, origin: &str, now: Instant) -> Option<String> {
+    fn check(&mut self, agent: &str, drive: &str, origin: &str, now: Instant) -> Option<String> {
         let key = Self::key(agent, drive, origin);
         match self.seen.get(&key) {
             Some(at) if now.saturating_duration_since(*at) < DENIED_TTL => {
@@ -552,13 +553,13 @@ impl DeniedDrives {
         }
     }
 
-    pub(crate) fn is_denied_anywhere(&self, agent: &str, drive: &str, now: Instant) -> bool {
+    fn is_denied_anywhere(&self, agent: &str, drive: &str, now: Instant) -> bool {
         self.seen.iter().any(|((a, d, _), at)| {
             a == agent && d == drive && now.saturating_duration_since(*at) < DENIED_TTL
         })
     }
 
-    pub(crate) fn clear(&mut self) {
+    fn clear(&mut self) {
         self.seen.clear();
     }
 }
