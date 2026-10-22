@@ -22,12 +22,18 @@ fn to_wit(export: &Export) -> AppExport {
         description: export.description.clone(),
         input_schema: serde_json::to_string(&export.input_schema).unwrap_or_default(),
         output_schema: serde_json::to_string(&export.output_schema).unwrap_or_default(),
-        effect: match export.effect {
+        effect: export.effect.into(),
+    }
+}
+
+impl From<ExportEffect> for Effect {
+    fn from(effect: ExportEffect) -> Self {
+        match effect {
             ExportEffect::Read => Effect::Read,
             ExportEffect::Write => Effect::Write,
             ExportEffect::External => Effect::External,
             ExportEffect::Interactive => Effect::Interactive,
-        },
+        }
     }
 }
 
@@ -37,6 +43,18 @@ pub fn describe(
     drive: &str,
     interface: &str,
 ) -> Result<Vec<AppExport>, HostError> {
+    Ok(provider_exports(registry, drive, interface)?
+        .iter()
+        .map(to_wit)
+        .collect())
+}
+
+/// The manifest's exports of `interface`, from its preferred provider.
+pub(super) fn provider_exports(
+    registry: &HostAbiRegistry,
+    drive: &str,
+    interface: &str,
+) -> Result<Vec<Export>, HostError> {
     let provider = registry
         .providers(drive, interface)
         .into_iter()
@@ -47,11 +65,7 @@ pub fn describe(
                 format!("no installed app in this drive provides {interface}"),
             )
         })?;
-    Ok(provider
-        .manifest
-        .exports_of(interface)
-        .map(to_wit)
-        .collect())
+    Ok(provider.manifest.exports_of(interface).cloned().collect())
 }
 
 impl calls::Host for AbiState {

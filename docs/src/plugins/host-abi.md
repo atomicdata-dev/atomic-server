@@ -8,7 +8,7 @@ An app is a WebAssembly component (`wasm32-wasip2`) that imports four interfaces
 
 | Interface | What it gives the app |
 | --- | --- |
-| `store` | `get`, `get-many`, `query` (class, parent, filters, cursor), `apply` (create, set, remove, destroy), `subscribe` |
+| `store` | `get`, `get-many`, `query` (class, parent, filters, cursor), `apply` (create, set, remove, destroy) |
 | `net` | `fetch` by manifest operation id. The host knows the operation's method, endpoint and effect, and substitutes `secret:<name>` in headers |
 | `events` | `set-filters`, `next` and `ack`: the drive's durable event stream, read from a cursor |
 | `calls` | `providers`, `describe` and `call` to the other apps in the drive |
@@ -26,8 +26,8 @@ Nothing runs as the server.
 - A read needs both the caller and the app's agent to be allowed to read, and the resource to be inside the Installation's [read scope](#scopes).
 - `store.apply` plans the intents with the same planner as every other plugin write, then checks write rights on every target before it writes anything. The outcome tells the app what happened:
   - `committed`: written, signed by the app's agent.
-  - `proposed`: the caller may write there but the app's agent may not, or the target is outside the Installation's write scope (or it has no identity). Nothing is written. The host keeps the intents as a proposal for review.
-  - `refused`: the plan is wrong, or the caller may not write there, or the intents touch an Installation, plugin or Release. Nothing is written; `problems` says why.
+  - `refused`: the plan is wrong, or the caller or the app's agent may not write there, or the target is outside the Installation's write scope (or the Installation has no identity), or the intents touch an Installation, plugin or Release. Nothing is written; `problems` says why.
+  - `proposed` exists in the interface, but the host does not return it yet: a write the app may not do is `refused`, and nothing is kept for review.
 - When an app calls another app, the callee runs with **its own** Installation's rights and scopes, not the caller's. `calls.call` accepts a list of `handle`s for per-call capabilities, but they are ignored for now.
 - When a person or tool calls an export over HTTP, the rights are the signed-in agent's **and** the callee's. Calling through an app never gives anyone more than they have.
 - `POST /host/call` first checks the drive: the signed-in agent must be able to read it, and to write it when the export's `effect` is `write` or `external`, or when the providing app declares any `secrets` in its manifest. Running a plugin can spend its secrets, so it takes the same rights as changing it (as for `/plugin-run`); a reader can call a `read` export of an app without secrets, not of one with. This is checked at every hop of a chain, not only the first. A stranger gets `forbidden` before any app is loaded or run.
@@ -313,7 +313,7 @@ One import is new, because a module has no caller to ask:
 | --- | --- |
 | `context.get` | The Installation, the agent the module acts as (`none` for a module in the operator's `global` folder, which reads as the public and writes nothing) and the Installation's config as JSON text. The user can edit the config at any time |
 
-A module runs as its Installation's agent, which is the only identity it has: reads are checked against that agent, `store.apply` is signed by it and gets the same `committed`, `proposed` and `refused` outcomes as for an app, and an Installation, plugin or Release cannot be changed through it. There is no separate rights code and no way to read or write as someone else. A module reads only what its agent was given (its scopes or `full-drive-access`, or access granted on the Installation page), and its scopes limit it the same way as an app.
+A module runs as its Installation's agent, which is the only identity it has: reads are checked against that agent, `store.apply` is signed by it and gets the same `committed` and `refused` outcomes as for an app, and an Installation, plugin or Release cannot be changed through it. There is no separate rights code and no way to read or write as someone else. A module reads only what its agent was given (its scopes or `full-drive-access`, or access granted on the Installation page), and its scopes limit it the same way as an app.
 
 Two things differ from an app, both because a module runs inside the server's own path and nobody is there to approve:
 
@@ -353,9 +353,8 @@ Every applied commit appends one row to its drive's event log, in the same batch
 
 ## Not built yet
 
-- `store.search` and `store.undo` return `unsupported`, as does the `ne` filter. `class` matches the class exactly, not its subclasses.
+- `store.search`, `store.subscribe` and `store.undo` return `unsupported`, as does the `ne` filter. `class` matches the class exactly, not its subclasses.
 - `events` carries one event per applied commit, and a destroy is one. Cron, field timers and inbound webhooks do not feed it yet, and the host does not call `on-event` itself: an app pulls.
-- Proposals from `apply` are kept in memory.
 - Handles passed to `calls.call` are ignored.
 - Declared schemas: the binding from a manifest name to the installed Property is not stored as a resource (it is recomputed), only the inline ontology of one app is supported, a class cannot be a scope or a field type, and views do not match subclasses of a declared class.
 - A frame cannot call `write`, `external` or `interactive` exports (approval UI). An export's `effect` is what its author declared, so an approval UI must not rely on it alone. Every hop is still bounded by the signed-in agent's rights and the callee's own grant.

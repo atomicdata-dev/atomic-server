@@ -147,7 +147,7 @@ impl StoreApplyHost {
     }
 
     /// Refuses unless `for_agent` and the Installation may write here.
-    async fn may_write(&self, subject: &str) -> Result<(), String> {
+    pub async fn may_write(&self, subject: &str) -> Result<(), String> {
         let resource = self
             .store
             .get_resource(&subject.into())

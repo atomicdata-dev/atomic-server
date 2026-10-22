@@ -1,5 +1,5 @@
 //! The apps loaded on this node, and the small per-installation state the ABI
-//! keeps for them (event queue, subscriptions, proposals).
+//! keeps for them (the event queue).
 //!
 //! Apps are found by reading Installations: a drive's active Installation
 //! whose pinned Release is a `sandboxed-app` is compiled once and kept until
@@ -8,7 +8,7 @@
 //! a pause or revocation takes effect on the next call.
 
 use std::{
-    collections::{BTreeMap, HashMap, VecDeque},
+    collections::{BTreeMap, HashMap},
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc, Mutex, RwLock,
@@ -16,10 +16,14 @@ use std::{
     time::{Duration, Instant},
 };
 
-use atomic_lib::{agents::ForAgent, storelike::Query, urls, Db, Storelike, Value};
+use atomic_lib::{agents::ForAgent, storelike::Query, urls, Db, Storelike, Subject, Value};
 use wasmtime::{component::Component, Engine};
 
-use super::bindings::atomic::host::store::QuerySpec;
+use super::{
+    bindings::SandboxedAppPre,
+    run::{instance_pre, AbiState},
+};
+
 use crate::plugins::{
     host_core,
     manifest::{Export, Manifest, Runtime, World},
@@ -28,11 +32,6 @@ use crate::plugins::{
 
 /// How many apps may call each other in one chain before the host refuses.
 pub const MAX_CALL_DEPTH: usize = 8;
-
-/// Subscriptions one installation may hold.
-pub(super) const SUBSCRIPTION_CAP: usize = 64;
-/// Proposals kept in memory per installation.
-const PROPOSAL_CAP: usize = 100;
 
 /// How long a release that failed to load is not tried again. Short enough
 /// that a package which was not synced yet is picked up, long enough that a
@@ -46,9 +45,12 @@ pub struct LoadedApp {
     pub installation: String,
     /// The pinned release id, when it came from an Installation.
     pub release_id: Option<String>,
-    pub manifest: Manifest,
-    pub(super) component: Component,
+    pub manifest: Arc<Manifest>,
+    /// The component linked against the host ABI, built once at register.
+    pub(super) pre: SandboxedAppPre<AbiState>,
     pub(super) engine: Arc<Engine>,
+    /// `drive` as the registry keys it (`Subject::pure_id`).
+    drive_key: String,
 }
 
 impl LoadedApp {
@@ -62,25 +64,18 @@ impl LoadedApp {
 
 type AppKey = (String, String);
 
-/// A write the app asked for that the host did not apply, kept for review.
-///
-/// In memory only: a restart forgets it. Durable proposals belong to the
-/// event/proposal work in step 3 of `planning/host-abi.md`.
-#[derive(Clone, Debug)]
-pub struct Proposal {
-    pub drive: String,
-    pub installation: String,
-    pub caller: String,
-    pub at_ms: i64,
-    /// The intents as the planner understands them (`{"intents": [...]}`).
-    pub verdict: serde_json::Value,
+/// Two spellings of one drive or installation (a query or a drive hint on the
+/// subject) are one key, as in [`crate::plugins::installation::resolve`].
+fn app_key(drive: &str, installation: &str) -> AppKey {
+    (
+        Subject::from(drive).pure_id(),
+        Subject::from(installation).pure_id(),
+    )
 }
 
 #[derive(Default)]
 pub struct HostAbiRegistry {
     apps: RwLock<BTreeMap<AppKey, Arc<LoadedApp>>>,
-    subscriptions: Mutex<HashMap<AppKey, BTreeMap<String, QuerySpec>>>,
-    proposals: Mutex<HashMap<AppKey, VecDeque<Proposal>>>,
     /// Releases that failed to load, per installation: (release id, when, why).
     load_failures: Mutex<HashMap<AppKey, (String, Instant, String)>>,
     /// How many times a release was actually read and compiled.
@@ -126,31 +121,28 @@ impl HostAbiRegistry {
         let engine = host_core::engine()?;
         let component = Component::from_binary(&engine, wasm)
             .map_err(|e| format!("the app is not a valid component: {e}"))?;
+        let pre = instance_pre(&engine, &component)?;
+        let key = app_key(drive, installation);
         let app = Arc::new(LoadedApp {
+            drive_key: key.0.clone(),
             drive: drive.to_string(),
             installation: installation.to_string(),
             release_id,
-            manifest,
-            component,
+            manifest: Arc::new(manifest),
+            pre,
             engine,
         });
         self.apps
             .write()
             .map_err(|_| "registry lock poisoned")?
-            .insert((drive.to_string(), installation.to_string()), app.clone());
+            .insert(key, app.clone());
         Ok(app)
     }
 
     pub fn unregister(&self, drive: &str, installation: &str) {
-        let key = (drive.to_string(), installation.to_string());
+        let key = app_key(drive, installation);
         if let Ok(mut apps) = self.apps.write() {
             apps.remove(&key);
-        }
-        if let Ok(mut subs) = self.subscriptions.lock() {
-            subs.remove(&key);
-        }
-        if let Ok(mut proposals) = self.proposals.lock() {
-            proposals.remove(&key);
         }
         if let Ok(mut failures) = self.load_failures.lock() {
             failures.remove(&key);
@@ -161,7 +153,7 @@ impl HostAbiRegistry {
         self.apps
             .read()
             .ok()?
-            .get(&(drive.to_string(), installation.to_string()))
+            .get(&app_key(drive, installation))
             .cloned()
     }
 
@@ -171,11 +163,14 @@ impl HostAbiRegistry {
     /// and the same on every node. A user-chosen default provider is a
     /// resource on the drive later.
     pub fn providers(&self, drive: &str, interface: &str) -> Vec<Arc<LoadedApp>> {
+        let drive = Subject::from(drive).pure_id();
         let Ok(apps) = self.apps.read() else {
             return Vec::new();
         };
         apps.values()
-            .filter(|app| app.drive == drive && app.manifest.exports_of(interface).next().is_some())
+            .filter(|app| {
+                app.drive_key == drive && app.manifest.exports_of(interface).next().is_some()
+            })
             .cloned()
             .collect()
     }
@@ -237,16 +232,13 @@ impl HostAbiRegistry {
     }
 
     /// Every app loaded for `drive`, in installation order.
-    pub fn apps_in(&self, drive: &str) -> Vec<Arc<LoadedApp>> {
-        self.providers_in(drive)
-    }
-
-    fn providers_in(&self, drive: &str) -> Vec<Arc<LoadedApp>> {
+    pub fn providers_in(&self, drive: &str) -> Vec<Arc<LoadedApp>> {
+        let drive = Subject::from(drive).pure_id();
         self.apps
             .read()
             .map(|apps| {
                 apps.values()
-                    .filter(|app| app.drive == drive)
+                    .filter(|app| app.drive_key == drive)
                     .cloned()
                     .collect()
             })
@@ -257,14 +249,14 @@ impl HostAbiRegistry {
     /// found out recently.
     fn load_failure(&self, drive: &str, installation: &str, release_id: &str) -> Option<String> {
         let failures = self.load_failures.lock().ok()?;
-        let (id, at, why) = failures.get(&(drive.to_string(), installation.to_string()))?;
+        let (id, at, why) = failures.get(&app_key(drive, installation))?;
         (id == release_id && at.elapsed() < LOAD_FAILURE_TTL).then(|| why.clone())
     }
 
     fn note_load_failure(&self, drive: &str, installation: &str, release_id: &str, why: &str) {
         if let Ok(mut failures) = self.load_failures.lock() {
             failures.insert(
-                (drive.to_string(), installation.to_string()),
+                app_key(drive, installation),
                 (release_id.to_string(), Instant::now(), why.to_string()),
             );
         }
@@ -274,74 +266,6 @@ impl HostAbiRegistry {
     /// failure cache).
     pub fn load_attempts(&self) -> usize {
         self.load_attempts.load(Ordering::SeqCst)
-    }
-
-    // -- subscriptions ------------------------------------------------------
-
-    pub(super) fn subscribe(
-        &self,
-        drive: &str,
-        installation: &str,
-        spec: QuerySpec,
-    ) -> Result<String, String> {
-        let mut subs = self.subscriptions.lock().map_err(|_| "lock poisoned")?;
-        let held = subs
-            .entry((drive.to_string(), installation.to_string()))
-            .or_default();
-        if held.len() >= SUBSCRIPTION_CAP {
-            return Err(format!(
-                "at most {SUBSCRIPTION_CAP} subscriptions per installation"
-            ));
-        }
-        let id = format!("sub:{}", ulid::Ulid::new().to_string().to_lowercase());
-        held.insert(id.clone(), spec);
-        Ok(id)
-    }
-
-    pub(super) fn unsubscribe(&self, drive: &str, installation: &str, id: &str) {
-        if let Ok(mut subs) = self.subscriptions.lock() {
-            if let Some(held) = subs.get_mut(&(drive.to_string(), installation.to_string())) {
-                held.remove(id);
-            }
-        }
-    }
-
-    /// The queries an installation subscribed to, by subscription id.
-    pub fn subscriptions(&self, drive: &str, installation: &str) -> Vec<(String, QuerySpec)> {
-        self.subscriptions
-            .lock()
-            .ok()
-            .and_then(|subs| {
-                subs.get(&(drive.to_string(), installation.to_string()))
-                    .map(|held| held.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-            })
-            .unwrap_or_default()
-    }
-
-    // -- proposals ----------------------------------------------------------
-
-    pub(super) fn keep_proposal(&self, proposal: Proposal) {
-        let Ok(mut all) = self.proposals.lock() else {
-            return;
-        };
-        let held = all
-            .entry((proposal.drive.clone(), proposal.installation.clone()))
-            .or_default();
-        held.push_back(proposal);
-        while held.len() > PROPOSAL_CAP {
-            held.pop_front();
-        }
-    }
-
-    pub fn proposals(&self, drive: &str, installation: &str) -> Vec<Proposal> {
-        self.proposals
-            .lock()
-            .ok()
-            .and_then(|all| {
-                all.get(&(drive.to_string(), installation.to_string()))
-                    .map(|held| held.iter().cloned().collect())
-            })
-            .unwrap_or_default()
     }
 }
 

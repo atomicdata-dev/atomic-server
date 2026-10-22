@@ -6,9 +6,7 @@
 
 use actix_web::{web, HttpResponse};
 use atomic_lib::{
-    agents::ForAgent,
     db::{
-        plugin_schedule::AutoApplyGrant,
         plugin_trigger::{PluginTrigger, PluginTriggerInfo, PluginTriggerKey},
         PropVal, QueryFilter,
     },
@@ -102,42 +100,15 @@ pub async fn handle_set_trigger(
 
     if body.auto_apply {
         // The same precondition a schedule's grant has, checked the same way.
-        let (reviewed, approved_source) =
-            crate::handlers::plugin_schedule::reviewed_run(&appstate, &body.drive, &body.plugin)
-                .await?;
-
-        crate::plugins::js_runtime::describe_manifest(&approved_source).await?;
-
-        let ForAgent::AgentSubject(subject) = &agent else {
-            return Err(AtomicServerError::bad_request(
-                "Only a signed-in agent can allow a plugin to write unattended",
-            ));
-        };
-
-        trigger.auto_apply = Some(AutoApplyGrant {
-            agent: subject.to_string(),
-            granted_at: atomic_lib::utils::now(),
-            reviewed_run: Some(reviewed),
-            release: Some(
-                appstate.store.publish_plugin_release(
-                    &atomic_lib::db::plugin_release::PluginRelease {
-                        source: Some(approved_source.clone()),
-                        manifest: serde_json::json!(
-                            crate::plugins::js_runtime::describe_manifest(&approved_source).await?
-                        ),
-                        runtime: atomic_lib::db::plugin_release::RUNTIME.into(),
-                        schemas: crate::plugins::scheduler::plugin_schema_bindings(
-                            &appstate.store,
-                            &body.drive,
-                            &body.plugin,
-                        )
-                        .await?,
-                        ..Default::default()
-                    },
-                )?,
-            ),
-            source: Some(approved_source),
-        });
+        trigger.auto_apply = Some(
+            crate::handlers::plugin_schedule::build_auto_apply_grant(
+                &appstate,
+                &agent,
+                &body.drive,
+                &body.plugin,
+            )
+            .await?,
+        );
     }
 
     // Changing automatic execution must not silently discard a queued

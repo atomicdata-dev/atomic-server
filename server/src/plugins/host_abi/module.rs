@@ -36,7 +36,7 @@ use super::{
     module_bindings::{
         atomic::host::context,
         exports::atomic::host::hooks::{CommitInfo, GetAnswer},
-        ServerModule as Bindings,
+        ServerModule as Bindings, ServerModulePre as BindingsPre,
     },
     registry::HostAbiRegistry,
     run::{build_host, AbiHost, AbiState, CallBudget},
@@ -73,7 +73,8 @@ enum Backend {
     /// A component, in a fresh instance per hook.
     Wasm {
         engine: Arc<Engine>,
-        component: Component,
+        /// The host ABI linked once, so a hook only instantiates.
+        pre: BindingsPre<AbiState>,
     },
     /// Compiled in: a built-in app. Same hooks, same imports, same registry.
     Native(Arc<dyn NativeHooks>),
@@ -152,8 +153,13 @@ impl ServerModule {
         db: &Db,
         parts: ModuleParts,
     ) -> AtomicResult<Self> {
+        let mut linker = Linker::new(&engine);
+        wasmtime_wasi::p2::add_to_linker_async(&mut linker).map_err(trap)?;
+        Bindings::add_to_linker::<_, HasSelf<_>>(&mut linker, |state| state).map_err(trap)?;
+        let pre =
+            BindingsPre::new(linker.instantiate_pre(&component).map_err(trap)?).map_err(trap)?;
         let mut inner = Inner {
-            backend: Backend::Wasm { engine, component },
+            backend: Backend::Wasm { engine, pre },
             db: Arc::new(db.clone()),
             parts,
             classes: Vec::new(),
@@ -222,7 +228,11 @@ impl ServerModule {
                 build_host(
                     &inner.parts.registry,
                     &inner.db,
-                    (drive, installation, inner.parts.manifest.clone()),
+                    (
+                        drive,
+                        installation,
+                        inner.parts.manifest.clone().map(Arc::new),
+                    ),
                     ForAgent::from(agent),
                     0,
                     budget,
@@ -235,13 +245,13 @@ impl ServerModule {
                 drive: String::new(),
                 installation: String::new(),
                 manifest: None,
-                core: match (&inner.backend, reader) {
-                    (Backend::Native(_), Some(reader)) => {
-                        HostCore::for_builtin(inner.db.clone(), reader.agent.clone())
-                    }
-                    _ => HostCore::for_global_module(inner.db.clone())
-                        .map_err(|e| super::error(super::code::FORBIDDEN, e))?,
-                },
+                core: HostCore::for_builtin(
+                    inner.db.clone(),
+                    match (&inner.backend, reader) {
+                        (Backend::Native(_), Some(reader)) => reader.agent.clone(),
+                        _ => ForAgent::Public,
+                    },
+                ),
                 depth: 0,
                 budget,
             },
@@ -281,7 +291,7 @@ impl ServerModule {
     }
 
     async fn instantiate(&self, installed: bool) -> AtomicResult<(Bindings, Store<AbiState>)> {
-        let Backend::Wasm { engine, component } = &self.inner.backend else {
+        let Backend::Wasm { engine, pre } = &self.inner.backend else {
             return Err(AtomicError::other_error(
                 "a native module has no instance".to_string(),
             ));
@@ -291,12 +301,7 @@ impl ServerModule {
         store.limiter(|state| &mut state.limits);
         limits.meter(&mut store).map_err(AtomicError::other_error)?;
 
-        let mut linker = Linker::new(engine);
-        wasmtime_wasi::p2::add_to_linker_async(&mut linker).map_err(trap)?;
-        Bindings::add_to_linker::<_, HasSelf<_>>(&mut linker, |state| state).map_err(trap)?;
-        let instance = Bindings::instantiate_async(&mut store, component, &linker)
-            .await
-            .map_err(trap)?;
+        let instance = pre.instantiate_async(&mut store).await.map_err(trap)?;
         Ok((instance, store))
     }
 

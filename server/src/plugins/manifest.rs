@@ -461,7 +461,7 @@ fn validate_uses(uses: &[String]) -> Result<(), String> {
 
 /// A flat object of strings, integers and booleans. At the top level a field
 /// may also be an `array` of such flat objects (`items`), one level deep.
-fn flat_object(schema: &super::actions::InputSchema, top: bool) -> bool {
+pub(super) fn flat_object(schema: &super::actions::InputSchema, top: bool) -> bool {
     schema.r#type == "object"
         && !schema.additional_properties
         && schema.properties.len() <= 32

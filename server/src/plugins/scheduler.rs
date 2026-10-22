@@ -282,7 +282,38 @@ pub(crate) async fn auto_apply(
     grant: &AutoApplyGrant,
     now: i64,
 ) -> Result<String, String> {
-    let terms = drive_terms(&appstate.store, &key.drive)
+    apply_recorded(
+        appstate,
+        &key.drive,
+        &key.plugin,
+        "cron",
+        &format!("cron:{now}"),
+        verdict,
+        grant,
+        now,
+        async |_| {},
+    )
+    .await
+}
+
+/// Plans a verdict, journals it, applies it as the grant's agent and records
+/// the run. `kind` names the trigger in the run log; `journal_key` names the
+/// journal. `wrote` sees every subject the apply touched, before the run
+/// record is written, so the record itself cannot look like a change worth
+/// reacting to.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn apply_recorded(
+    appstate: &AppState,
+    drive: &str,
+    plugin: &str,
+    kind: &str,
+    journal_key: &str,
+    verdict: &str,
+    grant: &AutoApplyGrant,
+    now: i64,
+    wrote: impl AsyncFnOnce(&crate::plugins::apply::ApplyReport),
+) -> Result<String, String> {
+    let terms = drive_terms(&appstate.store, drive)
         .await
         .ok_or("this drive has no plugin vocabulary")?;
 
@@ -295,19 +326,14 @@ pub(crate) async fn auto_apply(
 
     let mut host = StoreApplyHost::for_installation(
         &appstate.store,
-        &key.drive,
-        &key.plugin,
+        drive,
+        plugin,
         ForAgent::AgentSubject(atomic_lib::Subject::from_raw(&grant.agent, None)),
     )
     .await?;
 
     let plan = plan_verdict(&parsed, &mut host).await;
-    let journal = super::journal::Journal::new(
-        &appstate.store,
-        &key.drive,
-        &key.plugin,
-        &format!("cron:{now}"),
-    );
+    let journal = super::journal::Journal::new(&appstate.store, drive, plugin, journal_key);
     let plan = journal.plan(&plan)?;
 
     // A blocked plan is still logged: "it silently did nothing" and "it never
@@ -326,6 +352,10 @@ pub(crate) async fn auto_apply(
         )
     };
 
+    if let Some(report) = &report {
+        wrote(report).await;
+    }
+
     let summary = match &report {
         None => "the plan was blocked, so nothing was written".to_string(),
         Some(report) => format!(
@@ -334,17 +364,9 @@ pub(crate) async fn auto_apply(
         ),
     };
 
-    run_log::record_run(
-        &mut host,
-        &terms,
-        &key.plugin,
-        "cron",
-        now,
-        &plan,
-        report.as_ref(),
-    )
-    .await
-    .map_err(|e| format!("{summary}, but the run could not be recorded: {e}"))?;
+    run_log::record_run(&mut host, &terms, plugin, kind, now, &plan, report.as_ref())
+        .await
+        .map_err(|e| format!("{summary}, but the run could not be recorded: {e}"))?;
 
     if plan.blocked
         || report
@@ -357,24 +379,38 @@ pub(crate) async fn auto_apply(
     Ok(summary)
 }
 
-async fn run_one(appstate: &AppState, key: &PluginScheduleKey) -> Result<String, String> {
-    let source = plugin_source(&appstate.store, &key.drive, &key.plugin)
+/// What a run needs before the plugin's code starts: the source it will
+/// execute (the pinned one under auto-apply), the schema bindings and the
+/// validated host that reads as the authorized agent.
+pub(crate) struct PreparedRun {
+    pub source: String,
+    pub schemas: std::collections::BTreeMap<String, String>,
+    pub agent: String,
+    pub host: js_runtime::StoreHost,
+}
+
+/// `what` names the consumer ("trigger", "schedule") in the error shown when
+/// nobody authorized its reads.
+pub(crate) async fn prepare_run(
+    appstate: &AppState,
+    drive: &str,
+    plugin: &str,
+    auto_apply: Option<&AutoApplyGrant>,
+    run_as: Option<&String>,
+    what: &str,
+) -> Result<PreparedRun, String> {
+    let installed = plugin_source(&appstate.store, drive, plugin)
         .await
         .ok_or("the plugin has no source")?;
-
-    let runtime = js_runtime::embedded_runtime().map_err(|e| e.to_string())?;
-
-    let schedule = appstate
-        .store
-        .get_plugin_schedule(key)
-        .map_err(|e| e.to_string())?
-        .ok_or("schedule no longer exists")?;
-    let source = match &schedule.auto_apply {
+    let release = |id: &String| {
+        appstate
+            .store
+            .get_plugin_release(id)
+            .map_err(|e| e.to_string())
+    };
+    let source = match auto_apply {
         Some(grant) => match &grant.release {
-            Some(id) => appstate
-                .store
-                .get_plugin_release(id)
-                .map_err(|e| e.to_string())?
+            Some(id) => release(id)?
                 .source
                 .ok_or("the pinned release is not a JS release")?,
             None => grant
@@ -382,40 +418,57 @@ async fn run_one(appstate: &AppState, key: &PluginScheduleKey) -> Result<String,
                 .clone()
                 .ok_or("reactivate auto-apply to pin the approved source")?,
         },
-        None => source,
+        None => installed,
     };
-    let schemas = match schedule
-        .auto_apply
-        .as_ref()
-        .and_then(|grant| grant.release.as_ref())
-    {
-        Some(id) => {
-            appstate
-                .store
-                .get_plugin_release(id)
-                .map_err(|e| e.to_string())?
-                .schemas
-        }
-        None if schedule.auto_apply.is_none() => {
-            plugin_schema_bindings(&appstate.store, &key.drive, &key.plugin).await?
-        }
-        None => Default::default(),
+    let schemas = match auto_apply {
+        Some(grant) => match &grant.release {
+            Some(id) => release(id)?.schemas,
+            None => Default::default(),
+        },
+        None => plugin_schema_bindings(&appstate.store, drive, plugin).await?,
     };
-    let agent = schedule
-        .run_as
-        .as_ref()
-        .or_else(|| schedule.auto_apply.as_ref().map(|g| &g.agent))
-        .ok_or("reactivate this schedule to authorize its reads")?;
-    let execution_agent = ForAgent::AgentSubject(agent.as_str().into());
+    let agent = run_as
+        .or_else(|| auto_apply.map(|g| &g.agent))
+        .ok_or_else(|| format!("reactivate this {what} to authorize its reads"))?
+        .clone();
     let host = js_runtime::StoreHost {
         db: Arc::new(appstate.store.clone()),
-        plugin: key.plugin.clone(),
-        drive: key.drive.clone(),
-        for_agent: execution_agent,
+        plugin: plugin.to_string(),
+        drive: drive.to_string(),
+        for_agent: ForAgent::AgentSubject(agent.as_str().into()),
         manifest: js_runtime::describe_manifest(&source).await?,
     };
-
     host.validate_binding().await?;
+    Ok(PreparedRun {
+        source,
+        schemas,
+        agent,
+        host,
+    })
+}
+
+async fn run_one(appstate: &AppState, key: &PluginScheduleKey) -> Result<String, String> {
+    let runtime = js_runtime::embedded_runtime().map_err(|e| e.to_string())?;
+
+    let schedule = appstate
+        .store
+        .get_plugin_schedule(key)
+        .map_err(|e| e.to_string())?
+        .ok_or("schedule no longer exists")?;
+    let PreparedRun {
+        source,
+        schemas,
+        agent,
+        host,
+    } = prepare_run(
+        appstate,
+        &key.drive,
+        &key.plugin,
+        schedule.auto_apply.as_ref(),
+        schedule.run_as.as_ref(),
+        "schedule",
+    )
+    .await?;
 
     let input = serde_json::json!({
         "trigger": {"kind":"cron", "id":format!("cron:{}",schedule.last_run_at.unwrap_or(0)), "at":schedule.last_run_at.unwrap_or_else(atomic_lib::utils::now), "subject":key.plugin},

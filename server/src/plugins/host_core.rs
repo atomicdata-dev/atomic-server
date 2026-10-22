@@ -12,10 +12,8 @@
 use std::sync::{Arc, OnceLock};
 
 use atomic_lib::{
-    agents::ForAgent,
-    hierarchy,
-    storelike::{Query, ResourceResponse},
-    urls, Db, Resource, Storelike, Subject, Value,
+    agents::ForAgent, hierarchy, storelike::ResourceResponse, urls, Db, Resource, Storelike,
+    Subject, Value,
 };
 use futures::{Stream, StreamExt};
 use wasmtime::{Engine, Store, StoreLimits, StoreLimitsBuilder};
@@ -397,7 +395,7 @@ impl Grant {
 pub enum FetchPolicy {
     /// Declared operations from a versioned JS manifest: id, method, endpoint
     /// and effect must all match.
-    Operations(Box<Manifest>),
+    Operations(Arc<Manifest>),
     /// A JS draft without a manifest: `GET`/`HEAD` only, to the origins its
     /// secrets are scoped to. "Can reach" and "has a credential for" are the
     /// same thing here, which is wrong for a public API and why versioned
@@ -452,28 +450,13 @@ pub struct HostCore {
     grant: Grant,
     world: World,
     fetch_policy: FetchPolicy,
-    /// The drive queries are scoped to, and the most rows a query may return.
-    query_scope: Option<String>,
-    query_limit: Option<usize>,
 }
 
 impl HostCore {
-    /// A server module no Installation owns (the operator's `global/`
-    /// folder): the public agent. It reads what anyone may read, cannot
-    /// commit, has no secrets, and its queries are scoped to no drive.
-    pub fn for_global_module(db: Arc<Db>) -> Result<Self, String> {
-        Ok(Self {
-            db,
-            drive: None,
-            plugin: None,
-            grant: Grant::new(ForAgent::Public, None)?,
-            world: World::ServerExtension,
-            fetch_policy: FetchPolicy::SecretOrigins,
-            query_scope: None,
-            query_limit: None,
-        })
-    }
-
+    /// A server module no Installation owns (the operator's `global/` folder)
+    /// runs as `ForAgent::Public`: it reads what anyone may read, cannot
+    /// commit and has no secrets.
+    ///
     /// A built-in app (compiled in, see `host_abi::NativeHooks`) serving one
     /// read. It acts for the reader and is bounded by the reader's rights, as
     /// the extender it replaces was; it has no Installation, no secrets and no
@@ -492,8 +475,6 @@ impl HostCore {
             },
             world: World::ServerExtension,
             fetch_policy: FetchPolicy::SecretOrigins,
-            query_scope: None,
-            query_limit: None,
         }
     }
 
@@ -515,7 +496,7 @@ impl HostCore {
         drive: &str,
         plugin: &str,
         caller: ForAgent,
-        manifest: Option<Manifest>,
+        manifest: Option<Arc<Manifest>>,
     ) -> Result<Self, String> {
         let mut scopes = Scopes::default();
         let installation = match super::installation::resolve(&db, drive, plugin)
@@ -546,11 +527,9 @@ impl HostCore {
             grant: Grant::new(caller, installation)?.with_scopes(scopes),
             world: World::Extension,
             fetch_policy: match manifest {
-                Some(manifest) => FetchPolicy::Operations(Box::new(manifest)),
+                Some(manifest) => FetchPolicy::Operations(manifest),
                 None => FetchPolicy::SecretOrigins,
             },
-            query_scope: Some(drive.to_string()),
-            query_limit: Some(10_000),
         })
     }
 
@@ -606,40 +585,6 @@ impl HostCore {
             .await?;
 
         Ok(resource)
-    }
-
-    /// Resources matching `property = value`, each one authorized for the
-    /// grant. The store filters for the caller; the installation's rights are
-    /// applied on top.
-    pub async fn query(&self, property: &str, value: &str) -> Result<Vec<Resource>, String> {
-        let query = Query {
-            property: Some(property.to_string()),
-            value: Some(Value::String(value.to_string())),
-            limit: self.query_limit.map(|limit| limit + 1),
-            drive: self.query_scope.as_deref().map(Subject::from),
-            for_agent: self.grant.caller.clone(),
-            ..Default::default()
-        };
-
-        let result = self.db.query(&query).await.map_err(|e| e.to_string())?;
-
-        if let Some(limit) = self.query_limit {
-            if result.subjects.len() > limit || result.count != result.subjects.len() {
-                return Err(format!(
-                    "sandbox query is incomplete or exceeds {limit} records"
-                ));
-            }
-        }
-
-        let mut resources = Vec::with_capacity(result.resources.len());
-        for resource in result.resources {
-            self.grant
-                .check_installation_read(&self.db, &resource)
-                .await?;
-            resources.push(resource);
-        }
-
-        Ok(resources)
     }
 
     /// The installation's config as a JSON object, `{}` when it has none.
@@ -941,7 +886,7 @@ mod tests {
             &fixture.drive,
             &fixture.plugin,
             ForAgent::AgentSubject(agent.subject.clone()),
-            Some(js_manifest(origin)),
+            Some(Arc::new(js_manifest(origin))),
         )
         .await
         .unwrap()
@@ -952,7 +897,7 @@ mod tests {
             &fixture.drive,
             &fixture.plugin,
             ForAgent::AgentSubject(agent.subject.clone()),
-            Some(js_manifest(origin)),
+            Some(Arc::new(js_manifest(origin))),
         )
         .await
         .unwrap();
@@ -1028,11 +973,6 @@ mod tests {
         .await
         .unwrap();
         assert!(stranger.get_resource(&hidden).await.is_err());
-        let found = stranger
-            .query(urls::NAME, "host-core-hidden")
-            .await
-            .unwrap();
-        assert!(found.iter().all(|r| r.get_subject().as_str() != hidden));
         // The stranger may still read its own plugin: the refusal above is
         // about rights, not about the host being broken.
         assert!(stranger.get_resource(&fixture.plugin).await.is_ok());

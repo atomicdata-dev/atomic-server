@@ -62,15 +62,6 @@ fn status_of(code: &str) -> StatusCode {
     }
 }
 
-fn effect_name(effect: ExportEffect) -> &'static str {
-    match effect {
-        ExportEffect::Read => "read",
-        ExportEffect::Write => "write",
-        ExportEffect::External => "external",
-        ExportEffect::Interactive => "interactive",
-    }
-}
-
 #[tracing::instrument(skip(appstate, raw, req))]
 pub async fn handle_host_call(
     appstate: web::Data<AppState>,
@@ -109,15 +100,10 @@ pub async fn handle_host_call(
     // the call on to one that writes.
     let budget = match &body.allow_effects {
         Some(allowed) => CallBudget::default().only(
-            [
-                ExportEffect::Read,
-                ExportEffect::Write,
-                ExportEffect::External,
-                ExportEffect::Interactive,
-            ]
-            .into_iter()
-            .filter(|e| allowed.iter().any(|a| a == effect_name(*e)))
-            .collect(),
+            allowed
+                .iter()
+                .filter_map(|name| ExportEffect::from_name(name))
+                .collect(),
         ),
         None => CallBudget::default(),
     };

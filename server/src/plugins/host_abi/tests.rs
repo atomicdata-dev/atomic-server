@@ -26,7 +26,7 @@ use super::{
         store::{Host as _, Intent, Outcome, QuerySpec},
         types::{PropVal, Value as WitValue},
     },
-    call_as, call_entry, code,
+    call_for_agent, code,
     run::{app_error, build_host, with_deadline, AbiState},
     CallBudget, HostAbiRegistry, HostError, MAX_CALL_DEPTH,
 };
@@ -239,7 +239,7 @@ impl World {
         args: Json,
         caller: ForAgent,
     ) -> Result<Json, HostError> {
-        call_as(
+        call_for_agent(
             &self.registry,
             &self.db,
             &self.f.drive,
@@ -247,6 +247,7 @@ impl World {
             function,
             &args.to_string(),
             caller,
+            Arc::new(CallBudget::default()),
         )
         .await
         .map(|text| serde_json::from_str(&text).unwrap())
@@ -262,7 +263,7 @@ impl World {
         budget: Arc<CallBudget>,
     ) -> Result<Json, HostError> {
         self.registry.refresh(&self.db, &self.f.drive).await;
-        call_entry(
+        call_for_agent(
             &self.registry,
             &self.db,
             &self.f.drive,
@@ -271,7 +272,6 @@ impl World {
             &args.to_string(),
             caller,
             budget,
-            super::ENTRY_TIMEOUT,
         )
         .await
         .map(|text| serde_json::from_str(&text).unwrap())
@@ -503,8 +503,8 @@ async fn the_callee_never_gets_the_callers_rights() {
         .unwrap_err();
 
     assert!(
-        err.message.contains("Proposed"),
-        "the counter's write was only proposed: {err:?}"
+        err.message.contains("Refused"),
+        "the counter's write was refused: {err:?}"
     );
     assert_eq!(
         count_of(db, &subject, &property).await,
@@ -521,20 +521,24 @@ async fn without_a_write_grant_apply_is_proposed_and_without_the_callers_rights_
     let (subject, property) = counter_resource(&w.f).await;
     share(db, &subject, &[&counter.agent], &[]).await;
 
-    // The owner may write, the app may not: proposed, kept for review.
+    // The owner may write, the app may not: refused, with the reason.
     let mut state = w.state(&counter, owner(db)).await;
     let applied = state
         .apply(vec![set(&subject, &property, WitValue::Integer(41))])
         .await
         .unwrap();
-    assert_eq!(applied.outcome, Outcome::Proposed, "{applied:?}");
+    assert_eq!(applied.outcome, Outcome::Refused, "{applied:?}");
     assert!(applied.undo_token.is_none());
+    assert!(
+        applied
+            .problems
+            .iter()
+            .any(|p| p.message.contains("write right")),
+        "{applied:?}"
+    );
     assert_eq!(count_of(db, &subject, &property).await, 0);
-    let kept = w.registry.proposals(&w.f.drive, &counter.installation);
-    assert_eq!(kept.len(), 1);
-    assert_eq!(kept[0].verdict["intents"][0]["subject"], json!(subject));
 
-    // Nobody who asked may write: refused, and not kept.
+    // Nobody who asked may write: refused.
     let mut state = w.state(&counter, ForAgent::Public).await;
     let applied = state
         .apply(vec![set(&subject, &property, WitValue::Integer(41))])
@@ -542,12 +546,6 @@ async fn without_a_write_grant_apply_is_proposed_and_without_the_callers_rights_
         .unwrap();
     assert_eq!(applied.outcome, Outcome::Refused, "{applied:?}");
     assert_eq!(count_of(db, &subject, &property).await, 0);
-    assert_eq!(
-        w.registry
-            .proposals(&w.f.drive, &counter.installation)
-            .len(),
-        1
-    );
 
     // Both may: committed.
     share(db, &subject, &[&counter.agent], &[&counter.agent]).await;
@@ -989,19 +987,14 @@ async fn query_filters_pages_with_a_cursor_and_says_when_it_is_complete() {
         code::UNSUPPORTED
     );
 
-    // A subscription is stored and can be dropped.
-    let id = state.subscribe(spec(None, None, vec![])).await.unwrap();
     assert_eq!(
-        w.registry
-            .subscriptions(&w.f.drive, &counter.installation)
-            .len(),
-        1
+        state
+            .subscribe(spec(None, None, vec![]))
+            .await
+            .unwrap_err()
+            .code,
+        code::UNSUPPORTED
     );
-    state.unsubscribe(id).await;
-    assert!(w
-        .registry
-        .subscriptions(&w.f.drive, &counter.installation)
-        .is_empty());
 }
 
 /// Reads everything pending and acknowledges it, so a test starts from "now".
@@ -1547,6 +1540,35 @@ async fn a_release_that_cannot_be_loaded_is_not_compiled_again_on_every_call() {
 }
 
 #[actix_rt::test]
+async fn two_spellings_of_one_drive_are_one_registration() {
+    let w = World::new("host_abi_drive_spellings").await;
+    let db = &*w.db;
+    let counter = install(&w.f, "counter", COUNTER_MANIFEST, COUNTER_WASM).await;
+
+    w.registry.refresh(db, &w.f.drive).await;
+    let hinted = format!("{}?drive=elsewhere", w.f.drive);
+    assert_eq!(w.registry.providers(&hinted, COUNTER).len(), 1);
+    assert!(w.registry.app(&hinted, &counter.installation).is_some());
+
+    // Registering again under the other spelling replaces, not adds.
+    let app = w.registry.app(&w.f.drive, &counter.installation).unwrap();
+    let wasm = COUNTER_WASM;
+    w.registry
+        .register(
+            &hinted,
+            &counter.installation,
+            app.release_id.clone(),
+            (*app.manifest).clone(),
+            wasm,
+        )
+        .unwrap();
+    assert_eq!(w.registry.providers(&w.f.drive, COUNTER).len(), 1);
+
+    w.registry.unregister(&hinted, &counter.installation);
+    assert!(w.registry.providers(&w.f.drive, COUNTER).is_empty());
+}
+
+#[actix_rt::test]
 async fn get_many_reads_at_most_as_many_as_a_frame_does() {
     let w = World::new("host_abi_get_many_cap").await;
     let db = &*w.db;
@@ -1966,7 +1988,7 @@ async fn a_read_scope_limits_reads_to_its_subtree() {
 }
 
 /// A write scope permits a write inside it. Outside it nothing is written,
-/// whatever the agent holds: the plan is kept as a proposal, as for any write
+/// whatever the agent holds: the apply is refused, as for any write
 /// the app's agent may not make.
 #[actix_rt::test]
 async fn a_write_scope_limits_writes_to_its_subtree() {
@@ -1995,7 +2017,7 @@ async fn a_write_scope_limits_writes_to_its_subtree() {
         .apply(vec![set(&outside, &property, WitValue::Integer(5))])
         .await
         .unwrap();
-    assert_eq!(applied.outcome, Outcome::Proposed, "{applied:?}");
+    assert_eq!(applied.outcome, Outcome::Refused, "{applied:?}");
     assert!(
         applied
             .problems
