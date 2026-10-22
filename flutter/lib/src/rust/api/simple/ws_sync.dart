@@ -6,8 +6,12 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `catch_up_drive`, `ensure_drive_materialized`, `fetch_resource_state`, `follow_drive`, `handle_ws_message`, `ws_client_slot`, `ws_task_slot`
+// These functions are ignored because they are not marked as `pub`: `catch_up_drive`, `catch_up_drive`, `client`, `close`, `drain_outbox`, `ensure_drive_materialized`, `fetch_resource_state`, `follow_drive`, `follow_drive`, `handle_ws_message`, `is_open`, `open`, `origin`, `post_commit`, `set_origin`
+// These functions are ignored because they have generic arguments: `post`, `post`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `SinkTransport`, `SyncSession`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `post_commit`
 // These functions are ignored (category: IgnoreBecauseExplicitAttribute): `drain_outbox`
+// These functions are ignored (category: IgnoreBecauseOwnerTyShouldIgnore): `default`
 
 /// `http://host:9883` → `ws://host:9883/ws`
 Future<String> serverOriginToWsUrl({required String origin}) =>
@@ -20,7 +24,7 @@ Future<void> closeWsSync() =>
 Future<void> openWsSync({required String serverOrigin}) => RustLib.instance.api
     .crateApiSimpleWsSyncOpenWsSync(serverOrigin: serverOrigin);
 
-/// Post a commit JSON-AD over the open WS session (falls back to error if closed).
+/// Post a commit JSON-AD over the default store's session (an error if closed).
 Future<String> postCommitOverWs({required String commitJson}) =>
     RustLib.instance.api
         .crateApiSimpleWsSyncPostCommitOverWs(commitJson: commitJson);

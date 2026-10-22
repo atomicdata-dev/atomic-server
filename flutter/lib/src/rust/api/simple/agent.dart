@@ -7,7 +7,8 @@ import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'types.dart';
 
-/// Create an agent and a personal drive in one call. Pure local — no networking.
+/// Create an agent and a personal drive in one call (the default store's
+/// [`AtomicStore::setup`]). Pure local — no networking.
 /// Call `start_peer()` + `peer_announce()` afterwards if you want to be discoverable.
 Future<SetupResult> setup({required String name}) =>
     RustLib.instance.api.crateApiSimpleAgentSetup(name: name);

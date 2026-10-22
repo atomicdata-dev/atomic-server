@@ -83,7 +83,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -512513935;
+  int get rustContentHash => 405786243;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -97,10 +97,34 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 abstract class RustLibApi extends BaseApi {
   String? crateApiResourcesAtomicStoreAgentSubject({required AtomicStore that});
 
+  Future<String> crateApiResourcesAtomicStoreAppendChatEntry(
+      {required AtomicStore that,
+      required String chat,
+      required String role,
+      required String partsJson});
+
+  Future<void> crateApiResourcesAtomicStoreCloseWsSync(
+      {required AtomicStore that});
+
+  String? crateApiResourcesAtomicStoreConnectedServer(
+      {required AtomicStore that});
+
+  Future<String> crateApiResourcesAtomicStoreCreateAiChat(
+      {required AtomicStore that, required String name});
+
+  Future<String> crateApiResourcesAtomicStoreCreateResourceOfClass(
+      {required AtomicStore that,
+      required String drive,
+      required String classUrl,
+      required String name});
+
   Future<String> crateApiResourcesAtomicStoreCreateResourceWithValues(
       {required AtomicStore that, required List<PropValue> values});
 
   String? crateApiResourcesAtomicStoreDrive({required AtomicStore that});
+
+  Future<void> crateApiResourcesAtomicStoreFollowConversation(
+      {required AtomicStore that, required String subject});
 
   Future<List<String>> crateApiResourcesAtomicStoreGetChildSubjects(
       {required AtomicStore that, required String parent, required int limit});
@@ -108,11 +132,122 @@ abstract class RustLibApi extends BaseApi {
   Future<ResourceData> crateApiResourcesAtomicStoreGetResourceData(
       {required AtomicStore that, required String subject});
 
+  Future<String> crateApiResourcesAtomicStoreImportAiChat(
+      {required AtomicStore that,
+      required String name,
+      required String entriesJson});
+
+  bool crateApiResourcesAtomicStoreIsSyncing({required AtomicStore that});
+
+  Future<List<ActivityEntry>> crateApiResourcesAtomicStoreListActivity(
+      {required AtomicStore that,
+      required int limit,
+      required bool includeOwn});
+
+  Future<List<ActivityEntry>> crateApiResourcesAtomicStoreListActivityPage(
+      {required AtomicStore that,
+      PlatformInt64? beforeAt,
+      String? beforeSubject,
+      required int limit,
+      required bool includeOwn});
+
+  Future<String> crateApiResourcesAtomicStoreListAiChats(
+      {required AtomicStore that, required int limit, required int offset});
+
+  Future<String> crateApiResourcesAtomicStoreListChildren(
+      {required AtomicStore that, required String parent, required int limit});
+
+  Future<String> crateApiResourcesAtomicStoreListConversations(
+      {required AtomicStore that, required int limit});
+
+  Future<String> crateApiResourcesAtomicStoreListFavorites(
+      {required AtomicStore that, required int limit});
+
+  Future<String> crateApiResourcesAtomicStoreListNotifications(
+      {required AtomicStore that, required int limit});
+
+  Future<String> crateApiResourcesAtomicStoreListRecentResources(
+      {required AtomicStore that, required String drive, required int limit});
+
+  Future<StoreAgentLoad> crateApiResourcesAtomicStoreLoadAgent(
+      {required AtomicStore that, required String secret});
+
+  Future<void> crateApiResourcesAtomicStoreMarkNotificationRead(
+      {required AtomicStore that, required String subject});
+
+  Future<void> crateApiResourcesAtomicStoreMoveResource(
+      {required AtomicStore that,
+      required String subject,
+      required String newParent,
+      required int index});
+
   Future<String> crateApiResourcesAtomicStoreNewDrive(
       {required AtomicStore that, required String name});
 
+  void crateApiResourcesAtomicStoreNoteResourceOpened(
+      {required AtomicStore that,
+      required String drive,
+      required String subject});
+
   Future<AtomicStore> crateApiResourcesAtomicStoreOpen(
       {required String path, String? agentSecret, String? drive});
+
+  Future<void> crateApiResourcesAtomicStoreOpenWsSync(
+      {required AtomicStore that, required String serverOrigin});
+
+  Future<bool> crateApiResourcesAtomicStorePushPending(
+      {required AtomicStore that});
+
+  Future<String> crateApiResourcesAtomicStoreReadChat(
+      {required AtomicStore that, required String subject});
+
+  Future<String> crateApiResourcesAtomicStoreReadChatAfter(
+      {required AtomicStore that,
+      required String subject,
+      required String after,
+      required int limit});
+
+  Future<String> crateApiResourcesAtomicStoreReadChatPage(
+      {required AtomicStore that,
+      required String subject,
+      String? before,
+      required int limit});
+
+  Future<String> crateApiResourcesAtomicStoreReadChatRoom(
+      {required AtomicStore that, required String subject});
+
+  Future<String> crateApiResourcesAtomicStoreReadChatRoomAfter(
+      {required AtomicStore that,
+      required String subject,
+      required String after,
+      required int limit});
+
+  Future<String> crateApiResourcesAtomicStoreReadChatRoomPage(
+      {required AtomicStore that,
+      required String subject,
+      String? before,
+      required int limit});
+
+  Future<String> crateApiResourcesAtomicStoreReadConversation(
+      {required AtomicStore that, required String subject});
+
+  Future<String> crateApiResourcesAtomicStoreReadConversationAfter(
+      {required AtomicStore that,
+      required String subject,
+      required String after,
+      required int limit});
+
+  Future<String> crateApiResourcesAtomicStoreReadConversationPage(
+      {required AtomicStore that,
+      required String subject,
+      String? before,
+      required int limit});
+
+  Future<String> crateApiResourcesAtomicStoreResourceIcons(
+      {required AtomicStore that, required List<String> subjects});
+
+  String crateApiResourcesAtomicStoreResourceWebUrl(
+      {required AtomicStore that, required String subject});
 
   Future<void> crateApiResourcesAtomicStoreSaveResourceChanges(
       {required AtomicStore that,
@@ -120,11 +255,29 @@ abstract class RustLibApi extends BaseApi {
       required List<PropValue> changes,
       required List<String> remove});
 
+  Future<String> crateApiResourcesAtomicStoreSearch(
+      {required AtomicStore that,
+      String? drive,
+      required String query,
+      required int limit,
+      required List<String> classes});
+
   Future<List<SearchHit>> crateApiResourcesAtomicStoreSearchResources(
       {required AtomicStore that,
       required String query,
       String? drive,
       required int limit});
+
+  Future<String> crateApiResourcesAtomicStoreSendChatRoomMessage(
+      {required AtomicStore that,
+      required String subject,
+      required String text,
+      String? replyTo});
+
+  Future<String> crateApiResourcesAtomicStoreSendConversationMessage(
+      {required AtomicStore that,
+      required String subject,
+      required String text});
 
   void crateApiResourcesAtomicStoreSetDrive(
       {required AtomicStore that, required String drive});
@@ -139,6 +292,9 @@ abstract class RustLibApi extends BaseApi {
       {required AtomicStore that,
       required String subject,
       required int timeoutMs});
+
+  Future<void> crateApiResourcesAtomicStoreWarmSearch(
+      {required AtomicStore that});
 
   void crateApiSimplePeersAddKnownPeer(
       {required String nodeId, required String name});
@@ -448,6 +604,154 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<String> crateApiResourcesAtomicStoreAppendChatEntry(
+      {required AtomicStore that,
+      required String chat,
+      required String role,
+      required String partsJson}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(chat, serializer);
+        sse_encode_String(role, serializer);
+        sse_encode_String(partsJson, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 2, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreAppendChatEntryConstMeta,
+      argValues: [that, chat, role, partsJson],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreAppendChatEntryConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_append_chat_entry",
+        argNames: ["that", "chat", "role", "partsJson"],
+      );
+
+  @override
+  Future<void> crateApiResourcesAtomicStoreCloseWsSync(
+      {required AtomicStore that}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 3, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_unit,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreCloseWsSyncConstMeta,
+      argValues: [that],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreCloseWsSyncConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_close_ws_sync",
+        argNames: ["that"],
+      );
+
+  @override
+  String? crateApiResourcesAtomicStoreConnectedServer(
+      {required AtomicStore that}) {
+    return handler.executeSync(SyncTask(
+      callFfi: () {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4)!;
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_opt_String,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreConnectedServerConstMeta,
+      argValues: [that],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreConnectedServerConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_connected_server",
+        argNames: ["that"],
+      );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreCreateAiChat(
+      {required AtomicStore that, required String name}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(name, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 5, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreCreateAiChatConstMeta,
+      argValues: [that, name],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreCreateAiChatConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_create_ai_chat",
+        argNames: ["that", "name"],
+      );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreCreateResourceOfClass(
+      {required AtomicStore that,
+      required String drive,
+      required String classUrl,
+      required String name}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(drive, serializer);
+        sse_encode_String(classUrl, serializer);
+        sse_encode_String(name, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 6, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreCreateResourceOfClassConstMeta,
+      argValues: [that, drive, classUrl, name],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta
+      get kCrateApiResourcesAtomicStoreCreateResourceOfClassConstMeta =>
+          const TaskConstMeta(
+            debugName: "AtomicStore_create_resource_of_class",
+            argNames: ["that", "drive", "classUrl", "name"],
+          );
+
+  @override
   Future<String> crateApiResourcesAtomicStoreCreateResourceWithValues(
       {required AtomicStore that, required List<PropValue> values}) {
     return handler.executeNormal(NormalTask(
@@ -457,7 +761,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that, serializer);
         sse_encode_list_prop_value(values, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 2, port: port_);
+            funcId: 7, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -483,7 +787,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
             that, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_opt_String,
@@ -502,6 +806,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiResourcesAtomicStoreFollowConversation(
+      {required AtomicStore that, required String subject}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(subject, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 9, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_unit,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreFollowConversationConstMeta,
+      argValues: [that, subject],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreFollowConversationConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_follow_conversation",
+        argNames: ["that", "subject"],
+      );
+
+  @override
   Future<List<String>> crateApiResourcesAtomicStoreGetChildSubjects(
       {required AtomicStore that, required String parent, required int limit}) {
     return handler.executeNormal(NormalTask(
@@ -512,7 +844,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(parent, serializer);
         sse_encode_u_32(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 4, port: port_);
+            funcId: 10, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_list_String,
@@ -540,7 +872,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that, serializer);
         sse_encode_String(subject, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 5, port: port_);
+            funcId: 11, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_resource_data,
@@ -559,6 +891,389 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<String> crateApiResourcesAtomicStoreImportAiChat(
+      {required AtomicStore that,
+      required String name,
+      required String entriesJson}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(name, serializer);
+        sse_encode_String(entriesJson, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 12, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreImportAiChatConstMeta,
+      argValues: [that, name, entriesJson],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreImportAiChatConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_import_ai_chat",
+        argNames: ["that", "name", "entriesJson"],
+      );
+
+  @override
+  bool crateApiResourcesAtomicStoreIsSyncing({required AtomicStore that}) {
+    return handler.executeSync(SyncTask(
+      callFfi: () {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13)!;
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_bool,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreIsSyncingConstMeta,
+      argValues: [that],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreIsSyncingConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_is_syncing",
+        argNames: ["that"],
+      );
+
+  @override
+  Future<List<ActivityEntry>> crateApiResourcesAtomicStoreListActivity(
+      {required AtomicStore that,
+      required int limit,
+      required bool includeOwn}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_u_32(limit, serializer);
+        sse_encode_bool(includeOwn, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 14, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_list_activity_entry,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreListActivityConstMeta,
+      argValues: [that, limit, includeOwn],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreListActivityConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_list_activity",
+        argNames: ["that", "limit", "includeOwn"],
+      );
+
+  @override
+  Future<List<ActivityEntry>> crateApiResourcesAtomicStoreListActivityPage(
+      {required AtomicStore that,
+      PlatformInt64? beforeAt,
+      String? beforeSubject,
+      required int limit,
+      required bool includeOwn}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_opt_box_autoadd_i_64(beforeAt, serializer);
+        sse_encode_opt_String(beforeSubject, serializer);
+        sse_encode_u_32(limit, serializer);
+        sse_encode_bool(includeOwn, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 15, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_list_activity_entry,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreListActivityPageConstMeta,
+      argValues: [that, beforeAt, beforeSubject, limit, includeOwn],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreListActivityPageConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_list_activity_page",
+        argNames: ["that", "beforeAt", "beforeSubject", "limit", "includeOwn"],
+      );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreListAiChats(
+      {required AtomicStore that, required int limit, required int offset}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_u_32(limit, serializer);
+        sse_encode_u_32(offset, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 16, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreListAiChatsConstMeta,
+      argValues: [that, limit, offset],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreListAiChatsConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_list_ai_chats",
+        argNames: ["that", "limit", "offset"],
+      );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreListChildren(
+      {required AtomicStore that, required String parent, required int limit}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(parent, serializer);
+        sse_encode_u_32(limit, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 17, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreListChildrenConstMeta,
+      argValues: [that, parent, limit],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreListChildrenConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_list_children",
+        argNames: ["that", "parent", "limit"],
+      );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreListConversations(
+      {required AtomicStore that, required int limit}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_u_32(limit, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 18, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreListConversationsConstMeta,
+      argValues: [that, limit],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreListConversationsConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_list_conversations",
+        argNames: ["that", "limit"],
+      );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreListFavorites(
+      {required AtomicStore that, required int limit}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_u_32(limit, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 19, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreListFavoritesConstMeta,
+      argValues: [that, limit],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreListFavoritesConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_list_favorites",
+        argNames: ["that", "limit"],
+      );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreListNotifications(
+      {required AtomicStore that, required int limit}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_u_32(limit, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 20, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreListNotificationsConstMeta,
+      argValues: [that, limit],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreListNotificationsConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_list_notifications",
+        argNames: ["that", "limit"],
+      );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreListRecentResources(
+      {required AtomicStore that, required String drive, required int limit}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(drive, serializer);
+        sse_encode_u_32(limit, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 21, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreListRecentResourcesConstMeta,
+      argValues: [that, drive, limit],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreListRecentResourcesConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_list_recent_resources",
+        argNames: ["that", "drive", "limit"],
+      );
+
+  @override
+  Future<StoreAgentLoad> crateApiResourcesAtomicStoreLoadAgent(
+      {required AtomicStore that, required String secret}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(secret, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 22, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_store_agent_load,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreLoadAgentConstMeta,
+      argValues: [that, secret],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreLoadAgentConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_load_agent",
+        argNames: ["that", "secret"],
+      );
+
+  @override
+  Future<void> crateApiResourcesAtomicStoreMarkNotificationRead(
+      {required AtomicStore that, required String subject}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(subject, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 23, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_unit,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreMarkNotificationReadConstMeta,
+      argValues: [that, subject],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta
+      get kCrateApiResourcesAtomicStoreMarkNotificationReadConstMeta =>
+          const TaskConstMeta(
+            debugName: "AtomicStore_mark_notification_read",
+            argNames: ["that", "subject"],
+          );
+
+  @override
+  Future<void> crateApiResourcesAtomicStoreMoveResource(
+      {required AtomicStore that,
+      required String subject,
+      required String newParent,
+      required int index}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(subject, serializer);
+        sse_encode_String(newParent, serializer);
+        sse_encode_u_32(index, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 24, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_unit,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreMoveResourceConstMeta,
+      argValues: [that, subject, newParent, index],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreMoveResourceConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_move_resource",
+        argNames: ["that", "subject", "newParent", "index"],
+      );
+
+  @override
   Future<String> crateApiResourcesAtomicStoreNewDrive(
       {required AtomicStore that, required String name}) {
     return handler.executeNormal(NormalTask(
@@ -568,7 +1283,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that, serializer);
         sse_encode_String(name, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 6, port: port_);
+            funcId: 25, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -587,6 +1302,36 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  void crateApiResourcesAtomicStoreNoteResourceOpened(
+      {required AtomicStore that,
+      required String drive,
+      required String subject}) {
+    return handler.executeSync(SyncTask(
+      callFfi: () {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(drive, serializer);
+        sse_encode_String(subject, serializer);
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_unit,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreNoteResourceOpenedConstMeta,
+      argValues: [that, drive, subject],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreNoteResourceOpenedConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_note_resource_opened",
+        argNames: ["that", "drive", "subject"],
+      );
+
+  @override
   Future<AtomicStore> crateApiResourcesAtomicStoreOpen(
       {required String path, String? agentSecret, String? drive}) {
     return handler.executeNormal(NormalTask(
@@ -596,7 +1341,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_opt_String(agentSecret, serializer);
         sse_encode_opt_String(drive, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 7, port: port_);
+            funcId: 27, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -616,6 +1361,400 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiResourcesAtomicStoreOpenWsSync(
+      {required AtomicStore that, required String serverOrigin}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(serverOrigin, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 28, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_unit,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreOpenWsSyncConstMeta,
+      argValues: [that, serverOrigin],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreOpenWsSyncConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_open_ws_sync",
+        argNames: ["that", "serverOrigin"],
+      );
+
+  @override
+  Future<bool> crateApiResourcesAtomicStorePushPending(
+      {required AtomicStore that}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 29, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_bool,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiResourcesAtomicStorePushPendingConstMeta,
+      argValues: [that],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStorePushPendingConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_push_pending",
+        argNames: ["that"],
+      );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreReadChat(
+      {required AtomicStore that, required String subject}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(subject, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 30, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreReadChatConstMeta,
+      argValues: [that, subject],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreReadChatConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_read_chat",
+        argNames: ["that", "subject"],
+      );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreReadChatAfter(
+      {required AtomicStore that,
+      required String subject,
+      required String after,
+      required int limit}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(subject, serializer);
+        sse_encode_String(after, serializer);
+        sse_encode_u_32(limit, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 31, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreReadChatAfterConstMeta,
+      argValues: [that, subject, after, limit],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreReadChatAfterConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_read_chat_after",
+        argNames: ["that", "subject", "after", "limit"],
+      );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreReadChatPage(
+      {required AtomicStore that,
+      required String subject,
+      String? before,
+      required int limit}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(subject, serializer);
+        sse_encode_opt_String(before, serializer);
+        sse_encode_u_32(limit, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 32, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreReadChatPageConstMeta,
+      argValues: [that, subject, before, limit],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreReadChatPageConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_read_chat_page",
+        argNames: ["that", "subject", "before", "limit"],
+      );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreReadChatRoom(
+      {required AtomicStore that, required String subject}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(subject, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 33, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreReadChatRoomConstMeta,
+      argValues: [that, subject],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreReadChatRoomConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_read_chat_room",
+        argNames: ["that", "subject"],
+      );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreReadChatRoomAfter(
+      {required AtomicStore that,
+      required String subject,
+      required String after,
+      required int limit}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(subject, serializer);
+        sse_encode_String(after, serializer);
+        sse_encode_u_32(limit, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 34, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreReadChatRoomAfterConstMeta,
+      argValues: [that, subject, after, limit],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreReadChatRoomAfterConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_read_chat_room_after",
+        argNames: ["that", "subject", "after", "limit"],
+      );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreReadChatRoomPage(
+      {required AtomicStore that,
+      required String subject,
+      String? before,
+      required int limit}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(subject, serializer);
+        sse_encode_opt_String(before, serializer);
+        sse_encode_u_32(limit, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 35, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreReadChatRoomPageConstMeta,
+      argValues: [that, subject, before, limit],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreReadChatRoomPageConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_read_chat_room_page",
+        argNames: ["that", "subject", "before", "limit"],
+      );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreReadConversation(
+      {required AtomicStore that, required String subject}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(subject, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 36, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreReadConversationConstMeta,
+      argValues: [that, subject],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreReadConversationConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_read_conversation",
+        argNames: ["that", "subject"],
+      );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreReadConversationAfter(
+      {required AtomicStore that,
+      required String subject,
+      required String after,
+      required int limit}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(subject, serializer);
+        sse_encode_String(after, serializer);
+        sse_encode_u_32(limit, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 37, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreReadConversationAfterConstMeta,
+      argValues: [that, subject, after, limit],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta
+      get kCrateApiResourcesAtomicStoreReadConversationAfterConstMeta =>
+          const TaskConstMeta(
+            debugName: "AtomicStore_read_conversation_after",
+            argNames: ["that", "subject", "after", "limit"],
+          );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreReadConversationPage(
+      {required AtomicStore that,
+      required String subject,
+      String? before,
+      required int limit}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(subject, serializer);
+        sse_encode_opt_String(before, serializer);
+        sse_encode_u_32(limit, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 38, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreReadConversationPageConstMeta,
+      argValues: [that, subject, before, limit],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta
+      get kCrateApiResourcesAtomicStoreReadConversationPageConstMeta =>
+          const TaskConstMeta(
+            debugName: "AtomicStore_read_conversation_page",
+            argNames: ["that", "subject", "before", "limit"],
+          );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreResourceIcons(
+      {required AtomicStore that, required List<String> subjects}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_list_String(subjects, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 39, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreResourceIconsConstMeta,
+      argValues: [that, subjects],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreResourceIconsConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_resource_icons",
+        argNames: ["that", "subjects"],
+      );
+
+  @override
+  String crateApiResourcesAtomicStoreResourceWebUrl(
+      {required AtomicStore that, required String subject}) {
+    return handler.executeSync(SyncTask(
+      callFfi: () {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(subject, serializer);
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 40)!;
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreResourceWebUrlConstMeta,
+      argValues: [that, subject],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreResourceWebUrlConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_resource_web_url",
+        argNames: ["that", "subject"],
+      );
+
+  @override
   Future<void> crateApiResourcesAtomicStoreSaveResourceChanges(
       {required AtomicStore that,
       required String subject,
@@ -630,7 +1769,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_list_prop_value(changes, serializer);
         sse_encode_list_String(remove, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 8, port: port_);
+            funcId: 41, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -649,6 +1788,41 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<String> crateApiResourcesAtomicStoreSearch(
+      {required AtomicStore that,
+      String? drive,
+      required String query,
+      required int limit,
+      required List<String> classes}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_opt_String(drive, serializer);
+        sse_encode_String(query, serializer);
+        sse_encode_u_32(limit, serializer);
+        sse_encode_list_String(classes, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 42, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreSearchConstMeta,
+      argValues: [that, drive, query, limit, classes],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreSearchConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_search",
+        argNames: ["that", "drive", "query", "limit", "classes"],
+      );
+
+  @override
   Future<List<SearchHit>> crateApiResourcesAtomicStoreSearchResources(
       {required AtomicStore that,
       required String query,
@@ -663,7 +1837,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_opt_String(drive, serializer);
         sse_encode_u_32(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 9, port: port_);
+            funcId: 43, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_list_search_hit,
@@ -682,6 +1856,71 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<String> crateApiResourcesAtomicStoreSendChatRoomMessage(
+      {required AtomicStore that,
+      required String subject,
+      required String text,
+      String? replyTo}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(subject, serializer);
+        sse_encode_String(text, serializer);
+        sse_encode_opt_String(replyTo, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 44, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreSendChatRoomMessageConstMeta,
+      argValues: [that, subject, text, replyTo],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreSendChatRoomMessageConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_send_chat_room_message",
+        argNames: ["that", "subject", "text", "replyTo"],
+      );
+
+  @override
+  Future<String> crateApiResourcesAtomicStoreSendConversationMessage(
+      {required AtomicStore that,
+      required String subject,
+      required String text}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        sse_encode_String(subject, serializer);
+        sse_encode_String(text, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 45, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreSendConversationMessageConstMeta,
+      argValues: [that, subject, text],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta
+      get kCrateApiResourcesAtomicStoreSendConversationMessageConstMeta =>
+          const TaskConstMeta(
+            debugName: "AtomicStore_send_conversation_message",
+            argNames: ["that", "subject", "text"],
+          );
+
+  @override
   void crateApiResourcesAtomicStoreSetDrive(
       {required AtomicStore that, required String drive}) {
     return handler.executeSync(SyncTask(
@@ -690,7 +1929,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
             that, serializer);
         sse_encode_String(drive, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 46)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -718,7 +1957,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that, serializer);
         sse_encode_String(name, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 11, port: port_);
+            funcId: 47, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_store_setup,
@@ -746,7 +1985,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that, serializer);
         sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
             other, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 48)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_bool,
@@ -777,7 +2016,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(subject, serializer);
         sse_encode_u_32(timeoutMs, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 13, port: port_);
+            funcId: 49, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_resource_event,
@@ -797,6 +2036,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
 
   @override
+  Future<void> crateApiResourcesAtomicStoreWarmSearch(
+      {required AtomicStore that}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerAtomicStore(
+            that, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 50, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_unit,
+        decodeErrorData: sse_decode_atomic_error,
+      ),
+      constMeta: kCrateApiResourcesAtomicStoreWarmSearchConstMeta,
+      argValues: [that],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiResourcesAtomicStoreWarmSearchConstMeta =>
+      const TaskConstMeta(
+        debugName: "AtomicStore_warm_search",
+        argNames: ["that"],
+      );
+
+  @override
   void crateApiSimplePeersAddKnownPeer(
       {required String nodeId, required String name}) {
     return handler.executeSync(SyncTask(
@@ -804,7 +2070,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(nodeId, serializer);
         sse_encode_String(name, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 51)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -828,7 +2094,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(secret, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 52)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_agent_info,
@@ -856,7 +2122,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(role, serializer);
         sse_encode_String(partsJson, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 16, port: port_);
+            funcId: 53, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -879,7 +2145,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return handler.executeSync(SyncTask(
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 54)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_background_activity,
@@ -903,7 +2169,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 18, port: port_);
+            funcId: 55, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -927,7 +2193,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 19, port: port_);
+            funcId: 56, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -951,7 +2217,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 20, port: port_);
+            funcId: 57, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -976,7 +2242,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(origin, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 21, port: port_);
+            funcId: 58, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -1000,7 +2266,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(name, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 59)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_agent_info,
@@ -1025,7 +2291,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(name, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 23, port: port_);
+            funcId: 60, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1050,7 +2316,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(name, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 24, port: port_);
+            funcId: 61, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1077,7 +2343,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(parentSubject, serializer);
         sse_encode_String(name, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 25, port: port_);
+            funcId: 62, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1105,7 +2371,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(classUrl, serializer);
         sse_encode_String(name, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 26, port: port_);
+            funcId: 63, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1131,7 +2397,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_list_prop_value(values, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 27, port: port_);
+            funcId: 64, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1154,7 +2420,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return handler.executeSync(SyncTask(
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 65)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1181,7 +2447,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(method, serializer);
         sse_encode_String(argsJson, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 29, port: port_);
+            funcId: 66, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1205,7 +2471,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(file, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 30, port: port_);
+            funcId: 67, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_list_prim_u_8_strict,
@@ -1229,7 +2495,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 31, port: port_);
+            funcId: 68, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -1253,7 +2519,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(subject, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 32, port: port_);
+            funcId: 69, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -1279,7 +2545,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(body, serializer);
         sse_encode_String(drive, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 33)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 70)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_bool,
@@ -1303,7 +2569,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 34, port: port_);
+            funcId: 71, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_opt_box_autoadd_agent_info,
@@ -1326,7 +2592,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return handler.executeSync(SyncTask(
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 72)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_opt_String,
@@ -1353,7 +2619,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(parent, serializer);
         sse_encode_u_32(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 36, port: port_);
+            funcId: 73, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_list_String,
@@ -1376,7 +2642,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return handler.executeSync(SyncTask(
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 37)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 74)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1399,7 +2665,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return handler.executeSync(SyncTask(
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 38)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 75)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_opt_String,
@@ -1422,7 +2688,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return handler.executeSync(SyncTask(
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 39)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 76)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1445,7 +2711,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return handler.executeSync(SyncTask(
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 40)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 77)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1469,7 +2735,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 41, port: port_);
+            funcId: 78, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1492,7 +2758,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return handler.executeSync(SyncTask(
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 42)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 79)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_opt_String,
@@ -1519,7 +2785,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(subject, serializer);
         sse_encode_String(property, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 43, port: port_);
+            funcId: 80, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1545,7 +2811,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(subject, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 44, port: port_);
+            funcId: 81, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_resource_data,
@@ -1571,7 +2837,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(subject, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 45, port: port_);
+            funcId: 82, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_list_version_metadata,
@@ -1598,7 +2864,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(name, serializer);
         sse_encode_String(entriesJson, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 46, port: port_);
+            funcId: 83, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1622,7 +2888,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 47, port: port_);
+            funcId: 84, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -1648,7 +2914,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_u_32(limit, serializer);
         sse_encode_bool(includeOwn, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 48, port: port_);
+            funcId: 85, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_list_activity_entry,
@@ -1680,7 +2946,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_u_32(limit, serializer);
         sse_encode_bool(includeOwn, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 49, port: port_);
+            funcId: 86, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_list_activity_entry,
@@ -1707,7 +2973,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_u_32(limit, serializer);
         sse_encode_u_32(offset, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 50, port: port_);
+            funcId: 87, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1734,7 +3000,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(parent, serializer);
         sse_encode_u_32(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 51, port: port_);
+            funcId: 88, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1759,7 +3025,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_u_32(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 52, port: port_);
+            funcId: 89, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1783,7 +3049,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 53, port: port_);
+            funcId: 90, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_list_String,
@@ -1807,7 +3073,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 54, port: port_);
+            funcId: 91, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1832,7 +3098,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_u_32(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 55, port: port_);
+            funcId: 92, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1857,7 +3123,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_u_32(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 56, port: port_);
+            funcId: 93, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1884,7 +3150,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(drive, serializer);
         sse_encode_u_32(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 57, port: port_);
+            funcId: 94, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1907,7 +3173,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return handler.executeSync(SyncTask(
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 58)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 95)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_i_32,
@@ -1930,7 +3196,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return handler.executeSync(SyncTask(
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 59)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 96)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_list_String,
@@ -1953,7 +3219,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return handler.executeSync(SyncTask(
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 60)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 97)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -1978,7 +3244,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(secret, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 61, port: port_);
+            funcId: 98, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2004,7 +3270,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(subject, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 62, port: port_);
+            funcId: 99, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -2034,7 +3300,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(newParent, serializer);
         sse_encode_u_32(index, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 63, port: port_);
+            funcId: 100, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -2059,7 +3325,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(name, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 64, port: port_);
+            funcId: 101, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2084,7 +3350,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(drive, serializer);
         sse_encode_String(subject, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 65)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 102)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -2109,7 +3375,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(path, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 66, port: port_);
+            funcId: 103, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -2133,7 +3399,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(serverUrl, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 67, port: port_);
+            funcId: 104, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -2158,7 +3424,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(serverOrigin, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 68, port: port_);
+            funcId: 105, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -2183,7 +3449,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(driveSubject, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 69, port: port_);
+            funcId: 106, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -2209,7 +3475,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(driveSubject, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 70, port: port_);
+            funcId: 107, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_i_32,
@@ -2232,7 +3498,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return handler.executeSync(SyncTask(
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 71)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 108)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -2255,7 +3521,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return handler.executeSync(SyncTask(
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 72)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 109)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2280,7 +3546,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(nodeId, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 73, port: port_);
+            funcId: 110, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2305,7 +3571,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_u_32(timeoutMs, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 74, port: port_);
+            funcId: 111, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_opt_String,
@@ -2329,7 +3595,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 75, port: port_);
+            funcId: 112, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2355,7 +3621,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(commitJson, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 76, port: port_);
+            funcId: 113, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2380,7 +3646,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(subject, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 77, port: port_);
+            funcId: 114, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2407,7 +3673,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(after, serializer);
         sse_encode_u_32(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 78, port: port_);
+            funcId: 115, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2435,7 +3701,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_opt_String(before, serializer);
         sse_encode_u_32(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 79, port: port_);
+            funcId: 116, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2460,7 +3726,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(subject, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 80, port: port_);
+            funcId: 117, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2488,7 +3754,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(after, serializer);
         sse_encode_u_32(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 81, port: port_);
+            funcId: 118, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2516,7 +3782,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_opt_String(before, serializer);
         sse_encode_u_32(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 82, port: port_);
+            funcId: 119, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2541,7 +3807,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(subject, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 83, port: port_);
+            funcId: 120, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2569,7 +3835,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(after, serializer);
         sse_encode_u_32(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 84, port: port_);
+            funcId: 121, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2597,7 +3863,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_opt_String(before, serializer);
         sse_encode_u_32(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 85, port: port_);
+            funcId: 122, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2622,7 +3888,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(file, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 86, port: port_);
+            funcId: 123, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_opt_list_prim_u_8_strict,
@@ -2649,7 +3915,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(subject, serializer);
         sse_encode_u_32(maxChars, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 87, port: port_);
+            funcId: 124, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2673,7 +3939,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(nodeId, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 88)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 125)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -2699,7 +3965,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(drive, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 89, port: port_);
+            funcId: 126, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_list_String,
@@ -2725,7 +3991,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_list_String(subjects, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 90, port: port_);
+            funcId: 127, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2749,7 +4015,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(subject, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 91)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 128)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2777,7 +4043,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(secret, serializer);
         sse_encode_opt_String(driveHint, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 92, port: port_);
+            funcId: 129, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2807,7 +4073,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_list_prop_value(changes, serializer);
         sse_encode_list_String(remove, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 93, port: port_);
+            funcId: 130, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -2839,7 +4105,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_u_32(limit, serializer);
         sse_encode_list_String(classes, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 94, port: port_);
+            funcId: 131, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2866,7 +4132,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_opt_String(drive, serializer);
         sse_encode_u_32(limit, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 95, port: port_);
+            funcId: 132, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_list_search_hit,
@@ -2894,7 +4160,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(text, serializer);
         sse_encode_opt_String(replyTo, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 96, port: port_);
+            funcId: 133, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2921,7 +4187,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(subject, serializer);
         sse_encode_String(text, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 97, port: port_);
+            funcId: 134, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2947,7 +4213,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(origin, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 98, port: port_);
+            funcId: 135, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -2972,7 +4238,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(subject, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 99, port: port_);
+            funcId: 136, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -3000,7 +4266,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(description, serializer);
         sse_encode_opt_String(icon, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 100, port: port_);
+            funcId: 137, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -3024,7 +4290,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_bool(foreground, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 101)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 138)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -3048,7 +4314,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(name, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 102)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 139)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -3072,7 +4338,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(subject, serializer);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 103)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 140)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -3102,7 +4368,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(property, serializer);
         sse_encode_String(value, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 104, port: port_);
+            funcId: 141, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -3127,7 +4393,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(name, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 105, port: port_);
+            funcId: 142, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_setup_result,
@@ -3150,7 +4416,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 106, port: port_);
+            funcId: 143, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -3173,7 +4439,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return handler.executeSync(SyncTask(
       callFfi: () {
         final serializer = SseSerializer(generalizedFrbRustBinding);
-        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 107)!;
+        return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 144)!;
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_opt_box_autoadd_store_recovery,
@@ -3197,7 +4463,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 108, port: port_);
+            funcId: 145, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -3221,7 +4487,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 109, port: port_);
+            funcId: 146, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -3246,7 +4512,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(serverUrl, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 110, port: port_);
+            funcId: 147, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_i_32,
@@ -3276,7 +4542,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(mimetype, serializer);
         sse_encode_list_prim_u_8_loose(bytes, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 111, port: port_);
+            funcId: 148, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -3302,7 +4568,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_i_32(current, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 112, port: port_);
+            funcId: 149, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_i_32,
@@ -3329,7 +4595,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(subject, serializer);
         sse_encode_u_32(timeoutMs, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 113, port: port_);
+            funcId: 150, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_resource_event,
@@ -3353,7 +4619,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 114, port: port_);
+            funcId: 151, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -3379,7 +4645,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(subject, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 115, port: port_);
+            funcId: 152, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -3403,7 +4669,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 116, port: port_);
+            funcId: 153, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -3428,7 +4694,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(parent, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 117, port: port_);
+            funcId: 154, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -3454,7 +4720,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(subject, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 118, port: port_);
+            funcId: 155, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_String,
@@ -3797,6 +5063,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       agentSecret: dco_decode_String(arr[0]),
       agentSubject: dco_decode_String(arr[1]),
       driveSubject: dco_decode_String(arr[2]),
+    );
+  }
+
+  @protected
+  StoreAgentLoad dco_decode_store_agent_load(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return StoreAgentLoad(
+      agentSubject: dco_decode_String(arr[0]),
+      needsSync: dco_decode_bool(arr[1]),
     );
   }
 
@@ -4266,6 +5544,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  StoreAgentLoad sse_decode_store_agent_load(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_agentSubject = sse_decode_String(deserializer);
+    var var_needsSync = sse_decode_bool(deserializer);
+    return StoreAgentLoad(
+        agentSubject: var_agentSubject, needsSync: var_needsSync);
+  }
+
+  @protected
   StoreRecovery sse_decode_store_recovery(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_keptPath = sse_decode_String(deserializer);
@@ -4670,6 +5957,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_store_agent_load(
+      StoreAgentLoad self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.agentSubject, serializer);
+    sse_encode_bool(self.needsSync, serializer);
+  }
+
+  @protected
   void sse_encode_store_recovery(StoreRecovery self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.keptPath, serializer);
@@ -4752,6 +6047,45 @@ class AtomicStoreImpl extends RustOpaque implements AtomicStore {
         that: this,
       );
 
+  /// Add a message to a chat: `role` is `user` or `assistant`, `parts_json` the
+  /// message's parts as the web app stores them (`[{"type":"text","text":…}]`).
+  /// It goes on the newest page with room, or on a new page. Returns the entry's
+  /// id (`<page>#<key>`).
+  Future<String> appendChatEntry(
+          {required String chat,
+          required String role,
+          required String partsJson}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreAppendChatEntry(
+          that: this, chat: chat, role: role, partsJson: partsJson);
+
+  /// Close this handle's session. Writes wait in the outbox for the next
+  /// [`AtomicStore::open_ws_sync`].
+  Future<void> closeWsSync() =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreCloseWsSync(
+        that: this,
+      );
+
+  /// The server this handle's session was last opened on.
+  String? connectedServer() =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreConnectedServer(
+        that: this,
+      );
+
+  /// Start an AI chat named `name` in the agent's private drive, as the web
+  /// app's AI sidebar does. Returns the chat's subject.
+  Future<String> createAiChat({required String name}) => RustLib.instance.api
+      .crateApiResourcesAtomicStoreCreateAiChat(that: this, name: name);
+
+  /// Create a resource of `class_url` named `name` ("Untitled" when empty)
+  /// under `drive`, signed by this device's agent, and push it like every other
+  /// local write. Returns its subject.
+  Future<String> createResourceOfClass(
+          {required String drive,
+          required String classUrl,
+          required String name}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreCreateResourceOfClass(
+          that: this, drive: drive, classUrl: classUrl, name: name);
+
   /// Create a resource with a new subject (a DID derived from the signed
   /// genesis commit) holding `values`, signed by this handle's agent.
   /// Returns its subject. `values` should include `isA` and `parent`.
@@ -4764,6 +6098,14 @@ class AtomicStoreImpl extends RustOpaque implements AtomicStore {
   String? drive() => RustLib.instance.api.crateApiResourcesAtomicStoreDrive(
         that: this,
       );
+
+  /// Get a conversation onto this device and follow it: fetched from the
+  /// connected server when missing, and its new messages arrive over the open
+  /// sync session. Errors (no session, not hosted there) are for the caller to
+  /// ignore; reading what is already local does not need this.
+  Future<void> followConversation({required String subject}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreFollowConversation(
+          that: this, subject: subject);
 
   /// The subjects under `parent`, in the order the sidebar shows them (at
   /// most `limit`), without the folders the web hides.
@@ -4778,10 +6120,234 @@ class AtomicStoreImpl extends RustOpaque implements AtomicStore {
       RustLib.instance.api.crateApiResourcesAtomicStoreGetResourceData(
           that: this, subject: subject);
 
+  /// Import a whole AI chat at once: an AI chat named `name` in the agent's
+  /// private drive with every message of `entries_json`, a JSON array of
+  /// `{role, parts, c}` (`parts` as `append_chat_entry` takes them, as an array
+  /// or its JSON string; `c` the message's time in ms, now when absent), oldest
+  /// first. One commit per 256 messages instead of one per message. Returns the
+  /// chat's subject.
+  Future<String> importAiChat(
+          {required String name, required String entriesJson}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreImportAiChat(
+          that: this, name: name, entriesJson: entriesJson);
+
+  /// Whether the session is open now.
+  bool isSyncing() =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreIsSyncing(
+        that: this,
+      );
+
+  /// What changed lately in every drive, newest first, by whom. Read from the
+  /// recents index, which the store's change events keep.
+  /// `include_own` adds the person's own changes (the feed's "Show mine"),
+  /// by `You`.
+  Future<List<ActivityEntry>> listActivity(
+          {required int limit, required bool includeOwn}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreListActivity(
+          that: this, limit: limit, includeOwn: includeOwn);
+
+  /// One page of the full Activity feed, newest first: the entries after the
+  /// one at `before_at` (unix ms) with subject `before_subject` (the last entry
+  /// of the previous page; both `None` for the first page). A page shorter than
+  /// `limit` is the end of the feed.
+  Future<List<ActivityEntry>> listActivityPage(
+          {PlatformInt64? beforeAt,
+          String? beforeSubject,
+          required int limit,
+          required bool includeOwn}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreListActivityPage(
+          that: this,
+          beforeAt: beforeAt,
+          beforeSubject: beforeSubject,
+          limit: limit,
+          includeOwn: includeOwn);
+
+  /// `limit` AI chats of the person (all drives) after the `offset` newest
+  /// ones, newest activity first, as JSON `[{subject, name, last_activity}]`
+  /// (`last_activity` in ms, 0 when empty). A page shorter than `limit` is the
+  /// last. Read from the recents index, not rebuilt from the chats' pages.
+  Future<String> listAiChats({required int limit, required int offset}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreListAiChats(
+          that: this, limit: limit, offset: offset);
+
+  /// The children of `parent` in the web sidebar's order, as JSON `{total,
+  /// children: [{subject, title, class_name, expandable, emoji?, icon_file?,
+  /// image_url?}]}`: the first `limit` by `sortOrder` (else creation time),
+  /// without the standard folders, AI chats and meetings the web leaves out.
+  Future<String> listChildren({required String parent, required int limit}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreListChildren(
+          that: this, parent: parent, limit: limit);
+
+  /// The person's conversations (DMs and group chats), as JSON
+  /// `[{subject, title, class_name, opened_at, last_message, emoji?}]`, newest
+  /// activity first (`opened_at` is the time of the last message in ms, 0 for an
+  /// empty or unreadable one, which come last in the order the private drive
+  /// lists them). A conversation has no name of its own: its title is who else is
+  /// in it, as the web app shows it. `last_message` is the text of the newest
+  /// message ("" when there is none or it cannot be opened). `class_name` is
+  /// `conversation`, which the app opens natively.
+  Future<String> listConversations({required int limit}) => RustLib.instance.api
+      .crateApiResourcesAtomicStoreListConversations(that: this, limit: limit);
+
+  /// The person's favorites (all drives), newest added first, as JSON
+  /// `[{subject, title, class_name, opened_at}]` (`opened_at` is always 0).
+  /// Favorites that are gone or unreadable are left out.
+  Future<String> listFavorites({required int limit}) => RustLib.instance.api
+      .crateApiResourcesAtomicStoreListFavorites(that: this, limit: limit);
+
+  /// The notifications in the Inbox of the person's private drive (what the web
+  /// app recorded there), newest first, one per source, as JSON `[{subject,
+  /// title, body, about, kind, actor, source, occurred_at, read}]`. Read from the
+  /// local store; empty when there is no Inbox on this device.
+  Future<String> listNotifications({required int limit}) => RustLib.instance.api
+      .crateApiResourcesAtomicStoreListNotifications(that: this, limit: limit);
+
+  /// The `limit` resources of `drive` this device opened last, newest first, as
+  /// JSON `[{subject, title, class_name, opened_at}]`. Resources that are gone
+  /// are left out.
+  Future<String> listRecentResources(
+          {required String drive, required int limit}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreListRecentResources(
+          that: this, drive: drive, limit: limit);
+
+  /// Sign as the agent of `secret` from now on (this handle only). When
+  /// the secret names a drive, this handle works in it. `needs_sync` says
+  /// that drive is not in the store yet: fetch it from a server
+  /// ([`AtomicStore::open_ws_sync`]) or a paired device first.
+  Future<StoreAgentLoad> loadAgent({required String secret}) =>
+      RustLib.instance.api
+          .crateApiResourcesAtomicStoreLoadAgent(that: this, secret: secret);
+
+  /// Mark a notification read (`readAt`, as the web app does), and the other
+  /// copies of the same event in the Inbox. Synced like any other edit.
+  Future<void> markNotificationRead({required String subject}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreMarkNotificationRead(
+          that: this, subject: subject);
+
+  /// Move `subject` under `new_parent` at `index` among the parent's children as
+  /// the sidebar lists them (an index past the end appends), as the web app's
+  /// drag and drop does: `parent` when it changes, a fractional `sortOrder`
+  /// always. Refuses its own descendants. Pushed like every local write.
+  Future<void> moveResource(
+          {required String subject,
+          required String newParent,
+          required int index}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreMoveResource(
+          that: this, subject: subject, newParent: newParent, index: index);
+
   /// Create a drive named `name`, which this handle works in from now on.
   /// Returns its subject.
   Future<String> newDrive({required String name}) => RustLib.instance.api
       .crateApiResourcesAtomicStoreNewDrive(that: this, name: name);
+
+  /// Record that this device opened `subject` in `drive`. Local to the device:
+  /// nothing is committed or synced.
+  void noteResourceOpened({required String drive, required String subject}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreNoteResourceOpened(
+          that: this, drive: drive, subject: subject);
+
+  /// Open this handle's own WebSocket session to the server at
+  /// `server_origin`: sign in as this handle's agent, subscribe to its
+  /// drive (fetching it when missing), apply what the server sends, and send
+  /// what waits in the store's outbox. Replaces the session this handle had.
+  /// Writes through this handle go out over it from now on.
+  Future<void> openWsSync({required String serverOrigin}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreOpenWsSync(
+          that: this, serverOrigin: serverOrigin);
+
+  /// Send what waits in the outbox over this handle's session now. `true`
+  /// when nothing is left waiting; without a session nothing is attempted.
+  Future<bool> pushPending() =>
+      RustLib.instance.api.crateApiResourcesAtomicStorePushPending(
+        that: this,
+      );
+
+  /// The entries of a chat, oldest first, as a JSON array of the fields the web
+  /// app stores: `id`, `a`, `c`, `role`, `parts` (array) and the rest as is.
+  Future<String> readChat({required String subject}) => RustLib.instance.api
+      .crateApiResourcesAtomicStoreReadChat(that: this, subject: subject);
+
+  /// The entries of an AI chat after the `after` cursor: JSON `{entries,
+  /// newest, more}`, `newest` the cursor for the next call, `more` when
+  /// `limit` cut the list.
+  Future<String> readChatAfter(
+          {required String subject,
+          required String after,
+          required int limit}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreReadChatAfter(
+          that: this, subject: subject, after: after, limit: limit);
+
+  /// A window of an AI chat: JSON `{entries, older, newest}`, `entries` as
+  /// [`read_chat`] gives them (oldest first), `older` the cursor of the window
+  /// before (null at the start of the chat), `newest` the cursor of the last
+  /// entry (null for an empty chat).
+  Future<String> readChatPage(
+          {required String subject, String? before, required int limit}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreReadChatPage(
+          that: this, subject: subject, before: before, limit: limit);
+
+  /// The chat of a meeting or chat room, oldest first, as JSON `[{id, author,
+  /// author_name, mine, kind, text, c, reply_to?, about?, about_title?}]`:
+  /// `kind` is `text` (a message) or `event` (a system line of a meeting; a
+  /// "Viewing" trail line has `about`, the resource viewed, and `about_title`).
+  /// Read from the local store, never waiting on the network.
+  Future<String> readChatRoom({required String subject}) => RustLib.instance.api
+      .crateApiResourcesAtomicStoreReadChatRoom(that: this, subject: subject);
+
+  /// The messages of a meeting or chat room after `after`: JSON `{messages,
+  /// newest, more}`. See [`read_chat_after`].
+  Future<String> readChatRoomAfter(
+          {required String subject,
+          required String after,
+          required int limit}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreReadChatRoomAfter(
+          that: this, subject: subject, after: after, limit: limit);
+
+  /// A window of a meeting or chat room: JSON `{messages, older, newest}`,
+  /// `messages` as [`read_chat_room`] gives them. See [`read_chat_page`].
+  Future<String> readChatRoomPage(
+          {required String subject, String? before, required int limit}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreReadChatRoomPage(
+          that: this, subject: subject, before: before, limit: limit);
+
+  /// The messages of a conversation, oldest first, as JSON `[{id, author,
+  /// author_name, mine, text, c, reply_to?}]`: `id` the message's subject,
+  /// `author` who signed it (an agent subject), `author_name` their name (the
+  /// cached name or "Unknown member", never waiting on the network), `mine` when
+  /// this device's agent wrote it, `text` the decrypted text (null when this
+  /// agent cannot open it) and `c` its time in ms. Read from the local store;
+  /// see [`follow_conversation`] to get the conversation onto this device.
+  Future<String> readConversation({required String subject}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreReadConversation(
+          that: this, subject: subject);
+
+  /// The messages of a conversation after `after`: JSON `{messages, newest,
+  /// more}`.
+  Future<String> readConversationAfter(
+          {required String subject,
+          required String after,
+          required int limit}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreReadConversationAfter(
+          that: this, subject: subject, after: after, limit: limit);
+
+  /// A window of a conversation: JSON `{messages, older, newest}`, `messages`
+  /// as [`read_conversation`] gives them; only the window is decrypted.
+  Future<String> readConversationPage(
+          {required String subject, String? before, required int limit}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreReadConversationPage(
+          that: this, subject: subject, before: before, limit: limit);
+
+  /// The emojis of `subjects` as JSON `{subject: emoji}`, only for those that
+  /// have one. For rows that do not carry their icon themselves (the activity
+  /// feed), read from the stored propvals like the other rows.
+  Future<String> resourceIcons({required List<String> subjects}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreResourceIcons(
+          that: this, subjects: subjects);
+
+  /// The URL that shows `subject` in the data-browser of the connected server,
+  /// for a webview. Errors when no server is connected (`open_ws_sync`).
+  String resourceWebUrl({required String subject}) => RustLib.instance.api
+      .crateApiResourcesAtomicStoreResourceWebUrl(that: this, subject: subject);
 
   /// Set the `changes` properties and remove the `remove` ones of an
   /// existing resource, as one signed commit by this handle's agent.
@@ -4792,11 +6358,46 @@ class AtomicStoreImpl extends RustOpaque implements AtomicStore {
       RustLib.instance.api.crateApiResourcesAtomicStoreSaveResourceChanges(
           that: this, subject: subject, changes: changes, remove: remove);
 
+  /// Full-text search (type-ahead on the last word) across every drive of this
+  /// store, or only in `drive` when given. JSON
+  /// `[{subject, title, class_name, drive, score}]`, best first; `drive` is the
+  /// drive the hit lives in ("" when unknown). `classes` (`drive`, `aichat`,
+  /// `conversation`, `chatroom`, or class URLs; empty: any) keeps only
+  /// resources of those classes, applied before the limit.
+  Future<String> search(
+          {String? drive,
+          required String query,
+          required int limit,
+          required List<String> classes}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreSearch(
+          that: this,
+          drive: drive,
+          query: query,
+          limit: limit,
+          classes: classes);
+
   /// Full-text search, best first, across every drive or only in `drive`.
   Future<List<SearchHit>> searchResources(
           {required String query, String? drive, required int limit}) =>
       RustLib.instance.api.crateApiResourcesAtomicStoreSearchResources(
           that: this, query: query, drive: drive, limit: limit);
+
+  /// Post `text` in a meeting or chat room as this device's agent, as the web
+  /// app does, so web clients show it. `reply_to` is the `id` of the message it
+  /// answers. Returns the entry's id (`<page>#<key>`).
+  Future<String> sendChatRoomMessage(
+          {required String subject, required String text, String? replyTo}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreSendChatRoomMessage(
+          that: this, subject: subject, text: text, replyTo: replyTo);
+
+  /// Post `text` in a conversation as this device's agent: sealed with the
+  /// conversation's newest epoch key, saved as a `SealedMessage` under it that
+  /// only the author may write (as the web app does), and synced like any
+  /// other edit. Returns the message's subject.
+  Future<String> sendConversationMessage(
+          {required String subject, required String text}) =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreSendConversationMessage(
+          that: this, subject: subject, text: text);
 
   /// Work in `drive` from now on (this handle only).
   void setDrive({required String drive}) => RustLib.instance.api
@@ -4819,4 +6420,11 @@ class AtomicStoreImpl extends RustOpaque implements AtomicStore {
           {required String subject, required int timeoutMs}) =>
       RustLib.instance.api.crateApiResourcesAtomicStoreWaitForResourceEvent(
           that: this, subject: subject, timeoutMs: timeoutMs);
+
+  /// Read the search index once so the first keystroke is not cold. Call it
+  /// after the first frame; it runs on a blocking thread and never fails.
+  Future<void> warmSearch() =>
+      RustLib.instance.api.crateApiResourcesAtomicStoreWarmSearch(
+        that: this,
+      );
 }

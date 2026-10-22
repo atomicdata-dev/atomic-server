@@ -44,6 +44,10 @@ impl AtomicError {
         Self::new(ErrorKind::Invalid, message)
     }
 
+    pub(crate) fn network(message: impl Into<String>) -> Self {
+        Self::new(ErrorKind::Network, message)
+    }
+
     pub(crate) fn storage(message: impl Into<String>) -> Self {
         Self::new(ErrorKind::Storage, message)
     }
@@ -70,12 +74,6 @@ impl From<atomic_lib::AtomicError> for AtomicError {
         };
         AtomicError::new(kind, e.message)
     }
-}
-
-/// The store the bridge writes to, or [`AtomicError::Storage`] when `open_db`
-/// has not run.
-pub(crate) fn open_store() -> Result<&'static std::sync::Arc<atomic_lib::Db>, AtomicError> {
-    super::simple::state::db().map_err(AtomicError::storage)
 }
 
 #[cfg(test)]

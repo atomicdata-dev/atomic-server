@@ -47,7 +47,7 @@ pub async fn open_db(path: String) -> Result<(), String> {
         return Ok(());
     }
 
-    let (store, recovery, _fresh) = open_shared(std::path::Path::new(&path)).await?;
+    let (store, recovery, fresh) = open_shared(std::path::Path::new(&path)).await?;
     if let Some(recovery) = recovery {
         #[cfg(not(target_arch = "wasm32"))]
         state::set_store_recovery(recovery);
@@ -55,13 +55,17 @@ pub async fn open_db(path: String) -> Result<(), String> {
         let _ = recovery;
     }
 
-    set_db(store);
+    set_db(store.clone());
     #[cfg(not(target_arch = "wasm32"))]
     {
         state::set_store_dir(std::path::Path::new(&path));
-        catch_up_search_index(db()?.clone()).await;
-        crate::host::start_recents(std::path::Path::new(&path), db()?.clone());
+        catch_up_search_index(store.db.clone()).await;
+        if fresh {
+            store.start_recents(std::path::Path::new(&path));
+        }
     }
+    #[cfg(target_arch = "wasm32")]
+    let _ = fresh;
     Ok(())
 }
 
@@ -71,7 +75,7 @@ pub async fn open_db(path: String) -> Result<(), String> {
 /// opened by this call (and a damaged one set aside, in the second).
 pub(crate) async fn open_shared(
     path: &std::path::Path,
-) -> Result<(std::sync::Arc<atomic_lib::Db>, Option<StoreRecovery>, bool), String> {
+) -> Result<(state::OpenStore, Option<StoreRecovery>, bool), String> {
     #[cfg(not(target_arch = "wasm32"))]
     let key = {
         let _ = std::fs::create_dir_all(path);
@@ -94,7 +98,10 @@ pub(crate) async fn open_shared(
         None,
     );
 
-    let store = std::sync::Arc::new(store);
+    let store = state::OpenStore {
+        db: std::sync::Arc::new(store),
+        recents: Default::default(),
+    };
     state::register_store(key, store.clone());
     Ok((store, recovery, true))
 }

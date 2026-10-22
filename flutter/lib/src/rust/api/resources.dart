@@ -4,11 +4,12 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../frb_generated.dart';
+import 'assistant.dart';
 import 'error.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `atomic_to_sub_resource`, `atomic_to_value`, `global`, `is_default`, `list_to_propvals`, `node`, `parse`, `propvals_to_list`, `push`, `scalar`, `sub_resource_to_value`, `value_to_atomic`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `atomic_to_sub_resource`, `atomic_to_value`, `build`, `global`, `list_to_propvals`, `new_default`, `node`, `parse`, `pin_drive`, `propvals_to_list`, `push`, `pusher`, `scalar`, `sub_resource_to_value`, `value_to_atomic`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// [`AtomicStore::get_resource_data`] on the default store.
 Future<ResourceData> getResourceData({required String subject}) =>
@@ -54,6 +55,30 @@ abstract class AtomicStore implements RustOpaqueInterface {
   /// The subject of the agent that signs, if one is set.
   String? agentSubject();
 
+  /// Add a message to a chat: `role` is `user` or `assistant`, `parts_json` the
+  /// message's parts as the web app stores them (`[{"type":"text","text":…}]`).
+  /// It goes on the newest page with room, or on a new page. Returns the entry's
+  /// id (`<page>#<key>`).
+  Future<String> appendChatEntry(
+      {required String chat, required String role, required String partsJson});
+
+  /// Close this handle's session. Writes wait in the outbox for the next
+  /// [`AtomicStore::open_ws_sync`].
+  Future<void> closeWsSync();
+
+  /// The server this handle's session was last opened on.
+  String? connectedServer();
+
+  /// Start an AI chat named `name` in the agent's private drive, as the web
+  /// app's AI sidebar does. Returns the chat's subject.
+  Future<String> createAiChat({required String name});
+
+  /// Create a resource of `class_url` named `name` ("Untitled" when empty)
+  /// under `drive`, signed by this device's agent, and push it like every other
+  /// local write. Returns its subject.
+  Future<String> createResourceOfClass(
+      {required String drive, required String classUrl, required String name});
+
   /// Create a resource with a new subject (a DID derived from the signed
   /// genesis commit) holding `values`, signed by this handle's agent.
   /// Returns its subject. `values` should include `isA` and `parent`.
@@ -62,6 +87,12 @@ abstract class AtomicStore implements RustOpaqueInterface {
   /// The drive this handle works in: the one set on it, else the store's
   /// active drive.
   String? drive();
+
+  /// Get a conversation onto this device and follow it: fetched from the
+  /// connected server when missing, and its new messages arrive over the open
+  /// sync session. Errors (no session, not hosted there) are for the caller to
+  /// ignore; reading what is already local does not need this.
+  Future<void> followConversation({required String subject});
 
   /// The subjects under `parent`, in the order the sidebar shows them (at
   /// most `limit`), without the folders the web hides.
@@ -72,9 +103,98 @@ abstract class AtomicStore implements RustOpaqueInterface {
   /// when this device does not have it (sync first, or ask the server).
   Future<ResourceData> getResourceData({required String subject});
 
+  /// Import a whole AI chat at once: an AI chat named `name` in the agent's
+  /// private drive with every message of `entries_json`, a JSON array of
+  /// `{role, parts, c}` (`parts` as `append_chat_entry` takes them, as an array
+  /// or its JSON string; `c` the message's time in ms, now when absent), oldest
+  /// first. One commit per 256 messages instead of one per message. Returns the
+  /// chat's subject.
+  Future<String> importAiChat(
+      {required String name, required String entriesJson});
+
+  /// Whether the session is open now.
+  bool isSyncing();
+
+  /// What changed lately in every drive, newest first, by whom. Read from the
+  /// recents index, which the store's change events keep.
+  /// `include_own` adds the person's own changes (the feed's "Show mine"),
+  /// by `You`.
+  Future<List<ActivityEntry>> listActivity(
+      {required int limit, required bool includeOwn});
+
+  /// One page of the full Activity feed, newest first: the entries after the
+  /// one at `before_at` (unix ms) with subject `before_subject` (the last entry
+  /// of the previous page; both `None` for the first page). A page shorter than
+  /// `limit` is the end of the feed.
+  Future<List<ActivityEntry>> listActivityPage(
+      {PlatformInt64? beforeAt,
+      String? beforeSubject,
+      required int limit,
+      required bool includeOwn});
+
+  /// `limit` AI chats of the person (all drives) after the `offset` newest
+  /// ones, newest activity first, as JSON `[{subject, name, last_activity}]`
+  /// (`last_activity` in ms, 0 when empty). A page shorter than `limit` is the
+  /// last. Read from the recents index, not rebuilt from the chats' pages.
+  Future<String> listAiChats({required int limit, required int offset});
+
+  /// The children of `parent` in the web sidebar's order, as JSON `{total,
+  /// children: [{subject, title, class_name, expandable, emoji?, icon_file?,
+  /// image_url?}]}`: the first `limit` by `sortOrder` (else creation time),
+  /// without the standard folders, AI chats and meetings the web leaves out.
+  Future<String> listChildren({required String parent, required int limit});
+
+  /// The person's conversations (DMs and group chats), as JSON
+  /// `[{subject, title, class_name, opened_at, last_message, emoji?}]`, newest
+  /// activity first (`opened_at` is the time of the last message in ms, 0 for an
+  /// empty or unreadable one, which come last in the order the private drive
+  /// lists them). A conversation has no name of its own: its title is who else is
+  /// in it, as the web app shows it. `last_message` is the text of the newest
+  /// message ("" when there is none or it cannot be opened). `class_name` is
+  /// `conversation`, which the app opens natively.
+  Future<String> listConversations({required int limit});
+
+  /// The person's favorites (all drives), newest added first, as JSON
+  /// `[{subject, title, class_name, opened_at}]` (`opened_at` is always 0).
+  /// Favorites that are gone or unreadable are left out.
+  Future<String> listFavorites({required int limit});
+
+  /// The notifications in the Inbox of the person's private drive (what the web
+  /// app recorded there), newest first, one per source, as JSON `[{subject,
+  /// title, body, about, kind, actor, source, occurred_at, read}]`. Read from the
+  /// local store; empty when there is no Inbox on this device.
+  Future<String> listNotifications({required int limit});
+
+  /// The `limit` resources of `drive` this device opened last, newest first, as
+  /// JSON `[{subject, title, class_name, opened_at}]`. Resources that are gone
+  /// are left out.
+  Future<String> listRecentResources(
+      {required String drive, required int limit});
+
+  /// Sign as the agent of `secret` from now on (this handle only). When
+  /// the secret names a drive, this handle works in it. `needs_sync` says
+  /// that drive is not in the store yet: fetch it from a server
+  /// ([`AtomicStore::open_ws_sync`]) or a paired device first.
+  Future<StoreAgentLoad> loadAgent({required String secret});
+
+  /// Mark a notification read (`readAt`, as the web app does), and the other
+  /// copies of the same event in the Inbox. Synced like any other edit.
+  Future<void> markNotificationRead({required String subject});
+
+  /// Move `subject` under `new_parent` at `index` among the parent's children as
+  /// the sidebar lists them (an index past the end appends), as the web app's
+  /// drag and drop does: `parent` when it changes, a fractional `sortOrder`
+  /// always. Refuses its own descendants. Pushed like every local write.
+  Future<void> moveResource(
+      {required String subject, required String newParent, required int index});
+
   /// Create a drive named `name`, which this handle works in from now on.
   /// Returns its subject.
   Future<String> newDrive({required String name});
+
+  /// Record that this device opened `subject` in `drive`. Local to the device:
+  /// nothing is committed or synced.
+  void noteResourceOpened({required String drive, required String subject});
 
   /// Open the store in the directory `path` (created when missing) for
   /// `agent_secret` (none: no agent yet, see [`AtomicStore::setup`]),
@@ -84,6 +204,79 @@ abstract class AtomicStore implements RustOpaqueInterface {
       RustLib.instance.api.crateApiResourcesAtomicStoreOpen(
           path: path, agentSecret: agentSecret, drive: drive);
 
+  /// Open this handle's own WebSocket session to the server at
+  /// `server_origin`: sign in as this handle's agent, subscribe to its
+  /// drive (fetching it when missing), apply what the server sends, and send
+  /// what waits in the store's outbox. Replaces the session this handle had.
+  /// Writes through this handle go out over it from now on.
+  Future<void> openWsSync({required String serverOrigin});
+
+  /// Send what waits in the outbox over this handle's session now. `true`
+  /// when nothing is left waiting; without a session nothing is attempted.
+  Future<bool> pushPending();
+
+  /// The entries of a chat, oldest first, as a JSON array of the fields the web
+  /// app stores: `id`, `a`, `c`, `role`, `parts` (array) and the rest as is.
+  Future<String> readChat({required String subject});
+
+  /// The entries of an AI chat after the `after` cursor: JSON `{entries,
+  /// newest, more}`, `newest` the cursor for the next call, `more` when
+  /// `limit` cut the list.
+  Future<String> readChatAfter(
+      {required String subject, required String after, required int limit});
+
+  /// A window of an AI chat: JSON `{entries, older, newest}`, `entries` as
+  /// [`read_chat`] gives them (oldest first), `older` the cursor of the window
+  /// before (null at the start of the chat), `newest` the cursor of the last
+  /// entry (null for an empty chat).
+  Future<String> readChatPage(
+      {required String subject, String? before, required int limit});
+
+  /// The chat of a meeting or chat room, oldest first, as JSON `[{id, author,
+  /// author_name, mine, kind, text, c, reply_to?, about?, about_title?}]`:
+  /// `kind` is `text` (a message) or `event` (a system line of a meeting; a
+  /// "Viewing" trail line has `about`, the resource viewed, and `about_title`).
+  /// Read from the local store, never waiting on the network.
+  Future<String> readChatRoom({required String subject});
+
+  /// The messages of a meeting or chat room after `after`: JSON `{messages,
+  /// newest, more}`. See [`read_chat_after`].
+  Future<String> readChatRoomAfter(
+      {required String subject, required String after, required int limit});
+
+  /// A window of a meeting or chat room: JSON `{messages, older, newest}`,
+  /// `messages` as [`read_chat_room`] gives them. See [`read_chat_page`].
+  Future<String> readChatRoomPage(
+      {required String subject, String? before, required int limit});
+
+  /// The messages of a conversation, oldest first, as JSON `[{id, author,
+  /// author_name, mine, text, c, reply_to?}]`: `id` the message's subject,
+  /// `author` who signed it (an agent subject), `author_name` their name (the
+  /// cached name or "Unknown member", never waiting on the network), `mine` when
+  /// this device's agent wrote it, `text` the decrypted text (null when this
+  /// agent cannot open it) and `c` its time in ms. Read from the local store;
+  /// see [`follow_conversation`] to get the conversation onto this device.
+  Future<String> readConversation({required String subject});
+
+  /// The messages of a conversation after `after`: JSON `{messages, newest,
+  /// more}`.
+  Future<String> readConversationAfter(
+      {required String subject, required String after, required int limit});
+
+  /// A window of a conversation: JSON `{messages, older, newest}`, `messages`
+  /// as [`read_conversation`] gives them; only the window is decrypted.
+  Future<String> readConversationPage(
+      {required String subject, String? before, required int limit});
+
+  /// The emojis of `subjects` as JSON `{subject: emoji}`, only for those that
+  /// have one. For rows that do not carry their icon themselves (the activity
+  /// feed), read from the stored propvals like the other rows.
+  Future<String> resourceIcons({required List<String> subjects});
+
+  /// The URL that shows `subject` in the data-browser of the connected server,
+  /// for a webview. Errors when no server is connected (`open_ws_sync`).
+  String resourceWebUrl({required String subject});
+
   /// Set the `changes` properties and remove the `remove` ones of an
   /// existing resource, as one signed commit by this handle's agent.
   Future<void> saveResourceChanges(
@@ -91,9 +284,34 @@ abstract class AtomicStore implements RustOpaqueInterface {
       required List<PropValue> changes,
       required List<String> remove});
 
+  /// Full-text search (type-ahead on the last word) across every drive of this
+  /// store, or only in `drive` when given. JSON
+  /// `[{subject, title, class_name, drive, score}]`, best first; `drive` is the
+  /// drive the hit lives in ("" when unknown). `classes` (`drive`, `aichat`,
+  /// `conversation`, `chatroom`, or class URLs; empty: any) keeps only
+  /// resources of those classes, applied before the limit.
+  Future<String> search(
+      {String? drive,
+      required String query,
+      required int limit,
+      required List<String> classes});
+
   /// Full-text search, best first, across every drive or only in `drive`.
   Future<List<SearchHit>> searchResources(
       {required String query, String? drive, required int limit});
+
+  /// Post `text` in a meeting or chat room as this device's agent, as the web
+  /// app does, so web clients show it. `reply_to` is the `id` of the message it
+  /// answers. Returns the entry's id (`<page>#<key>`).
+  Future<String> sendChatRoomMessage(
+      {required String subject, required String text, String? replyTo});
+
+  /// Post `text` in a conversation as this device's agent: sealed with the
+  /// conversation's newest epoch key, saved as a `SealedMessage` under it that
+  /// only the author may write (as the web app does), and synced like any
+  /// other edit. Returns the message's subject.
+  Future<String> sendConversationMessage(
+      {required String subject, required String text});
 
   /// Work in `drive` from now on (this handle only).
   void setDrive({required String drive});
@@ -111,6 +329,10 @@ abstract class AtomicStore implements RustOpaqueInterface {
   /// resource.
   Future<ResourceEvent> waitForResourceEvent(
       {required String subject, required int timeoutMs});
+
+  /// Read the search index once so the first keystroke is not cold. Call it
+  /// after the first frame; it runs on a blocking thread and never fails.
+  Future<void> warmSearch();
 }
 
 /// A property value. `datatype` says which of the other fields carries it;
@@ -295,6 +517,30 @@ class SearchHit {
           className == other.className &&
           drive == other.drive &&
           score == other.score;
+}
+
+/// What [`AtomicStore::load_agent`] found.
+class StoreAgentLoad {
+  final String agentSubject;
+
+  /// The agent's drive is not in the store yet.
+  final bool needsSync;
+
+  const StoreAgentLoad({
+    required this.agentSubject,
+    required this.needsSync,
+  });
+
+  @override
+  int get hashCode => agentSubject.hashCode ^ needsSync.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is StoreAgentLoad &&
+          runtimeType == other.runtimeType &&
+          agentSubject == other.agentSubject &&
+          needsSync == other.needsSync;
 }
 
 /// What [`AtomicStore::setup`] made.

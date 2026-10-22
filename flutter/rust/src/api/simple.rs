@@ -11,6 +11,8 @@ mod directory;
 mod peer_search;
 pub(crate) mod state;
 #[cfg(test)]
+mod session_tests;
+#[cfg(test)]
 mod store_open_tests;
 #[cfg(test)]
 pub(crate) mod tests;

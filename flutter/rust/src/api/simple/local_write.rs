@@ -25,17 +25,41 @@ pub(crate) async fn node_apply_local(
     node()?.apply_local_commit(commit, opts).await.map_err(err)
 }
 
+/// [`push_write`] for the default store, through its session.
 pub(crate) async fn push_local_write(
     response: &atomic_lib::commit::CommitResponse,
     store: &atomic_lib::Db,
 ) {
-    if let Some(bytes) = &response.commit.loro_update {
-        if !bytes.is_empty() {
-            let subject_key = response.commit.subject.pure_id();
-            atomic_lib::sync::peer::broadcast_live_update(store, &subject_key, bytes);
+    match state::default_store() {
+        Ok(default) => push_write(response, store, &default.sync).await,
+        Err(_) => {}
+    }
+}
+
+/// Hand a commit a handle just signed to whoever can take it. The server
+/// session of that handle gets the queued commit. Live peers, paired devices
+/// and the bulk reconcile (the Iroh peer is one per process) serve the
+/// default store only, so they are tried for a handle on that store.
+pub(crate) async fn push_write(
+    response: &atomic_lib::commit::CommitResponse,
+    store: &atomic_lib::Db,
+    session: &ws_sync::SyncSession,
+) {
+    let on_default_store = state::db()
+        .map(|d| std::sync::Arc::ptr_eq(&d.kv, &store.kv))
+        .unwrap_or(false);
+    if on_default_store {
+        if let Some(bytes) = &response.commit.loro_update {
+            if !bytes.is_empty() {
+                let subject_key = response.commit.subject.pure_id();
+                atomic_lib::sync::peer::broadcast_live_update(store, &subject_key, bytes);
+            }
         }
     }
-    let ws_ok = ws_sync::drain_outbox(store).await;
+    let ws_ok = session.drain_outbox(store).await;
+    if !on_default_store {
+        return;
+    }
     // No hub in reach: a paired peer takes the signed commit instead
     // (planning/serverless-p2p.md P4). The raw broadcast above already gave
     // every live peer the state; this is what makes it attributable.

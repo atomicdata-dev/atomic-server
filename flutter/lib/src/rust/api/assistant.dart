@@ -6,48 +6,33 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `activity_entry`, `conversations_in_json_ad`, `follow_conversations_in_background`, `follow_conversations`
+// These functions are ignored because they are not marked as `pub`: `activity_entry`, `conversations_in_json_ad`, `follow_conversations_in_background`, `follow_conversations`, `json`, `msg`, `store`
 
-/// The emojis of `subjects` as JSON `{subject: emoji}`, only for those that
-/// have one. For rows that do not carry their icon themselves (the activity
-/// feed), read from the stored propvals like the other rows.
+/// [`AtomicStore::resource_icons`] on the default store.
 Future<String> resourceIcons({required List<String> subjects}) =>
     RustLib.instance.api.crateApiAssistantResourceIcons(subjects: subjects);
 
-/// `limit` AI chats of the person (all drives) after the `offset` newest
-/// ones, newest activity first, as JSON `[{subject, name, last_activity}]`
-/// (`last_activity` in ms, 0 when empty). A page shorter than `limit` is the
-/// last. Read from the recents index, not rebuilt from the chats' pages.
+/// [`AtomicStore::list_ai_chats`] on the default store.
 Future<String> listAiChats({required int limit, required int offset}) =>
     RustLib.instance.api
         .crateApiAssistantListAiChats(limit: limit, offset: offset);
 
-/// The notifications in the Inbox of the person's private drive (what the web
-/// app recorded there), newest first, one per source, as JSON `[{subject,
-/// title, body, about, kind, actor, source, occurred_at, read}]`. Read from the
-/// local store; empty when there is no Inbox on this device.
+/// [`AtomicStore::list_notifications`] on the default store.
 Future<String> listNotifications({required int limit}) =>
     RustLib.instance.api.crateApiAssistantListNotifications(limit: limit);
 
-/// Mark a notification read (`readAt`, as the web app does), and the other
-/// copies of the same event in the Inbox. Synced like any other edit.
+/// [`AtomicStore::mark_notification_read`] on the default store.
 Future<void> markNotificationRead({required String subject}) =>
     RustLib.instance.api
         .crateApiAssistantMarkNotificationRead(subject: subject);
 
-/// What changed lately in every drive, newest first, by whom. Read from the
-/// recents index, which the store's change events keep.
-/// `include_own` adds the person's own changes (the feed's "Show mine"),
-/// by `You`.
+/// [`AtomicStore::list_activity`] on the default store.
 Future<List<ActivityEntry>> listActivity(
         {required int limit, required bool includeOwn}) =>
     RustLib.instance.api
         .crateApiAssistantListActivity(limit: limit, includeOwn: includeOwn);
 
-/// One page of the full Activity feed, newest first: the entries after the
-/// one at `before_at` (unix ms) with subject `before_subject` (the last entry
-/// of the previous page; both `None` for the first page). A page shorter than
-/// `limit` is the end of the feed.
+/// [`AtomicStore::list_activity_page`] on the default store.
 Future<List<ActivityEntry>> listActivityPage(
         {PlatformInt64? beforeAt,
         String? beforeSubject,
@@ -59,143 +44,95 @@ Future<List<ActivityEntry>> listActivityPage(
         limit: limit,
         includeOwn: includeOwn);
 
-/// Record that this device opened `subject` in `drive`. Local to the device:
-/// nothing is committed or synced.
+/// [`AtomicStore::note_resource_opened`] on the default store.
 void noteResourceOpened({required String drive, required String subject}) =>
     RustLib.instance.api
         .crateApiAssistantNoteResourceOpened(drive: drive, subject: subject);
 
-/// The `limit` resources of `drive` this device opened last, newest first, as
-/// JSON `[{subject, title, class_name, opened_at}]`. Resources that are gone
-/// are left out.
+/// [`AtomicStore::list_recent_resources`] on the default store.
 Future<String> listRecentResources(
         {required String drive, required int limit}) =>
     RustLib.instance.api
         .crateApiAssistantListRecentResources(drive: drive, limit: limit);
 
-/// The children of `parent` in the web sidebar's order, as JSON `{total,
-/// children: [{subject, title, class_name, expandable, emoji?, icon_file?,
-/// image_url?}]}`: the first `limit` by `sortOrder` (else creation time),
-/// without the standard folders, AI chats and meetings the web leaves out.
+/// [`AtomicStore::list_children`] on the default store.
 Future<String> listChildren({required String parent, required int limit}) =>
     RustLib.instance.api
         .crateApiAssistantListChildren(parent: parent, limit: limit);
 
-/// The person's favorites (all drives), newest added first, as JSON
-/// `[{subject, title, class_name, opened_at}]` (`opened_at` is always 0).
-/// Favorites that are gone or unreadable are left out.
+/// [`AtomicStore::list_favorites`] on the default store.
 Future<String> listFavorites({required int limit}) =>
     RustLib.instance.api.crateApiAssistantListFavorites(limit: limit);
 
-/// The person's conversations (DMs and group chats), as JSON
-/// `[{subject, title, class_name, opened_at, last_message, emoji?}]`, newest
-/// activity first (`opened_at` is the time of the last message in ms, 0 for an
-/// empty or unreadable one, which come last in the order the private drive
-/// lists them). A conversation has no name of its own: its title is who else is
-/// in it, as the web app shows it. `last_message` is the text of the newest
-/// message ("" when there is none or it cannot be opened). `class_name` is
-/// `conversation`, which the app opens natively.
+/// [`AtomicStore::list_conversations`] on the default store.
 Future<String> listConversations({required int limit}) =>
     RustLib.instance.api.crateApiAssistantListConversations(limit: limit);
 
-/// The messages of a conversation, oldest first, as JSON `[{id, author,
-/// author_name, mine, text, c, reply_to?}]`: `id` the message's subject,
-/// `author` who signed it (an agent subject), `author_name` their name (the
-/// cached name or "Unknown member", never waiting on the network), `mine` when
-/// this device's agent wrote it, `text` the decrypted text (null when this
-/// agent cannot open it) and `c` its time in ms. Read from the local store;
-/// see [`follow_conversation`] to get the conversation onto this device.
+/// [`AtomicStore::read_conversation`] on the default store.
 Future<String> readConversation({required String subject}) =>
     RustLib.instance.api.crateApiAssistantReadConversation(subject: subject);
 
-/// Post `text` in a conversation as this device's agent: sealed with the
-/// conversation's newest epoch key, saved as a `SealedMessage` under it that
-/// only the author may write (as the web app does), and synced like any
-/// other edit. Returns the message's subject.
+/// [`AtomicStore::send_conversation_message`] on the default store.
 Future<String> sendConversationMessage(
         {required String subject, required String text}) =>
     RustLib.instance.api
         .crateApiAssistantSendConversationMessage(subject: subject, text: text);
 
-/// Get a conversation onto this device and follow it: fetched from the
-/// connected server when missing, and its new messages arrive over the open
-/// sync session. Errors (no session, not hosted there) are for the caller to
-/// ignore; reading what is already local does not need this.
+/// [`AtomicStore::follow_conversation`] on the default store.
 Future<void> followConversation({required String subject}) =>
     RustLib.instance.api.crateApiAssistantFollowConversation(subject: subject);
 
-/// The entries of a chat, oldest first, as a JSON array of the fields the web
-/// app stores: `id`, `a`, `c`, `role`, `parts` (array) and the rest as is.
+/// [`AtomicStore::read_chat`] on the default store.
 Future<String> readChat({required String subject}) =>
     RustLib.instance.api.crateApiAssistantReadChat(subject: subject);
 
-/// The chat of a meeting or chat room, oldest first, as JSON `[{id, author,
-/// author_name, mine, kind, text, c, reply_to?, about?, about_title?}]`:
-/// `kind` is `text` (a message) or `event` (a system line of a meeting; a
-/// "Viewing" trail line has `about`, the resource viewed, and `about_title`).
-/// Read from the local store, never waiting on the network.
+/// [`AtomicStore::read_chat_room`] on the default store.
 Future<String> readChatRoom({required String subject}) =>
     RustLib.instance.api.crateApiAssistantReadChatRoom(subject: subject);
 
-/// A window of an AI chat: JSON `{entries, older, newest}`, `entries` as
-/// [`read_chat`] gives them (oldest first), `older` the cursor of the window
-/// before (null at the start of the chat), `newest` the cursor of the last
-/// entry (null for an empty chat).
+/// [`AtomicStore::read_chat_page`] on the default store.
 Future<String> readChatPage(
         {required String subject, String? before, required int limit}) =>
     RustLib.instance.api.crateApiAssistantReadChatPage(
         subject: subject, before: before, limit: limit);
 
-/// The entries of an AI chat after the `after` cursor: JSON `{entries,
-/// newest, more}`, `newest` the cursor for the next call, `more` when
-/// `limit` cut the list.
+/// [`AtomicStore::read_chat_after`] on the default store.
 Future<String> readChatAfter(
         {required String subject, required String after, required int limit}) =>
     RustLib.instance.api.crateApiAssistantReadChatAfter(
         subject: subject, after: after, limit: limit);
 
-/// A window of a meeting or chat room: JSON `{messages, older, newest}`,
-/// `messages` as [`read_chat_room`] gives them. See [`read_chat_page`].
+/// [`AtomicStore::read_chat_room_page`] on the default store.
 Future<String> readChatRoomPage(
         {required String subject, String? before, required int limit}) =>
     RustLib.instance.api.crateApiAssistantReadChatRoomPage(
         subject: subject, before: before, limit: limit);
 
-/// The messages of a meeting or chat room after `after`: JSON `{messages,
-/// newest, more}`. See [`read_chat_after`].
+/// [`AtomicStore::read_chat_room_after`] on the default store.
 Future<String> readChatRoomAfter(
         {required String subject, required String after, required int limit}) =>
     RustLib.instance.api.crateApiAssistantReadChatRoomAfter(
         subject: subject, after: after, limit: limit);
 
-/// A window of a conversation: JSON `{messages, older, newest}`, `messages`
-/// as [`read_conversation`] gives them; only the window is decrypted.
+/// [`AtomicStore::read_conversation_page`] on the default store.
 Future<String> readConversationPage(
         {required String subject, String? before, required int limit}) =>
     RustLib.instance.api.crateApiAssistantReadConversationPage(
         subject: subject, before: before, limit: limit);
 
-/// The messages of a conversation after `after`: JSON `{messages, newest,
-/// more}`.
+/// [`AtomicStore::read_conversation_after`] on the default store.
 Future<String> readConversationAfter(
         {required String subject, required String after, required int limit}) =>
     RustLib.instance.api.crateApiAssistantReadConversationAfter(
         subject: subject, after: after, limit: limit);
 
-/// Post `text` in a meeting or chat room as this device's agent, as the web
-/// app does, so web clients show it. `reply_to` is the `id` of the message it
-/// answers. Returns the entry's id (`<page>#<key>`).
+/// [`AtomicStore::send_chat_room_message`] on the default store.
 Future<String> sendChatRoomMessage(
         {required String subject, required String text, String? replyTo}) =>
     RustLib.instance.api.crateApiAssistantSendChatRoomMessage(
         subject: subject, text: text, replyTo: replyTo);
 
-/// Full-text search (type-ahead on the last word) across every drive of this
-/// store, or only in `drive` when given. JSON
-/// `[{subject, title, class_name, drive, score}]`, best first; `drive` is the
-/// drive the hit lives in ("" when unknown). `classes` (`drive`, `aichat`,
-/// `conversation`, `chatroom`, or class URLs; empty: any) keeps only
-/// resources of those classes, applied before the limit.
+/// [`AtomicStore::search`] on the default store.
 Future<String> search(
         {String? drive,
         required String query,
@@ -204,24 +141,18 @@ Future<String> search(
     RustLib.instance.api.crateApiAssistantSearch(
         drive: drive, query: query, limit: limit, classes: classes);
 
-/// Read the search index once so the first keystroke is not cold. Call it
-/// after the first frame; it runs on a blocking thread and never fails.
+/// [`AtomicStore::warm_search`] on the default store.
 Future<void> warmSearch() => RustLib.instance.api.crateApiAssistantWarmSearch();
 
-/// The URL that shows `subject` in the data-browser of the connected server,
-/// for a webview. Errors when no server is connected (`open_ws_sync`).
+/// [`AtomicStore::resource_web_url`] on the default store.
 String resourceWebUrl({required String subject}) =>
     RustLib.instance.api.crateApiAssistantResourceWebUrl(subject: subject);
 
-/// Start an AI chat named `name` in the agent's private drive, as the web
-/// app's AI sidebar does. Returns the chat's subject.
+/// [`AtomicStore::create_ai_chat`] on the default store.
 Future<String> createAiChat({required String name}) =>
     RustLib.instance.api.crateApiAssistantCreateAiChat(name: name);
 
-/// Add a message to a chat: `role` is `user` or `assistant`, `parts_json` the
-/// message's parts as the web app stores them (`[{"type":"text","text":…}]`).
-/// It goes on the newest page with room, or on a new page. Returns the entry's
-/// id (`<page>#<key>`).
+/// [`AtomicStore::append_chat_entry`] on the default store.
 Future<String> appendChatEntry(
         {required String chat,
         required String role,
@@ -229,9 +160,7 @@ Future<String> appendChatEntry(
     RustLib.instance.api.crateApiAssistantAppendChatEntry(
         chat: chat, role: role, partsJson: partsJson);
 
-/// Create a resource of `class_url` named `name` ("Untitled" when empty)
-/// under `drive`, signed by this device's agent, and push it like every other
-/// local write. Returns its subject.
+/// [`AtomicStore::create_resource_of_class`] on the default store.
 Future<String> createResourceOfClass(
         {required String drive,
         required String classUrl,
@@ -239,10 +168,7 @@ Future<String> createResourceOfClass(
     RustLib.instance.api.crateApiAssistantCreateResourceOfClass(
         drive: drive, classUrl: classUrl, name: name);
 
-/// Move `subject` under `new_parent` at `index` among the parent's children as
-/// the sidebar lists them (an index past the end appends), as the web app's
-/// drag and drop does: `parent` when it changes, a fractional `sortOrder`
-/// always. Refuses its own descendants. Pushed like every local write.
+/// [`AtomicStore::move_resource`] on the default store.
 Future<void> moveResource(
         {required String subject,
         required String newParent,
@@ -250,12 +176,7 @@ Future<void> moveResource(
     RustLib.instance.api.crateApiAssistantMoveResource(
         subject: subject, newParent: newParent, index: index);
 
-/// Import a whole AI chat at once: an AI chat named `name` in the agent's
-/// private drive with every message of `entries_json`, a JSON array of
-/// `{role, parts, c}` (`parts` as `append_chat_entry` takes them, as an array
-/// or its JSON string; `c` the message's time in ms, now when absent), oldest
-/// first. One commit per 256 messages instead of one per message. Returns the
-/// chat's subject.
+/// [`AtomicStore::import_ai_chat`] on the default store.
 Future<String> importAiChat(
         {required String name, required String entriesJson}) =>
     RustLib.instance.api

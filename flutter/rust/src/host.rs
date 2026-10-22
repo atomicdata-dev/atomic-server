@@ -1,10 +1,12 @@
-//! The bridge's binding of `atomic_lib::host` to this process: the store,
-//! recents index and conversation caches live in statics here, a local write
-//! is pushed with [`push_local_write`](crate::api::simple::push_local_write),
-//! and the profiles of agents this device does not hold come from the
-//! connected server (one cache, shared by the lists and the embedded page).
+//! The bridge's binding of `atomic_lib::host` to a store handle: each
+//! [`AtomicStore`] has its recents index, conversation and chat-room caches,
+//! profile cache and sync session, and a local write is pushed through the
+//! handle's own session (`push_write`). The functions below are those of the
+//! default store, for the free functions of the bridge.
 
-use crate::api::simple::state::{connected_server, db};
+use crate::api::resources::AtomicStore;
+use crate::api::simple::state::default_store;
+use crate::api::simple::ws_sync::SyncSession;
 use atomic_lib::{
     commit::CommitResponse,
     host::{
@@ -13,34 +15,38 @@ use atomic_lib::{
     },
     Storelike,
 };
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
-/// Hands a local write to the WebSocket session, live peers and paired
-/// devices (`push_local_write`).
-pub(crate) struct BridgePusher;
+/// Hands a local write of one handle to its WebSocket session, and for the
+/// store the app syncs, to live peers and paired devices.
+pub(crate) struct BridgePusher {
+    pub(crate) db: Arc<atomic_lib::Db>,
+    pub(crate) sync: Arc<SyncSession>,
+}
 
 #[async_trait::async_trait]
 impl LocalWritePusher for BridgePusher {
     async fn push(&self, response: &CommitResponse) {
-        if let Ok(store) = db() {
-            crate::api::simple::push_local_write(response, store.as_ref()).await;
-        }
+        crate::api::simple::push_write(response, self.db.as_ref(), &self.sync).await;
     }
 }
 
-/// Asks the connected server for an agent, with the library's HTTP client
-/// (which carries the Android TLS setup). The cache in front of it bounds the
-/// time and remembers failures.
-struct ServerProfileFetcher;
+/// Asks the server a handle's session is on for an agent, with the library's
+/// HTTP client (which carries the Android TLS setup). The cache in front of
+/// it bounds the time and remembers failures.
+pub(crate) struct ServerProfileFetcher {
+    pub(crate) db: Arc<atomic_lib::Db>,
+    pub(crate) sync: Arc<SyncSession>,
+}
 
 #[async_trait::async_trait]
 impl AgentProfileFetcher for ServerProfileFetcher {
     async fn fetch_agent_resource(&self, member: &str) -> Option<String> {
-        let Some(origin) = connected_server() else {
+        let Some(origin) = self.sync.origin() else {
             tracing::debug!("[profile] no connected server for {member}");
             return None;
         };
-        let agent = db().ok()?.get_default_agent().ok();
+        let agent = self.db.get_default_agent().ok();
         let url = format!("{origin}/{member}");
         let started = std::time::Instant::now();
         let fetched =
@@ -61,50 +67,44 @@ impl AgentProfileFetcher for ServerProfileFetcher {
     }
 
     async fn fetch_history_attribution(&self, subject: &str) -> Option<String> {
-        let origin = connected_server()?;
-        let agent = db().ok()?.get_default_agent().ok();
+        let origin = self.sync.origin()?;
+        let agent = self.db.get_default_agent().ok();
         atomic_lib::host::fetch_history_attribution(&origin, subject, agent.as_ref()).await
     }
 }
 
-/// The profiles of agents this device does not hold, fetched from the
-/// connected server and kept in memory.
-pub(crate) fn profiles() -> AgentProfiles {
-    static PROFILES: OnceLock<AgentProfiles> = OnceLock::new();
-    PROFILES
-        .get_or_init(|| AgentProfiles::new(Arc::new(ServerProfileFetcher)))
-        .clone()
+fn default() -> &'static AtomicStore {
+    // Every caller has already used the default store (`db()?`, `node()?`).
+    default_store().expect("the default store is open")
 }
 
-/// The pusher every bridge write goes through.
+/// The profiles of agents this device does not hold, fetched from the
+/// connected server and kept in memory (the default store's).
+pub(crate) fn profiles() -> AgentProfiles {
+    default().profiles.clone()
+}
+
+/// The pusher every default-store write goes through.
 pub(crate) fn pusher() -> Arc<dyn LocalWritePusher> {
-    static PUSHER: OnceLock<Arc<dyn LocalWritePusher>> = OnceLock::new();
-    PUSHER.get_or_init(|| Arc::new(BridgePusher)).clone()
+    default().pusher()
 }
 
 /// The recents index of the store `open_db` opened.
 pub(crate) fn recents() -> &'static Arc<RecentsIndex> {
-    static RECENTS: OnceLock<Arc<RecentsIndex>> = OnceLock::new();
-    RECENTS.get_or_init(Default::default)
+    &default().recents
 }
 
-/// Conversations, with their caches of agent names and opened messages.
+/// Conversations of the default store, with their caches of agent names and
+/// opened messages.
+#[allow(dead_code)]
 pub(crate) fn conversations() -> &'static Conversations {
-    static CONVERSATIONS: OnceLock<Conversations> = OnceLock::new();
-    CONVERSATIONS.get_or_init(|| Conversations::new(profiles()))
+    &default().conversations
 }
 
-/// Chat rooms and meetings, sharing the profile cache.
+/// Chat rooms and meetings of the default store.
+#[allow(dead_code)]
 pub(crate) fn chat_rooms() -> &'static ChatRooms {
-    static CHAT_ROOMS: OnceLock<ChatRooms> = OnceLock::new();
-    CHAT_ROOMS.get_or_init(|| ChatRooms::new(profiles()))
-}
-
-/// Load the recents index from `dir`, and keep it current for as long as the
-/// store lives.
-pub(crate) fn start_recents(dir: &std::path::Path, store: Arc<atomic_lib::Db>) {
-    recents().load(dir);
-    recents().clone().spawn_listener(store);
+    &default().chat_rooms
 }
 
 /// A value as the JSON string the Dart side reads.

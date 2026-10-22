@@ -1,6 +1,11 @@
 use std::sync::{Arc, OnceLock};
 
-static DB: OnceLock<Arc<atomic_lib::Db>> = OnceLock::new();
+use crate::api::resources::AtomicStore;
+
+/// The default store: what `open_db` opened, with the agent `load_agent` set
+/// and its own sync session. The free functions of the bridge are the
+/// methods of this handle.
+static DEFAULT: OnceLock<AtomicStore> = OnceLock::new();
 
 pub(crate) fn now_ms() -> i64 {
     std::time::SystemTime::now()
@@ -9,8 +14,12 @@ pub(crate) fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
+pub(crate) fn default_store() -> Result<&'static AtomicStore, String> {
+    DEFAULT.get().ok_or_else(|| "Call openDb() first.".into())
+}
+
 pub(crate) fn db() -> Result<&'static Arc<atomic_lib::Db>, String> {
-    DB.get().ok_or_else(|| "Call openDb() first.".into())
+    default_store().map(|store| &store.db)
 }
 
 /// The runtime the binding writes through (`planning/atomic-lib-runtime.md`):
@@ -39,8 +48,28 @@ pub(super) fn store_recovery() -> Option<super::StoreRecovery> {
         .clone()
 }
 
-pub(super) fn set_db(store: Arc<atomic_lib::Db>) {
-    let _ = DB.set(store);
+/// Make `store` the default store (once; a second call keeps the first).
+pub(super) fn set_db(store: OpenStore) {
+    let _ = DEFAULT.set(AtomicStore::new_default(store));
+}
+
+/// A store opened in this process with the index of what was opened and
+/// changed in it. Every handle on the file shares both.
+#[derive(Clone)]
+#[flutter_rust_bridge::frb(ignore)]
+pub(crate) struct OpenStore {
+    pub db: Arc<atomic_lib::Db>,
+    pub recents: Arc<atomic_lib::host::recents::RecentsIndex>,
+}
+
+impl OpenStore {
+    /// Load the recents index from `dir`, and keep it current for as long as
+    /// the store lives. Once per opened file (`open_shared` says when).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn start_recents(&self, dir: &std::path::Path) {
+        self.recents.load(dir);
+        self.recents.clone().spawn_listener(self.db.clone());
+    }
 }
 
 /// Every store opened in this process, by file. A file is opened once per
@@ -48,10 +77,10 @@ pub(super) fn set_db(store: Arc<atomic_lib::Db>) {
 /// `atomic_lib::db::recovery`), so a second handle on a path shares the
 /// first one's `Db`. Guarded by [`OPEN_DB_LOCK`] while opening.
 static OPEN_STORES: std::sync::Mutex<
-    Option<std::collections::HashMap<std::path::PathBuf, Arc<atomic_lib::Db>>>,
+    Option<std::collections::HashMap<std::path::PathBuf, OpenStore>>,
 > = std::sync::Mutex::new(None);
 
-pub(super) fn registered_store(key: &std::path::Path) -> Option<Arc<atomic_lib::Db>> {
+pub(super) fn registered_store(key: &std::path::Path) -> Option<OpenStore> {
     OPEN_STORES
         .lock()
         .unwrap_or_else(|e| e.into_inner())
@@ -59,7 +88,7 @@ pub(super) fn registered_store(key: &std::path::Path) -> Option<Arc<atomic_lib::
         .and_then(|m| m.get(key).cloned())
 }
 
-pub(super) fn register_store(key: std::path::PathBuf, store: Arc<atomic_lib::Db>) {
+pub(super) fn register_store(key: std::path::PathBuf, store: OpenStore) {
     OPEN_STORES
         .lock()
         .unwrap_or_else(|e| e.into_inner())
@@ -71,15 +100,18 @@ pub(crate) fn err(e: atomic_lib::AtomicError) -> String {
     e.to_string()
 }
 
-static SERVER_ORIGIN: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
-
-/// Remember the server `open_ws_sync` connected to (for links into its web app).
+/// Remember the server the default store's session connected to (for links
+/// into its web app).
+#[cfg(test)]
 pub(crate) fn set_server_origin(origin: &str) {
-    *SERVER_ORIGIN.lock().unwrap() = Some(origin.trim_end_matches('/').to_string());
+    if let Ok(store) = default_store() {
+        store.sync.set_origin(origin);
+    }
 }
 
+/// The server the default store's session is on, if it has been on one.
 pub(crate) fn connected_server() -> Option<String> {
-    SERVER_ORIGIN.lock().unwrap().clone()
+    default_store().ok().and_then(|store| store.sync.origin())
 }
 
 static STORE_DIR: std::sync::Mutex<Option<std::path::PathBuf>> = std::sync::Mutex::new(None);

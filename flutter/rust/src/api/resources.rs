@@ -10,9 +10,13 @@
 //! free functions are the same calls on the process-wide default store that
 //! `open_db` and `load_agent` set.
 
-use super::error::{open_store, AtomicError};
-use super::error::ErrorKind;
-use super::simple::local_write::push_local_write;
+use super::error::AtomicError;
+use super::simple::local_write::push_write;
+use super::simple::state::OpenStore;
+use super::simple::ws_sync::SyncSession;
+use atomic_lib::host::{
+    chat_rooms::ChatRooms, conversations::Conversations, profiles::AgentProfiles, recents::RecentsIndex,
+};
 use atomic_lib::{
     commit::CommitBuilder, host::lists, resources::PropVals, values::SubResource, Commit, Storelike, Value,
 };
@@ -249,17 +253,58 @@ fn list_to_propvals(list: &[PropValue]) -> Result<PropVals, AtomicError> {
 /// A file is opened once per process: two handles on one path share the
 /// store (reads, indexes, events) and differ in agent and drive only.
 ///
-/// Only the default store syncs: the process has one server session and one
-/// Iroh peer, and they serve it. A write through any other handle is signed,
-/// stored and queued in that store's outbox, and goes out when something
-/// drains it.
+/// Each handle has its own server session ([`AtomicStore::open_ws_sync`]):
+/// a write through it is signed by its agent, stored, queued in the store's
+/// outbox and sent over that session. The Iroh peer is one per process
+/// (`start_peer`, pairing): it serves the default store, and so also a handle
+/// on the default store's file. Handles on other files do not take part in
+/// peer sync.
 #[flutter_rust_bridge::frb(opaque)]
 pub struct AtomicStore {
-    db: std::sync::Arc<atomic_lib::Db>,
+    pub(crate) db: std::sync::Arc<atomic_lib::Db>,
     drive: std::sync::Mutex<Option<String>>,
+    /// This handle is the process-wide default (`state::default_store`).
+    default: bool,
+    pub(crate) sync: std::sync::Arc<SyncSession>,
+    /// Shared by every handle on the file.
+    pub(crate) recents: std::sync::Arc<RecentsIndex>,
+    pub(crate) conversations: Conversations,
+    pub(crate) chat_rooms: ChatRooms,
+    pub(crate) profiles: AgentProfiles,
+    /// A run of `follow_conversations` is going.
+    pub(crate) following: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl AtomicStore {
+    #[flutter_rust_bridge::frb(ignore)]
+    fn build(open: OpenStore, db: atomic_lib::Db, drive: Option<String>, default: bool) -> AtomicStore {
+        let db = std::sync::Arc::new(db);
+        let sync = std::sync::Arc::new(SyncSession::default());
+        let profiles = AgentProfiles::new(std::sync::Arc::new(crate::host::ServerProfileFetcher {
+            db: db.clone(),
+            sync: sync.clone(),
+        }));
+        AtomicStore {
+            db,
+            drive: std::sync::Mutex::new(drive),
+            default,
+            sync,
+            recents: open.recents,
+            conversations: Conversations::new(profiles.clone()),
+            chat_rooms: ChatRooms::new(profiles.clone()),
+            profiles,
+            following: Default::default(),
+        }
+    }
+
+    /// The default store: the file `open_db` opened, signing as the agent
+    /// `load_agent` sets (the store's own, shared by clones of its `Db`).
+    #[flutter_rust_bridge::frb(ignore)]
+    pub(crate) fn new_default(open: OpenStore) -> AtomicStore {
+        let db = (*open.db).clone();
+        AtomicStore::build(open, db, None, true)
+    }
+
     /// Open the store in the directory `path` (created when missing) for
     /// `agent_secret` (none: no agent yet, see [`AtomicStore::setup`]),
     /// working in `drive` (none: the store's active drive).
@@ -277,7 +322,8 @@ impl AtomicStore {
                 .map_err(AtomicError::storage)?;
         #[cfg(not(target_arch = "wasm32"))]
         if fresh {
-            super::simple::catch_up_search_index(shared.clone()).await;
+            super::simple::catch_up_search_index(shared.db.clone()).await;
+            shared.start_recents(std::path::Path::new(&path));
         }
         #[cfg(target_arch = "wasm32")]
         let _ = fresh;
@@ -285,26 +331,42 @@ impl AtomicStore {
             .map(|secret| atomic_lib::agents::Agent::from_secret(&secret))
             .transpose()
             .map_err(|e| AtomicError::invalid(e.to_string()))?;
-        Ok(AtomicStore {
-            db: std::sync::Arc::new(shared.with_own_agent(agent)),
-            drive: std::sync::Mutex::new(drive),
-        })
+        let db = shared.db.with_own_agent(agent);
+        Ok(AtomicStore::build(shared, db, drive, false))
     }
 
-    /// The default store, as `open_db` and `load_agent` left it. Shares the
-    /// process-wide agent, so `load_agent` after this is seen by it.
-    pub(crate) fn global() -> Result<AtomicStore, AtomicError> {
-        Ok(AtomicStore {
-            db: open_store()?.clone(),
-            drive: std::sync::Mutex::new(None),
-        })
+    /// The default store, as `open_db` and `load_agent` left it.
+    #[flutter_rust_bridge::frb(ignore)]
+    pub(crate) fn global() -> Result<&'static AtomicStore, AtomicError> {
+        super::simple::state::default_store().map_err(AtomicError::storage)
     }
 
-    /// Whether this handle is on the default store, the one that syncs.
-    fn is_default(&self) -> bool {
+    /// Whether this handle is on the default store's file (whose peer sync
+    /// the process runs).
+    #[cfg(test)]
+    fn on_default_store(&self) -> bool {
         super::simple::state::db()
             .map(|g| std::sync::Arc::ptr_eq(&g.kv, &self.db.kv))
             .unwrap_or(false)
+    }
+
+    /// The pusher of this handle's writes: its session, and the peers when
+    /// it is on the default store.
+    #[flutter_rust_bridge::frb(ignore)]
+    pub(crate) fn pusher(&self) -> std::sync::Arc<dyn atomic_lib::host::LocalWritePusher> {
+        std::sync::Arc::new(crate::host::BridgePusher {
+            db: self.db.clone(),
+            sync: self.sync.clone(),
+        })
+    }
+
+    /// Pin the working drive of a handle that is not the default (the
+    /// default follows the store's active drive).
+    #[flutter_rust_bridge::frb(ignore)]
+    fn pin_drive(&self, drive: &str) {
+        if !self.default {
+            *self.drive.lock().unwrap_or_else(|e| e.into_inner()) = Some(drive.to_string());
+        }
     }
 
     /// Whether both handles are on the same open store.
@@ -318,7 +380,7 @@ impl AtomicStore {
     /// the agent's secret (to keep) and the drive's subject.
     pub async fn setup(&self, name: String) -> Result<StoreSetup, AtomicError> {
         let (agent, drive) = self.db.setup(&name).await?;
-        *self.drive.lock().unwrap_or_else(|e| e.into_inner()) = Some(drive.clone());
+        self.pin_drive(&drive);
         Ok(StoreSetup {
             agent_secret: agent.build_secret()?,
             agent_subject: agent.subject.to_string(),
@@ -403,14 +465,13 @@ impl AtomicStore {
 
     // ── Writes ──
 
-    fn node(&self) -> atomic_lib::runtime::AtomicNode {
+    #[flutter_rust_bridge::frb(ignore)]
+    pub(crate) fn node(&self) -> atomic_lib::runtime::AtomicNode {
         atomic_lib::runtime::AtomicNode::from_db((*self.db).clone())
     }
 
     async fn push(&self, response: &atomic_lib::commit::CommitResponse) {
-        if self.is_default() {
-            push_local_write(response, self.db.as_ref()).await;
-        }
+        push_write(response, self.db.as_ref(), &self.sync).await;
     }
 
     /// Set the `changes` properties and remove the `remove` ones of an
@@ -462,8 +523,74 @@ impl AtomicStore {
     /// Returns its subject.
     pub async fn new_drive(&self, name: String) -> Result<String, AtomicError> {
         let drive = self.db.create_drive(&name).await?;
-        *self.drive.lock().unwrap_or_else(|e| e.into_inner()) = Some(drive.clone());
+        self.pin_drive(&drive);
         Ok(drive)
+    }
+
+    // ── Agent ──
+
+    /// Sign as the agent of `secret` from now on (this handle only). When
+    /// the secret names a drive, this handle works in it. `needs_sync` says
+    /// that drive is not in the store yet: fetch it from a server
+    /// ([`AtomicStore::open_ws_sync`]) or a paired device first.
+    pub async fn load_agent(&self, secret: String) -> Result<StoreAgentLoad, AtomicError> {
+        let loaded = self.db.load_agent_from_secret(&secret).await?;
+        if let Some(drive) = &loaded.agent.initial_drive {
+            self.pin_drive(&drive.to_string());
+        }
+        Ok(StoreAgentLoad {
+            agent_subject: loaded.agent.subject.to_string(),
+            needs_sync: loaded.drive_needs_sync,
+        })
+    }
+
+    // ── Sync ──
+
+    /// Open this handle's own WebSocket session to the server at
+    /// `server_origin`: sign in as this handle's agent, subscribe to its
+    /// drive (fetching it when missing), apply what the server sends, and send
+    /// what waits in the store's outbox. Replaces the session this handle had.
+    /// Writes through this handle go out over it from now on.
+    pub async fn open_ws_sync(&self, server_origin: String) -> Result<(), AtomicError> {
+        let drive = self.drive();
+        let have_drive = self
+            .sync
+            .open(&self.db, drive.clone(), &server_origin)
+            .await
+            .map_err(AtomicError::network)?;
+        if have_drive {
+            if let (true, Some(drive)) = (self.default, drive) {
+                // The person's other drives may be on the server; the
+                // search and pairing machinery behind this is the process's.
+                tokio::spawn(super::simple::follow_listed_drives(drive));
+            }
+            super::assistant::follow_conversations_in_background(self);
+        }
+        Ok(())
+    }
+
+    /// Close this handle's session. Writes wait in the outbox for the next
+    /// [`AtomicStore::open_ws_sync`].
+    pub async fn close_ws_sync(&self) {
+        self.sync.close().await;
+    }
+
+    /// The server this handle's session was last opened on.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn connected_server(&self) -> Option<String> {
+        self.sync.origin()
+    }
+
+    /// Whether the session is open now.
+    #[flutter_rust_bridge::frb(sync)]
+    pub fn is_syncing(&self) -> bool {
+        self.sync.is_open()
+    }
+
+    /// Send what waits in the outbox over this handle's session now. `true`
+    /// when nothing is left waiting; without a session nothing is attempted.
+    pub async fn push_pending(&self) -> bool {
+        self.sync.drain_outbox(&self.db).await
     }
 
     // ── Watching ──
@@ -483,6 +610,14 @@ impl AtomicStore {
         )
         .await)
     }
+}
+
+/// What [`AtomicStore::load_agent`] found.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoreAgentLoad {
+    pub agent_subject: String,
+    /// The agent's drive is not in the store yet.
+    pub needs_sync: bool,
 }
 
 /// What [`AtomicStore::setup`] made.
@@ -553,6 +688,7 @@ pub async fn wait_for_resource_event(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api::error::ErrorKind;
     use crate::api::simple::tests::shared_drive;
     use atomic_lib::urls;
 
@@ -786,8 +922,8 @@ mod tests {
         let handle = open(&dir).await;
         let default = AtomicStore::global().unwrap();
         assert!(handle.shares_store_with(&default));
-        assert!(handle.is_default());
+        assert!(handle.on_default_store());
         let other = open(&temp_dir("not-default")).await;
-        assert!(!other.is_default());
+        assert!(!other.on_default_store());
     }
 }

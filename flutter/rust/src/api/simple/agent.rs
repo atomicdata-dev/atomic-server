@@ -4,16 +4,18 @@ use super::*;
 
 // ── 2. Agent ───────────────────────────────────────────────────────────────
 
-/// Create an agent and a personal drive in one call. Pure local — no networking.
+/// Create an agent and a personal drive in one call (the default store's
+/// [`AtomicStore::setup`]). Pure local — no networking.
 /// Call `start_peer()` + `peer_announce()` afterwards if you want to be discoverable.
 pub async fn setup(name: String) -> Result<SetupResult, String> {
-    let store = db()?;
-    let (agent, drive_subject) = store.setup(&name).await.map_err(err)?;
-    let secret = agent.build_secret().map_err(err)?;
+    let made = state::default_store()?
+        .setup(name)
+        .await
+        .map_err(|e| e.message)?;
     Ok(SetupResult {
-        agent_secret: secret,
-        agent_subject: agent.subject.to_string(),
-        drive_subject,
+        agent_secret: made.agent_secret,
+        agent_subject: made.agent_subject,
+        drive_subject: made.drive,
     })
 }
 
@@ -23,11 +25,14 @@ pub async fn setup(name: String) -> Result<SetupResult, String> {
 /// Returns "needs_sync" if the drive doesn't exist locally (needs QR pairing).
 /// Returns the agent subject if everything is available.
 pub async fn load_agent(secret: String) -> Result<String, String> {
-    let result = db()?.load_agent_from_secret(&secret).await.map_err(err)?;
-    if result.drive_needs_sync {
+    let loaded = state::default_store()?
+        .load_agent(secret)
+        .await
+        .map_err(|e| e.message)?;
+    if loaded.needs_sync {
         Ok("needs_sync".to_string())
     } else {
-        Ok(result.agent.subject.to_string())
+        Ok(loaded.agent_subject)
     }
 }
 
