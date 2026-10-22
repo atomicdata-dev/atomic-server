@@ -12,7 +12,6 @@ export const PAGE_TITLE_TRANSITION_TAG = 'page-title';
 export const MEETING_PANEL_TITLE_TRANSITION_TAG = 'meeting-panel-title';
 export const RESOURCE_PAGE_TRANSITION_TAG = 'resource-page';
 export const BREADCRUMB_BAR_TRANSITION_TAG = 'breadcrumb-bar';
-export const NAVBAR_TRANSITION_TAG = 'navbar';
 
 const hashStringWithCYRB53 = (str: string, seed = 0) => {
   let h1 = 0xdeadbeef ^ seed,
