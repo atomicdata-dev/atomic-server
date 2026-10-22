@@ -128,30 +128,44 @@ a unit enum instead (`AtomicError`/`ErrorKind`, `AtomicValue`/`Datatype`).
 ### Store handles
 
 `AtomicStore` (`api/resources.rs`, opaque in Dart) is an open store with the
-agent that signs its writes and the drive it works in. The typed functions
-above are its methods; the free functions are the same calls on the default
-store, which `open_db` opens and `load_agent` signs for, so screens that have
+agent that signs its writes, the drive it works in and its own server session.
+The typed resource functions, the assistant and home lists (`list_children`,
+`list_recent_resources`, `search`, chats, conversations, activity,
+`move_resource`, ... in `api/assistant.rs`), `setup`, `load_agent` and the sync
+calls are its methods. The free functions are wrappers over the default
+handle, which `open_db` creates and `state::default_store()` holds
+(`state::db()` is its `Db`), so there is one code path and screens that have
 not moved keep working.
 
 ```dart
 final handle = await AtomicStore.open(
     path: dir, agentSecret: secret, drive: driveSubject); // or setup(name)
 final store = Store(backend: BridgeStoreBackend(handle), drive: handle.drive());
+await handle.openWsSync(serverOrigin: 'https://example.com'); // its own session
 ```
 
 - A file is opened once per process (Android recreates the activity in the
   same process, and a second open of a redb file damaged stores). A second
   handle on a path, including the one `open_db` opened, shares that `Db`
-  (`sharesStoreWith`) and differs in agent and drive only
-  (`atomic_lib::Db::with_own_agent`).
-- Only the default store syncs: the process has one server session and one
-  Iroh peer. A write through another handle is signed, stored and queued in
-  its outbox.
-- Still global: `open_db`, `load_agent`, `setup`, the sync, peer and
-  assistant functions read the default store (`state::db()`); moving them
-  onto the handle is the remaining step. The active drive is also stored in
-  the file (`Db::set_active_drive`), so handles on one file fall back to the
-  same one unless a drive is set on the handle.
+  (`sharesStoreWith`) and its recents index, and differs in agent, drive,
+  caches and sync session (`atomic_lib::Db::with_own_agent`).
+- Sync is per handle: `openWsSync` / `closeWsSync` / `pushPending` run a
+  `SyncSession` (`api/simple/ws_sync.rs`: the WebSocket, the task applying
+  what arrives, the server's origin). A write through a handle is queued in
+  the store's outbox and sent over that handle's session; with no session it
+  waits on disk. Opening a session subscribes to the handle's drive and
+  fetches it when missing. Two handles on one file share the outbox, so
+  either session may send an entry the other queued.
+- Still process-wide: the Iroh peer (`start_peer`, pairing, `peer_*`) and the
+  background orchestration around it (resume, `follow_listed_drives`, the
+  directory lookups in `api/simple/sync.rs`). They serve the default store
+  only, so a handle on another file takes no part in peer sync, and a handle
+  on the default file shares the peer with the default handle. `open_ws_sync`
+  on the default handle starts that orchestration; on another handle it only
+  follows that handle's conversations.
+- The active drive is also stored in the file (`Db::set_active_drive`), so
+  handles on one file fall back to the same one unless a drive is set on the
+  handle (the default handle always follows it).
 
 ## App identity
 

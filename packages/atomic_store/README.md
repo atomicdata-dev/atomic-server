@@ -109,4 +109,6 @@ final store = Store(backend: BridgeStoreBackend(handle), drive: driveSubject);
 
 `BridgeStoreBackend()` without a handle uses the app's default store (`open_db`,
 `load_agent`). Handles on the same path share one open database; see
-`flutter/README.md`.
+`flutter/README.md`. A handle also has its own server session
+(`handle.openWsSync(...)`), which its writes go out over; the Iroh peer stays
+process-wide.
