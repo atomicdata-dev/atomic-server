@@ -71,3 +71,32 @@ describe('shared template planning', () => {
     ).toThrow('Duplicate');
   });
 });
+
+describe('welcome template', () => {
+  const welcome = TEMPLATE_CATALOG.find(t => t.id === 'welcome')!;
+
+  it('plans two documents, the tasks table and a canvas, in order', () => {
+    const plan = planTemplate(welcome, TEMPLATE_CATALOG, true);
+
+    expect(plan.title).toBe('Welcome to Atomic');
+    expect(plan.parts.map(p => [p.kind, p.name])).toEqual([
+      ['document', 'Welcome to Atomic'],
+      ['document', 'Notes'],
+      ['table', 'Tasks'],
+      ['canvas', 'Sketch'],
+    ]);
+  });
+
+  it('keeps the welcome text to a handful of short paragraphs', () => {
+    const doc = welcome.parts[0];
+    if (doc.kind !== 'document') throw new Error('not a document');
+    const paragraphs = doc.text.split('\n');
+
+    expect(paragraphs.length).toBeGreaterThanOrEqual(5);
+    expect(paragraphs.length).toBeLessThanOrEqual(8);
+  });
+
+  it('is not offered by the gallery or the table chat', () => {
+    expect(welcome.entryPoints).toEqual([]);
+  });
+});

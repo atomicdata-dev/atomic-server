@@ -6,6 +6,7 @@ export interface TemplateDefinition {
   title: string;
   description: string;
   icon: string;
+  /** Where the gallery offers it. Empty: only code starts it (the welcome drive). */
   entryPoints: Array<'table' | 'workspace'>;
   parts: TemplatePart[];
 }
@@ -18,6 +19,7 @@ export type TemplatePart =
       name?: string;
     }
   | { key: string; kind: 'table'; catalogId: string; name: string }
+  | { key: string; kind: 'canvas'; name: string }
   | {
       key: string;
       kind: 'document';

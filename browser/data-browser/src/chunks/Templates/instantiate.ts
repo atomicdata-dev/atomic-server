@@ -1,6 +1,7 @@
 // @wc-ignore-file
 import { TEMPLATE_DEMO_KEY, readTemplateDemo } from './demoSession';
 import {
+  canvas,
   core,
   dataBrowser,
   enableLoro,
@@ -54,6 +55,14 @@ export async function instantiateTemplate(
         plan.examples,
       );
       subjects[part.key] = result.tableSubject;
+    } else if (part.kind === 'canvas') {
+      const resource = await store.newResource({
+        parent: target.parent,
+        isA: canvas.classes.canvas,
+        propVals: { [core.properties.name]: part.name },
+      });
+      await resource.save();
+      subjects[part.key] = resource.subject;
     } else if (part.kind === 'document') {
       const resource = await store.newResource({
         parent: target.parent,
