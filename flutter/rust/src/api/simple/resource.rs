@@ -67,19 +67,24 @@ pub async fn get_resource_history(subject: String) -> Result<Vec<VersionMetadata
         .collect())
 }
 
-pub async fn watch_resource(subject: String) -> Result<String, String> {
-    let store = db()?;
+/// Wait for the next change or destroy of `subject`, at most `timeout`.
+pub(crate) async fn wait_resource_event(
+    store: &atomic_lib::Db,
+    subject: &str,
+    timeout: std::time::Duration,
+) -> crate::api::resources::ResourceEvent {
+    use crate::api::resources::ResourceEvent;
     let mut rx = store.subscribe_events();
-    let target = atomic_lib::Subject::from_raw(&subject, store.get_base_domain().as_deref())
+    let target = atomic_lib::Subject::from_raw(subject, store.get_base_domain().as_deref())
         .without_params();
-    let result = tokio::time::timeout(std::time::Duration::from_secs(60), async {
+    let result = tokio::time::timeout(timeout, async {
         loop {
             match rx.recv().await {
                 Ok(atomic_lib::DbEvent::Changed { subject, .. }) if subject == target => {
-                    return subject.to_string();
+                    return ResourceEvent::Changed;
                 }
                 Ok(atomic_lib::DbEvent::Destroyed { subject, .. }) if subject == target => {
-                    return format!("!{}", subject);
+                    return ResourceEvent::Destroyed;
                 }
                 Ok(_) => continue,
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
@@ -91,10 +96,20 @@ pub async fn watch_resource(subject: String) -> Result<String, String> {
         }
     })
     .await;
-    match result {
-        Ok(s) => Ok(s),
-        Err(_) => Ok("timeout".into()),
-    }
+    result.unwrap_or(ResourceEvent::Timeout)
+}
+
+pub async fn watch_resource(subject: String) -> Result<String, String> {
+    use crate::api::resources::ResourceEvent;
+    let store = db()?;
+    let event = wait_resource_event(store, &subject, std::time::Duration::from_secs(60)).await;
+    let target = atomic_lib::Subject::from_raw(&subject, store.get_base_domain().as_deref())
+        .without_params();
+    Ok(match event {
+        ResourceEvent::Changed => target.to_string(),
+        ResourceEvent::Destroyed => format!("!{}", target),
+        ResourceEvent::Timeout => "timeout".into(),
+    })
 }
 
 pub async fn watch_children(parent: String) -> Result<String, String> {

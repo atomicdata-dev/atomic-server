@@ -6,6 +6,8 @@
 import 'api/assistant.dart';
 import 'api/context.dart';
 import 'api/embed.dart';
+import 'api/error.dart';
+import 'api/resources.dart';
 import 'api/simple/agent.dart';
 import 'api/simple/drive.dart';
 import 'api/simple/files.dart';
@@ -42,6 +44,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AgentInfo dco_decode_agent_info(dynamic raw);
 
   @protected
+  AtomicError dco_decode_atomic_error(dynamic raw);
+
+  @protected
+  AtomicValue dco_decode_atomic_value(dynamic raw);
+
+  @protected
   BackgroundActivity dco_decode_background_activity(dynamic raw);
 
   @protected
@@ -57,6 +65,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   StoreRecovery dco_decode_box_autoadd_store_recovery(dynamic raw);
 
   @protected
+  Datatype dco_decode_datatype(dynamic raw);
+
+  @protected
+  ErrorKind dco_decode_error_kind(dynamic raw);
+
+  @protected
+  double dco_decode_f_64(dynamic raw);
+
+  @protected
   int dco_decode_i_32(dynamic raw);
 
   @protected
@@ -69,13 +86,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ActivityEntry> dco_decode_list_activity_entry(dynamic raw);
 
   @protected
+  List<AtomicValue> dco_decode_list_atomic_value(dynamic raw);
+
+  @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<PropValue> dco_decode_list_prop_value(dynamic raw);
+
+  @protected
   List<(String, int)> dco_decode_list_record_string_u_32(dynamic raw);
+
+  @protected
+  List<SearchHit> dco_decode_list_search_hit(dynamic raw);
 
   @protected
   List<VersionMetadata> dco_decode_list_version_metadata(dynamic raw);
@@ -96,7 +122,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List? dco_decode_opt_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  PropValue dco_decode_prop_value(dynamic raw);
+
+  @protected
   (String, int) dco_decode_record_string_u_32(dynamic raw);
+
+  @protected
+  ResourceData dco_decode_resource_data(dynamic raw);
+
+  @protected
+  ResourceEvent dco_decode_resource_event(dynamic raw);
+
+  @protected
+  SearchHit dco_decode_search_hit(dynamic raw);
 
   @protected
   SetupResult dco_decode_setup_result(dynamic raw);
@@ -133,6 +171,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AgentInfo sse_decode_agent_info(SseDeserializer deserializer);
 
   @protected
+  AtomicError sse_decode_atomic_error(SseDeserializer deserializer);
+
+  @protected
+  AtomicValue sse_decode_atomic_value(SseDeserializer deserializer);
+
+  @protected
   BackgroundActivity sse_decode_background_activity(
       SseDeserializer deserializer);
 
@@ -150,6 +194,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       SseDeserializer deserializer);
 
   @protected
+  Datatype sse_decode_datatype(SseDeserializer deserializer);
+
+  @protected
+  ErrorKind sse_decode_error_kind(SseDeserializer deserializer);
+
+  @protected
+  double sse_decode_f_64(SseDeserializer deserializer);
+
+  @protected
   int sse_decode_i_32(SseDeserializer deserializer);
 
   @protected
@@ -163,14 +216,23 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       SseDeserializer deserializer);
 
   @protected
+  List<AtomicValue> sse_decode_list_atomic_value(SseDeserializer deserializer);
+
+  @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<PropValue> sse_decode_list_prop_value(SseDeserializer deserializer);
+
+  @protected
   List<(String, int)> sse_decode_list_record_string_u_32(
       SseDeserializer deserializer);
+
+  @protected
+  List<SearchHit> sse_decode_list_search_hit(SseDeserializer deserializer);
 
   @protected
   List<VersionMetadata> sse_decode_list_version_metadata(
@@ -194,7 +256,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List? sse_decode_opt_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  PropValue sse_decode_prop_value(SseDeserializer deserializer);
+
+  @protected
   (String, int) sse_decode_record_string_u_32(SseDeserializer deserializer);
+
+  @protected
+  ResourceData sse_decode_resource_data(SseDeserializer deserializer);
+
+  @protected
+  ResourceEvent sse_decode_resource_event(SseDeserializer deserializer);
+
+  @protected
+  SearchHit sse_decode_search_hit(SseDeserializer deserializer);
 
   @protected
   SetupResult sse_decode_setup_result(SseDeserializer deserializer);
@@ -231,6 +305,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_agent_info(AgentInfo self, SseSerializer serializer);
 
   @protected
+  void sse_encode_atomic_error(AtomicError self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_atomic_value(AtomicValue self, SseSerializer serializer);
+
+  @protected
   void sse_encode_background_activity(
       BackgroundActivity self, SseSerializer serializer);
 
@@ -250,6 +330,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       StoreRecovery self, SseSerializer serializer);
 
   @protected
+  void sse_encode_datatype(Datatype self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_error_kind(ErrorKind self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_f_64(double self, SseSerializer serializer);
+
+  @protected
   void sse_encode_i_32(int self, SseSerializer serializer);
 
   @protected
@@ -263,6 +352,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       List<ActivityEntry> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_atomic_value(
+      List<AtomicValue> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
 
   @protected
@@ -270,8 +363,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       Uint8List self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_prop_value(
+      List<PropValue> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_record_string_u_32(
       List<(String, int)> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_search_hit(
+      List<SearchHit> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_version_metadata(
@@ -297,8 +398,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       Uint8List? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_prop_value(PropValue self, SseSerializer serializer);
+
+  @protected
   void sse_encode_record_string_u_32(
       (String, int) self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_resource_data(ResourceData self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_resource_event(ResourceEvent self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_search_hit(SearchHit self, SseSerializer serializer);
 
   @protected
   void sse_encode_setup_result(SetupResult self, SseSerializer serializer);
