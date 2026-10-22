@@ -13222,10 +13222,6 @@ msgstr "Latest changes from each of {0} browsers and apps"
 msgid "The next backup from that browser or app adds them"
 msgstr "The next backup from that browser or app adds them"
 
-#: src/components/ConnectDrivePicker.tsx
-msgid "All drives"
-msgstr "All drives"
-
 #: src/actions/resourceActions.tsx
 msgid "Move..."
 msgstr "Move..."
@@ -13255,6 +13251,26 @@ msgstr "A resource can't be moved into itself."
 msgid "A resource can't be moved into something inside it."
 msgstr "A resource can't be moved into something inside it."
 
-#: src/helpers/moveResource.ts
-msgid "Moving to another drive is not supported yet."
-msgstr "Moving to another drive is not supported yet."
+#: src/components/MoveResourceDialog.tsx
+msgid "You don't have write access to the original."
+msgstr "You don't have write access to the original."
+
+#: src/components/MoveResourceDialog.tsx
+msgid "The original is moved to the Trash of its drive."
+msgstr "The original is moved to the Trash of its drive."
+
+#: src/components/MoveResourceDialog.tsx
+msgid "Moving to another drive"
+msgstr "Moving to another drive"
+
+#: src/components/MoveResourceDialog.tsx
+msgid "This makes a copy with a new identifier, so its link changes. Links and references elsewhere keep pointing at the old identifier; they only keep working through the redirect. Access follows the new parent."
+msgstr "This makes a copy with a new identifier, so its link changes. Links and references elsewhere keep pointing at the old identifier; they only keep working through the redirect. Access follows the new parent."
+
+#: src/components/MoveResourceDialog.tsx
+msgid "<0/> Leave a redirect at the old location"
+msgstr "<0/> Leave a redirect at the old location"
+
+#: src/components/ConnectDrivePicker.tsx
+msgid "All drives"
+msgstr "All drives"

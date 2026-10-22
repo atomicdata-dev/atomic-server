@@ -14,7 +14,10 @@ import {
   notifications,
   conversations,
   useArray,
+  useString,
 } from '@tomic/react';
+import { useNavigate } from '@tanstack/react-router';
+import { paths } from '../routes/paths';
 
 import { ContainerNarrow } from '../components/Containers';
 import Collection from '../views/CollectionPage';
@@ -290,6 +293,31 @@ const ResourcePage: React.FC<Props> = ({ subject, websiteVersion }) => {
   );
 };
 
+/**
+ * A Redirect has two origins. The answer to accepting an invite is never stored
+ * and has no `parent`: `InvitePage` keeps the page while it finishes the
+ * sign-in. One left behind by "Move..." is stored where the original lived, so
+ * it keeps its `parent`: follow its `destination`.
+ */
+const RedirectPage: React.FC<ResourcePageProps> = ({ resource }) => {
+  const navigate = useNavigate();
+  const [parent] = useString(resource, core.properties.parent);
+  const [destination] = useString(resource, server.properties.destination);
+  const follow = !!parent && !!destination;
+
+  useEffect(() => {
+    if (follow) {
+      navigate({
+        to: paths.show,
+        search: { subject: destination },
+        replace: true,
+      });
+    }
+  }, [follow, destination, navigate]);
+
+  return follow ? <Spinner /> : <InvitePage resource={resource} />;
+};
+
 function selectComponent(klass: string | undefined) {
   switch (klass) {
     case collections.classes.collection:
@@ -299,8 +327,9 @@ function selectComponent(klass: string | undefined) {
     case server.classes.drive:
       return DrivePage;
     case server.classes.invite:
-    case server.classes.redirect:
       return InvitePage;
+    case server.classes.redirect:
+      return RedirectPage;
     case dataBrowser.classes.document:
       return DocumentPage;
     case core.classes.class:

@@ -8,14 +8,20 @@ Menu item "Move..." (`actions/resourceActions.tsx`, `MoveResourceDialog.tsx`, `h
 - [x] Unit test (`helpers/moveResource.test.ts`)
 - [ ] Screenshots + e2e (only if the smoke tier needs it)
 
-## Other drive (blocked: no copy API)
-A drive is immutable, so this is copy + replace. Nothing in `@tomic/lib` copies a resource:
-`store.newResource` creates a fresh genesis, but there is no helper that clones propvals,
-rewrites references among the copied resources, carries blobs (files hold a blob id plus
-drive-bound rights) or recreates children. That is a feature of its own, not a small addition.
+## Other drive
+Done: `copyResourceTree` + `replaceWithRedirect` (`helpers/moveResource.ts`, the tree walk), the
+single-resource copy shared with forks (`copyResource` in `@tomic/lib` `copy.ts`), the dialog's
+other-drive warning and "Leave a redirect at the old location" checkbox (off = original to Trash), and
+`views/ResourcePage.tsx` following a stored `Redirect` (one with a `parent`; the invite answer has none).
 
-- [ ] `store.copyResourceTree(subject, targetParent)`: walk children (collection query on `parent`), `newResource` per node, map old to new subjects, rewrite resource-valued props that point inside the copied set, skip server-managed props (`drive`, `parent`, `lastCommit`, rights)
-- [ ] Decide files/blobs: re-upload vs. reference
-- [ ] Dialog: when another drive is picked, state the id and link change and that old links stop pointing at it; checkbox "Leave a redirect at the old location" (default on)
-- [ ] Redirect: replace the original with a `Redirect` (`https://atomicdata.dev/classes/Redirect`, `destination` = new subject) or trash it; needs delete/replace of a genesis resource to be checked
-- [ ] Until then `moveBlockedReason` returns "Moving to another drive is not supported yet."
+How it works: copy = fresh genesis ids, children via `parent`, references inside the copied set
+rewritten, rights not carried over (they follow the new parent). Files are copied by value; blobs
+are content-addressed, so the copy points at the same bytes. Rich-text bodies are seeded from the
+original's Loro doc. The original keeps parent/drive/genesis/rights and is overwritten to
+`isA=Redirect` + `destination`, keeping `name`/`shortname`/`filename` so the old sidebar row keeps its title.
+After the copy and the Redirect saved, the original's direct children go to the old drive's Trash
+(`trashDescendants`; trash moves a subtree), so a failure earlier loses nothing.
+
+- [ ] Trees with Properties/Tables (content-addressed ids) are refused; copying needs the ids re-derived
+- [ ] Links inside rich-text bodies are not rewritten to the new ids
+- [ ] Screenshots + e2e (only if the smoke tier needs it)

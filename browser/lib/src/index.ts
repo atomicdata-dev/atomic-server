@@ -91,6 +91,7 @@ export * from './search.js';
 export * from './resource.js';
 export * from './chat-log.js';
 export * from './forks.js';
+export * from './copy.js';
 export * from './store.js';
 export * from './property-identity.js';
 export { getOrCreateDriveLocation } from './drive-location.js';
