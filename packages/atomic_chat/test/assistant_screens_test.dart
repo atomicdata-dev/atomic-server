@@ -2584,9 +2584,13 @@ void main() {
       await tester.tap(find.text('A doc'));
       await tester.pumpAndSettle();
       expect(x(tester, 'Profile'), lessThan(x(tester, 'More')));
-      expect([
+      // More takes a slot of its own: the others move left to share the width.
+      final shifted = [
         for (final t in ['Search', 'New', 'Profile']) x(tester, t)
-      ], xs);
+      ];
+      for (var i = 0; i < xs.length; i++) {
+        expect(shifted[i], lessThan(xs[i]));
+      }
     });
 
     testWidgets('the last button is the page on top\'s menu, else none',
