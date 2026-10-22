@@ -18,7 +18,7 @@ test.describe('open-locked-drive', () => {
     await clickAccountMenuItem(page, 'Profile');
     await page.click('[data-test="sign-out"]');
     await expect(
-      page.getByRole('button', { name: 'Create account' }),
+      page.getByRole('button', { name: 'Get started' }),
     ).toBeVisible();
 
     // The portal's Open action carries the drive twice: as the subject and as

@@ -21,10 +21,10 @@ test.describe('onboarding', () => {
     // shape mt940 had: a test winning a coin toss rather than passing.
     test.slow();
 
-    // Start at the canonical signed-out onboarding surface.
-    await page.goto(`${FRONTEND_URL}/app/welcome`);
-
-    // Card → create account (then NewIdentitySection auto-starts)
+    // The welcome screen's Get started skips the profile and secret steps.
+    // They stay reachable for someone who followed a link to a drive they
+    // cannot open and has no account: that sign-in step offers to create one.
+    await page.goto(`${FRONTEND_URL}/app/welcome?next=did%3Aad%3Aunknown`);
     await page.getByRole('button', { name: 'Create account' }).click();
 
     // Wait for the profile step (after identity is created)

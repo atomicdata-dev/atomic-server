@@ -57,33 +57,3 @@ test('does not offer account recovery when the signed-in account has no backup',
     page.getByRole('heading', { name: 'Portal drives' }),
   ).toBeVisible();
 });
-
-test('a managed node sends account creation to the portal', async ({
-  page,
-}) => {
-  await page.route('**/server', route =>
-    route.fulfill({
-      json: {
-        'https://atomicdata.dev/properties/server/managed': true,
-        'https://atomicdata.dev/properties/server/portalUrl': new URL(
-          process.env.FRONTEND_URL || 'http://localhost:6747',
-        ).origin,
-      },
-    }),
-  );
-  await page.route('**/signin', route =>
-    route.fulfill({
-      contentType: 'text/html',
-      body: '<h1>Portal sign in</h1>',
-    }),
-  );
-  await page.goto(
-    `${process.env.FRONTEND_URL || 'http://localhost:6747'}/app/welcome`,
-  );
-  const createAccount = page.getByRole('button', { name: 'Create account' });
-  await expect(createAccount).toBeEnabled();
-  await createAccount.click();
-  await expect(
-    page.getByRole('heading', { name: 'Portal sign in' }),
-  ).toBeVisible();
-});

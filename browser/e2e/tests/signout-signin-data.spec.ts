@@ -144,9 +144,7 @@ async function signOut(page: Page) {
 
   await clickAccountMenuItem(page, 'Profile');
   await page.click('[data-test="sign-out"]');
-  await expect(
-    page.getByRole('button', { name: 'Create account' }),
-  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Get started' })).toBeVisible();
 }
 
 /**

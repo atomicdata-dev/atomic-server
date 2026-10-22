@@ -240,3 +240,41 @@ test('the conflict dialog brings the workspace along after a failed try', async 
   await unlockAccount(page, account.secret, account.agent);
   await expectBroughtAlong(page, drive, account.agent);
 });
+
+test('a workspace started with Get started comes along when signing in', async ({
+  page,
+  browserDiagnostics,
+}) => {
+  test.setTimeout(300_000);
+  allowTemplateSetupWarning(browserDiagnostics);
+  const account = await existingAccount(page);
+  const portal = await mockPortal(page, account.agent);
+
+  await page.goto(`${FRONTEND_URL}/app/welcome`);
+  await page.getByRole('button', { name: 'Get started' }).click();
+  await expect(page).not.toHaveURL(/\/app\/welcome/, { timeout: 60_000 });
+  await expect
+    .poll(() => page.evaluate(() => !!window.store?.getAgent()), {
+      timeout: 30_000,
+    })
+    .toBe(true);
+  // Work of its own, in a drive that stays on this device.
+  const drive = await page.evaluate(async () => {
+    const store = window.store;
+    const made = await store.createDrive('Started drive', {
+      personal: false,
+      localOnly: true,
+    });
+    store.setDrive(made.subject);
+
+    return made.subject;
+  });
+
+  portal.signedIn = true;
+  await page.goto(
+    `${FRONTEND_URL}/app/show?subject=${encodeURIComponent(drive)}`,
+  );
+  await expect(page.getByTestId('identity-conflict')).toHaveCount(0);
+  await unlockAccount(page, account.secret, account.agent);
+  await expectBroughtAlong(page, drive, account.agent);
+});

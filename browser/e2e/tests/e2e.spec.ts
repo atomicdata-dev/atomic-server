@@ -87,14 +87,14 @@ test.describe('data-browser', async () => {
         await page.evaluate(() => window.store.getAgent()),
       ).toBeUndefined();
       await expect(
-        page.getByRole('button', { name: 'Create account' }),
+        page.getByRole('button', { name: 'Get started' }),
       ).toBeVisible();
       await expect(
         page.getByRole('button', { name: 'Sign in', exact: true }),
       ).toBeVisible();
       await page.reload();
       await expect(
-        page.getByRole('button', { name: 'Create account' }),
+        page.getByRole('button', { name: 'Get started' }),
       ).toBeVisible();
     },
   );
