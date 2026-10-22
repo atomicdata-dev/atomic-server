@@ -18,6 +18,7 @@ const state = vi.hoisted(() => ({
   hosted: false,
   unavailable: false,
   startLocalIdentity: vi.fn(),
+  startWelcomeDrive: vi.fn(),
   nudge: vi.fn(),
   navigate: vi.fn(),
   setAgent: vi.fn(),
@@ -135,6 +136,9 @@ vi.mock('../../helpers/originNode', () => ({
 vi.mock('../../helpers/startLocalIdentity', () => ({
   startLocalIdentity: state.startLocalIdentity,
 }));
+vi.mock('../../helpers/startWelcomeDrive', () => ({
+  startWelcomeDrive: state.startWelcomeDrive,
+}));
 vi.mock('../../helpers/privateHomeNudge', () => ({
   privateHomeNudge: state.nudge,
 }));
@@ -204,6 +208,10 @@ beforeEach(() => {
     agent: { subject: 'did:ad:agent:new' },
     drive: 'did:ad:newhome',
   });
+  state.startWelcomeDrive.mockResolvedValue({
+    drive: 'did:ad:welcome',
+    landing: 'did:ad:welcomedoc',
+  });
   state.recovery.mockResolvedValue(null);
   state.account = null;
   state.hasData = true;
@@ -239,18 +247,38 @@ it.each([true, false])(
   },
 );
 
-it('starts with a real local identity and opens its drive, without a nudge', async () => {
+it('starts with a real local identity and lands on the Welcome document, without a nudge', async () => {
   await show();
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Get started' }));
   });
   expect(state.startLocalIdentity).toHaveBeenCalledWith(state.store);
   expect(state.setAgent).toHaveBeenCalledWith({ subject: 'did:ad:agent:new' });
+  expect(state.startWelcomeDrive).toHaveBeenCalledWith(
+    state.store,
+    'did:ad:newhome',
+  );
+  expect(state.setDrive).toHaveBeenCalledWith('did:ad:welcome');
+  expect(state.navigate).toHaveBeenCalledWith(
+    '/app/show?subject=did:ad:welcomedoc',
+  );
+  expect(state.nudge).not.toHaveBeenCalled();
+});
+
+it('opens the personal drive when the welcome drive cannot be made', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  state.startWelcomeDrive.mockRejectedValue(new Error('No room'));
+  await show();
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Get started' }));
+  });
   expect(state.setDrive).toHaveBeenCalledWith('did:ad:newhome');
   expect(state.navigate).toHaveBeenCalledWith(
     '/app/show?subject=did:ad:newhome',
   );
-  expect(state.nudge).not.toHaveBeenCalled();
+  expect(log).toHaveBeenCalled();
+  expect(screen.queryByRole('alert')).toBeNull();
+  log.mockRestore();
 });
 
 it('shows the error and keeps the choice when starting fails', async () => {

@@ -13,6 +13,22 @@ test('Get started opens a workspace of your own, without an account', async ({
   await page.getByRole('button', { name: 'Get started' }).click();
   await expect(page).not.toHaveURL(/\/app\/welcome/, { timeout: 60_000 });
 
+  // They land in the ready-made drive, on its Welcome document.
+  await expect(
+    page.getByRole('heading', { name: 'Welcome to Atomic' }).first(),
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('stored on this device')).toBeVisible();
+  await expect(page.getByTestId('current-drive-title')).toHaveText(
+    'Welcome to Atomic',
+  );
+  const items = page.locator('[data-sidebar-id]');
+  await expect(items).toHaveText([
+    'Welcome to Atomic',
+    'Notes',
+    'Tasks',
+    'Sketch',
+  ]);
+
   // Not a disposable guest: the agent has a personal drive of its own.
   await expect
     .poll(

@@ -27,6 +27,7 @@ import { connectHostedDrive, shortDid } from '../../helpers/managed/reconcile';
 import { deviceHasDriveData } from '../../helpers/driveData';
 import { discoverHomeServerForApp } from '../../helpers/discoverHomeServer';
 import { startLocalIdentity } from '../../helpers/startLocalIdentity';
+import { startWelcomeDrive } from '../../helpers/startWelcomeDrive';
 import { openPrivateHome } from '../../helpers/openPrivateHome';
 import { privateHomeNudge } from '../../helpers/privateHomeNudge';
 import { withDeadline } from '../../helpers/withDeadline';
@@ -890,10 +891,18 @@ export function GettingStartedFlow({
 
     try {
       const { agent, drive } = await startLocalIdentity(store);
+      let open = { drive, landing: drive };
+
+      try {
+        open = await startWelcomeDrive(store, drive);
+      } catch (e) {
+        // Never block starting: the personal drive is there and works.
+        console.error('Could not create the welcome drive', e);
+      }
 
       setAgent(agent);
-      setDrive(drive);
-      navigate(constructOpenURL(drive));
+      setDrive(open.drive);
+      navigate(constructOpenURL(open.landing));
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
       setStep('welcome');
