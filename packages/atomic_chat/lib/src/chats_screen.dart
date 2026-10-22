@@ -1118,6 +1118,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
                 child: CurrentDriveHeader(
                   drive: _currentDrive,
                   onTap: _toggleSwitcher,
+                  onOpen: _currentDrive == null
+                      ? null
+                      : () => _openDrivePage(_currentDrive!),
                   onDrop: (d) => _tree.currentState?.moveToRoot(d),
                 ),
               ),
@@ -1129,81 +1132,85 @@ class _ChatsScreenState extends State<ChatsScreen> {
             builder: (context, switching, _) => switching
                 ? _switcherBody()
                 : ScrollConfiguration(
-            behavior: ScrollConfiguration.of(context)
-                .copyWith(physics: const AppScrollPhysics()),
-            // Sideways the camera cutout is at a side: the rows (ListTiles)
-            // keep out of it, and so do the headings.
-            child: SafeArea(
-              top: false,
-              bottom: false,
-              child: LayoutBuilder(builder: (context, box) {
-                final shown = _panelIds(split);
-                final open = [
-                  for (final s in shown)
-                    if (!_layout.collapsed.contains(s)) s
-                ];
-                final room = box.maxHeight.isFinite ? box.maxHeight : 600.0;
-                final m = SidebarMetrics.of(context);
-                final scale =
-                    math.max(1.0, MediaQuery.textScalerOf(context).scale(1));
-                // Upper bounds of what a panel needs: its heading, up to
-                // _homeItems rows (two lines with a caption on touch) and a
-                // "Show all" row. A panel this tall never scrolls.
-                final headerH = (m.compact ? m.headerHeight : 48.0) * scale + 1;
-                final rowH = (m.compact ? m.rowHeight : 72.0) * scale;
-                final showAllH = (m.compact ? m.rowHeight : 48.0) * scale;
-                final natural = rowH * _homeItems + showAllH;
-                final headers = headerH * shown.where(_takesRoom).length;
-                // The panels come first; the tree keeps at least three rows.
-                final minTree = (m.compact ? m.rowHeight : 56.0) * 3;
-                final bottomPad = MediaQuery.paddingOf(context).bottom;
-                final cap = math.max(0.0, room - minTree);
-                final avail = math.max(0.0, cap - headers - bottomPad);
-                _bodyMaxes.clear();
-                final taking = open.where(_takesRoom).toList();
-                for (final s in open) {
-                  _bodyMaxes[s] = natural;
-                }
-                if (taking.isNotEmpty) {
-                  if (natural * taking.length <= avail) {
-                    // Everything fits: each panel is as tall as its rows.
-                  } else {
-                    // Short window: the panel opened last keeps its whole
-                    // content, the others share what is left (and scroll).
-                    final last = _openOrder.lastWhere(taking.contains,
-                        orElse: () => taking.last);
-                    final others = taking.length - 1;
-                    final lastMax = others == 0
-                        ? math.min(natural, avail)
-                        : math.min(
-                            natural, math.max(0.0, avail - others * rowH));
-                    _bodyMaxes[last] = lastMax;
-                    for (final s in taking) {
-                      if (s != last) {
-                        _bodyMaxes[s] =
-                            math.max(0.0, (avail - lastMax) / others);
-                      }
-                    }
-                  }
-                }
-                return Column(children: [
-                  // The tree takes what the panels leave; it scrolls itself.
-                  Expanded(child: _driveTree()),
-                  // Bottom-anchored panels, just above the bottom bar.
-                  Container(
-                    key: const Key('home-panels'),
-                    constraints: BoxConstraints(maxHeight: cap),
-                    padding: EdgeInsets.only(
-                        bottom: MediaQuery.paddingOf(context).bottom),
-                    child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: _shownSections(split)),
+                    behavior: ScrollConfiguration.of(context)
+                        .copyWith(physics: const AppScrollPhysics()),
+                    // Sideways the camera cutout is at a side: the rows (ListTiles)
+                    // keep out of it, and so do the headings.
+                    child: SafeArea(
+                      top: false,
+                      bottom: false,
+                      child: LayoutBuilder(builder: (context, box) {
+                        final shown = _panelIds(split);
+                        final open = [
+                          for (final s in shown)
+                            if (!_layout.collapsed.contains(s)) s
+                        ];
+                        final room =
+                            box.maxHeight.isFinite ? box.maxHeight : 600.0;
+                        final m = SidebarMetrics.of(context);
+                        final scale = math.max(
+                            1.0, MediaQuery.textScalerOf(context).scale(1));
+                        // Upper bounds of what a panel needs: its heading, up to
+                        // _homeItems rows (two lines with a caption on touch) and a
+                        // "Show all" row. A panel this tall never scrolls.
+                        final headerH =
+                            (m.compact ? m.headerHeight : 48.0) * scale + 1;
+                        final rowH = (m.compact ? m.rowHeight : 72.0) * scale;
+                        final showAllH =
+                            (m.compact ? m.rowHeight : 48.0) * scale;
+                        final natural = rowH * _homeItems + showAllH;
+                        final headers =
+                            headerH * shown.where(_takesRoom).length;
+                        // The panels come first; the tree keeps at least three rows.
+                        final minTree = (m.compact ? m.rowHeight : 56.0) * 3;
+                        final bottomPad = MediaQuery.paddingOf(context).bottom;
+                        final cap = math.max(0.0, room - minTree);
+                        final avail = math.max(0.0, cap - headers - bottomPad);
+                        _bodyMaxes.clear();
+                        final taking = open.where(_takesRoom).toList();
+                        for (final s in open) {
+                          _bodyMaxes[s] = natural;
+                        }
+                        if (taking.isNotEmpty) {
+                          if (natural * taking.length <= avail) {
+                            // Everything fits: each panel is as tall as its rows.
+                          } else {
+                            // Short window: the panel opened last keeps its whole
+                            // content, the others share what is left (and scroll).
+                            final last = _openOrder.lastWhere(taking.contains,
+                                orElse: () => taking.last);
+                            final others = taking.length - 1;
+                            final lastMax = others == 0
+                                ? math.min(natural, avail)
+                                : math.min(natural,
+                                    math.max(0.0, avail - others * rowH));
+                            _bodyMaxes[last] = lastMax;
+                            for (final s in taking) {
+                              if (s != last) {
+                                _bodyMaxes[s] =
+                                    math.max(0.0, (avail - lastMax) / others);
+                              }
+                            }
+                          }
+                        }
+                        return Column(children: [
+                          // The tree takes what the panels leave; it scrolls itself.
+                          Expanded(child: _driveTree()),
+                          // Bottom-anchored panels, just above the bottom bar.
+                          Container(
+                            key: const Key('home-panels'),
+                            constraints: BoxConstraints(maxHeight: cap),
+                            padding: EdgeInsets.only(
+                                bottom: MediaQuery.paddingOf(context).bottom),
+                            child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: _shownSections(split)),
+                          ),
+                        ]);
+                      }),
+                    ),
                   ),
-                ]);
-              }),
-            ),
           ),
-        ),
         );
       },
     )));

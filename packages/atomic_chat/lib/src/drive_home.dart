@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:async';
 
 import 'package:atomic_flutter/atomic_flutter.dart'
@@ -48,17 +49,27 @@ class DriveAvatar extends StatelessWidget {
 }
 
 /// The current drive as the home's heading: avatar, bold name and the small
-/// up/down selector of the web sidebar. A tap opens the drive switcher.
+/// up/down selector of the web sidebar. A tap on the drive opens its page, a
+/// tap on the selector at the right edge opens the drive switcher.
 class CurrentDriveHeader extends StatelessWidget {
   final DriveInfo? drive;
+
+  /// The switch icon was tapped: toggle the drive switcher.
   final VoidCallback onTap;
+
+  /// The drive (avatar and name) was tapped: open the drive's page.
+  final VoidCallback? onOpen;
 
   /// A resource of the tree was dropped on the header: move it to the drive's
   /// root. Null: the header accepts no drops.
   final ValueChanged<DriveDrag>? onDrop;
 
   const CurrentDriveHeader(
-      {super.key, required this.drive, required this.onTap, this.onDrop});
+      {super.key,
+      required this.drive,
+      required this.onTap,
+      this.onOpen,
+      this.onDrop});
 
   @override
   Widget build(BuildContext context) {
@@ -86,53 +97,94 @@ class CurrentDriveHeader extends StatelessWidget {
     final d = drive;
     final name = d == null ? 'Drive' : driveTitle(d);
     final m = SidebarMetrics.of(context);
-    return Semantics(
-      button: true,
-      label: 'Current drive: $name. Switch drive',
-      excludeSemantics: true,
-      onTap: onTap,
-      child: InkWell(
-        key: const Key('current-drive-header'),
-        mouseCursor: WidgetStateMouseCursor.clickable,
-        borderRadius: BorderRadius.circular(8),
-        onTap: onTap,
-        child: ConstrainedBox(
-          constraints:
-              BoxConstraints(minHeight: m.compact ? m.driveHeaderHeight : 0),
-          child: Padding(
-            // Compact: the avatar sits at the rows' icon column (the bar's
-            // title spacing is 4). Touch: the bar's title spacing is already
-            // the rows' 16, so no side padding of our own.
-            padding: m.compact
-                ? EdgeInsets.symmetric(vertical: 4, horizontal: m.hPad - 4)
-                : const EdgeInsets.symmetric(vertical: 6),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              if (SidebarIconsScope.of(context)) ...[
-                DriveAvatar(
-                    drive: d,
-                    size: m.compact ? m.driveAvatar : 28,
-                    alignGlyphStart: !m.compact),
-                SizedBox(width: m.compact ? m.gap : 10),
-              ],
-              Flexible(
-                child: Text(name,
-                    key: const Key('current-drive-name'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    strutStyle:
-                        m.compact ? SidebarRow.strut(m.driveNameSize) : null,
-                    style: TextStyle(
-                        color: c.textPrimary,
-                        fontSize: m.compact ? m.driveNameSize : 20,
-                        height: m.compact ? 1.2 : null,
-                        fontWeight: FontWeight.w700)),
+    final open = onOpen;
+    // The title bar ends 4 dp (its actions) plus its title spacing before the
+    // screen's edge; the switch icon ends where the panels' chevrons do (hPad
+    // from it), so its box is pushed that far out.
+    final spacing = m.compact ? 4.0 : 16.0;
+    // (A compact panel's chevron box itself ends hPad from the edge; on touch
+    // its icon does.)
+    final out = spacing +
+        4 -
+        m.hPad +
+        (m.compact ? 0 : (m.chevronSlot - m.chevronSize) / 2);
+    return ConstrainedBox(
+      key: const Key('current-drive-header'),
+      constraints: const BoxConstraints(minHeight: 40),
+      child: Padding(
+        // Compact: the avatar sits at the rows' icon column (the bar's title
+        // spacing is 4). Touch: the bar's title spacing is already the rows'
+        // 16, so no side padding of our own.
+        padding: EdgeInsets.only(left: m.compact ? m.hPad - 4 : 0),
+        child: Row(children: [
+          // The drive: its avatar sits in the rows' icon column and its name
+          // where the rows' titles start. A tap opens the drive's page.
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Semantics(
+                button: true,
+                label: 'Open drive $name',
+                excludeSemantics: true,
+                onTap: open,
+                child: InkWell(
+                  key: const Key('current-drive-open'),
+                  mouseCursor: WidgetStateMouseCursor.clickable,
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: open,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 40),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      if (SidebarIconsScope.of(context)) ...[
+                        DriveAvatar(
+                            drive: d,
+                            size: m.iconSlot,
+                            alignGlyphStart: !m.compact),
+                        SizedBox(width: m.gap),
+                      ],
+                      Flexible(
+                        child: Text(name,
+                            key: const Key('current-drive-name'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            strutStyle: m.compact
+                                ? SidebarRow.strut(m.driveNameSize)
+                                : null,
+                            style: TextStyle(
+                                color: c.textPrimary,
+                                fontSize: m.compact ? m.driveNameSize : 20,
+                                height: m.compact ? 1.2 : null,
+                                fontWeight: FontWeight.w700)),
+                      ),
+                    ]),
+                  ),
+                ),
               ),
-              const SizedBox(width: 4),
-              Icon(Icons.unfold_more,
-                  size: m.compact ? m.chevronSize : 20, color: c.textSecondary),
-            ]),
+            ),
           ),
-        ),
+          // The switcher: its own target at the right edge.
+          Transform.translate(
+              offset: Offset(out, 0),
+              child: Semantics(
+                button: true,
+                label: 'Switch drive',
+                excludeSemantics: true,
+                onTap: onTap,
+                child: InkWell(
+                  key: const Key('current-drive-switch'),
+                  mouseCursor: WidgetStateMouseCursor.clickable,
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: onTap,
+                  child: SizedBox(
+                    width: m.chevronSlot,
+                    height: math.max(40, m.chevronSlot),
+                    child: Center(
+                        child: Icon(Icons.unfold_more,
+                            size: m.chevronSize, color: c.textSecondary)),
+                  ),
+                ),
+              )),
+        ]),
       ),
     );
   }
@@ -715,8 +767,8 @@ class DriveTreeState extends State<DriveTree> {
       iconSize: m.chevronSize,
       constraints:
           BoxConstraints.tightFor(width: m.chevronSlot, height: m.chevronSlot),
-      style: IconButton.styleFrom(
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+      style:
+          IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
       icon: AnimatedRotation(
         turns: open ? 0 : -0.25,
         duration: const Duration(milliseconds: 120),
@@ -887,9 +939,11 @@ class DriveTreeState extends State<DriveTree> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(children: [
-            const SizedBox(width: 6),
-            Icon(Icons.add, size: 22, color: c.textSecondary),
-            const SizedBox(width: 24),
+            SizedBox(
+                width: m.iconSlot,
+                child: GlyphStart(
+                    icon: Icons.add, size: 20, color: c.textSecondary)),
+            SizedBox(width: m.gap),
             Text('New', style: TextStyle(color: c.textSecondary, fontSize: 15)),
           ]),
         ),
@@ -1050,9 +1104,8 @@ class _DragRow extends StatelessWidget {
               height: 2,
               child: IgnorePointer(
                 child: ColoredBox(
-                    key: Key(zone == DropZone.before
-                        ? 'drop-before'
-                        : 'drop-after'),
+                    key: Key(
+                        zone == DropZone.before ? 'drop-before' : 'drop-after'),
                     color: accent),
               ),
             ),

@@ -1350,7 +1350,7 @@ void main() {
       await _settle(tester);
 
       Future<List<String>> switcher() async {
-        await tester.tap(find.byKey(const Key('current-drive-header')));
+        await tester.tap(find.byKey(const Key('current-drive-switch')));
         await _settle(tester);
         final tops = {
           for (final d in ['a', 'b'])

@@ -25,7 +25,7 @@ void main() {
     // The current drive is the header; the switcher lists them as given.
     expect(find.byKey(const Key('current-drive-name')), findsOneWidget);
     expect(find.text('Zebra'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('current-drive-header')));
+    await tester.tap(find.byKey(const Key('current-drive-switch')));
     await tester.pumpAndSettle();
     double y(String s) => tester
         .getTopLeft(find.byKey(ValueKey('drive-switcher-row-did:ad:$s')))

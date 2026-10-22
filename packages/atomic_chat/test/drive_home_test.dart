@@ -163,12 +163,14 @@ void main() {
 
   group('the quick drive switcher', () {
     for (final size in [const Size(393, 851), const Size(1000, 800)]) {
-      testWidgets('replaces the sidebar in place at $size: no sheet, no popover',
+      testWidgets(
+          'replaces the sidebar in place at $size: no sheet, no popover',
           (tester) async {
         _size(tester, size);
         await _home(tester, _api());
-        expect(find.byKey(const Key('drive-tree-row-did:ad:z')), findsOneWidget);
-        await tester.tap(find.byKey(const Key('current-drive-header')));
+        expect(
+            find.byKey(const Key('drive-tree-row-did:ad:z')), findsOneWidget);
+        await tester.tap(find.byKey(const Key('current-drive-switch')));
         await tester.pumpAndSettle();
         // Nothing on top: no sheet, no dialog, no popover, no barrier.
         expect(find.byType(BottomSheet), findsNothing);
@@ -197,18 +199,17 @@ void main() {
                 of: find.byKey(const ValueKey('drive-switcher-row-did:ad:a')),
                 matching: find.byKey(const Key('drive-switcher-current'))),
             findsOneWidget);
-        expect(
-            find.byKey(const Key('drive-switcher-current')), findsOneWidget);
+        expect(find.byKey(const Key('drive-switcher-current')), findsOneWidget);
         expect(find.byKey(const Key('drive-switcher-manage')), findsOneWidget);
       });
     }
 
     testWidgets('the header toggles it back to the sidebar', (tester) async {
       await _home(tester, _api());
-      await tester.tap(find.byKey(const Key('current-drive-header')));
+      await tester.tap(find.byKey(const Key('current-drive-switch')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('drive-switcher')), findsOneWidget);
-      await tester.tap(find.byKey(const Key('current-drive-header')));
+      await tester.tap(find.byKey(const Key('current-drive-switch')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('drive-switcher')), findsNothing);
       expect(find.byKey(const Key('drive-tree-row-did:ad:z')), findsOneWidget);
@@ -216,7 +217,7 @@ void main() {
 
     testWidgets('system back closes it', (tester) async {
       await _home(tester, _api());
-      await tester.tap(find.byKey(const Key('current-drive-header')));
+      await tester.tap(find.byKey(const Key('current-drive-switch')));
       await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
@@ -226,7 +227,7 @@ void main() {
 
     testWidgets('searching filters as you type', (tester) async {
       await _home(tester, _api());
-      await tester.tap(find.byKey(const Key('current-drive-header')));
+      await tester.tap(find.byKey(const Key('current-drive-switch')));
       await tester.pumpAndSettle();
       await tester.enterText(
           find.byKey(const Key('drive-switcher-search')), 'gam');
@@ -249,7 +250,7 @@ void main() {
       await _home(tester, api);
       expect(find.text('Zebra notes'), findsOneWidget);
       expect(find.text('Beta only'), findsNothing);
-      await tester.tap(find.byKey(const Key('current-drive-header')));
+      await tester.tap(find.byKey(const Key('current-drive-switch')));
       await tester.pumpAndSettle();
       await tester
           .tap(find.byKey(const ValueKey('drive-switcher-switch-did:ad:b')));
@@ -268,7 +269,7 @@ void main() {
     testWidgets('the current drive has a chip and no Switch button',
         (tester) async {
       await _home(tester, _api());
-      await tester.tap(find.byKey(const Key('current-drive-header')));
+      await tester.tap(find.byKey(const Key('current-drive-switch')));
       await tester.pumpAndSettle();
       expect(
           find.descendant(
@@ -288,7 +289,7 @@ void main() {
       _size(tester, const Size(393, 851));
       final api = _api();
       await _home(tester, api);
-      await tester.tap(find.byKey(const Key('current-drive-header')));
+      await tester.tap(find.byKey(const Key('current-drive-switch')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Beta'));
       await tester.pumpAndSettle();
@@ -308,7 +309,7 @@ void main() {
     testWidgets('the current drive row opens its page too', (tester) async {
       final api = _api();
       await _home(tester, api);
-      await tester.tap(find.byKey(const Key('current-drive-header')));
+      await tester.tap(find.byKey(const Key('current-drive-switch')));
       await tester.pumpAndSettle();
       await tester
           .tap(find.byKey(const ValueKey('drive-switcher-open-did:ad:a')));
@@ -324,7 +325,7 @@ void main() {
           'edge at $width', (tester) async {
         _size(tester, Size(width, 851));
         await _home(tester, _api());
-        await tester.tap(find.byKey(const Key('current-drive-header')));
+        await tester.tap(find.byKey(const Key('current-drive-switch')));
         await tester.pumpAndSettle();
         final box = tester.getRect(find.byKey(const Key('drive-switcher')));
         for (final d in [_alpha, _beta, _gamma]) {
@@ -354,7 +355,7 @@ void main() {
     testWidgets('keyboard and semantics', (tester) async {
       final handle = tester.ensureSemantics();
       await _home(tester, _api());
-      await tester.tap(find.byKey(const Key('current-drive-header')));
+      await tester.tap(find.byKey(const Key('current-drive-switch')));
       await tester.pumpAndSettle();
       expect(find.bySemanticsLabel('Open Beta'), findsOneWidget);
       expect(find.bySemanticsLabel('Switch to Beta'), findsOneWidget);
@@ -365,7 +366,7 @@ void main() {
     testWidgets('Ctrl+Enter on a focused row switches', (tester) async {
       final api = _api();
       await _home(tester, api);
-      await tester.tap(find.byKey(const Key('current-drive-header')));
+      await tester.tap(find.byKey(const Key('current-drive-switch')));
       await tester.pumpAndSettle();
       final focus = Focus.of(tester.element(find.descendant(
           of: find.byKey(const ValueKey('drive-switcher-open-did:ad:b')),
@@ -383,7 +384,7 @@ void main() {
       testWidgets('the button label and the chip are legible in $brightness',
           (tester) async {
         await _home(tester, _api(), brightness: brightness);
-        await tester.tap(find.byKey(const Key('current-drive-header')));
+        await tester.tap(find.byKey(const Key('current-drive-switch')));
         await tester.pumpAndSettle();
         final button = tester.widget<FilledButton>(
             find.byKey(const ValueKey('drive-switcher-switch-did:ad:b')));
@@ -403,7 +404,7 @@ void main() {
     testWidgets('Manage drives… lists every drive on a page of its own',
         (tester) async {
       await _home(tester, _api());
-      await tester.tap(find.byKey(const Key('current-drive-header')));
+      await tester.tap(find.byKey(const Key('current-drive-switch')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('drive-switcher-manage')));
       await tester.pumpAndSettle();
@@ -783,16 +784,10 @@ void main() {
       'light': (Brightness.light, AppColors.light),
       'dark': (Brightness.dark, AppColors.dark),
     }.entries) {
-      macTest('${entry.key}: the small text reads at 4.5:1',
-          (tester) async {
+      macTest('${entry.key}: the small text reads at 4.5:1', (tester) async {
         final (b, c) = entry.value;
         await desktop(tester, b: b);
-        for (final t in [
-          'Zebra notes',
-          'Inside the folder',
-          'New',
-          'Fav 0'
-        ]) {
+        for (final t in ['Zebra notes', 'Inside the folder', 'New', 'Fav 0']) {
           final text = tester.widget<Text>(
               find.descendant(of: row(t), matching: find.text(t)));
           expect(_contrast(text.style!.color!, c.bgBody),
@@ -897,8 +892,8 @@ void main() {
       }
 
       double titleLeft(String panel, String title) => tester
-          .getTopLeft(find.descendant(
-              of: _panel(panel), matching: find.text(title)))
+          .getTopLeft(
+              find.descendant(of: _panel(panel), matching: find.text(title)))
           .dx;
 
       // What shows of a row's leading: a bare glyph's own box, else the slot
@@ -908,28 +903,35 @@ void main() {
         final glyph = find.descendant(
             of: find.descendant(of: row, matching: find.byType(RowLeading)),
             matching: find.byType(Icon));
-        final lead = find.descendant(of: row, matching: find.byType(RowLeading));
+        final lead =
+            find.descendant(of: row, matching: find.byType(RowLeading));
         final circle = find.descendant(
             of: lead,
             matching: find.byWidgetPredicate((w) =>
                 w is DecoratedBox &&
                 (w.decoration as BoxDecoration).color != null));
-        return circle.evaluate().isNotEmpty || glyph.evaluate().isEmpty
-            ? tester.getRect(lead.first).left
-            : tester.getRect(glyph.first).left;
+        if (circle.evaluate().isNotEmpty || glyph.evaluate().isEmpty) {
+          return tester.getRect(lead.first).left;
+        }
+        // Where the glyph's ink starts: its box plus the glyph's own inset.
+        final icon = tester.widget<Icon>(glyph.first);
+        return tester.getRect(glyph.first).left +
+            glyphInset(icon.icon!) / 24 * icon.size!;
       }
 
       final lefts = <String, double>{
         'Mango plan (tree)': leadingLeft('Mango plan'),
         'Folder (tree, depth 0)': leadingLeft('Apple folder'),
         'Chat room (tree)': leadingLeft('Room talk'),
-        'Drive header': tester
-            .getRect(find.descendant(
-                of: find.descendant(
-                    of: find.byKey(const Key('current-drive-header')),
-                    matching: find.byType(RowLeading)),
-                matching: find.byType(Icon)))
-            .left,
+        'Drive header': () {
+          final icon = find.descendant(
+              of: find.descendant(
+                  of: find.byKey(const Key('current-drive-header')),
+                  matching: find.byType(RowLeading)),
+              matching: find.byType(Icon));
+          return tester.getRect(icon).left +
+              glyphInset(Icons.folder_outlined) / 24 * 20;
+        }(),
         'Messages heading': titleLeft('messages', 'Messages'),
       };
       await open('messages');
@@ -943,6 +945,74 @@ void main() {
       for (final e in lefts.entries) {
         expect(e.value, closeTo(16, 0.5), reason: '${e.key}: $lefts');
       }
+      // The document icon has a wider glyph inset than the folder's: its ink
+      // still starts at the same x.
+      expect(
+          leadingLeft('Mango plan'), closeTo(leadingLeft('Apple folder'), 0.5));
+    });
+
+    testWidgets(
+        'the drive name starts where the row titles do, the avatar where '
+        'the row icons do', (tester) async {
+      _size(tester, const Size(393, 851));
+      await _home(tester, api());
+      final name =
+          tester.getTopLeft(find.byKey(const Key('current-drive-name')));
+      final title = tester.getTopLeft(find.text('Mango plan'));
+      expect(name.dx, closeTo(title.dx, 0.5));
+      expect(name.dx, SidebarMetrics.touch.titleX(0));
+      final avatar = tester.getRect(find.descendant(
+          of: find.byKey(const Key('current-drive-open')),
+          matching: find.byType(RowLeading)));
+      final rowIcon = tester.getRect(find.descendant(
+          of: rowOf('Apple folder').first, matching: find.byType(RowLeading)));
+      expect(avatar.left, closeTo(rowIcon.left, 0.5));
+      expect(avatar.width, rowIcon.width);
+    });
+
+    for (final compact in [false, true]) {
+      testWidgets(
+          'the switch icon ends where the panel chevrons do '
+          '(${compact ? 'desktop' : 'touch'})', (tester) async {
+        _size(tester, Size(compact ? 1000 : 393, 851));
+        if (compact) SidebarMetrics.debugOverride = SidebarMetrics.desktop;
+        await _home(tester, api());
+        final icon = tester.getRect(find.byIcon(Icons.unfold_more));
+        final chevron = tester.getRect(find.descendant(
+            of: _panel('favorites'), matching: find.byIcon(Icons.expand_more)));
+        expect(icon.right, closeTo(chevron.right, 0.5));
+        final hit =
+            tester.getRect(find.byKey(const Key('current-drive-switch')));
+        expect(hit.height, greaterThanOrEqualTo(compact ? 24 : 40));
+        expect(hit.width, greaterThanOrEqualTo(compact ? 24 : 40));
+      });
+    }
+
+    for (final target in ['name', 'avatar']) {
+      testWidgets('tapping the drive $target opens the drive, not the switcher',
+          (tester) async {
+        _size(tester, const Size(393, 851));
+        await _home(tester, api());
+        await tester.tap(target == 'name'
+            ? find.byKey(const Key('current-drive-name'))
+            : find.descendant(
+                of: find.byKey(const Key('current-drive-open')),
+                matching: find.byType(RowLeading)));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('drive-switcher')), findsNothing);
+        final page = tester.widget<ResourceView>(find.byType(ResourceView));
+        expect(page.path ?? page.subject, anyOf(isNull, contains('did:ad:a')));
+      });
+    }
+
+    testWidgets('tapping the switch icon opens the switcher, not the drive',
+        (tester) async {
+      _size(tester, const Size(393, 851));
+      await _home(tester, api());
+      await tester.tap(find.byKey(const Key('current-drive-switch')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('drive-switcher')), findsOneWidget);
+      expect(find.byType(ResourceView), findsNothing);
     });
 
     for (final compact in [false, true]) {
@@ -962,7 +1032,10 @@ void main() {
         expect(tree.size, panel.size);
         // And that is the sidebar's inset from the right edge.
         final inset = compact ? 16.0 : 16.0;
-        expect(panel.right, closeTo(tester.getSize(find.byType(Scaffold).first).width - inset, 0.5));
+        expect(
+            panel.right,
+            closeTo(tester.getSize(find.byType(Scaffold).first).width - inset,
+                0.5));
         // The toggle still hits where it is drawn.
         await tester.tapAt(tree.center);
         await tester.pumpAndSettle();
@@ -998,14 +1071,12 @@ void main() {
       expect(resolve(DropZone.before, dragged: 'a'), isNull);
       expect(resolve(DropZone.after, dragged: 'a'), const DriveMove('p', 1));
       // c dragged to before b: index 1 among a, b.
-      expect(
-          resolve(DropZone.before, dragged: 'c'), const DriveMove('p', 1));
+      expect(resolve(DropZone.before, dragged: 'c'), const DriveMove('p', 1));
       expect(resolve(DropZone.after, dragged: 'c'), isNull);
     });
 
     test('into a row appends to its children, only when it can hold them', () {
-      expect(resolve(DropZone.into),
-          const DriveMove('b', driveMoveToEnd));
+      expect(resolve(DropZone.into), const DriveMove('b', driveMoveToEnd));
       expect(resolve(DropZone.into, canHold: false), isNull);
     });
 
@@ -1027,7 +1098,10 @@ void main() {
     /// 0 is its top edge, 0.5 its middle, 1 its bottom edge. Returns the
     /// gesture, still down, when [release] is false.
     Future<TestGesture> drag(WidgetTester tester, String subject,
-        {String? target, Offset? to, double at = 0.5, bool release = true}) async {
+        {String? target,
+        Offset? to,
+        double at = 0.5,
+        bool release = true}) async {
       final gesture = await tester.startGesture(tester.getCenter(row(subject)));
       await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
       Offset point;
@@ -1037,8 +1111,8 @@ void main() {
         final rect = tester.getRect(row(target!));
         point = Offset(rect.center.dx, rect.top + rect.height * at);
         // Keep off the exact edge, which belongs to the next row.
-        point = Offset(point.dx,
-            point.dy.clamp(rect.top + 2, rect.bottom - 2).toDouble());
+        point = Offset(
+            point.dx, point.dy.clamp(rect.top + 2, rect.bottom - 2).toDouble());
       }
       await gesture.moveBy(const Offset(0, 4));
       await tester.pump();
@@ -1091,14 +1165,13 @@ void main() {
       expect(row('did:ad:f1'), findsOneWidget);
     });
 
-    testWidgets('a line shows where a drop between rows lands',
-        (tester) async {
+    testWidgets('a line shows where a drop between rows lands', (tester) async {
       await _home(tester, _api());
       final gesture = await drag(tester, 'did:ad:z',
           target: 'did:ad:f', at: 0, release: false);
       expect(find.byKey(const Key('drop-before')), findsOneWidget);
-      await gesture.moveTo(tester.getRect(row('did:ad:f')).bottomCenter -
-          const Offset(0, 2));
+      await gesture.moveTo(
+          tester.getRect(row('did:ad:f')).bottomCenter - const Offset(0, 2));
       await tester.pump();
       expect(find.byKey(const Key('drop-after')), findsOneWidget);
       await gesture.cancel();
@@ -1109,7 +1182,8 @@ void main() {
         (tester) async {
       final api = _api();
       await _home(tester, api);
-      await tester.tap(find.byKey(const ValueKey('drive-tree-toggle-did:ad:f')));
+      await tester
+          .tap(find.byKey(const ValueKey('drive-tree-toggle-did:ad:f')));
       await tester.pumpAndSettle();
       final gesture =
           await drag(tester, 'did:ad:f', target: 'did:ad:f1', release: false);
@@ -1123,7 +1197,8 @@ void main() {
         (tester) async {
       final api = _api();
       await _home(tester, api);
-      await tester.tap(find.byKey(const ValueKey('drive-tree-toggle-did:ad:f')));
+      await tester
+          .tap(find.byKey(const ValueKey('drive-tree-toggle-did:ad:f')));
       await tester.pumpAndSettle();
       await drag(tester, 'did:ad:f1',
           to: tester.getCenter(find.byKey(const Key('current-drive-header'))));

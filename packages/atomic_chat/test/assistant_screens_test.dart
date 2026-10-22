@@ -1070,7 +1070,7 @@ void main() {
       await tester.pumpAndSettle();
       ResourceView.serverFactory = () async => throw 'no server in a test';
       // "Manage drives…" in the switcher lists them; a drive opens as its page.
-      await tester.tap(find.byKey(const Key('current-drive-header')));
+      await tester.tap(find.byKey(const Key('current-drive-switch')));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('drive-switcher-manage')));
       await tester.pumpAndSettle();

@@ -115,7 +115,7 @@ void main() {
     await tester.pumpWidget(_shell(_BarApi()));
     await tester.pumpAndSettle();
     expect(_current('Home'), isTrue);
-    await tester.tap(find.byKey(const Key('current-drive-header')));
+    await tester.tap(find.byKey(const Key('current-drive-switch')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('drive-switcher')), findsOneWidget);
     // The list is not the home: Home is not "current" and goes back to it.

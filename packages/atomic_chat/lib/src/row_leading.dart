@@ -158,6 +158,33 @@ class RowPictures {
 
 enum RowShape { circle, square }
 
+/// How far (of 24) the ink of a Material glyph starts inside its box. Most
+/// outlined icons have 2; the tall ones more.
+double glyphInset(IconData icon) {
+  if (icon == Icons.description_outlined) return 4;
+  if (icon == Icons.add) return 5;
+  return 2;
+}
+
+/// A bare [icon] whose ink starts at the left edge of the box it is put in
+/// (so at the x of a picture, an avatar or a panel heading's title), not
+/// where the glyph's own padding is.
+class GlyphStart extends StatelessWidget {
+  final IconData icon;
+  final double size;
+  final Color color;
+
+  const GlyphStart(
+      {super.key, required this.icon, required this.size, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Align(
+      alignment: Alignment.centerLeft,
+      child: Transform.translate(
+          offset: Offset(-glyphInset(icon) / 24 * size, 0),
+          child: Icon(icon, size: size, color: color)));
+}
+
 /// A stable background for the initial of [name]: the same name always gets
 /// the same colour. Dark enough for white text.
 Color initialColor(String name) {
@@ -312,7 +339,10 @@ class _RowLeadingState extends State<RowLeading> {
       // A bare glyph that starts at the slot's edge has no circle behind
       // it: centred in one it would start 6 dp right of the pictures.
       if (circle && !widget.alignGlyphStart) background = c.mainSelectedBg;
-      base = Icon(widget.fallbackIcon, size: widget.iconSize, color: c.main);
+      base = widget.alignGlyphStart
+          ? GlyphStart(
+              icon: widget.fallbackIcon, size: widget.iconSize, color: c.main)
+          : Icon(widget.fallbackIcon, size: widget.iconSize, color: c.main);
     }
     final radius =
         BorderRadius.circular(circle ? size / 2 : widget.cornerRadius);
