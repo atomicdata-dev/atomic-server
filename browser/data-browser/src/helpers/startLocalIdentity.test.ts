@@ -2,6 +2,16 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { Agent, Store } from '@tomic/react';
 
 const saved = vi.hoisted(() => ({ saveAgentToIDB: vi.fn() }));
+const env = vi.hoisted(() => ({
+  portal: undefined as string | undefined,
+  noNode: false,
+}));
+
+vi.mock('./managed/cloudSync', () => ({
+  getManagedPortalUrl: () => env.portal,
+}));
+vi.mock('./originNode', () => ({ isOriginWithoutNode: () => env.noNode }));
+vi.mock('./tauri', () => ({ isRunningInTauri: () => false }));
 
 vi.mock('./agentStorage', () => saved);
 
@@ -17,6 +27,7 @@ function fakeStore(failDrive = false) {
     }),
   };
   const store = {
+    getServerUrl: () => 'https://node.example',
     setAgent: vi.fn((agent?: Agent) => {
       calls.push(agent ? 'setAgent' : 'clearAgent');
     }),
@@ -39,22 +50,38 @@ function fakeStore(failDrive = false) {
 beforeEach(() => {
   calls.length = 0;
   saved.saveAgentToIDB.mockReset();
+  env.portal = undefined;
+  env.noNode = false;
 });
 
-it('mints a real, local-only agent with its own drive', async () => {
+it.each([
+  ['a portal origin', 'https://portal.example', false],
+  ['an origin without a node', undefined, true],
+])('keeps agent and drive local-only on %s', async (_name, portal, noNode) => {
+  env.portal = portal;
+  env.noNode = noNode;
   const { store } = fakeStore();
   const { agent, drive } = await startLocalIdentity(store as unknown as Store);
 
   expect(drive).toBe('did:ad:home');
   expect(agent.subject).toMatch(/agent:/);
-  // Registered before any await-ed work, so nothing fetches the agent first.
+  // Registered before any awaited work, so nothing fetches the agent first.
   expect(calls.slice(0, 2)).toEqual([
     'setAgent',
     `local-only:${agent.subject}`,
   ]);
-  // The personal drive exists before this resolves, and is kept local.
   expect(store.ensurePrivateDrive).toHaveBeenCalledWith(undefined, {
     localOnly: true,
+  });
+});
+
+it('makes the identity on the server when a node is behind the app', async () => {
+  const { store } = fakeStore();
+  await startLocalIdentity(store as unknown as Store);
+
+  expect(store.registerLocalOnlyDrive).not.toHaveBeenCalled();
+  expect(store.ensurePrivateDrive).toHaveBeenCalledWith(undefined, {
+    localOnly: false,
   });
 });
 

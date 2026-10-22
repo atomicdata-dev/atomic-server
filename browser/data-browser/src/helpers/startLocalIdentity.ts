@@ -8,6 +8,9 @@ import {
   type Store,
 } from '@tomic/react';
 import { saveAgentToIDB } from './agentStorage';
+import { getManagedPortalUrl } from './managed/cloudSync';
+import { isOriginWithoutNode } from './originNode';
+import { isRunningInTauri } from './tauri';
 
 /**
  * Write the Agent resource every identity has: its public key and class, and
@@ -39,9 +42,12 @@ export async function saveAgentResource(
  * Nothing here is disposable. The key is stored like any account's (not as the
  * demo's throwaway guest, `adoptOnDevice: false`) and the personal drive exists
  * before this resolves, so the reconcile gate never mistakes the identity for
- * an empty one. The agent and its drive are registered local-only, which is
- * what lets a later sign-in to an existing account bring this workspace along
- * (`canBringAlong`) rather than only keep its key.
+ * an empty one.
+ *
+ * Local-only exactly when `NewIdentitySection` makes it so: on a portal or
+ * node-less origin (hosted) nothing can host it, and local-only is what lets a
+ * later sign-in bring this workspace along (`canBringAlong`); on a normal node
+ * the identity and drive are made on that server.
  *
  * Returns the agent to hand to `setAgent` and the drive to open.
  */
@@ -53,16 +59,19 @@ export async function startLocalIdentity(
     await new JSCryptoProvider(keys.privateKey).getPublicKey(),
   );
   const agent = new Agent(new JSCryptoProvider(keys.privateKey), did);
+  const localOnly =
+    !isRunningInTauri() &&
+    !!(getManagedPortalUrl() || isOriginWithoutNode(store.getServerUrl()));
 
   try {
     store.setAgent(agent);
-    // Registered before anything async so no consumer fetches the agent from a
-    // server that has never heard of it.
-    store.registerLocalOnlyDrive(did);
+    // Registered before anything async so no consumer fetches a local-only
+    // agent from a server that has never heard of it.
+    if (localOnly) store.registerLocalOnlyDrive(did);
     await saveAgentResource(store, did);
 
     const drive = await store.ensurePrivateDrive(undefined, {
-      localOnly: true,
+      localOnly,
     });
     const secret = Agent.buildSecret(keys.privateKey, did, drive.subject);
 

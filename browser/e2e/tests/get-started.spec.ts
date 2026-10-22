@@ -13,8 +13,7 @@ test('Get started opens a workspace of your own, without an account', async ({
   await page.getByRole('button', { name: 'Get started' }).click();
   await expect(page).not.toHaveURL(/\/app\/welcome/, { timeout: 60_000 });
 
-  // Not a disposable guest: the agent has a personal drive that is its own,
-  // kept on this device.
+  // Not a disposable guest: the agent has a personal drive of its own.
   await expect
     .poll(
       () =>
@@ -30,14 +29,16 @@ test('Get started opens a workspace of your own, without an account', async ({
             hasHome: !!agentResource.get(
               'https://atomicdata.dev/properties/personalDrive',
             ),
+            // This server is a normal node, so the identity and its home
+            // live on it. Local-only is for node-less origins (unit tests).
             localOnly:
-              store.isLocalOnlyDrive(agent.subject) &&
+              store.isLocalOnlyDrive(agent.subject) ||
               store.isLocalOnlyDrive(home),
           };
         }),
       { timeout: 30_000 },
     )
-    .toEqual({ hasHome: true, localOnly: true });
+    .toEqual({ hasHome: true, localOnly: false });
 
   // The same identity survives a reload.
   const subject = await page.evaluate(() => window.store.getAgent()?.subject);
