@@ -14,7 +14,7 @@ import {
 import { conversations, core, dataBrowser, useStore } from '@tomic/react';
 import { useCallback, useRef, useState, type MouseEvent } from 'react';
 import toast from 'react-hot-toast';
-import { isContentAddressed } from '../../helpers/propertyIdentity';
+import { moveBlockedReason } from '../../helpers/moveResource';
 import {
   SIDEBAR_TRANSITION_TAG,
   getTransitionName,
@@ -353,9 +353,14 @@ export const useSidebarDnd = (
       return;
     }
 
-    // A content-addressed property's parent is part of its ID: it cannot move.
-    if (renderedUnder !== dropParent && isContentAddressed(subject)) {
-      toast.error("A property can't be moved to another parent.");
+    // Same rules as the More menu's Move dialog (property, descendant, other drive).
+    const blocked =
+      renderedUnder !== dropParent
+        ? moveBlockedReason(store, subject, dropParent)
+        : undefined;
+
+    if (blocked) {
+      toast.error(blocked);
       onIsRearangingChange(false);
       setDraggingResource(undefined);
       waitForSaveRef.current = Promise.resolve();

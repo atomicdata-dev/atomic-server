@@ -22,6 +22,7 @@ import {
   FaMagnifyingGlass,
   FaComments,
   FaPencil,
+  FaFolderTree,
   FaPlay,
   FaPlus,
   FaRotateRight,
@@ -43,6 +44,7 @@ import {
   historyURL,
   importerURL,
 } from '../helpers/navigation';
+import { isContentAddressed } from '../helpers/propertyIdentity';
 import { paths } from '../routes/paths';
 import { shortcuts } from './shortcuts';
 import type { ActionContext, ActionDefinition } from './types';
@@ -432,6 +434,22 @@ export const resourceActions: ActionDefinition[] = [
         ctx.navigate(constructOpenURL(parent));
       }
     },
+  },
+  {
+    id: 'move',
+    scope: 'resource',
+    section: 'action',
+    label: () => 'Move...',
+    helper: () => 'Move this resource to another parent.',
+    keywords: ['move', 'parent', 'folder', 'relocate', 'reparent'],
+    icon: () => <FaFolderTree />,
+    // Drives have no parent and a property's parent is part of its id.
+    available: ctx =>
+      ctx.canWrite &&
+      ctx.openMoveDialog !== undefined &&
+      !isContentAddressed(ctx.subject) &&
+      !ctx.resource.getClasses().includes(server.classes.drive),
+    run: ctx => ctx.openMoveDialog?.(),
   },
   {
     id: 'import',

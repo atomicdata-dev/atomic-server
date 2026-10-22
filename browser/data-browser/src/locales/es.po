@@ -132,6 +132,7 @@ msgstr "Agentes de IA"
 #: src/components/ConnectAppForm.tsx
 #: src/components/EditLanguagesDialog.tsx
 #: src/components/HostUI/hostUIDialogs.tsx
+#: src/components/MoveResourceDialog.tsx
 #: src/components/ParentPicker/ParentPickerDialog.tsx
 #: src/components/Share/ShareDialog.tsx
 #: src/components/forms/EditFormDialog.tsx
@@ -11893,7 +11894,7 @@ msgstr ""
 msgid "A property can't be moved to another ontology."
 msgstr ""
 
-#: src/components/SideBar/useSidebarDnd.ts
+#: src/helpers/moveResource.ts
 msgid "A property can't be moved to another parent."
 msgstr ""
 
@@ -13210,4 +13211,37 @@ msgstr ""
 
 #: src/components/ConnectDrivePicker.tsx
 msgid "All drives"
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid "Move..."
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid "Move this resource to another parent."
+msgstr ""
+
+#: src/components/MoveResourceDialog.tsx
+#: src/components/MoveResourceDialog.tsx
+msgid "Move"
+msgstr ""
+
+#: src/components/MoveResourceDialog.tsx
+msgid "You don't have write access to that location."
+msgstr ""
+
+#: src/components/MoveResourceDialog.tsx
+msgid "Access follows the new parent: who can see or edit this may change."
+msgstr ""
+
+#: src/helpers/moveResource.ts
+msgid "A resource can't be moved into itself."
+msgstr ""
+
+#: src/helpers/moveResource.ts
+msgid "A resource can't be moved into something inside it."
+msgstr ""
+
+#: src/helpers/moveResource.ts
+msgid "Moving to another drive is not supported yet."
 msgstr ""
