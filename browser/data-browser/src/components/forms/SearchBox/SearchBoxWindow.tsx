@@ -1,4 +1,5 @@
 import {
+  Client,
   core,
   dataBrowser,
   useResources,
@@ -234,6 +235,13 @@ export function SearchBoxWindow({
 
     const selected = options[override! ?? selectedIndex!];
 
+    // No results to pick from: take what was typed if it is a subject.
+    if (!selected) {
+      if (Client.isValidSubject(searchValue)) onSelect(searchValue);
+
+      return;
+    }
+
     // The selected option is a "Create ..." option.
     if (selected.type === OptionType.CreateOption) {
       createItem(searchValue);
@@ -270,7 +278,8 @@ export function SearchBoxWindow({
   const handleChange: React.ChangeEventHandler<HTMLInputElement> = e => {
     if (
       e.target.value.startsWith('http:') ||
-      e.target.value.startsWith('https:')
+      e.target.value.startsWith('https:') ||
+      Client.isValidSubject(e.target.value)
     ) {
       onChange(e.target.value);
       setValueIsURL(true);

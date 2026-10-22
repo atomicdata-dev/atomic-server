@@ -28,6 +28,7 @@ export interface ActionContextOverrides {
   openPluginRun?: () => void;
   pluginClass?: string;
   openCoverPicker?: () => void;
+  openMoveDialog?: () => void;
   onAfterDelete?: () => void;
   toggleSidebar?: () => void;
 }

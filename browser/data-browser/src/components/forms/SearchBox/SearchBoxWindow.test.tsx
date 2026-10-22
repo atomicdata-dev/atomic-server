@@ -220,4 +220,24 @@ describe('class picker', () => {
 
     expect(onSelect).toHaveBeenCalledWith(url);
   });
+
+  it('takes a typed subject on Enter when nothing was found, after arrowing', () => {
+    const { onSelect } = show(newStore(), { searchValue: 'atomic:abc123' });
+    const input = screen.getByRole('textbox');
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onSelect).toHaveBeenCalledWith('atomic:abc123');
+  });
+
+  it('ignores Enter on free text when nothing was found', () => {
+    const { onSelect } = show(newStore(), { searchValue: 'foo bar' });
+    const input = screen.getByRole('textbox');
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onSelect).not.toHaveBeenCalled();
+  });
 });

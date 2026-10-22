@@ -3,7 +3,10 @@
 //! needs nothing more; the write tools exist only when the person allowed
 //! editing, and sign their commits as that issued agent (see [`super::write`]).
 
+use std::sync::LazyLock;
+
 use atomic_lib::{agents::ForAgent, client::search::SearchOpts, urls, Storelike, Subject};
+use serde::Deserialize;
 use serde_json::{json, Value};
 
 use super::{
@@ -16,7 +19,6 @@ use super::{
 use crate::appstate::AppState;
 
 const MAX_SUBJECTS: usize = 20;
-const MAX_SCHEMA_MATCHES: usize = 50;
 
 pub const READ_INSTRUCTIONS: &str = "Tools for reading Atomic Data (a graph of resources, each with a subject such as did:ad:… and properties). This connection is read-only: it can find and read what the person approved, and cannot change it. Start with list_drives or search, then read resources with get_resource. Use find_schema to look up the classes (types) that exist, with their JSON Schema.";
 
@@ -30,175 +32,61 @@ pub fn instructions(write: bool) -> &'static str {
     }
 }
 
+/// One built-in tool as data. `tools.json` holds them all, in the order
+/// they are listed; `effect` decides read/write gating and the default
+/// annotations, and `annotations` only adds hints on top of those.
+#[derive(Deserialize)]
+struct ActionSpec {
+    name: String,
+    title: String,
+    description: String,
+    #[serde(rename = "inputSchema")]
+    input_schema: Value,
+    effect: Effect,
+    #[serde(default)]
+    annotations: serde_json::Map<String, Value>,
+}
+
+#[derive(Deserialize, PartialEq, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+enum Effect {
+    Read,
+    Write,
+}
+
+static SPECS: LazyLock<Vec<ActionSpec>> = LazyLock::new(|| {
+    serde_json::from_str(include_str!("tools.json")).expect("tools.json is valid")
+});
+
+impl ActionSpec {
+    fn render(&self) -> Value {
+        let mut annotations = match self.effect {
+            Effect::Read => json!({"readOnlyHint": true}),
+            Effect::Write => json!({"readOnlyHint": false, "destructiveHint": false}),
+        };
+        annotations
+            .as_object_mut()
+            .expect("object")
+            .extend(self.annotations.clone());
+
+        json!({
+            "name": self.name,
+            "title": self.title,
+            "description": self.description,
+            "inputSchema": self.input_schema,
+            "annotations": annotations,
+        })
+    }
+}
+
 /// The tools a connection may call: the read tools, and the write tools only
 /// when the person allowed editing.
 pub fn list(write: bool) -> Value {
-    let subjects = json!({
-        "type": "array",
-        "items": {"type": "string"},
-        "minItems": 1,
-        "maxItems": MAX_SUBJECTS,
-        "description": "Subjects (URLs or did:ad:…) of the resources to read."
-    });
-    let read_only = json!({"readOnlyHint": true});
-    let value = json!({
-        "oneOf": [
-            {"type": "string"},
-            {"type": "number"},
-            {"type": "boolean"},
-            {"type": "array", "items": {"type": "string"}}
-        ]
-    });
-
-    let mut tools = vec![
-        json!({
-            "name": "list_drives",
-            "title": "List drives",
-            "description": "The drives and folders the person shared with this connection, and whether each can be edited. The first is the default for tools that take a `drive`.",
-            "inputSchema": {"type": "object", "properties": {}},
-            "annotations": read_only
-        }),
-        json!({
-            "name": "get_resource",
-            "title": "Read resources",
-            "description": "Read one or more resources by subject. Returns JSON with property shortnames as keys; documents and meetings include their text as `_documentText`. Children of a folder or drive can be found with search (parents) or query.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {"subjects": subjects},
-                "required": ["subjects"]
-            },
-            "annotations": read_only
-        }),
-        json!({
-            "name": "search",
-            "title": "Search",
-            "description": "Full-text search for resources by words in their name, description or other text. Matches whole words. Give `parents` (drive or folder subjects) to search inside them; with an empty query it lists everything inside `parents`.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "Words to search for."},
-                    "parents": {"type": "array", "items": {"type": "string"}},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 50}
-                },
-                "required": ["query"]
-            },
-            "annotations": read_only
-        }),
-        json!({
-            "name": "query",
-            "title": "Query by property",
-            "description": "Find resources with specific property values, like a SQL WHERE. With `class` set, where/select take property shortnames and tag names (e.g. class: \"task\", where: [{property: \"status\", value: \"done\"}]) and an isA filter is added. Without `class`, properties must be full URLs, e.g. where: [{property: \"https://atomicdata.dev/properties/parent\", value: \"did:ad:…\"}] lists the children of a folder. Results are not sorted.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "class": {"type": "string"},
-                    "where": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {"property": {"type": "string"}, "value": value},
-                            "required": ["property", "value"]
-                        }
-                    },
-                    "select": {"type": "array", "items": {"type": "string"}, "description": "Properties to include. Defaults to name."},
-                    "parents": {"type": "array", "items": {"type": "string"}, "description": "Drives or folders to look in. Defaults to the default drive."},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 200}
-                },
-                "required": ["where"]
-            },
-            "annotations": read_only
-        }),
-        json!({
-            "name": "find_schema",
-            "title": "Find classes",
-            "description": "Search the classes (custom types, like \"task\" or \"deal\") defined on the drives shared with this connection, each as a JSON Schema. Search FIRST, before creating a class or resources of a custom type, and reuse a class that fits instead of making a near-duplicate. `query` is words matched (OR) against a class's and its ontology's shortname, name and description; classes that match more words come first; an empty query lists everything. Each match has `class` (subject), `shortname`, `ontology` ({subject, shortname}) and `jsonSchema`: the class as an object schema, with `required`, constraints as JSON Schema keywords, and `x-atomic-property` holding each property's subject. Default 10 matches, `total` is how many matched.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "Words to look for, e.g. \"invoice customer\". Empty lists all classes."},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": MAX_SCHEMA_MATCHES}
-                },
-                "required": ["query"]
-            },
-            "annotations": read_only
-        }),
-        json!({
-            "name": "get_user_classes",
-            "title": "List classes (deprecated)",
-            "description": "Deprecated: use find_schema. Same as find_schema with an empty query (up to 50 classes), as a plain list. Takes an optional `drive` to list the classes of that drive only.",
-            "inputSchema": {"type": "object", "properties": {"drive": {"type": "string"}}},
-            "annotations": read_only
-        }),
-        json!({
-            "name": "get_schema",
-            "title": "Get class schema",
-            "description": "The required and recommended properties of a class, with their shortnames and datatypes.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "subject": {"type": "string", "description": "The class: a name such as \"document\" or \"task\", or a subject."},
-                    "drive": {"type": "string"}
-                },
-                "required": ["subject"]
-            },
-            "annotations": read_only
-        }),
-    ];
-
-    if write {
-        tools.extend([
-            json!({
-                "name": "edit_resource",
-                "title": "Edit a property",
-                "description": "Set one property on a resource and save it. `property` is a shortname from the resource's schema (e.g. \"status\") or a full property URL; select values take tag names, dates take ISO strings. To replace the text of a document or meeting, use property \"_documentText\" with Markdown or plain text (headings, lists, task lists, code blocks, **bold**, *italic*, `code`, links); it overwrites the whole body, so read `_documentText` with get_resource first when keeping parts of it.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {"subject": {"type": "string"}, "property": {"type": "string"}, "value": value},
-                    "required": ["subject", "property", "value"]
-                },
-                "annotations": {"readOnlyHint": false, "destructiveHint": false}
-            }),
-            json!({
-                "name": "create_resource",
-                "title": "Create resources",
-                "description": "Create one or more resources from compact JSON-AD. For a document or meeting, \"_documentText\" sets its text from Markdown or plain text. Each object needs \"@class\" (a shortname like \"folder\", \"document\", \"table\", a class from find_schema, or a full URL) and \"@parent\" (a drive, folder or table subject), plus property shortnames as keys, e.g. {\"@class\": \"task\", \"@parent\": \"did:ad:…\", \"name\": \"Call Anna\", \"status\": \"todo\"}. Never pass \"@id\". Pass several to create many at once.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {"resources": {"type": "array", "minItems": 1, "maxItems": 200, "items": {"type": "object"}}},
-                    "required": ["resources"]
-                },
-                "annotations": {"readOnlyHint": false, "destructiveHint": false}
-            }),
-            json!({
-                "name": "ensure_ontology",
-                "title": "Create or update a schema",
-                "description": "Create or update classes from a JSON Schema (draft 2020-12). Run find_schema first and reuse existing classes; only describe what is missing. Every object schema in `$defs` becomes a class, its `properties` become properties, `required` becomes required properties, and constraints go in the schema as keywords: enum, minimum, maximum, minLength, maxLength, pattern, minItems, maxItems. A `$ref` to \"#/$defs/Name\" links to another class. Idempotent: calling it again with the same schema changes nothing. Properties are identified by ontology, shortname and type, so renaming a shortname or changing a type makes a NEW property (the old one and its data stay). Returns the shortname to subject maps of the classes and properties; use a class subject as `@class` in create_resource. An invalid schema returns an error naming the JSON pointer to fix (unsupported: oneOf/anyOf/allOf, nullable types, nested object schemas; move those to `$defs`). Example schema: {\"title\":\"Shop\",\"$defs\":{\"customer\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\",\"minLength\":1}},\"required\":[\"name\"]}}}",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "drive": {"type": "string", "description": "The drive (or folder) to put the ontology in. Defaults to the first drive that can be edited."},
-                        "schema": {"type": "object", "description": "The JSON Schema."},
-                        "shortname": {"type": "string", "description": "Shortname (lowercase slug) of the ontology. Defaults to the schema's `x-atomic-ontology`, then its `title`, then the drive's default ontology."}
-                    },
-                    "required": ["schema"]
-                },
-                "annotations": {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": true}
-            }),
-            json!({
-                "name": "delete_resource",
-                "title": "Delete a resource",
-                "description": "Delete a resource and everything inside it (a folder deletes its contents). This cannot be undone from here; confirm with the person first unless they clearly asked for it. A whole drive cannot be deleted.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {"subject": {"type": "string"}},
-                    "required": ["subject"]
-                },
-                "annotations": {"readOnlyHint": false, "destructiveHint": true}
-            }),
-        ]);
-    }
-
-    json!(tools)
+    SPECS
+        .iter()
+        .filter(|spec| write || spec.effect == Effect::Read)
+        .map(ActionSpec::render)
+        .collect()
 }
 
 /// Runs a tool. `Err` becomes a tool error the model reads.
@@ -577,4 +465,85 @@ async fn search(appstate: &AppState, for_agent: &ForAgent, args: &Value) -> Resu
     }
 
     Ok(json!(out))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const READ: [&str; 7] = [
+        "list_drives",
+        "get_resource",
+        "search",
+        "query",
+        "find_schema",
+        "get_user_classes",
+        "get_schema",
+    ];
+    const WRITE: [&str; 4] = [
+        "edit_resource",
+        "create_resource",
+        "ensure_ontology",
+        "delete_resource",
+    ];
+
+    fn names(write: bool) -> Vec<String> {
+        list(write)
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["name"].as_str().unwrap().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn tools_json_parses_and_lists_in_order() {
+        assert_eq!(SPECS.len(), 11);
+        assert_eq!(names(false), READ);
+        assert_eq!(names(true), [READ.as_slice(), WRITE.as_slice()].concat());
+    }
+
+    #[test]
+    fn annotations_follow_effect() {
+        let tools = list(true);
+        let tool = |name: &str| {
+            tools
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|t| t["name"] == name)
+                .unwrap()
+                .clone()
+        };
+
+        assert_eq!(tool("search")["annotations"], json!({"readOnlyHint": true}));
+        assert_eq!(
+            tool("edit_resource")["annotations"],
+            json!({"readOnlyHint": false, "destructiveHint": false})
+        );
+        assert_eq!(
+            tool("delete_resource")["annotations"],
+            json!({"readOnlyHint": false, "destructiveHint": true})
+        );
+        assert_eq!(
+            tool("ensure_ontology")["annotations"],
+            json!({"readOnlyHint": false, "destructiveHint": false, "idempotentHint": true})
+        );
+    }
+
+    #[test]
+    fn schema_limit_matches_constant() {
+        let tools = list(false);
+        let get = tools
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["name"] == "get_resource")
+            .unwrap();
+
+        assert_eq!(
+            get["inputSchema"]["properties"]["subjects"]["maxItems"],
+            json!(MAX_SUBJECTS)
+        );
+    }
 }

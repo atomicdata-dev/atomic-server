@@ -4,13 +4,12 @@
 
 use std::io::Write;
 
-use atomic_lib::{
-    agents::ForAgent, db::app_agent::AppAgentKey, urls, Db, Resource, Storelike, Value,
-};
+use atomic_lib::{db::app_agent::AppAgentKey, urls, Db, Resource, Storelike, Value};
 use serde_json::json;
 
 use super::tests::{
-    count_of, counter_resource, install as install_app, share, COUNTER_MANIFEST, COUNTER_WASM,
+    count_of, counter_resource, install as install_app, owner, share, COUNTER_MANIFEST,
+    COUNTER_WASM,
 };
 use crate::plugins::{
     release,
@@ -118,10 +117,6 @@ async fn try_folder(db: &Db, drive: &str, name: &str) -> Result<String, String> 
         .await
         .map_err(|e| e.to_string())?;
     Ok(folder.get_subject().to_string())
-}
-
-fn owner(db: &Db) -> ForAgent {
-    ForAgent::AgentSubject(db.get_default_agent().unwrap().subject)
 }
 
 /// The description the module's `on-get` wrote on a read of `folder`.

@@ -16,17 +16,12 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
-use atomic_lib::agents::ForAgent;
 use atomic_lib::db::plugin_trigger::{PluginTrigger, PluginTriggerKey};
 use tokio::sync::Mutex;
 
 use crate::appstate::AppState;
-use crate::plugins::apply::ApplyOptions;
 use crate::plugins::js_runtime;
-use crate::plugins::plan::plan_verdict;
-use crate::plugins::run_log;
-use crate::plugins::scheduler::{drive_terms, plugin_source};
-use crate::plugins::store_host::StoreApplyHost;
+use crate::plugins::scheduler::{apply_recorded, prepare_run, PreparedRun};
 
 /// How many times one plugin may be triggered inside [`RATE_WINDOW_MS`].
 ///
@@ -281,63 +276,24 @@ async fn run(
     let subject = event.subject.as_str();
     let edge = event.edge;
     let now = event.at;
-    let source = plugin_source(&appstate.store, &key.drive, &key.plugin)
-        .await
-        .ok_or("the plugin has no source")?;
-
-    let source = match &trigger.auto_apply {
-        Some(grant) => match &grant.release {
-            Some(id) => appstate
-                .store
-                .get_plugin_release(id)
-                .map_err(|e| e.to_string())?
-                .source
-                .ok_or("the pinned release is not a JS release")?,
-            None => grant
-                .source
-                .clone()
-                .ok_or("reactivate auto-apply to pin the approved source")?,
-        },
-        None => source,
-    };
     let runtime = js_runtime::embedded_runtime().map_err(|e| e.to_string())?;
-
-    let agent = trigger
-        .run_as
-        .as_ref()
-        .or_else(|| trigger.auto_apply.as_ref().map(|g| &g.agent))
-        .ok_or("reactivate this trigger to authorize its reads")?;
-    let execution_agent = ForAgent::AgentSubject(agent.as_str().into());
-    let host = js_runtime::StoreHost {
-        db: Arc::new(appstate.store.clone()),
-        plugin: key.plugin.clone(),
-        drive: key.drive.clone(),
-        for_agent: execution_agent,
-        manifest: js_runtime::describe_manifest(&source).await?,
-    };
-
     // The subject is the resource that moved, not the plugin: what a query
     // trigger is *about* is that row.
-    host.validate_binding().await?;
+    let PreparedRun {
+        source,
+        schemas,
+        agent,
+        host,
+    } = prepare_run(
+        appstate,
+        &key.drive,
+        &key.plugin,
+        trigger.auto_apply.as_ref(),
+        trigger.run_as.as_ref(),
+        "trigger",
+    )
+    .await?;
 
-    let schemas = match trigger
-        .auto_apply
-        .as_ref()
-        .and_then(|grant| grant.release.as_ref())
-    {
-        Some(id) => {
-            appstate
-                .store
-                .get_plugin_release(id)
-                .map_err(|e| e.to_string())?
-                .schemas
-        }
-        None if trigger.auto_apply.is_none() => {
-            super::scheduler::plugin_schema_bindings(&appstate.store, &key.drive, &key.plugin)
-                .await?
-        }
-        None => Default::default(),
-    };
     let input = serde_json::json!({"trigger":{"kind":"query","id":event.id,"at":now,"subject":subject,"edge":edge.as_str()},"schemas":schemas}).to_string();
 
     let authorization = serde_json::json!([agent, source]).to_string();
@@ -381,88 +337,26 @@ async fn run(
         return Ok("proposal saved for review; trigger paused until resolved".into());
     };
 
-    let terms = drive_terms(&appstate.store, &key.drive)
-        .await
-        .ok_or("this drive has no plugin vocabulary")?;
-
-    if terms.class("plugin-run").is_none() {
-        return Err("this drive has no plugin-run class, so the run could not be recorded".into());
-    }
-
-    let parsed: serde_json::Value =
-        serde_json::from_str(&verdict).map_err(|e| format!("the verdict is not JSON: {e}"))?;
-
-    let mut apply_host = StoreApplyHost::for_installation(
-        &appstate.store,
+    let summary = apply_recorded(
+        appstate,
         &key.drive,
-        &key.plugin,
-        ForAgent::AgentSubject(atomic_lib::Subject::from_raw(&grant.agent, None)),
-    )
-    .await?;
-
-    let plan = plan_verdict(&parsed, &mut apply_host).await;
-    let journal = super::journal::Journal::new(
-        &appstate.store,
-        &key.drive,
-        &key.plugin,
-        &format!("query:{}", event.id),
-    );
-    let plan = journal.plan(&plan)?;
-
-    let report = if plan.blocked {
-        None
-    } else {
-        Some(
-            super::apply::apply_plan_recorded(
-                &plan,
-                &mut apply_host,
-                ApplyOptions::default(),
-                Some(&journal),
-            )
-            .await?,
-        )
-    };
-
-    if let Some(report) = &report {
-        // Before the record is written, so the record itself cannot look like
-        // a change worth reacting to.
-        guard.lock().await.remember_writes(
-            &key.plugin,
-            report
-                .outcomes
-                .iter()
-                .map(|outcome| outcome.subject.clone()),
-        );
-    }
-
-    let summary = match &report {
-        None => "the plan was blocked, so nothing was written".to_string(),
-        Some(report) => format!(
-            "applied {} change(s), {} failed",
-            report.applied, report.failed
-        ),
-    };
-
-    run_log::record_run(
-        &mut apply_host,
-        &terms,
         &key.plugin,
         "query",
+        &format!("query:{}", event.id),
+        &verdict,
+        &grant,
         now,
-        &plan,
-        report.as_ref(),
+        async |report| {
+            guard.lock().await.remember_writes(
+                &key.plugin,
+                report
+                    .outcomes
+                    .iter()
+                    .map(|outcome| outcome.subject.clone()),
+            );
+        },
     )
-    .await
-    .map_err(|e| format!("{summary}, but the run could not be recorded: {e}"))?;
-
-    if plan.blocked
-        || report
-            .as_ref()
-            .is_some_and(|r| r.failed > 0 || r.stopped_early)
-    {
-        return Err(summary);
-    }
-    journal.finish(&summary)?;
+    .await?;
     stored.pending_verdict = None;
     stored.last_error = None;
     appstate
@@ -495,7 +389,9 @@ fn record_error(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::plugins::scheduler::{drive_terms, plugin_source};
     use crate::plugins::test_fixture::{children_named, fixture, write_plugin, Fixture};
+    use atomic_lib::agents::ForAgent;
     use atomic_lib::db::plugin_schedule::AutoApplyGrant;
     use atomic_lib::db::QueryFilter;
     use atomic_lib::storelike::PropVal;

@@ -100,6 +100,7 @@ interface store {
   search: func(text: string, class: option<subject>, limit: u32) -> result<list<subject>, error>;
 
   /// Live updates arrive as `events` with kind `entered` / `left` / `changed`.
+  /// The host does not support this yet and returns `unsupported`.
   subscribe: func(q: query-spec) -> result<string, error>;
   unsubscribe: func(subscription: string);
 
@@ -122,7 +123,8 @@ interface store {
     /// Written.
     committed,
     /// Stored as a proposal for review (unattended run without auto-apply,
-    /// or a grant that only allows proposing).
+    /// or a grant that only allows proposing). The host does not return this
+    /// yet: a write the app may not do is `refused`.
     proposed,
     /// Nothing done: an error problem blocked it.
     refused,

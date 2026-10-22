@@ -21,6 +21,7 @@ use crate::{
     forms,
     handlers::download::{download_file_handler_partial, DownloadParams},
     handlers::single_page_app::generate_nonce,
+    helpers::NO_STORE,
 };
 
 pub struct FormApiError {
@@ -71,14 +72,6 @@ impl std::fmt::Display for FormApiError {
 }
 
 impl std::error::Error for FormApiError {}
-
-/// Every visitor-facing form response carries this. The routes answer for a
-/// form whose state the owner changes at will (publish, schedule, unpublish),
-/// and a `410 Gone` is cacheable by default: Chromium kept serving a cached
-/// "not accepting responses" for the definition of a form that had since been
-/// published — the builder said published, visitors kept the old answer, and
-/// nothing on the wire explained why.
-const NO_STORE: &str = "no-store, no-cache, must-revalidate, private";
 
 impl ResponseError for FormApiError {
     fn status_code(&self) -> StatusCode {

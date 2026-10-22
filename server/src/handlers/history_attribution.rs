@@ -8,8 +8,7 @@
 //! one per change.
 
 use crate::{
-    appstate::AppState, context::RequestContext, errors::AtomicServerResult,
-    helpers::get_client_agent,
+    appstate::AppState, errors::AtomicServerResult, helpers::get_client_agent_for_signed_url,
 };
 use actix_web::{web, HttpRequest, HttpResponse};
 use atomic_lib::{Storelike, Subject};
@@ -27,13 +26,9 @@ pub async fn handle_history_attribution(
     req: HttpRequest,
 ) -> AtomicServerResult<HttpResponse> {
     let store = &appstate.store;
-    let origin = RequestContext::new(&req, &appstate).origin;
     let subject = params.subject.clone();
 
-    // The client signs the full request URL (path + query); rebuild it exactly
-    // so the signature check matches what it signed.
-    let full_url = format!("{}{}", origin, req.uri());
-    let for_agent = get_client_agent(req.headers(), &appstate, &full_url).await?;
+    let for_agent = get_client_agent_for_signed_url(&req, &appstate).await?;
 
     // A destroyed subject has no resource to check against; its drive is the
     // rights anchor, the same gate `SYNC_DIFF.removeCommits` uses. Only a

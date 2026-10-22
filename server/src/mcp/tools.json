@@ -1,0 +1,304 @@
+[
+  {
+    "name": "list_drives",
+    "title": "List drives",
+    "description": "The drives and folders the person shared with this connection, and whether each can be edited. The first is the default for tools that take a `drive`.",
+    "effect": "read",
+    "inputSchema": {
+      "properties": {},
+      "type": "object"
+    }
+  },
+  {
+    "name": "get_resource",
+    "title": "Read resources",
+    "description": "Read one or more resources by subject. Returns JSON with property shortnames as keys; documents and meetings include their text as `_documentText`. Children of a folder or drive can be found with search (parents) or query.",
+    "effect": "read",
+    "inputSchema": {
+      "properties": {
+        "subjects": {
+          "description": "Subjects (URLs or did:ad:…) of the resources to read.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "subjects"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "search",
+    "title": "Search",
+    "description": "Full-text search for resources by words in their name, description or other text. Matches whole words. Give `parents` (drive or folder subjects) to search inside them; with an empty query it lists everything inside `parents`.",
+    "effect": "read",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "parents": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "query": {
+          "description": "Words to search for.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "query",
+    "title": "Query by property",
+    "description": "Find resources with specific property values, like a SQL WHERE. With `class` set, where/select take property shortnames and tag names (e.g. class: \"task\", where: [{property: \"status\", value: \"done\"}]) and an isA filter is added. Without `class`, properties must be full URLs, e.g. where: [{property: \"https://atomicdata.dev/properties/parent\", value: \"did:ad:…\"}] lists the children of a folder. Results are not sorted.",
+    "effect": "read",
+    "inputSchema": {
+      "properties": {
+        "class": {
+          "type": "string"
+        },
+        "limit": {
+          "maximum": 200,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "parents": {
+          "description": "Drives or folders to look in. Defaults to the default drive.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "select": {
+          "description": "Properties to include. Defaults to name.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "where": {
+          "items": {
+            "properties": {
+              "property": {
+                "type": "string"
+              },
+              "value": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "property",
+              "value"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "where"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "find_schema",
+    "title": "Find classes",
+    "description": "Search the classes (custom types, like \"task\" or \"deal\") defined on the drives shared with this connection, each as a JSON Schema. Search FIRST, before creating a class or resources of a custom type, and reuse a class that fits instead of making a near-duplicate. `query` is words matched (OR) against a class's and its ontology's shortname, name and description; classes that match more words come first; an empty query lists everything. Each match has `class` (subject), `shortname`, `ontology` ({subject, shortname}) and `jsonSchema`: the class as an object schema, with `required`, constraints as JSON Schema keywords, and `x-atomic-property` holding each property's subject. Default 10 matches, `total` is how many matched.",
+    "effect": "read",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "query": {
+          "description": "Words to look for, e.g. \"invoice customer\". Empty lists all classes.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "get_user_classes",
+    "title": "List classes (deprecated)",
+    "description": "Deprecated: use find_schema. Same as find_schema with an empty query (up to 50 classes), as a plain list. Takes an optional `drive` to list the classes of that drive only.",
+    "effect": "read",
+    "inputSchema": {
+      "properties": {
+        "drive": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  {
+    "name": "get_schema",
+    "title": "Get class schema",
+    "description": "The required and recommended properties of a class, with their shortnames and datatypes.",
+    "effect": "read",
+    "inputSchema": {
+      "properties": {
+        "drive": {
+          "type": "string"
+        },
+        "subject": {
+          "description": "The class: a name such as \"document\" or \"task\", or a subject.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "subject"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "edit_resource",
+    "title": "Edit a property",
+    "description": "Set one property on a resource and save it. `property` is a shortname from the resource's schema (e.g. \"status\") or a full property URL; select values take tag names, dates take ISO strings. To replace the text of a document or meeting, use property \"_documentText\" with Markdown or plain text (headings, lists, task lists, code blocks, **bold**, *italic*, `code`, links); it overwrites the whole body, so read `_documentText` with get_resource first when keeping parts of it.",
+    "effect": "write",
+    "inputSchema": {
+      "properties": {
+        "property": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "value": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ]
+        }
+      },
+      "required": [
+        "subject",
+        "property",
+        "value"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "create_resource",
+    "title": "Create resources",
+    "description": "Create one or more resources from compact JSON-AD. For a document or meeting, \"_documentText\" sets its text from Markdown or plain text. Each object needs \"@class\" (a shortname like \"folder\", \"document\", \"table\", a class from find_schema, or a full URL) and \"@parent\" (a drive, folder or table subject), plus property shortnames as keys, e.g. {\"@class\": \"task\", \"@parent\": \"did:ad:…\", \"name\": \"Call Anna\", \"status\": \"todo\"}. Never pass \"@id\". Pass several to create many at once.",
+    "effect": "write",
+    "inputSchema": {
+      "properties": {
+        "resources": {
+          "items": {
+            "type": "object"
+          },
+          "maxItems": 200,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "resources"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "ensure_ontology",
+    "title": "Create or update a schema",
+    "description": "Create or update classes from a JSON Schema (draft 2020-12). Run find_schema first and reuse existing classes; only describe what is missing. Every object schema in `$defs` becomes a class, its `properties` become properties, `required` becomes required properties, and constraints go in the schema as keywords: enum, minimum, maximum, minLength, maxLength, pattern, minItems, maxItems. A `$ref` to \"#/$defs/Name\" links to another class. Idempotent: calling it again with the same schema changes nothing. Properties are identified by ontology, shortname and type, so renaming a shortname or changing a type makes a NEW property (the old one and its data stay). Returns the shortname to subject maps of the classes and properties; use a class subject as `@class` in create_resource. An invalid schema returns an error naming the JSON pointer to fix (unsupported: oneOf/anyOf/allOf, nullable types, nested object schemas; move those to `$defs`). Example schema: {\"title\":\"Shop\",\"$defs\":{\"customer\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\",\"minLength\":1}},\"required\":[\"name\"]}}}",
+    "effect": "write",
+    "inputSchema": {
+      "properties": {
+        "drive": {
+          "description": "The drive (or folder) to put the ontology in. Defaults to the first drive that can be edited.",
+          "type": "string"
+        },
+        "schema": {
+          "description": "The JSON Schema.",
+          "type": "object"
+        },
+        "shortname": {
+          "description": "Shortname (lowercase slug) of the ontology. Defaults to the schema's `x-atomic-ontology`, then its `title`, then the drive's default ontology.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema"
+      ],
+      "type": "object"
+    },
+    "annotations": {
+      "idempotentHint": true
+    }
+  },
+  {
+    "name": "delete_resource",
+    "title": "Delete a resource",
+    "description": "Delete a resource and everything inside it (a folder deletes its contents). This cannot be undone from here; confirm with the person first unless they clearly asked for it. A whole drive cannot be deleted.",
+    "effect": "write",
+    "inputSchema": {
+      "properties": {
+        "subject": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "subject"
+      ],
+      "type": "object"
+    },
+    "annotations": {
+      "destructiveHint": true
+    }
+  }
+]

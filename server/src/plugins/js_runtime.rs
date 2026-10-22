@@ -305,7 +305,7 @@ impl StoreHost {
             &self.drive,
             &self.plugin,
             self.for_agent.clone(),
-            self.manifest.clone(),
+            self.manifest.clone().map(std::sync::Arc::new),
         )
         .await
     }

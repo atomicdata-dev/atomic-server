@@ -6,7 +6,7 @@
 //! An app is a wasip2 component of world `sandboxed-app`. Everything it can do
 //! is an import the host wrote here:
 //!
-//! - [`store`]: `get`, `get-many`, `query`, `apply`, `subscribe`. Reads are
+//! - [`store`]: `get`, `get-many`, `query`, `apply`. Reads are
 //!   checked against the caller and the Installation's agent
 //!   ([`HostCore`]'s `Grant`), writes go through the existing planner and
 //!   applier ([`crate::plugins::plan`], [`crate::plugins::apply`]) as the
@@ -26,8 +26,8 @@
 //!
 //! Gaps in this slice, deliberately: handles passed to `calls.call` are
 //! accepted and ignored (the callee gets exactly its own grant); the host does
-//! not call `on-event` itself (apps pull `events`); `search`, `undo` and the `ne` filter are `unsupported`; proposals are kept in
-//! memory; `apply` is checked for rights before it writes but is not a single
+//! not call `on-event` itself (apps pull `events`); `search`, `subscribe`, `undo` and the `ne` filter are `unsupported`;
+//! `apply` is checked for rights before it writes but is not a single
 //! store transaction.
 
 mod calls;
@@ -53,11 +53,10 @@ mod wit_tests;
 pub use forward::{CallForwarder, IrohForwarder, ServedCalls};
 pub use js::JsAbi;
 pub use module::{ModuleParts, NativeHooks, ServerModule};
-pub use registry::{HostAbiRegistry, LoadedApp, Proposal, MAX_CALL_DEPTH};
+pub use registry::{HostAbiRegistry, LoadedApp, MAX_CALL_DEPTH};
 pub(crate) use run::AbiState;
 pub use run::{
-    call_as, call_entry, call_export, call_for_agent, CallBudget, CallError, CHAIN_CALLS,
-    CHAIN_FUEL, ENTRY_TIMEOUT,
+    call_export, call_for_agent, CallBudget, CallError, CHAIN_CALLS, CHAIN_FUEL, ENTRY_TIMEOUT,
 };
 
 pub(crate) mod bindings {

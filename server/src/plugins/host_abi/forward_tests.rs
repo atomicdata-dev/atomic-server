@@ -16,7 +16,7 @@ use atomic_lib::{
 use serde_json::json;
 
 use super::{
-    call_as, call_entry, call_export, code,
+    call_export, call_for_agent, code,
     forward::{serve, IrohForwarder, ServedCalls},
     tests::{
         count_of, counter_resource, install, owner, share, CALLER, CALLER_MANIFEST, CALLER_WASM,
@@ -124,7 +124,7 @@ async fn a_call_with_no_local_provider_runs_on_the_peer_that_has_the_app() {
     // sync it has with B, but it could not have written it: it has no app.
 
     // -- A caller who cannot write B's drive is forbidden there, for a write.
-    let err = call_as(
+    let err = call_for_agent(
         &registry_a,
         &db_a,
         &f.drive,
@@ -132,6 +132,7 @@ async fn a_call_with_no_local_provider_runs_on_the_peer_that_has_the_app() {
         "increment",
         &args.to_string(),
         ForAgent::AgentSubject(reader.as_str().into()),
+        Arc::new(CallBudget::default()),
     )
     .await
     .unwrap_err();
@@ -145,7 +146,7 @@ async fn a_call_with_no_local_provider_runs_on_the_peer_that_has_the_app() {
     // -- A read-only budget on A is read-only on B.
     registry_a.refresh(&db_a, &f.drive).await;
     let reads_only = || Arc::new(CallBudget::default().only(vec![ExportEffect::Read]));
-    let err = call_entry(
+    let err = call_for_agent(
         &registry_a,
         &db_a,
         &f.drive,
@@ -154,7 +155,6 @@ async fn a_call_with_no_local_provider_runs_on_the_peer_that_has_the_app() {
         &args.to_string(),
         owner(&db_b),
         reads_only(),
-        super::ENTRY_TIMEOUT,
     )
     .await
     .unwrap_err();
@@ -166,7 +166,7 @@ async fn a_call_with_no_local_provider_runs_on_the_peer_that_has_the_app() {
     );
     // The same budget still runs a read there, and an app that calls on from B
     // cannot reach a write.
-    let ok = call_entry(
+    let ok = call_for_agent(
         &registry_a,
         &db_a,
         &f.drive,
@@ -175,11 +175,10 @@ async fn a_call_with_no_local_provider_runs_on_the_peer_that_has_the_app() {
         &json!({"n": 0, "limit": 2}).to_string(),
         owner(&db_b),
         reads_only(),
-        super::ENTRY_TIMEOUT,
     )
     .await;
     assert!(ok.is_ok(), "{ok:?}");
-    let err = call_entry(
+    let err = call_for_agent(
         &registry_a,
         &db_a,
         &f.drive,
@@ -188,7 +187,6 @@ async fn a_call_with_no_local_provider_runs_on_the_peer_that_has_the_app() {
         &args.to_string(),
         owner(&db_b),
         reads_only(),
-        super::ENTRY_TIMEOUT,
     )
     .await
     .unwrap_err();
@@ -217,7 +215,7 @@ async fn a_call_with_no_local_provider_runs_on_the_peer_that_has_the_app() {
     assert_eq!(err.code, code::DEPTH_EXCEEDED, "{err:?}");
 
     // -- A drive no peer syncs is answered as before.
-    let err = call_as(
+    let err = call_export(
         &registry_a,
         &db_a,
         "did:ad:somewhere-else",
@@ -225,6 +223,8 @@ async fn a_call_with_no_local_provider_runs_on_the_peer_that_has_the_app() {
         "increment",
         &args.to_string(),
         owner(&db_b),
+        0,
+        Arc::new(CallBudget::default()),
     )
     .await
     .unwrap_err();

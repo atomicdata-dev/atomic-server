@@ -1,11 +1,11 @@
-//! `atomic:host/store`: reads, queries, subscriptions and `apply`.
+//! `atomic:host/store`: reads, queries and `apply`.
 //!
 //! Every read goes through [`HostCore`]'s grant (the caller and the
 //! Installation's agent must both be able to read). Every write is planned by
 //! [`plan_verdict`] and applied by [`apply_plan`] through [`StoreApplyHost`],
 //! signed by the Installation's agent.
 
-use atomic_lib::{agents::ForAgent, hierarchy::check_write, urls, Db, Storelike};
+use atomic_lib::{urls, Db, Storelike};
 
 use super::{
     bindings::atomic::host::{
@@ -15,7 +15,6 @@ use super::{
     classify, code,
     convert::{self, check_spec, intents_to_verdict, to_query, to_wit_resource},
     error,
-    registry::{Proposal, SUBSCRIPTION_CAP},
     run::AbiState,
     HostError,
 };
@@ -58,18 +57,6 @@ fn plan_problems(plan: &RunPlan) -> Vec<Problem> {
             property: None,
         })
         .collect()
-}
-
-/// Refuses unless `agent` may write `subject`.
-async fn may_write(db: &Db, subject: &str, agent: &ForAgent) -> Result<(), String> {
-    let resource = db
-        .get_resource(&subject.into())
-        .await
-        .map_err(|e| format!("{subject} could not be read: {e}"))?;
-    check_write(db, &resource, agent)
-        .await
-        .map(|_| ())
-        .map_err(|e| e.to_string())
 }
 
 /// Where each planned change lands: the resource written, or for a create the
@@ -233,27 +220,14 @@ impl store::Host for AbiState {
         ))
     }
 
-    async fn subscribe(&mut self, q: QuerySpec) -> Result<String, HostError> {
-        check_spec(&q)?;
-        // Resolves the properties now, so a bad query fails here and not
-        // silently never fires.
-        to_query(&self.host.db, &q, &self.host.drive).await?;
-        self.host
-            .registry
-            .subscribe(&self.host.drive, &self.host.installation, q)
-            .map_err(|e| {
-                error(
-                    code::INVALID_ARGUMENT,
-                    format!("{e} (limit {SUBSCRIPTION_CAP})"),
-                )
-            })
+    async fn subscribe(&mut self, _q: QuerySpec) -> Result<String, HostError> {
+        Err(error(
+            code::UNSUPPORTED,
+            "subscribe is not available on the host ABI yet",
+        ))
     }
 
-    async fn unsubscribe(&mut self, subscription: String) {
-        self.host
-            .registry
-            .unsubscribe(&self.host.drive, &self.host.installation, &subscription);
-    }
+    async fn unsubscribe(&mut self, _subscription: String) {}
 
     async fn apply(&mut self, intents: Vec<Intent>) -> Result<Applied, HostError> {
         if intents.is_empty() || intents.len() > MAX_INTENTS {
@@ -299,7 +273,7 @@ impl store::Host for AbiState {
             undo_token: None,
         };
 
-        // 1. The plan itself is wrong: nothing to commit or propose.
+        // 1. The plan itself is wrong: nothing to commit.
         if plan.blocked {
             return Ok(refused(plan_problems(&plan)));
         }
@@ -310,71 +284,22 @@ impl store::Host for AbiState {
             )]));
         }
 
-        // 2. The caller may not write there: refused, not proposed. A proposal
-        //    is for work the caller is entitled to ask for. When the caller is
-        //    the app itself (another app called it) there is no separate
-        //    caller to ask: only the app's own grant decides, below.
-        let targets = write_targets(&plan);
-        let app_agent = match &writer.signing_as {
-            Some(key) => host
-                .db
-                .get_app_agent_info(key)
-                .ok()
-                .flatten()
-                .map(|info| ForAgent::AgentSubject(info.agent.into())),
-            None => None,
-        };
-        if app_agent.as_ref() != Some(&caller) {
-            for target in &targets {
-                if let Err(e) = may_write(&host.db, target, &caller).await {
-                    return Ok(refused(vec![problem(e, Some(target.clone()))]));
-                }
+        // 2. Both the caller and the Installation's own agent must be able to
+        //    write there; the first that cannot is the reason. An
+        //    installation without a key has no identity to write as.
+        if writer.signing_as.is_none() {
+            return Ok(refused(vec![problem(
+                "this installation has no identity of its own to write as",
+                None,
+            )]));
+        }
+        for target in write_targets(&plan) {
+            if let Err(e) = writer.may_write(&target).await {
+                return Ok(refused(vec![problem(e, Some(target))]));
             }
         }
 
-        // 3. The Installation's own agent may not write there (or it has none):
-        //    the work is kept as a proposal and nothing is written.
-        let why_not = match &app_agent {
-            None => Some("this installation has no identity of its own to write as".to_string()),
-            Some(_) => {
-                let mut first = None;
-                for target in &targets {
-                    let allowed = match host.db.get_resource(&target.as_str().into()).await {
-                        Ok(resource) => writer.installation_may_write(&resource).await,
-                        Err(e) => Err(format!("{target} could not be read: {e}")),
-                    };
-                    if let Err(e) = allowed {
-                        first = Some(format!("the installation may not write {target}: {e}"));
-                        break;
-                    }
-                }
-                first
-            }
-        };
-        if let Some(reason) = why_not {
-            host.registry.keep_proposal(Proposal {
-                drive: host.drive.clone(),
-                installation: host.installation.clone(),
-                caller: format!("{caller:?}"),
-                at_ms: atomic_lib::utils::now(),
-                verdict,
-            });
-            let mut problems = plan_problems(&plan);
-            problems.push(Problem {
-                severity: Severity::Warning,
-                message: format!("kept as a proposal, nothing was written: {reason}"),
-                subject: None,
-                property: None,
-            });
-            return Ok(Applied {
-                outcome: Outcome::Proposed,
-                created: Vec::new(),
-                problems,
-                undo_token: None,
-            });
-        }
-
-        // 4. Both may: write it, as the Installation.
+        // 3. Write it, as the Installation.
         let report = match apply_plan(&plan, &mut writer, ApplyOptions::default()).await {
             Ok(report) => report,
             Err(e) => return Ok(refused(vec![problem(e, None)])),

@@ -23,7 +23,7 @@ use wasmtime::StoreLimitsBuilder;
 
 use super::{
     bindings::atomic::host::{
-        calls::{self, AppExport, Effect},
+        calls,
         net::{self, Header, Request},
         store::{self, Filter, FilterOp, Page, QuerySpec},
         types::{Resource, Value},
@@ -36,7 +36,7 @@ use super::{
 use crate::plugins::{
     host_core::{PluginHost, ResourceGrants},
     js_runtime::StoreHost,
-    manifest::ExportEffect,
+    manifest::{Export, ExportEffect},
 };
 
 /// A [`StoreHost`] that also answers the host ABI.
@@ -78,7 +78,7 @@ impl JsAbi {
             (
                 &self.host.drive,
                 &self.host.plugin,
-                self.host.manifest.clone(),
+                self.host.manifest.clone().map(Arc::new),
             ),
             self.host.for_agent.clone(),
             0,
@@ -140,8 +140,7 @@ impl JsAbi {
             }
             "calls.providers" => json!(calls::Host::providers(&mut state, text(0)?).await),
             "calls.describe" => Json::Array(
-                calls::Host::describe(&mut state, text(0)?)
-                    .await?
+                super::calls::provider_exports(&state.host.registry, &state.host.drive, &text(0)?)?
                     .iter()
                     .map(export_json)
                     .collect(),
@@ -247,19 +246,14 @@ fn page_json(page: &Page) -> Json {
     })
 }
 
-fn export_json(export: &AppExport) -> Json {
+fn export_json(export: &Export) -> Json {
     json!({
         "interface": export.interface,
         "function": export.function,
         "description": export.description,
-        "inputSchema": serde_json::from_str::<Json>(&export.input_schema).unwrap_or(Json::Null),
-        "outputSchema": serde_json::from_str::<Json>(&export.output_schema).unwrap_or(Json::Null),
-        "effect": match export.effect {
-            Effect::Read => "read",
-            Effect::Write => "write",
-            Effect::External => "external",
-            Effect::Interactive => "interactive",
-        },
+        "inputSchema": serde_json::to_value(&export.input_schema).unwrap_or(Json::Null),
+        "outputSchema": serde_json::to_value(&export.output_schema).unwrap_or(Json::Null),
+        "effect": export.effect.name(),
     })
 }
 

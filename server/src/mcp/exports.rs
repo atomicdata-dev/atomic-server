@@ -94,7 +94,7 @@ async fn gather(appstate: &AppState, grant: &Grant) -> Vec<(String, Found)> {
             continue;
         }
         appstate.host_abi.refresh(&db, drive).await;
-        for app in appstate.host_abi.apps_in(drive) {
+        for app in appstate.host_abi.providers_in(drive) {
             for export in &app.manifest.exports {
                 if offered(&app, export, grant.write) {
                     found.push((
