@@ -37,3 +37,34 @@ jobs:
         run: bash flutter/scripts/build_embed.sh
       - name: Check the embed size budget
         run: bash flutter/scripts/check_embed_size.sh
+  bridge-codegen:
+    # The generated bridge glue (flutter/lib/src/rust, flutter/rust/src/frb_generated.rs)
+    # must be exactly what the pinned codegen produces from flutter/rust/src/api.
+    runs-on: ubuntu-latest
+    env:
+      FRB_CODEGEN_VERSION: 2.12.0 # keep equal to flutter_rust_bridge in flutter/pubspec.yaml and flutter/rust/Cargo.toml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.7'
+          channel: stable
+          cache: true
+      - name: Rust toolchain (from rust-toolchain.toml)
+        run: rustup show
+      - name: Cache flutter_rust_bridge_codegen
+        id: codegen-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/flutter_rust_bridge_codegen
+          key: frb-codegen-${{ env.FRB_CODEGEN_VERSION }}-${{ runner.os }}
+      - name: Install flutter_rust_bridge_codegen
+        if: steps.codegen-cache.outputs.cache-hit != 'true'
+        run: cargo install flutter_rust_bridge_codegen --version "$FRB_CODEGEN_VERSION" --locked
+      - run: flutter pub get
+        working-directory: flutter
+      - name: Regenerate the bindings
+        run: flutter_rust_bridge_codegen generate
+        working-directory: flutter
+      - name: Fail when the committed bindings are stale
+        run: git diff --exit-code -- flutter/lib/src/rust flutter/rust/src/frb_generated.rs

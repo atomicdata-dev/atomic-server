@@ -93,31 +93,21 @@ Future<Uint8List> fetchFileBytes({required String file}) =>
 /// Keep a picked picture as a File in the active drive (bytes in the local
 /// store, the File queued for sync like the web app's upload) and return the
 /// File's subject, to pass as `icon` to `set_agent_profile`.
-Future<String> uploadAgentPicture({
-  required String filename,
-  required String mimetype,
-  required List<int> bytes,
-}) =>
+Future<String> uploadAgentPicture(
+        {required String filename,
+        required String mimetype,
+        required List<int> bytes}) =>
     RustLib.instance.api.crateApiSimpleUploadAgentPicture(
-      filename: filename,
-      mimetype: mimetype,
-      bytes: bytes,
-    );
+        filename: filename, mimetype: mimetype, bytes: bytes);
 
 /// Save this device's agent's profile: a commit by the agent on its own
 /// resource, stored here and synced like any other edit. An empty
 /// `description` removes it; `icon` is the subject of a File for the picture
 /// (empty removes it, `None` leaves it as it is).
-Future<void> setAgentProfile({
-  required String name,
-  required String description,
-  String? icon,
-}) =>
+Future<void> setAgentProfile(
+        {required String name, required String description, String? icon}) =>
     RustLib.instance.api.crateApiSimpleSetAgentProfile(
-      name: name,
-      description: description,
-      icon: icon,
-    );
+        name: name, description: description, icon: icon);
 
 /// Create a new drive. Returns the drive subject.
 Future<String> createDrive({required String name}) =>
@@ -139,34 +129,22 @@ Future<List<String>> listDrives() =>
 Future<String> listDrivesWithNames() =>
     RustLib.instance.api.crateApiSimpleListDrivesWithNames();
 
-Future<String> createResource({
-  required String parentSubject,
-  required String name,
-}) =>
-    RustLib.instance.api.crateApiSimpleCreateResource(
-      parentSubject: parentSubject,
-      name: name,
-    );
+Future<String> createResource(
+        {required String parentSubject, required String name}) =>
+    RustLib.instance.api
+        .crateApiSimpleCreateResource(parentSubject: parentSubject, name: name);
 
-Future<void> setProperty({
-  required String subject,
-  required String property,
-  required String value,
-}) =>
+Future<void> setProperty(
+        {required String subject,
+        required String property,
+        required String value}) =>
     RustLib.instance.api.crateApiSimpleSetProperty(
-      subject: subject,
-      property: property,
-      value: value,
-    );
+        subject: subject, property: property, value: value);
 
-Future<String> getProperty({
-  required String subject,
-  required String property,
-}) =>
-    RustLib.instance.api.crateApiSimpleGetProperty(
-      subject: subject,
-      property: property,
-    );
+Future<String> getProperty(
+        {required String subject, required String property}) =>
+    RustLib.instance.api
+        .crateApiSimpleGetProperty(subject: subject, property: property);
 
 /// Load versioned state for history operations.
 Future<void> warmResourceHistory({required String subject}) =>
@@ -202,16 +180,12 @@ Future<int> syncDriveToServer({required String serverUrl}) =>
 /// Restore agent + drive on app start. Opens WS sync, fetches drive from server when missing,
 /// then falls back to Iroh discover / known peers (previous "auto pair on boot" behaviour).
 /// Returns `"ok"` or `"needs_sync"`.
-Future<String> resumeAppSession({
-  required String serverUrl,
-  required String secret,
-  String? driveHint,
-}) =>
+Future<String> resumeAppSession(
+        {required String serverUrl,
+        required String secret,
+        String? driveHint}) =>
     RustLib.instance.api.crateApiSimpleResumeAppSession(
-      serverUrl: serverUrl,
-      secret: secret,
-      driveHint: driveHint,
-    );
+        serverUrl: serverUrl, secret: secret, driveHint: driveHint);
 
 /// Start Iroh, sync known peers (then pkarr). Returns JSON [`SyncConnectivityReport`].
 Future<String> syncConnectivityNow() =>
@@ -228,10 +202,8 @@ Future<List<String>> resolveDriveOrigins({required String drive}) =>
 /// Whether `body`, the answer of `GET /genesis?subject=<drive>`, is the drive's
 /// own genesis certificate and verifies against the DID.
 bool genesisAnswerVerifies({required String body, required String drive}) =>
-    RustLib.instance.api.crateApiSimpleGenesisAnswerVerifies(
-      body: body,
-      drive: drive,
-    );
+    RustLib.instance.api
+        .crateApiSimpleGenesisAnswerVerifies(body: body, drive: drive);
 
 /// Connect to the server that hosts the active drive: fetches the drive and
 /// follows its commits over WS, then, in the background, follows the drives the
@@ -250,8 +222,7 @@ Future<String> startPeer() => RustLib.instance.api.crateApiSimpleStartPeer();
 /// What the search for this account's other devices is doing, as JSON:
 /// `{"state": "starting" | "searching" | "no_peers_yet" | "connected" |
 /// "failed", "message": "…", "detail": "…" | null, "retry_in_secs"?,
-/// "devices"?, "reason"?, "last_checked_ms": …, "attempts": …,
-/// "directory_lookups_last_hour": …, "paused": …}`.
+/// "devices"?, "reason"?, "last_checked_ms": …, "attempts": …}`.
 String peerSearchStatus() =>
     RustLib.instance.api.crateApiSimplePeerSearchStatus();
 
