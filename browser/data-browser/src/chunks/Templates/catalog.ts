@@ -105,7 +105,7 @@ export const TEMPLATE_CATALOG: TemplateDefinition[] = [
         name: 'Welcome to Atomic',
         text: [
           'Welcome to Atomic. This is a small drive to play in, at your own pace. There is nothing you have to do.',
-          'Everything here is stored on this device and belongs only to you. Nobody else can read it.',
+          'Everything here is stored on this device and belongs only to you. Only you can read it, unless you share it.',
           'You can edit, rename or delete anything in this drive, including this document. Try it: the sidebar has a document, a table and a canvas.',
           'The browser app and the mobile apps use the same data. The browser app can do everything; the mobile apps offer a focused subset, and it is still growing.',
           'Keep your work safe: for now it only exists on this device. Save your secret, or connect an account or another device, to keep it somewhere else too. You will find these under Settings and on the Sync page.',
