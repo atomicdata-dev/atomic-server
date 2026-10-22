@@ -13,6 +13,8 @@ dependencies:
     path: ../packages/atomic_chat
   atomic_flutter:
     path: ../packages/atomic_flutter
+  atomic_store:
+    path: ../packages/atomic_store
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8

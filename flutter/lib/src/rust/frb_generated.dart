@@ -289,7 +289,7 @@ abstract class RustLibApi extends BaseApi {
 
   Future<void> crateApiResourcesSaveResourceChanges(
       {required String subject,
-      required List<PropValue> set_,
+      required List<PropValue> changes,
       required List<String> remove});
 
   Future<String> crateApiAssistantSearch(
@@ -2370,13 +2370,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @override
   Future<void> crateApiResourcesSaveResourceChanges(
       {required String subject,
-      required List<PropValue> set_,
+      required List<PropValue> changes,
       required List<String> remove}) {
     return handler.executeNormal(NormalTask(
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(subject, serializer);
-        sse_encode_list_prop_value(set_, serializer);
+        sse_encode_list_prop_value(changes, serializer);
         sse_encode_list_String(remove, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
             funcId: 80, port: port_);
@@ -2386,7 +2386,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         decodeErrorData: sse_decode_atomic_error,
       ),
       constMeta: kCrateApiResourcesSaveResourceChangesConstMeta,
-      argValues: [subject, set_, remove],
+      argValues: [subject, changes, remove],
       apiImpl: this,
     ));
   }
@@ -2394,7 +2394,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiResourcesSaveResourceChangesConstMeta =>
       const TaskConstMeta(
         debugName: "save_resource_changes",
-        argNames: ["subject", "set_", "remove"],
+        argNames: ["subject", "changes", "remove"],
       );
 
   @override

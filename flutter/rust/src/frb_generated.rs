@@ -2908,7 +2908,8 @@ fn wire__crate__api__resources__save_resource_changes_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_subject = <String>::sse_decode(&mut deserializer);
-            let api_set = <Vec<crate::api::resources::PropValue>>::sse_decode(&mut deserializer);
+            let api_changes =
+                <Vec<crate::api::resources::PropValue>>::sse_decode(&mut deserializer);
             let api_remove = <Vec<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
@@ -2916,7 +2917,7 @@ fn wire__crate__api__resources__save_resource_changes_impl(
                     (move || async move {
                         let output_ok = crate::api::resources::save_resource_changes(
                             api_subject,
-                            api_set,
+                            api_changes,
                             api_remove,
                         )
                         .await?;

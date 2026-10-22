@@ -290,16 +290,16 @@ pub async fn search_resources(
 
 // ── Writes ─────────────────────────────────────────────────────────────────
 
-/// Set the `set` properties and remove the `remove` ones of an existing
+/// Set the `changes` properties and remove the `remove` ones of an existing
 /// resource, as one signed commit by the active agent.
 pub async fn save_resource_changes(
     subject: String,
-    set: Vec<PropValue>,
+    changes: Vec<PropValue>,
     remove: Vec<String>,
 ) -> Result<(), AtomicError> {
     let store = open_store()?;
     let mut resource = store.get_resource(&subject.as_str().into()).await?;
-    for p in &set {
+    for p in &changes {
         resource.set_unsafe(p.property.clone(), atomic_to_value(&p.value)?)?;
     }
     for property in &remove {

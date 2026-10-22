@@ -28,14 +28,14 @@ Future<List<SearchHit>> searchResources(
     RustLib.instance.api.crateApiResourcesSearchResources(
         query: query, drive: drive, limit: limit);
 
-/// Set the `set` properties and remove the `remove` ones of an existing
+/// Set the `changes` properties and remove the `remove` ones of an existing
 /// resource, as one signed commit by the active agent.
 Future<void> saveResourceChanges(
         {required String subject,
-        required List<PropValue> set_,
+        required List<PropValue> changes,
         required List<String> remove}) =>
     RustLib.instance.api.crateApiResourcesSaveResourceChanges(
-        subject: subject, set_: set_, remove: remove);
+        subject: subject, changes: changes, remove: remove);
 
 /// Create a resource with a new subject (a DID derived from the signed
 /// genesis commit) holding `values`, signed by the active agent. Returns its
