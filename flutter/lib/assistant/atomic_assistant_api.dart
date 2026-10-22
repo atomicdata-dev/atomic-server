@@ -8,7 +8,7 @@ import '../atomic/account_store.dart';
 import '../atomic/atomic_client.dart';
 import '../atomic/own_profile.dart';
 import '../src/rust/api/assistant.dart' as ffi_assistant;
-import '../src/rust/api/simple.dart' as ffi_simple;
+import '../src/rust/api/simple/drive.dart' as ffi_simple;
 import 'fake_ai.dart';
 
 /// The app's [AssistantApi]: the local node through [AtomicClient] (the Rust

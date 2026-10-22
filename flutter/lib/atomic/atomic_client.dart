@@ -28,7 +28,13 @@ import '../src/rust/api/context.dart' as context;
 import '../src/rust/api/embed.dart' as embed;
 import 'session.dart';
 import '../screens/store_recovery_screen.dart' show StoreRecoveryNotice;
-import '../src/rust/api/simple.dart' as ffi;
+import '../src/rust/api/simple/agent.dart' as ffi;
+import '../src/rust/api/simple/drive.dart' as ffi;
+import '../src/rust/api/simple/files.dart' as ffi;
+import '../src/rust/api/simple/peers.dart' as ffi;
+import '../src/rust/api/simple/resource.dart' as ffi;
+import '../src/rust/api/simple/store.dart' as ffi;
+import '../src/rust/api/simple/sync.dart' as ffi;
 import '../src/rust/api/simple/types.dart' show AgentInfo, VersionMetadata;
 
 export '../src/rust/api/simple/types.dart' show AgentInfo, VersionMetadata;

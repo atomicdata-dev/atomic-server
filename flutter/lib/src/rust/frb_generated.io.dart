@@ -6,7 +6,13 @@
 import 'api/assistant.dart';
 import 'api/context.dart';
 import 'api/embed.dart';
-import 'api/simple.dart';
+import 'api/simple/agent.dart';
+import 'api/simple/drive.dart';
+import 'api/simple/files.dart';
+import 'api/simple/peers.dart';
+import 'api/simple/resource.dart';
+import 'api/simple/store.dart';
+import 'api/simple/sync.dart';
 import 'api/simple/types.dart';
 import 'api/simple/ws_sync.dart';
 import 'dart:async';
