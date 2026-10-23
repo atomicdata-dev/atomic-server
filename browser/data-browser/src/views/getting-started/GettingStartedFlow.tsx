@@ -485,6 +485,18 @@ export function GettingStartedFlow({
   >('idle');
 
   /**
+   * The account's sign-in card is on screen. It then carries the agent secret
+   * too, as the portal's does, so both show the same options; the separate
+   * secret field is for when there is no account to sign in to.
+   */
+  const offerAccountSignIn =
+    !!knownPortalUrl &&
+    !(restore.phase === 'ready' && assistedUnlock === 'trying') &&
+    (restore.phase === 'no-session' ||
+      (restore.phase === 'ready' && assistedUnlock === 'needs-sign-in'));
+  const signInWithSecret = (secret: string) => void trySecret(secret, true);
+
+  /**
    * The account's own ways in, above the passkey, code and secret: while the
    * account is unlocking the identity by itself, say so; where there is no
    * session, or it is too old to unlock with, offer the same sign-in options
@@ -497,12 +509,7 @@ export function GettingStartedFlow({
       );
     }
 
-    const offerSignIn =
-      !!knownPortalUrl &&
-      (restore.phase === 'no-session' ||
-        (restore.phase === 'ready' && assistedUnlock === 'needs-sign-in'));
-
-    if (!offerSignIn || !knownPortalUrl) return null;
+    if (!offerAccountSignIn || !knownPortalUrl) return null;
 
     const onSignedIn = () => setRestoreAttempt(n => n + 1);
 
@@ -520,12 +527,14 @@ export function GettingStartedFlow({
             portalUrl={knownPortalUrl}
             disabled={loading}
             onSignedIn={onSignedIn}
+            onSecret={signInWithSecret}
           />
         ) : (
           <AccountSignInViaBrowser
             portalUrl={knownPortalUrl}
             disabled={loading}
             onSignedIn={onSignedIn}
+            onSecret={signInWithSecret}
           />
         )}
       </Column>
@@ -1261,33 +1270,35 @@ export function GettingStartedFlow({
 
                 <form key='form' onSubmit={handleSubmitSignIn}>
                   <Column gap='1rem'>
-                    <InputWrapper key='input' hasPrefix>
-                      <FaKey />
-                      <InputStyled
-                        value={secretValue}
-                        // A secret either parses or it doesn't, so there's
-                        // nothing to confirm with a button: signing in the
-                        // moment it's valid covers typing and pasting alike.
-                        onChange={e => {
-                          setSecretValue(e.target.value);
-                          void trySecret(e.target.value);
-                        }}
-                        onBlur={() => void trySecret(secretValue, true)}
-                        type='password'
-                        name='secret'
-                        autoComplete='current-password'
-                        spellCheck={false}
-                        placeholder={
-                          loading ? 'Signing in…' : 'Paste your agent secret'
-                        }
-                        aria-label='Agent secret'
-                        disabled={loading}
-                        autoFocus={
-                          !restoreUnlock.showPasskey &&
-                          knownAccounts.length <= 1
-                        }
-                      />
-                    </InputWrapper>
+                    {offerAccountSignIn ? null : (
+                      <InputWrapper key='input' hasPrefix>
+                        <FaKey />
+                        <InputStyled
+                          value={secretValue}
+                          // A secret either parses or it doesn't, so there's
+                          // nothing to confirm with a button: signing in the
+                          // moment it's valid covers typing and pasting alike.
+                          onChange={e => {
+                            setSecretValue(e.target.value);
+                            void trySecret(e.target.value);
+                          }}
+                          onBlur={() => void trySecret(secretValue, true)}
+                          type='password'
+                          name='secret'
+                          autoComplete='current-password'
+                          spellCheck={false}
+                          placeholder={
+                            loading ? 'Signing in…' : 'Paste your agent secret'
+                          }
+                          aria-label='Agent secret'
+                          disabled={loading}
+                          autoFocus={
+                            !restoreUnlock.showPasskey &&
+                            knownAccounts.length <= 1
+                          }
+                        />
+                      </InputWrapper>
+                    )}
                     {/* Rendered by the passkey/account block above when one of
                         those is shown, so it never appears twice. */}
                     {(secretError || error) &&
