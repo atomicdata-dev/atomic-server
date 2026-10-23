@@ -30,11 +30,11 @@ Not published to pub.dev yet; use a path or git dependency:
 dependencies:
   atomic_store_flutter:
     git:
-      url: https://github.com/atomicdata-dev/atomic-server
+      url: https://github.com/ontola/atomic-server
       path: packages/atomic_store_flutter
   atomic_store:
     git:
-      url: https://github.com/atomicdata-dev/atomic-server
+      url: https://github.com/ontola/atomic-server
       path: packages/atomic_store
   path_provider: ^2.1.5
 ```

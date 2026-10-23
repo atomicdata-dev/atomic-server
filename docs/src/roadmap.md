@@ -58,5 +58,5 @@ We are working on polishing the developer experience (SDKs/APIs), expanding offl
 - **Passkey + PRF integration** (2026). Derive the encryption key directly from WebAuthn, making "sign in with passkey" a true one-step account restore.
 - **Cross-Agent Suggestions / Distributor Mode** (2026). Enabling users to suggest edits to other agents' drives via direct mesh channels.
 - **Multi-user P2P Presence** (2026). Ephemeral cursors and awareness syncing device-to-device directly over Iroh without a central hub.
-- **Published SDK packages** (2026). Ship the WASM client database as an npm package and the Dart SDK on pub.dev, so a local-first app is an install away instead of a checkout. See `planning/dart-sdk-package.md`.
+- **Published SDK packages** (2026). Ship the WASM client database as an npm package and the Dart SDK on pub.dev, so a local-first app is an install away instead of a checkout.
 - **1.0 release** (tbd). Mark the specification, the server, and the browser as *stable*.

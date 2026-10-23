@@ -6,93 +6,153 @@ A phone or tablet running your app gets the same local store, the same signing, 
 It is not a REST wrapper around a server: the app works with no server at all, and syncs to one, or to another phone, when you ask it to.
 
 The bridge is [`flutter_rust_bridge`](https://github.com/fzyzcjy/flutter_rust_bridge).
-On Android and iOS it goes through `dart:ffi`; on the web the same Rust is compiled to WASM.
+On Android, iOS, macOS and Linux it goes through `dart:ffi`. Flutter web is not supported: a browser has no native node, so use [`@tomic/lib`](js.md) there.
 
 ## Status
 
-The Dart SDK lives in the repository under [`flutter/lib/atomic`](https://github.com/ontola/atomic-server/tree/develop/flutter/lib/atomic), inside **Atomic Canvas**, a collaborative infinite drawing canvas that ships as the reference app.
-It is not yet published on pub.dev.
-The API is still moving, so expect to vendor it or depend on the git path for now; the extraction into a package is planned in `planning/dart-sdk-package.md`.
-The canvas-specific calls (strokes, folders, thumbnails) sit next to the general ones; only the general ones are described here.
+The SDK is two Dart packages in the repository:
 
-## What the SDK gives you
+- [`atomic_store`](https://github.com/ontola/atomic-server/tree/develop/packages/atomic_store) is pure Dart, with no Flutter and no native code.
+  It has a `Store` and `Resource` API that mirrors `@tomic/lib` (`getResource`, `newResource`, `search`, `watch`, `resource.set`, `save`), over a `StoreBackend` you can swap.
+- [`atomic_store_flutter`](https://github.com/ontola/atomic-server/tree/develop/packages/atomic_store_flutter) is an FFI plugin that builds `atomic_lib` for you and gives you a working `Store` through `AtomicFlutter.open`.
+  You never touch Rust or `flutter_rust_bridge`.
 
-The client is grouped by concern, and everything up to the last group is purely local: nothing touches the network until you call a sync method.
+Neither is on pub.dev yet.
+Depend on a git ref or a path, and pin the ref.
+The first native build compiles `atomic_lib` and takes about 10 minutes.
+Web is not supported by `atomic_store_flutter`, because a browser has no native node; use a different `StoreBackend` there.
 
-| Group | Calls | What it does |
-| --- | --- | --- |
-| Database | `openDb(path)` | Open (or create) the local store on disk |
-| Agent | `setup(name)`, `loadAgent(secret)`, `getActiveAgent()` | Create a keypair and a personal Drive, or restore one from a secret. Pure local. |
-| Drive | `createDrive(name)`, `listDrives()`, `setActiveDrive(subject)` | Workspaces, addressed by `atomic:` identifiers |
-| Resource | `getProperty(subject, property)`, `setProperty(subject, property, value)` | Read and write; a write is signed and applied locally at once |
-| History | `getResourceHistory(subject)`, `getResourceAtVersion(subject, version)` | Time travel over the Resource's Loro oplog, no network needed |
-| Peer sync | `startPeer()`, `getPeerId()`, `peerSync(nodeId)`, `peerAnnounce(drive)`, `peerDiscoverSync(drive)` | Device-to-device over Iroh: pair by scanning a code, or discover a Drive through the pkarr relay |
-| Server sync | `openWsSync(serverUrl)`, `syncDriveToServer(serverUrl)` | Talk to an always-on device over WebSocket: subscribe to live updates, or push a Drive that was created on this phone so a browser can reach it |
+## Add it to your app
 
-The distinction in the last two rows matters.
-Connecting to a server *fetches* a Drive this device lacks and pushes commits made from then on.
-A Drive created on the phone before it ever connected anywhere has to be offered explicitly with `syncDriveToServer`; that is the only way it reaches a browser tab, which cannot be paired with.
+```yaml
+dependencies:
+  atomic_store_flutter:
+    git:
+      url: https://github.com/ontola/atomic-server
+      path: packages/atomic_store_flutter
+  atomic_store:
+    git:
+      url: https://github.com/ontola/atomic-server
+      path: packages/atomic_store
+  path_provider: ^2.1.5
+```
+
+The Rust crate reaches `atomic_lib` through a relative path, so the dependency must come from a full checkout of this repository.
+A git dependency clones all of it, so that holds.
+The [package README](https://github.com/ontola/atomic-server/tree/develop/packages/atomic_store_flutter) lists the prerequisites (Flutter version, Rust via rustup, Android NDK or Xcode, Linux build packages).
+
+## What the node gives you
+
+`AtomicFlutter.open` returns an `AtomicNode`.
+Everything up to sync is purely local: nothing touches the network until you call a sync method.
+
+| Part | What it does |
+| --- | --- |
+| `node.store` | The `Store`: read, write, search and watch resources in `node.drive` |
+| `node.identity` | Create an agent, sign in with a secret, profile, sign out |
+| `node.drives` | List, create and switch Drives (workspaces) |
+| `node.sync` | Sync with a server over WebSocket: `connect`, `resume`, `discover`, `watchStatus` |
+| `node.peers` | Device to device over Iroh: start, pairing code, `pair`, known and live devices |
+| `node.sharing` | Rights (`grant`, `revoke`, `setPublic`, `rights`) and invite links |
+| `node.handle` | The raw bridge handle, for everything not wrapped yet |
+
+Connecting to a server *fetches* a Drive this device lacks and sends the writes that are waiting.
+Writes always succeed locally first; offline, they wait on disk until the next `connect`.
+The node does not reconnect on its own: call `connect` or `resume` again after a drop.
 
 ## A minimal flow
 
 ```dart
-import 'package:your_app/atomic/atomic_client.dart';
+import 'package:atomic_store/atomic_store.dart';
+import 'package:atomic_store_flutter/atomic_store_flutter.dart';
 
-// 1. Local store. Nothing here needs a network.
-await AtomicClient.openDb('$appDir/atomic.redb');
+await AtomicFlutter.init(); // once, in main()
 
-// 2. Identity. Keep the secret; it is the account.
-final setup = await AtomicClient.setup('Alice');
-// setup.agentSubject  -> atomic:agent:...
-// setup.driveSubject  -> atomic:...   (Alice's personal Drive)
-// setup.agentSecret   -> store this in secure storage
+// 1. Local node: database, signing agent and a private Drive.
+//    Nothing here needs a network.
+final node = await AtomicFlutter.open(path: appDir, agentName: 'Alice');
+await secureStorage.write(key: 'agent', value: node.agentSecret); // the secret is the account
 
-// 3. Read and write. The write is signed and lands locally immediately.
-await AtomicClient.setProperty(
-  setup.driveSubject,
-  'https://atomicdata.dev/properties/description',
-  'Written on a train',
+// 2. Read and write. The write is signed and lands locally immediately.
+final note = node.store.newResource(
+  isA: [Classes.folder],
+  props: {Props.name: 'Written on a train'},
 );
-final desc = await AtomicClient.getProperty(
-  setup.driveSubject,
-  'https://atomicdata.dev/properties/description',
-);
+await note.save(); // one signed commit
 
-// 4. Later, with a network: sync.
-await AtomicClient.startPeer();            // this device becomes dialable
-final myCode = await AtomicClient.getPeerId(); // show as a QR code
-// ...or, on the other device, after scanning:
-await AtomicClient.peerSync(scannedNodeId);
+// 3. Later, with a network: sync with a server...
+await node.sync.connect('https://example.com');
+
+// ...or with another device, no server needed.
+await node.peers.start();               // this device becomes dialable
+showQr(node.peers.pairingCode);         // render as a QR code
+await node.peers.pair(scannedText);     // on the other device, after scanning
+
+// 4. Share.
+await node.sharing.grant(note.subject, friendAgentSubject, ShareRole.write);
 ```
 
-On the next launch, `loadAgent(secret)` restores the identity and the local store already holds the data.
+On the next launch, pass the saved secret and the same path: `AtomicFlutter.open(path: appDir, agentSecret: saved)`.
+The node signs as the same agent, works in the Drive it was last in, and the local store already holds the data.
+Open a database path once per process and keep the `AtomicNode`.
+
+For a second device of the same person, open with the same secret and a new path.
+`node.driveNeedsSync` is then `true`: the Drive arrives when you `connect` to a server that holds it, or `pair` with a device that has it.
+`node.sync.discover(drive)` looks up servers for a Drive through its public record, and each must prove it hosts the Drive.
+
+The package also has a runnable [example app](https://github.com/ontola/atomic-server/tree/develop/packages/atomic_store_flutter/example) of about 100 lines.
 
 ## Reacting to changes
 
 Sync applies remote commits to the local store in the background.
-The app learns about them by polling the store's event stream:
+The `Store` turns the node's event stream into Dart streams, so you do not poll:
 
 ```dart
-while (mounted) {
-  final event = await AtomicClient.pollDbEvent(timeoutMs: 60000);
-  if (event == null) continue; // timeout, nothing changed
-  // event['subject'] changed, was destroyed, or entered / left a watched query
-  refresh(event['subject'] as String);
-}
+// One resource: emits now, then once per change, and ends when it is destroyed.
+node.store.watch(subject).listen((r) => print(r.name));
+
+// A live list: the children of a parent, again whenever they change.
+node.store.watchChildren(folder.subject).listen((List<Resource> notes) { /* ... */ });
 ```
 
-`AtomicStore`, a `ChangeNotifier` in the same folder, wraps this into `watch(subject)` streams for widgets.
+Both fit a `StreamBuilder`.
+There is also `store.subscribe(subject, callback)` with a cancelable subscription, like `@tomic/lib`.
+Local and synced writes are both seen.
+`node.drives.watchCurrent()`, `node.sync.watchStatus()` and `node.peers.watchKnown()` / `watchLive()` do the same for Drives, connection state and paired devices.
+
+## Testing without the native library
+
+`atomic_store` has `InMemoryBackend` in `package:atomic_store/testing.dart`, and `atomic_store_flutter` has fakes of each node part in `package:atomic_store_flutter/testing.dart`.
+Take the interface (`Peers`, `ServerSync`, `Drives`, `Identity`, `Sharing`) in your widgets and pass `node.peers` and friends in production.
+
+```dart
+final store = Store(backend: InMemoryBackend());
+final peers = FakePeers(deviceName: 'Test phone');
+final sync = FakeServerSync();
+```
+
+`backend.touch(subject)` and `backend.destroy(subject)` simulate someone else's edit or delete.
+The package READMEs have recipes for testing streams and widgets.
+
+## What is not wrapped yet
+
+- Accepting an invite on the receiving side.
+  The node creates invite links; accepting happens in the server's web app (`/app/invite`) or its `/invites` endpoint.
+- Files and blobs, and history (time travel over a Resource's Loro oplog).
+  They exist in the raw bridge (`package:atomic_store_flutter/bridge/api/...`, generated and unstable) but have no typed Dart wrapper.
+- Where to keep the agent secret, which server to use and remembering it, and the sign-in screens.
+  The package gives you `identity` and `sync`, not UI.
 
 ## Signing HTTP requests from Dart
 
 Some endpoints on an always-on device, such as file download, check who is asking.
-`atomic_auth.dart` signs those requests in pure Dart using the same scheme as `@tomic/lib` and `atomic_lib`: sign `"<url> <timestamp>"` with the Agent key and send the signature, public key, timestamp and Agent identifier as headers.
+The reference app signs those requests in pure Dart (`flutter/lib/atomic/atomic_auth.dart`) using the same scheme as `@tomic/lib` and `atomic_lib`: sign `"<url> <timestamp>"` with the Agent key and send the signature, public key, timestamp and Agent identifier as headers.
 See [Authentication](authentication.md#per-request-signing).
 
-## Running the reference app
+## The reference app
 
-Atomic Canvas targets Android, iOS and web from one codebase.
-The [`flutter/README.md`](https://github.com/ontola/atomic-server/blob/develop/flutter/README.md) has the dev loop (`make phone`, `make tablet`, `make web`, hot reload from any terminal) and the pairing walkthrough: open Settings, show a code on one device, scan it on the other, and both devices exchange data regardless of who started.
+The app in [`flutter/`](https://github.com/ontola/atomic-server/tree/develop/flutter) is a full Android, iOS and web client built on these packages.
+Its [`README.md`](https://github.com/ontola/atomic-server/blob/develop/flutter/README.md) has the dev loop (`make phone`, `make tablet`, `make web`, hot reload from any terminal) and the pairing walkthrough: open Settings, show a code on one device, scan it on the other, and both devices exchange data regardless of who started.
 
 ## Compared to the other clients
 
