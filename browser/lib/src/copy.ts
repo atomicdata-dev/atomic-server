@@ -2,7 +2,7 @@ import { core } from './ontologies/core.js';
 import { server } from './ontologies/server.js';
 import type { Resource } from './resource.js';
 import type { Store } from './store.js';
-import type { AtomicValue } from './value.js';
+import type { AtomicValue, JSONValue } from './value.js';
 
 const P = 'https://atomicdata.dev/properties/';
 
@@ -71,14 +71,6 @@ export async function copyResource(
     copy,
   }: CopyResourceOptions,
 ): Promise<{ copy: Resource; version?: string }> {
-  const target =
-    copy ??
-    (await store.newResource({
-      parent,
-      isA: classes,
-      deferGenesis: original.hasLoroBody(),
-    }));
-
   const rewrite = (value: AtomicValue): AtomicValue =>
     typeof value === 'string'
       ? (subjects?.get(value) ?? value)
@@ -89,6 +81,24 @@ export async function copyResource(
   const content = Object.entries(original.getPropVals()).filter(
     ([prop]) => !NON_COPIED_PROPS.has(prop) && !exclude?.has(prop),
   );
+  // Without a Loro body the genesis is committed as soon as the resource is
+  // created, so the content must go in then: a genesis with `isA` but without
+  // its required properties is dropped by the outbox.
+  const withContent = !copy && !original.hasLoroBody();
+  const target =
+    copy ??
+    (await store.newResource({
+      parent,
+      isA: classes,
+      deferGenesis: original.hasLoroBody(),
+      propVals: withContent
+        ? ({
+            ...Object.fromEntries(content.map(([p, v]) => [p, rewrite(v)])),
+            ...propVals,
+          } as Record<string, JSONValue>)
+        : undefined,
+    }));
+
   const identity = target.getPropVals();
   let version: string | undefined;
 
@@ -102,12 +112,14 @@ export async function copyResource(
     }
   }
 
-  for (const [prop, value] of content) {
-    await target.set(prop, rewrite(value), false);
-  }
+  if (!withContent) {
+    for (const [prop, value] of content) {
+      await target.set(prop, rewrite(value), false);
+    }
 
-  for (const [prop, value] of Object.entries(propVals)) {
-    await target.set(prop, value, false);
+    for (const [prop, value] of Object.entries(propVals)) {
+      await target.set(prop, value, false);
+    }
   }
 
   // The seeded body also brought the original's rights; drop what is not ours.

@@ -1,4 +1,4 @@
-import { describe, it } from 'vitest';
+import { describe, it, vi } from 'vitest';
 import { core } from './index.js';
 import { copyResource, NON_COPIED_PROPS } from './copy.js';
 import { testStore } from './test-store.js';
@@ -108,5 +108,26 @@ describe('copyResource', () => {
     expect(copy.get(core.properties.read)).toBe(undefined);
     await copy.save();
     expect(copy.get(core.properties.read)).toBe(undefined);
+  });
+
+  it('hands the content to newResource so the genesis already has its required properties', async ({
+    expect,
+  }) => {
+    const { store } = await testStore();
+    const drive = await store.newResource({ isA: DRIVE, noParent: true });
+    await drive.save();
+    const original = await store.newResource({
+      parent: drive.subject,
+      isA: BLOGPOST,
+      propVals: { [core.properties.name]: 'Cheese' },
+    });
+    await original.save();
+
+    const spy = vi.spyOn(store, 'newResource');
+    await copyResource(store, original, { parent: drive.subject });
+
+    expect(spy.mock.calls[0][0]?.propVals).toMatchObject({
+      [core.properties.name]: 'Cheese',
+    });
   });
 });
