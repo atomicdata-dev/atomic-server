@@ -849,10 +849,19 @@ mod tests {
         let children = get_child_subjects(drive.clone(), 100).await.unwrap();
         assert!(children.contains(&subject));
 
-        let waiter = tokio::spawn(wait_for_store_event(10_000));
+        // Other tests write to this store at the same time: wait for ours.
+        let mine = subject.clone();
+        let waiter = tokio::spawn(async move {
+            loop {
+                let event = wait_for_store_event(10_000).await.unwrap();
+                if event.subject == mine || event.kind == ResourceEvent::Timeout {
+                    return event;
+                }
+            }
+        });
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         destroy_resource(subject.clone()).await.unwrap();
-        let event = waiter.await.unwrap().unwrap();
+        let event = waiter.await.unwrap();
         assert_eq!(event.kind, ResourceEvent::Destroyed);
         assert_eq!(event.subject, subject);
         assert_eq!(
