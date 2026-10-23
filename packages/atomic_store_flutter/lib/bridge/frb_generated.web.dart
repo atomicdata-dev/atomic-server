@@ -207,6 +207,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   StoreSetup dco_decode_store_setup(dynamic raw);
 
   @protected
+  StoreSignIn dco_decode_store_sign_in(dynamic raw);
+
+  @protected
   int dco_decode_u_32(dynamic raw);
 
   @protected
@@ -402,6 +405,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   StoreSetup sse_decode_store_setup(SseDeserializer deserializer);
+
+  @protected
+  StoreSignIn sse_decode_store_sign_in(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
@@ -611,6 +617,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_store_setup(StoreSetup self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_store_sign_in(StoreSignIn self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);

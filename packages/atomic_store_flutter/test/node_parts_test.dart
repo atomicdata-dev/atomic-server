@@ -166,6 +166,21 @@ void main() {
       expect(store.drive, 'did:ad:other');
       await expectLater(id.signIn('bad'), throwsA(isA<StoreException>()));
     });
+
+    test('signing in as someone else brings the work along, once', () async {
+      final id = FakeIdentity(_store());
+      final made = await id.create('Alice');
+      id.work = ['did:ad:notes', 'did:ad:shared'];
+      id.known['bob'] = (drive: 'did:ad:bob', needsSync: false);
+
+      final first = await id.signIn('bob');
+      expect(first.broughtAlong, ['did:ad:notes', 'did:ad:shared']);
+      expect(first.previousSecret, made.secret);
+
+      final again = await id.signIn('bob');
+      expect(again.broughtAlong, isEmpty);
+      expect(again.previousSecret, isNull);
+    });
   });
 
   group('Sharing', () {

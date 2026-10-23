@@ -26,7 +26,9 @@ class SignIn {
   const SignIn(
       {required this.agentSubject,
       required this.drive,
-      required this.needsSync});
+      required this.needsSync,
+      this.broughtAlong = const [],
+      this.previousSecret});
 
   final String agentSubject;
 
@@ -37,6 +39,18 @@ class SignIn {
   /// That drive is not on this device yet: connect to a server that hosts it
   /// (`node.sync`), or pair with a device that has it (`node.peers`).
   final bool needsSync;
+
+  /// Subjects of the drives of the agent that was signed in before, which now
+  /// belong to the new agent too (it was added to their `write`, and they are
+  /// in its drive list). Empty when nobody was signed in, it was the same
+  /// agent, or it had no work. Only the first sign-in brings anything.
+  final List<String> broughtAlong;
+
+  /// The secret of the agent that was signed in before, when it was a
+  /// different one (with work or not). **Sensitive, and the package does not
+  /// keep it**: archive it where the app keeps secrets, so that agent can still
+  /// be signed in as. `null` when there was no different previous agent.
+  final String? previousSecret;
 }
 
 /// Who signs: an agent, which is an Ed25519 key pair and nothing else. There
@@ -66,7 +80,9 @@ abstract interface class Identity {
   Future<({String secret, String agentSubject, String drive})> create(
       String name);
 
-  /// Signs as the agent of [secret] from now on. The store works in the drive
+  /// Signs as the agent of [secret] from now on. When a different agent with
+  /// work was signed in, that work comes along ([SignIn.broughtAlong]) and its
+  /// secret is returned to archive ([SignIn.previousSecret]). The store works in the drive
   /// the secret names; when this device does not hold it yet ([SignIn.needsSync]),
   /// the store is empty until it syncs. Throws a `StoreException` for a text
   /// that is not an agent secret.
@@ -126,7 +142,7 @@ class BridgeIdentity implements Identity {
 
   @override
   Future<SignIn> signIn(String secret) async {
-    final loaded = await _guard(() => _handle.loadAgent(secret: secret));
+    final loaded = await _guard(() => _handle.signIn(secret: secret));
     _secret = secret;
     final drive = _handle.drive();
     _store.drive = drive;
@@ -135,7 +151,9 @@ class BridgeIdentity implements Identity {
     return SignIn(
         agentSubject: loaded.agentSubject,
         drive: drive,
-        needsSync: loaded.needsSync);
+        needsSync: loaded.needsSync,
+        broughtAlong: loaded.broughtAlong,
+        previousSecret: loaded.previousSecret);
   }
 
   @override

@@ -326,6 +326,10 @@ class FakeIdentity implements Identity {
   /// is on this device.
   final Map<String, ({String drive, bool needsSync})> known = {};
 
+  /// Drive subjects the signed-in agent has work in. Signing in as a different
+  /// agent brings them along once and then clears this, like the real thing.
+  List<String> work = [];
+
   int _n = 0;
 
   @override
@@ -351,10 +355,18 @@ class FakeIdentity implements Identity {
     if (entry == null) {
       throw const StoreException(StoreErrorKind.invalid, 'Not an agent secret');
     }
+    final previous = _secret;
+    final different = previous != null && previous != secret;
+    final brought = different ? List<String>.of(work) : <String>[];
+    if (different) work = [];
     _secret = secret;
     _store.drive = entry.drive;
     return SignIn(
-        agentSubject: subject!, drive: entry.drive, needsSync: entry.needsSync);
+        agentSubject: subject!,
+        drive: entry.drive,
+        needsSync: entry.needsSync,
+        broughtAlong: brought,
+        previousSecret: different ? previous : null);
   }
 
   @override

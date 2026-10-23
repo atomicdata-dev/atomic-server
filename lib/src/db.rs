@@ -7,6 +7,7 @@ mod ai_chat_migration_test;
 pub mod app_agent;
 pub mod blob_backend;
 pub mod blob_gc;
+pub mod bring_along;
 mod canonical_scheme;
 mod chat_migration;
 #[cfg(test)]
@@ -1620,7 +1621,21 @@ impl Db {
     /// Repeat genesis for the same subject merges.
     pub async fn ensure_private_drive(&self) -> AtomicResult<String> {
         let agent = self.get_default_agent()?;
-        let did = self.private_drive_subject()?;
+        self.ensure_private_drive_for(&agent).await
+    }
+
+    /// [`Self::ensure_private_drive`] for an explicit agent rather than the
+    /// default one. The agent needs its private key.
+    pub async fn ensure_private_drive_for(
+        &self,
+        agent: &crate::agents::Agent,
+    ) -> AtomicResult<String> {
+        let agent = agent.clone();
+        let private_key = agent
+            .private_key
+            .as_ref()
+            .ok_or("Cannot derive a private drive without a private key")?;
+        let did = crate::genesis::GenesisCert::private_drive_subject(private_key)?;
         if self.get_resource(&did.as_str().into()).await.is_ok() {
             return Ok(did);
         }

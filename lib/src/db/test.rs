@@ -5977,3 +5977,116 @@ async fn stored_envelope_bytes_per_small_edit_stay_small() {
         edits.iter().sum::<usize>()
     );
 }
+
+/// Signing in as someone else brings the work along: the drives the old agent
+/// can write become writable by the new one and show up in its drive list; a
+/// drive the old agent can only read, and an empty private drive, stay behind.
+#[tokio::test]
+#[timeout(120000)]
+async fn bring_along_moves_writable_drives_to_the_new_agent_once() {
+    let db = Db::init_temp("bring_along_main").await.unwrap();
+    let (a, a_home) = db.setup("Alice").await.unwrap();
+    let a_subject = a.subject.to_string();
+
+    // A shared drive A made, listed on A's home.
+    let shared = db.create_drive("Shared").await.unwrap();
+    // Something in A's private drive, so it counts as work.
+    db.create_resource(urls::FOLDER, &a_home, "Notes", None)
+        .await
+        .unwrap();
+
+    // A drive somebody else made that A lists but cannot write.
+    let other = db.create_agent(Some("Carol")).await.unwrap();
+    db.set_default_agent(other.clone());
+    let read_only = db.create_drive("Carol's").await.unwrap();
+    db.set_default_agent(a.clone());
+    db.push_drive_to_list(&a_home, &read_only).await.unwrap();
+
+    let b = db.create_agent(Some("Bob")).await.unwrap();
+    let b_subject = b.subject.to_string();
+    let b_home =
+        crate::genesis::GenesisCert::private_drive_subject(b.private_key.as_ref().unwrap())
+            .unwrap();
+
+    assert!(db.has_work_to_bring(&a).await.unwrap());
+    let brought = db.bring_along(&a, &b).await.unwrap();
+    let mut got = brought.drives.clone();
+    got.sort();
+    let mut want = vec![shared.clone(), a_home.clone()];
+    want.sort();
+    assert_eq!(
+        got, want,
+        "shared + private-with-content, not the read-only one"
+    );
+
+    // B can write what came along, and lists it.
+    for drive in [&shared, &a_home] {
+        let r = db.get_resource(&drive.as_str().into()).await.unwrap();
+        let write = r.get(urls::WRITE).unwrap().to_subjects(None).unwrap();
+        assert!(write.contains(&a_subject), "A keeps its own right");
+        assert!(write.contains(&b_subject));
+    }
+    let ro = db.get_resource(&read_only.as_str().into()).await.unwrap();
+    assert!(!ro
+        .get(urls::WRITE)
+        .unwrap()
+        .to_subjects(None)
+        .unwrap()
+        .contains(&b_subject));
+    let home = db.get_resource(&b_home.as_str().into()).await.unwrap();
+    let listed = home.get(urls::DRIVES).unwrap().to_subjects(None).unwrap();
+    assert!(listed.contains(&shared) && listed.contains(&a_home));
+    assert!(!listed.contains(&read_only));
+
+    // Second run: nothing to bring, nothing breaks.
+    let again = db.bring_along(&a, &b).await.unwrap();
+    assert!(again.drives.is_empty(), "{again:?}");
+    // Same agent: no-op.
+    assert!(db.bring_along(&a, &a).await.unwrap().drives.is_empty());
+}
+
+/// An agent that only has its empty private drive has nothing to bring.
+#[tokio::test]
+#[timeout(120000)]
+async fn bring_along_skips_an_empty_private_drive() {
+    let db = Db::init_temp("bring_along_empty").await.unwrap();
+    let (a, _home) = db.setup("Alice").await.unwrap();
+    let b = db.create_agent(Some("Bob")).await.unwrap();
+
+    assert!(!db.has_work_to_bring(&a).await.unwrap());
+    assert!(db.bring_along(&a, &b).await.unwrap().drives.is_empty());
+}
+
+/// A legacy drive (listed on the Agent resource, not on the home) comes along.
+#[tokio::test]
+#[timeout(120000)]
+async fn bring_along_finds_drives_listed_on_the_agent() {
+    let db = Db::init_temp("bring_along_legacy").await.unwrap();
+    let (a, _home) = db.setup("Alice").await.unwrap();
+    let drive = db.create_drive("Old").await.unwrap();
+    // Move the entry from the home list to the legacy Agent.drives list.
+    let mut agent_res = db.get_resource(&a.subject).await.unwrap();
+    agent_res
+        .set_unsafe(
+            urls::DRIVES.into(),
+            Value::ResourceArray(vec![drive.clone().into()]),
+        )
+        .unwrap();
+    db.add_resource_opts(&agent_res, false, true, true)
+        .await
+        .unwrap();
+    let home_subject = db.private_drive_subject().unwrap();
+    let mut home = db
+        .get_resource(&home_subject.as_str().into())
+        .await
+        .unwrap();
+    home.set_unsafe(urls::DRIVES.into(), Value::ResourceArray(vec![]))
+        .unwrap();
+    db.add_resource_opts(&home, false, true, true)
+        .await
+        .unwrap();
+
+    let b = db.create_agent(Some("Bob")).await.unwrap();
+    let brought = db.bring_along(&a, &b).await.unwrap();
+    assert_eq!(brought.drives, vec![drive]);
+}

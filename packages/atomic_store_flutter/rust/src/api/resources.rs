@@ -576,6 +576,39 @@ impl AtomicStore {
         })
     }
 
+    /// Sign in as the agent of `secret` like [`AtomicStore::load_agent`], and
+    /// when this handle was signed in as a different agent that has work, bring
+    /// that work along: the old agent adds the new one to `write` on every drive
+    /// it can write, and the drives are listed on the new agent's home (see
+    /// `Db::bring_along`). Both writes are local and sync later.
+    ///
+    /// `previous_secret` is the old agent's secret whenever there was a
+    /// different old agent, work or not. The package never stores it: the app
+    /// decides where it is archived.
+    pub async fn sign_in(&self, secret: String) -> Result<StoreSignIn, AtomicError> {
+        let previous = self.db.get_default_agent().ok();
+        let loaded = self.db.load_agent_from_secret(&secret).await?;
+        if let Some(drive) = &loaded.agent.initial_drive {
+            self.pin_drive(&drive.to_string());
+        }
+        let mut brought_along = Vec::new();
+        let mut previous_secret = None;
+        if let Some(previous) =
+            previous.filter(|p| p.subject != loaded.agent.subject && p.private_key.is_some())
+        {
+            if self.db.has_work_to_bring(&previous).await? {
+                brought_along = self.db.bring_along(&previous, &loaded.agent).await?.drives;
+            }
+            previous_secret = Some(previous.build_secret()?);
+        }
+        Ok(StoreSignIn {
+            agent_subject: loaded.agent.subject.to_string(),
+            needs_sync: loaded.drive_needs_sync,
+            brought_along,
+            previous_secret,
+        })
+    }
+
     // ── Sync ──
 
     /// Open this handle's own WebSocket session to the server at
@@ -662,6 +695,20 @@ pub struct StoreAgentLoad {
     pub agent_subject: String,
     /// The agent's drive is not in the store yet.
     pub needs_sync: bool,
+}
+
+/// What [`AtomicStore::sign_in`] found and did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoreSignIn {
+    pub agent_subject: String,
+    /// The agent's drive is not in the store yet.
+    pub needs_sync: bool,
+    /// Drives of the agent that was signed in before that now belong to the
+    /// new one too. Empty when there was no such agent or it had no work.
+    pub brought_along: Vec<String>,
+    /// The secret of the agent signed in before, when it was a different one.
+    /// Sensitive; the caller archives it.
+    pub previous_secret: Option<String>,
 }
 
 /// What [`AtomicStore::setup`] made.
@@ -1167,6 +1214,51 @@ mod tests {
         assert_eq!(loaded.agent_subject, made.agent_subject);
         assert!(loaded.needs_sync, "the drive is not on this device yet");
         assert_eq!(b.drive(), Some(made.drive));
+        std::fs::remove_dir_all(dir_a).ok();
+        std::fs::remove_dir_all(dir_b).ok();
+    }
+
+    #[tokio::test]
+    async fn signing_in_as_someone_else_brings_the_old_agents_drives_along() {
+        let (dir_a, dir_b) = (temp_dir("bring-a"), temp_dir("bring-b"));
+        let (a, b) = (open(&dir_a).await, open(&dir_b).await);
+        let alice = a.setup("Alice".into()).await.unwrap();
+        let bob = b.setup("Bob".into()).await.unwrap();
+        let shared = a.new_drive("Shared".into()).await.unwrap();
+
+        let signed = a.sign_in(bob.agent_secret.clone()).await.unwrap();
+        assert_eq!(signed.agent_subject, bob.agent_subject);
+        assert_eq!(signed.brought_along, vec![shared.clone()]);
+        let previous = atomic_lib::agents::Agent::from_secret(
+            &signed.previous_secret.expect("the old secret comes back"),
+        )
+        .unwrap();
+        assert_eq!(previous.subject.to_string(), alice.agent_subject);
+        assert!(a
+            .db
+            .list_drives()
+            .await
+            .unwrap()
+            .iter()
+            .any(|d| d.subject == shared));
+
+        // Again as the same agent: a plain sign-in.
+        let again = a.sign_in(bob.agent_secret).await.unwrap();
+        assert!(again.brought_along.is_empty());
+        assert_eq!(again.previous_secret, None);
+        std::fs::remove_dir_all(dir_a).ok();
+        std::fs::remove_dir_all(dir_b).ok();
+    }
+
+    #[tokio::test]
+    async fn signing_in_with_nothing_to_bring_still_returns_the_old_secret() {
+        let (dir_a, dir_b) = (temp_dir("nobring-a"), temp_dir("nobring-b"));
+        let (a, b) = (open(&dir_a).await, open(&dir_b).await);
+        a.setup("Alice".into()).await.unwrap();
+        let bob = b.setup("Bob".into()).await.unwrap();
+        let signed = a.sign_in(bob.agent_secret).await.unwrap();
+        assert!(signed.brought_along.is_empty());
+        assert!(signed.previous_secret.is_some());
         std::fs::remove_dir_all(dir_a).ok();
         std::fs::remove_dir_all(dir_b).ok();
     }

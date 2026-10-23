@@ -10,7 +10,7 @@ import 'node.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `atomic_to_sub_resource`, `atomic_to_value`, `build`, `global`, `list_to_propvals`, `new_default`, `node`, `parse`, `pin_drive`, `propvals_to_list`, `push`, `pusher`, `scalar`, `sub_resource_to_value`, `value_to_atomic`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// [`AtomicStore::get_resource_data`] on the default store.
 Future<ResourceData> getResourceData({required String subject}) =>
@@ -389,6 +389,17 @@ abstract class AtomicStore implements RustOpaqueInterface {
   /// Whether both handles are on the same open store.
   bool sharesStoreWith({required AtomicStore other});
 
+  /// Sign in as the agent of `secret` like [`AtomicStore::load_agent`], and
+  /// when this handle was signed in as a different agent that has work, bring
+  /// that work along: the old agent adds the new one to `write` on every drive
+  /// it can write, and the drives are listed on the new agent's home (see
+  /// `Db::bring_along`). Both writes are local and sync later.
+  ///
+  /// `previous_secret` is the old agent's secret whenever there was a
+  /// different old agent, work or not. The package never stores it: the app
+  /// decides where it is archived.
+  Future<StoreSignIn> signIn({required String secret});
+
   /// Stop signing: the agent is forgotten by this handle (the data stays in
   /// the store; keep the secret to sign in again). Closes the server session.
   Future<void> signOut();
@@ -685,4 +696,44 @@ class StoreSetup {
           agentSecret == other.agentSecret &&
           agentSubject == other.agentSubject &&
           drive == other.drive;
+}
+
+/// What [`AtomicStore::sign_in`] found and did.
+class StoreSignIn {
+  final String agentSubject;
+
+  /// The agent's drive is not in the store yet.
+  final bool needsSync;
+
+  /// Drives of the agent that was signed in before that now belong to the
+  /// new one too. Empty when there was no such agent or it had no work.
+  final List<String> broughtAlong;
+
+  /// The secret of the agent signed in before, when it was a different one.
+  /// Sensitive; the caller archives it.
+  final String? previousSecret;
+
+  const StoreSignIn({
+    required this.agentSubject,
+    required this.needsSync,
+    required this.broughtAlong,
+    this.previousSecret,
+  });
+
+  @override
+  int get hashCode =>
+      agentSubject.hashCode ^
+      needsSync.hashCode ^
+      broughtAlong.hashCode ^
+      previousSecret.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is StoreSignIn &&
+          runtimeType == other.runtimeType &&
+          agentSubject == other.agentSubject &&
+          needsSync == other.needsSync &&
+          broughtAlong == other.broughtAlong &&
+          previousSecret == other.previousSecret;
 }

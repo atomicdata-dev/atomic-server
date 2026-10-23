@@ -149,6 +149,13 @@ await node.identity.signOut();                       // forget the agent here
 Whoever has it is the agent. `signIn` makes the store work in the drive the
 secret names (`node.drive`, `node.store.drive`).
 
+Signing in as a *different* agent brings the old one's work along: the old agent
+adds the new one to `write` on every drive it can write (its private drive only
+if it holds something), and they are listed for the new agent. `SignIn.broughtAlong`
+has those drive subjects (show "your notes are in your account now"), and
+`SignIn.previousSecret` is the old agent's secret, which the package does not
+keep: archive it. Nothing is copied; a second sign-in brings nothing.
+
 ### Drives (`node.drives`)
 
 ```dart
