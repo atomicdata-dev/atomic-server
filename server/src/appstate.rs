@@ -177,36 +177,6 @@ impl AppState {
         #[cfg(feature = "vector-search")]
         store.add_endpoint(plugins::vector_search::vector_search_endpoint())?;
 
-        // Get and register Wasm class extender plugins
-        #[cfg(feature = "wasm-plugins")]
-        {
-            let extenders = wasm::load_wasm_class_extenders(
-                &config.plugin_path,
-                &config.plugin_cache_path,
-                &store,
-                &host_abi,
-            )
-            .await?;
-
-            for extender in extenders {
-                // A paused installation keeps its files, so the loader above
-                // finds them. Registering them anyway would resume every
-                // paused plugin on restart.
-                if let Some(subject) = &extender.subject {
-                    if let Ok(resource) = store.get_resource(&subject.as_str().into()).await {
-                        if plugins::installation::is_suspended(&resource) {
-                            tracing::info!(
-                                %subject,
-                                "skipped a class extender: its installation is not active"
-                            );
-                            continue;
-                        }
-                    }
-                }
-                store.add_class_extender(extender)?;
-            }
-        }
-
         set_default_agent(&config, &store).await?;
 
         // The core models (classes, properties, default ontologies) are seeded
@@ -228,12 +198,23 @@ impl AppState {
         }
 
         // Legacy `Plugin` + `pluginFile` resources become Installations, once.
-        // After the extenders above are loaded (so their meta is current) and
-        // after the default agent is set (the migration commits as the server).
+        // After the default agent is set (the migration commits as the server)
+        // and before the modules are loaded, so a migrated plugin loads too.
         #[cfg(feature = "wasm-plugins")]
         if let Err(e) = plugins::plugin::migrate_legacy_plugins(&store).await {
             tracing::warn!("legacy plugin migration failed: {e}");
         }
+
+        // Load the Wasm class extenders: the operator's `global/` folder and
+        // the active Installations of a server module, from their releases.
+        #[cfg(feature = "wasm-plugins")]
+        wasm::load_wasm_class_extenders(
+            &config.plugin_path,
+            &config.plugin_cache_path,
+            &store,
+            &host_abi,
+        )
+        .await?;
 
         // Who may put a *new* Drive here. Installed after populate so the scan
         // below sees every Drive already on disk, and before anything binds so
