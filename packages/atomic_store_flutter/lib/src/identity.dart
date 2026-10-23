@@ -56,14 +56,13 @@ class SignIn {
 /// Who signs: an agent, which is an Ed25519 key pair and nothing else. There
 /// is no account and no password; the secret **is** the identity.
 ///
-/// **Keeping the secret is the app's job.** The package never writes it
-/// anywhere: put it in secure storage (for example `flutter_secure_storage`)
-/// and pass it back to `AtomicFlutter.open(agentSecret: ...)` next start, or
-/// to [signIn]. Whoever has the secret is the agent.
+/// **The secret is kept for you.** `AtomicFlutter.open` stores it in the OS
+/// keychain (its `secretStore`, `SecureAgentSecrets` by default) and reads it
+/// back next start; [signIn] and [signOut] update it. Whoever has the secret
+/// is the agent.
 ///
 /// ```dart
 /// final made = await node.identity.create('Alice');   // new agent + drive
-/// await storage.write(key: 'agent', value: made.secret);
 /// // elsewhere, with the secret:
 /// final found = await node.identity.signIn(secret);
 /// if (found.needsSync) await node.sync.resume(origin);

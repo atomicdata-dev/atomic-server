@@ -158,8 +158,8 @@ class AtomicNode implements AtomicParts {
   String? _agentSecret;
   bool _driveNeedsSync;
 
-  /// Who signs: create or load an agent, sign out, the profile. Keeping the
-  /// secret is the app's job (see [Identity]).
+  /// Who signs: create or load an agent, sign out, the profile. The secret
+  /// is kept in the `secretStore` given to [AtomicFlutter.open].
   @override
   late final Identity identity;
 
