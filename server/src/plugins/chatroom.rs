@@ -133,7 +133,7 @@ mod module {
                 scope: atomic_lib::class_extender::ClassExtenderScope::Global,
                 installation: None,
                 agent: None,
-                data_dir: None,
+                storage_dir: None,
                 manifest: None,
                 registry,
             },

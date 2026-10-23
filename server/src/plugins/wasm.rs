@@ -103,7 +103,7 @@ async fn load_global_module(
         scope: ClassExtenderScope::Global,
         installation: None,
         agent: None,
-        data_dir: setup_plugin_data_dir(path, global_dir),
+        storage_dir: global_storage_dir(path, global_dir),
         manifest: None,
         registry: registry.clone(),
     };
@@ -261,7 +261,7 @@ pub async fn read_class_urls(db: &Db, wasm_bytes: &[u8]) -> AtomicResult<Vec<Str
         scope: ClassExtenderScope::Global,
         installation: None,
         agent: None,
-        data_dir: None,
+        storage_dir: None,
         manifest: None,
         // Only asked which classes it extends: it calls nobody.
         registry: Arc::default(),
@@ -358,8 +358,8 @@ pub async fn activate_module(
         )
         .await?;
         bind_installation_agent(db, drive_subject, installation, &agent)?;
-        let data_dir = scoped_data_dir(plugins_dir, drive_subject, namespace)?;
-        extract_assets(&mut zip, &data_dir)?;
+        let storage_dir = scoped_storage_dir(plugins_dir, drive_subject, namespace)?;
+        extract_assets(&mut zip, &storage_dir)?;
         let engine = host_core::engine().map_err(AtomicError::from)?;
         let (component, cwasm) = load_component(&engine, &wasm_bytes, cache_dir)?;
         let parts = ModuleParts {
@@ -367,7 +367,7 @@ pub async fn activate_module(
             scope: ClassExtenderScope::Drive(drive_subject.to_string()),
             installation: Some(installation.to_string()),
             agent: Some(agent),
-            data_dir: Some(data_dir),
+            storage_dir: Some(storage_dir),
             manifest: Some(manifest.clone()),
             registry: registry.clone(),
         };
@@ -397,7 +397,7 @@ pub async fn activate_module(
 
 /// The folder a drive-scoped module reads and (with `storage`) writes through
 /// WASI. Shared by the plugins of one namespace on a drive.
-fn scoped_data_dir(
+fn scoped_storage_dir(
     plugins_dir: &Path,
     drive_subject: &str,
     namespace: &str,
@@ -413,7 +413,7 @@ fn scoped_data_dir(
 }
 
 /// Writes the package's `assets/` into the module's folder, where it reads them.
-fn extract_assets(zip: &mut ZipArchive<Cursor<Vec<u8>>>, data_dir: &Path) -> AtomicResult<()> {
+fn extract_assets(zip: &mut ZipArchive<Cursor<Vec<u8>>>, storage_dir: &Path) -> AtomicResult<()> {
     for i in 0..zip.len() {
         let mut file = zip
             .by_index(i)
@@ -423,7 +423,7 @@ fn extract_assets(zip: &mut ZipArchive<Cursor<Vec<u8>>>, data_dir: &Path) -> Ato
             continue;
         };
         // Zip entry names are attacker-controlled: only plain relative paths.
-        let target = data_dir.join(
+        let target = storage_dir.join(
             safe_relative_path(stripped.trim_end_matches('/')).ok_or_else(|| {
                 AtomicError::from(format!("Plugin zip contains an unsafe asset path: {name}"))
             })?,
@@ -456,7 +456,7 @@ fn find_wasm_files(dir: &Path) -> Vec<PathBuf> {
     files
 }
 
-fn setup_plugin_data_dir(wasm_file_path: &Path, plugin_dir: &Path) -> Option<PathBuf> {
+fn global_storage_dir(wasm_file_path: &Path, plugin_dir: &Path) -> Option<PathBuf> {
     let filename = wasm_file_path.file_name().and_then(|s| s.to_str())?;
 
     // Remove .wasm extension
@@ -479,21 +479,21 @@ fn setup_plugin_data_dir(wasm_file_path: &Path, plugin_dir: &Path) -> Option<Pat
         .and_then(|s| s.to_str())
         .unwrap_or(stem);
 
-    let data_dir = plugin_dir.join(plugin_name);
+    let storage_dir = plugin_dir.join(plugin_name);
 
-    if !data_dir.exists() {
-        if let Err(err) = std::fs::create_dir_all(&data_dir) {
+    if !storage_dir.exists() {
+        if let Err(err) = std::fs::create_dir_all(&storage_dir) {
             warn!(
                 error = %err,
-                path = %data_dir.display(),
+                path = %storage_dir.display(),
                 "Failed to create data directory for plugin"
             );
             return None;
         }
     }
 
-    if data_dir.exists() {
-        Some(data_dir)
+    if storage_dir.exists() {
+        Some(storage_dir)
     } else {
         None
     }
