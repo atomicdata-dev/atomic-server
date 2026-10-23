@@ -875,6 +875,61 @@ async fn same_agent_peers_reconcile_the_agent_resource() {
     );
 }
 
+/// The scenario behind the account sheet: two devices of one account are
+/// connected, and a profile edit made on one shows up on the other without a
+/// new connect. The agent resource sits outside every drive, so this is the
+/// live path (a `Changed` event on `did:ad:agent:...`), not drive sync.
+#[tokio::test]
+async fn a_later_edit_of_the_agent_resource_reaches_the_connected_same_agent_peer() {
+    let pair = setup_pair("agent_live_edit").await;
+    let agent_subject = pair.db_b.get_default_agent().unwrap().subject.to_string();
+
+    async fn name_of(db: &Db, subject: &str) -> Option<String> {
+        db.get_resource(&subject.into())
+            .await
+            .ok()
+            .and_then(|r| r.get(crate::urls::NAME).ok().map(|v| v.to_string()))
+    }
+
+    // Connect; B learns "Alice" from the connect-time handoff.
+    sync_b_from_a(&pair).await;
+    wait_for_live_peers(1, std::time::Duration::from_secs(3)).await;
+    let first = wait_until(std::time::Duration::from_secs(10), || async {
+        name_of(&pair.db_b, &agent_subject).await.as_deref() == Some("Alice")
+    })
+    .await;
+    assert!(first, "B gets the name at connect time");
+
+    // B (the device that dialed) renames the account. Nobody reconnects. B
+    // runs the same push loop `peer::start` gives a real device.
+    crate::sync::peer::start_live_sync(pair.db_b.clone());
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    let mut agent_b = pair
+        .db_b
+        .get_resource(&agent_subject.as_str().into())
+        .await
+        .unwrap();
+    agent_b
+        .set(
+            crate::urls::NAME.into(),
+            "Bobby".to_string().into(),
+            &pair.db_b,
+        )
+        .await
+        .unwrap();
+    agent_b.save(&pair.db_b).await.unwrap();
+
+    let live = wait_until(std::time::Duration::from_secs(10), || async {
+        name_of(&pair.db_a, &agent_subject).await.as_deref() == Some("Bobby")
+    })
+    .await;
+    assert!(
+        live,
+        "a later edit of the agent resource must reach the connected same-agent peer, got {:?}",
+        name_of(&pair.db_a, &agent_subject).await
+    );
+}
+
 /// A device hands a server its own agent resource on connect, even though they
 /// are different accounts. That is what lets a browser reading from the server
 /// later learn whose drives are whose: the agent resource carries `name` and

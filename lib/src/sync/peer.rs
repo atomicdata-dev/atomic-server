@@ -878,7 +878,7 @@ pub fn broadcast_live_update(store: &Db, subject_key: &str, loro_bytes: &[u8]) {
 }
 
 /// Start the live sync system. Watches for local changes and pushes to all connected peers.
-fn start_live_sync(store: Db) {
+pub(crate) fn start_live_sync(store: Db) {
     // Spawn the push loop: watches db_events, pushes deltas/destroys to live peers
     tokio::spawn(async move {
         let mut rx = store.subscribe_events();

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:atomic_store/atomic_store.dart';
 
 import '../bridge/api/error.dart' as bridge;
@@ -95,6 +97,13 @@ abstract interface class Identity {
   /// The signed-in agent's profile (name, description, picture).
   Future<Profile> profile();
 
+  /// The profile of the agent signed in now, and again after every change of
+  /// it, made here or arriving from another device (a paired device or the
+  /// server). The first event is the current profile. Ends when signed out; a
+  /// sign-in as another agent needs a new call. Cancel the subscription when
+  /// the screen goes away.
+  Stream<Profile> watchProfile();
+
   /// Saves the profile name (not empty) and description (empty removes it) as
   /// a signed commit by the agent; it syncs like any edit.
   Future<void> updateProfile({required String name, String description = ''});
@@ -174,6 +183,34 @@ class BridgeIdentity implements Identity {
         description: p.description,
         emoji: p.emoji,
         imageUrl: p.imageUrl);
+  }
+
+  @override
+  Stream<Profile> watchProfile() {
+    final subject = this.subject;
+    if (subject == null) return const Stream.empty();
+    // Not `async*`: such a stream cannot be cancelled while it waits. The
+    // agent resource changes when a device of the same agent edits it: a peer
+    // or the server writes it into the store like any other change.
+    StreamSubscription<Resource>? sub;
+    late final StreamController<Profile> controller;
+    controller = StreamController<Profile>(
+      onListen: () {
+        sub = _store.watch(subject).listen((_) async {
+          try {
+            final p = await profile();
+            if (!controller.isClosed) controller.add(p);
+          } on StoreException {
+            // Not readable right now; the next change tries again.
+          }
+        },
+            // The agent resource is not in the store: nothing to follow.
+            onError: (Object _) {},
+            onDone: () => controller.close());
+      },
+      onCancel: () => sub?.cancel(),
+    );
+    return controller.stream;
   }
 
   @override

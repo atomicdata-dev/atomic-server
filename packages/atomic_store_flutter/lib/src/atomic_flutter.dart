@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:atomic_store/atomic_store.dart';
 
 import 'agent_secrets.dart';
@@ -52,6 +54,15 @@ abstract final class AtomicFlutter {
   /// and [Identity.signOut] (which deletes it). Pass [MemoryAgentSecrets] to
   /// keep nothing.
   ///
+  /// With [startPeers] (the default) the node starts device to device sync at
+  /// once, in the background: it announces itself for the drive and looks for
+  /// the account's other devices (see [Peers.start]), and does so again after
+  /// every [Identity.signIn]. Two apps signed in with the same secret then find
+  /// each other without the app doing anything. A failed start (no network, or
+  /// another node of this process owns the peer) is not an error here; call
+  /// `node.peers.start()` yourself to see it. Pass `false` for an app that
+  /// stays local until the person asks.
+  ///
   /// A file is opened once per process: call this once and keep the result.
   static Future<AtomicNode> open({
     required String path,
@@ -59,6 +70,7 @@ abstract final class AtomicFlutter {
     String agentName = 'Me',
     String? drive,
     AgentSecretStore secretStore = const SecureAgentSecrets(),
+    bool startPeers = true,
   }) async {
     await init();
     final key = 'atomic_agent:$path';
@@ -82,7 +94,7 @@ abstract final class AtomicFlutter {
         workingDrive = created.drive;
       }
       await secretStore.write(key, secret);
-      return AtomicNode._(
+      final node = AtomicNode._(
         handle,
         Store(backend: BridgeStoreBackend(handle), drive: workingDrive),
         secret,
@@ -90,7 +102,10 @@ abstract final class AtomicFlutter {
         needsSync,
         secretStore,
         key,
+        startPeers,
       );
+      node._startPeers();
+      return node;
     } on bridge.AtomicError catch (e) {
       throw storeExceptionFromBridge(e);
     }
@@ -116,7 +131,7 @@ abstract interface class AtomicParts {
 /// an app that never pairs devices never starts [peers].
 class AtomicNode implements AtomicParts {
   AtomicNode._(this.handle, this.store, String agentSecret, String? drive,
-      bool driveNeedsSync, this._secrets, this._secretKey)
+      bool driveNeedsSync, this._secrets, this._secretKey, this._autoPeers)
       : _agentSecret = agentSecret,
         _driveNeedsSync = driveNeedsSync {
     identity = BridgeIdentity(handle, store,
@@ -131,6 +146,9 @@ class AtomicNode implements AtomicParts {
       if (previousSecret != null) {
         await _secrets.archive(_secretKey, previousSecret);
       }
+      // The new drive is announced and searched for devices (a no-op when the
+      // peer is not running yet, and a retry when the first start failed).
+      if (secret != null) _startPeers();
     }, agentSecret);
     drives = BridgeDrives(handle, store);
     sync = BridgeServerSync(handle, store);
@@ -154,6 +172,15 @@ class AtomicNode implements AtomicParts {
 
   final AgentSecretStore _secrets;
   final String _secretKey;
+  final bool _autoPeers;
+
+  /// Starts [peers] in the background when the node was opened with
+  /// `startPeers`. Starting is idempotent; failures are left to
+  /// `peers.start()` called by the app.
+  void _startPeers() {
+    if (!_autoPeers) return;
+    unawaited(peers.start().then((_) {}, onError: (Object _) {}));
+  }
 
   String? _agentSecret;
   bool _driveNeedsSync;

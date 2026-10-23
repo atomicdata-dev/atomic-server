@@ -390,6 +390,8 @@ impl AtomicStore {
     pub async fn setup(&self, name: String) -> Result<StoreSetup, AtomicError> {
         let (agent, drive) = self.db.setup(&name).await?;
         self.pin_drive(&drive);
+        // Other devices find this one in the new drive's record.
+        super::simple::peer_search_again();
         Ok(StoreSetup {
             agent_secret: agent.build_secret()?,
             agent_subject: agent.subject.to_string(),
@@ -601,6 +603,10 @@ impl AtomicStore {
             }
             previous_secret = Some(previous.build_secret()?);
         }
+        // The account's other devices look for this one in the secret's drive:
+        // announce there and search it now, when the peer already runs. (The
+        // search loop reads the drives each round and announces on a change.)
+        super::simple::peer_search_again();
         Ok(StoreSignIn {
             agent_subject: loaded.agent.subject.to_string(),
             needs_sync: loaded.drive_needs_sync,

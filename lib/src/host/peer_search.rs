@@ -481,14 +481,19 @@ impl PeerSearch {
             return;
         }
         let mut last_announce: Option<Instant> = None;
+        // The drives announced for at `last_announce`. A different list (a
+        // sign-in moved this device to the secret's drive) announces at once:
+        // the other devices look for us in that drive, not in the old one.
+        let mut announced_for: Vec<String> = Vec::new();
         loop {
             // In the background: no directory traffic at all. A resume (or
             // anything else that wakes the loop) is noticed here.
             while self.is_paused() {
                 self.wake.notified().await;
             }
-            let announce = last_announce.is_none_or(|t| t.elapsed() >= announce_every);
             let list = drives();
+            let announce = last_announce.is_none_or(|t| t.elapsed() >= announce_every)
+                || (!list.is_empty() && list != announced_for);
             let wait = if list.is_empty() {
                 self.set(
                     PeerSearchState::NoPeersYet {
@@ -504,6 +509,7 @@ impl PeerSearch {
                     .await;
                 if announce {
                     last_announce = Some(Instant::now());
+                    announced_for = list;
                 }
                 if outcome.live > 0 {
                     self.schedule.connected
@@ -842,6 +848,36 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(200)).await;
         // The asked-for round, then the quick 10 ms round again, then the hour.
         assert_eq!(directory.lookups.load(Ordering::SeqCst), 4);
+        run.abort();
+    }
+
+    /// A sign-in moves the device to another drive; the others look for it
+    /// there, so it announces there at once, not at the next periodic announce.
+    #[tokio::test]
+    async fn a_changed_drive_list_announces_again_before_the_periodic_announce() {
+        let search = PeerSearch::new(fast());
+        let directory = FakeDirectory::answering(vec![Ok(vec![ME])]);
+        let dialer = FakeDialer::reaching(&[]);
+        let current = Arc::new(Mutex::new(vec!["did:ad:old".to_string()]));
+        let seen = current.clone();
+        let run = tokio::spawn(search.clone().run(
+            ME.into(),
+            move || seen.lock().unwrap().clone(),
+            directory.clone(),
+            dialer.clone(),
+            Duration::from_secs(3600),
+        ));
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert_eq!(directory.announces.load(Ordering::SeqCst), 1);
+        // The same drives, searched again: no new announce.
+        search.search_again();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert_eq!(directory.announces.load(Ordering::SeqCst), 1);
+
+        *current.lock().unwrap() = vec!["did:ad:new".to_string()];
+        search.search_again();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert_eq!(directory.announces.load(Ordering::SeqCst), 2);
         run.abort();
     }
 

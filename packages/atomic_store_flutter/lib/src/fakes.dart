@@ -323,6 +323,7 @@ class FakeIdentity implements Identity {
   final Store _store;
   String? _secret;
   final Map<String, Profile> _profiles = {};
+  final _profileChanges = StreamController<Profile>.broadcast();
 
   /// Secrets that [signIn] accepts, with the drive each names and whether it
   /// is on this device.
@@ -348,6 +349,7 @@ class FakeIdentity implements Identity {
     _secret = 'fake-secret-${++_n}-$name';
     _store.drive = drive;
     _profiles[_secret!] = Profile(subject: subject!, name: name);
+    _profileChanges.add(_profiles[_secret!]!);
     return (secret: _secret!, agentSubject: subject!, drive: drive);
   }
 
@@ -384,6 +386,22 @@ class FakeIdentity implements Identity {
   }
 
   @override
+  Stream<Profile> watchProfile() {
+    if (_secret == null) return const Stream.empty();
+    final secret = _secret!;
+    return _current(() => _profiles[secret] ?? Profile(subject: subject!),
+        _profileChanges.stream);
+  }
+
+  /// The profile changes without this node writing it, as when another
+  /// device of the same agent edits it.
+  void changeProfileElsewhere(String name) {
+    final secret = _secret!;
+    _profiles[secret] = Profile(subject: subject!, name: name);
+    _profileChanges.add(_profiles[secret]!);
+  }
+
+  @override
   Future<void> updateProfile(
       {required String name, String description = ''}) async {
     if (name.trim().isEmpty) {
@@ -392,6 +410,7 @@ class FakeIdentity implements Identity {
     }
     _profiles[_secret!] =
         Profile(subject: subject!, name: name.trim(), description: description);
+    _profileChanges.add(_profiles[_secret!]!);
   }
 }
 

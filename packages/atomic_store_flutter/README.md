@@ -223,7 +223,7 @@ Sync between devices over Iroh (QUIC), no server: pair with a QR code and the
 devices keep each other's drive up to date while both are online.
 
 ```dart
-await node.peers.start();                            // once; own node id
+await node.peers.start();                            // own node id; open() already did
 showQr(node.peers.pairingCode);                      // 'atomic:node:<id>:<device name>'
 await node.peers.pair(scannedText);                  // device B: parse, sync, remember
 node.peers.watchKnown().listen(...);                 // paired devices, live flag
@@ -237,6 +237,13 @@ node.peers.rename(id, 'Kitchen tablet'); node.peers.remove(id);
 anything else. A code is routing only: the device dialed proves it holds the
 same agent key before anything crosses. Call `node.peers.setForeground(bool)`
 from the app lifecycle so the background search stops.
+
+`AtomicFlutter.open` starts the peer in the background (pass `startPeers:
+false` to keep the node local until the person asks) and starts it again after
+every `identity.signIn`, so two apps signed in with the same secret announce
+themselves for the same drive, find each other, and keep each other's drive and
+profile (the name in the account sheet) up to date with nothing more from the
+app. The profile follows `identity.watchProfile()`.
 
 **Peers belong to the process.** Iroh runs one endpoint per process and it
 serves the store of the first node that calls `peers.start()`; another node

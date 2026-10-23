@@ -46,6 +46,37 @@ void main() {
     expect(find.text('Sign in'), findsOneWidget);
   });
 
+  testWidgets('the name follows the agent when another device changes it',
+      (tester) async {
+    final node = newNode();
+    await tester.runAsync(() => node.identity.create('Alice'));
+    await openSheet(tester, node);
+    await real(tester, () async {});
+    expect(find.text('Alice'), findsOneWidget);
+
+    // Another device of the same agent renames it: no button is pressed here.
+    await real(tester, () async => node.identity.changeProfileElsewhere('Bob'));
+    expect(find.text('Bob'), findsOneWidget);
+    expect(find.text('Alice'), findsNothing);
+  });
+
+  testWidgets('the name follows the account signed in after a sign-in',
+      (tester) async {
+    final node = newNode();
+    await tester.runAsync(() => node.identity.create('Alice'));
+    await openSheet(tester, node);
+
+    await tester.tap(find.text('Sign in').first);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, 'other-secret');
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await real(tester, () async {});
+
+    await real(
+        tester, () async => node.identity.changeProfileElsewhere('Carol'));
+    expect(find.text('Carol'), findsOneWidget);
+  });
+
   testWidgets('signing in names the drives that came along', (tester) async {
     final node =
         FakeNode(Store(backend: InMemoryBackend(), drive: drive), drives: [

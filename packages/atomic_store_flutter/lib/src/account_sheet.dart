@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:atomic_store/atomic_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'atomic_flutter.dart';
 import 'drives.dart';
+import 'identity.dart';
 import 'pairing.dart';
 import 'sharing.dart';
 
@@ -63,15 +66,32 @@ class _AccountSheetState extends State<_AccountSheet> {
   bool _showSecret = false;
   bool _write = false;
   String? _link;
+  StreamSubscription<Profile>? _profileChanges;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _follow();
+  }
+
+  /// Follows the profile of the agent signed in now, so a name changed on
+  /// another device shows here without a button. Call again after the agent
+  /// changes.
+  void _follow() {
+    _profileChanges?.cancel();
+    _profileChanges = _signedOut
+        ? null
+        : node.identity.watchProfile().listen((profile) {
+            if (mounted && !_signedOut && profile.name != _name) {
+              setState(() => _name = profile.name);
+            }
+          }, onError: (Object _) {});
   }
 
   @override
   void dispose() {
+    _profileChanges?.cancel();
     _secretField.dispose();
     _codeField.dispose();
     super.dispose();
@@ -134,6 +154,7 @@ class _AccountSheetState extends State<_AccountSheet> {
         if (previous != null) widget.onPreviousSecret?.call(previous);
         _secretField.clear();
         _signedOut = false;
+        _follow();
         await _load();
         final names = [
           for (final subject in found.broughtAlong)
@@ -172,6 +193,7 @@ class _AccountSheetState extends State<_AccountSheet> {
     await node.identity.signOut();
     _signedOut = true;
     _showSecret = false;
+    _follow();
     await _load();
   }
 
