@@ -21,6 +21,10 @@ import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition
 import { useWelcomeLayoutEffect } from '../../hooks/useWelcomeLayoutEffect';
 import { useSettings } from '../../helpers/AppSettings';
 import { saveAgentToIDB } from '../../helpers/agentStorage';
+import {
+  applyBroughtAlong,
+  prepareIdentitySwitch,
+} from '../../helpers/bringAlong';
 import { beat } from '../../helpers/deviceLock';
 import { fetchPrivateDriveSubject } from '../../helpers/privateDrive';
 import { connectHostedDrive, shortDid } from '../../helpers/managed/reconcile';
@@ -107,6 +111,7 @@ type Step =
   | 'restore'
   | 'restore-upgraded'
   | 'secret-conflict'
+  | 'bring-along'
   | 'connect-device'
   | 'opening-workspace';
 
@@ -279,6 +284,10 @@ export function GettingStartedFlow({
   const [secretConflict, setSecretConflict] = useState<
     (SecretAccountConflict & { secret: string }) | null
   >(null);
+  /** The question before this browser's own work is left behind or brought along. */
+  const [bringPrompt, setBringPrompt] = useState<{
+    answer: (bring: boolean) => void;
+  } | null>(null);
   /** Shown only after blur/Enter — every prefix of a valid secret is invalid,
    * so erroring while typing would be constant noise. */
   const [secretError, setSecretError] = useState<string | undefined>();
@@ -595,10 +604,24 @@ export function GettingStartedFlow({
       }
 
       setSecretConflict(null);
+      // The identity this browser holds is kept on the device. When it has
+      // work, ask before it is left behind (see helpers/bringAlong.ts).
+      const outcome = await prepareIdentitySwitch(
+        store,
+        newAgent.subject,
+        () =>
+          new Promise<boolean>(resolve => {
+            setBringPrompt({ answer: resolve });
+            setStep('bring-along');
+          }),
+      );
+      setBringPrompt(null);
       setWorkspaceStage('identity');
       setStep('opening-workspace');
       setAgent(newAgent);
       await saveAgentToIDB(secret);
+      if (outcome === 'brought' && newAgent.subject)
+        applyBroughtAlong(store, newAgent.subject);
       // However they got in — passkey, code, or secret — the device is open
       // again, so start the clock fresh (see deviceLock.ts).
       beat();
@@ -1617,6 +1640,37 @@ export function GettingStartedFlow({
                   }
                 >
                   Use this secret and sign out
+                </Button>
+              </Column>
+            </OnboardingCard>
+          </OnboardingWrap>
+        </Swap>
+      ) : step === 'bring-along' && bringPrompt ? (
+        <Swap key='bring-along'>
+          <OnboardingWrap>
+            <OnboardingCard key='card' data-testid='bring-along'>
+              <Column gap='1rem'>
+                <CardTitle key='title'>Keep what you made here?</CardTitle>
+                <p key='copy'>
+                  What you made in this browser goes to the account you&apos;re
+                  signing in to. If you leave it here, it stays on this device.
+                </p>
+                <Button
+                  key='bring'
+                  type='button'
+                  data-testid='bring-along-yes'
+                  onClick={() => bringPrompt.answer(true)}
+                >
+                  Bring it along
+                </Button>
+                <Button
+                  key='leave'
+                  type='button'
+                  subtle
+                  data-testid='bring-along-no'
+                  onClick={() => bringPrompt.answer(false)}
+                >
+                  Leave it here
                 </Button>
               </Column>
             </OnboardingCard>

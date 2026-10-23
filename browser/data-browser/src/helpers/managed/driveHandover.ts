@@ -138,6 +138,18 @@ async function drivesOf(
   return drivesListedIn(home).filter(drive => drive !== personalDrive);
 }
 
+/**
+ * The drives `from` could hand over, before any grant: what a sign-in as
+ * someone else would bring along. Throws when they cannot be read.
+ */
+export async function listHandoverDrives(
+  store: HandoverStore,
+  from: string,
+  personalDrive?: string,
+): Promise<string[]> {
+  return [...new Set(await drivesOf(store, from, personalDrive))];
+}
+
 const inFlight = new Map<string, Promise<PendingDriveHandover>>();
 
 /**

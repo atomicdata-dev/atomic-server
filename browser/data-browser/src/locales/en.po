@@ -13341,3 +13341,19 @@ msgstr "Go back to your device."
 #: src/routes/SendIdentityRoute.tsx
 msgid "Could not send your identity"
 msgstr "Could not send your identity"
+
+#: src/views/getting-started/GettingStartedFlow.tsx
+msgid "Keep what you made here?"
+msgstr "Keep what you made here?"
+
+#: src/views/getting-started/GettingStartedFlow.tsx
+msgid "What you made in this browser goes to the account you're signing in to. If you leave it here, it stays on this device."
+msgstr "What you made in this browser goes to the account you're signing in to. If you leave it here, it stays on this device."
+
+#: src/views/getting-started/GettingStartedFlow.tsx
+msgid "Bring it along"
+msgstr "Bring it along"
+
+#: src/views/getting-started/GettingStartedFlow.tsx
+msgid "Leave it here"
+msgstr "Leave it here"
