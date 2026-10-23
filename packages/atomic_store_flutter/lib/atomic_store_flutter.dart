@@ -5,6 +5,8 @@
 library;
 
 export 'src/atomic_flutter.dart' show AtomicFlutter, AtomicNode;
+export 'src/init_native.dart' if (dart.library.js_interop) 'src/init_web.dart'
+    show nativeLibrary;
 export 'src/bridge_store_backend.dart'
     show
         BridgeStoreBackend,

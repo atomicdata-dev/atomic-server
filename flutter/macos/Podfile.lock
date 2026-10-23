@@ -24,7 +24,7 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral
 
 SPEC CHECKSUMS:
-  atomic_store_flutter: 93e834ae6cb8b45bc9b18c52cfc7a9ea9c0f352f
+  atomic_store_flutter: 5aa0d65d29c74140f7c4e30c4abf7bffab5584c1
   flutter_secure_storage_macos: 7f45e30f838cf2659862a4e4e3ee1c347c2b3b54
   flutter_tts: ae915565cc6948444b513acc8ee021993281e027
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1

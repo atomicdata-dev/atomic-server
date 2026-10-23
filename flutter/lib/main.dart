@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:atomic_store_flutter/bridge/frb_generated.dart';
+import 'package:atomic_store_flutter/atomic_store_flutter.dart'
+    show nativeLibrary;
 import 'package:atomic_chat/atomic_chat.dart'
     show
         AppShell,
@@ -39,7 +41,7 @@ void main() async {
   // Independent of the database, so read while it opens.
   final theme = Future.wait([AppThemeMode.load(), AppSidebarIcons.load()]);
   await bootstrap(
-    initRust: RustLib.init,
+    initRust: () => RustLib.init(externalLibrary: nativeLibrary()),
     ready: () => theme,
     documentsPath: () => resolveStoreDirectory(
       desktop: storeInSupportDirectory,
