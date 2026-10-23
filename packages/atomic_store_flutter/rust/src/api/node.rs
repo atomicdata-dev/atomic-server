@@ -314,7 +314,6 @@ impl AtomicStore {
         expires_at: Option<i64>,
         max_usages: Option<i64>,
     ) -> Result<String, AtomicError> {
-        use serde_json::Value;
         if matches!(max_usages, Some(n) if n < 1) {
             return Err(AtomicError::invalid(
                 "The usage limit of an invite must be a whole number of at least 1.",
@@ -323,44 +322,10 @@ impl AtomicStore {
         let agent = self.db.get_default_agent().map_err(other)?;
         let expires = expires_at
             .unwrap_or_else(|| atomic_lib::utils::now() + 30 * 24 * 60 * 60 * 1000);
-        // Sorted keys, no whitespace: the bytes `@tomic/lib` and the server sign
-        // and verify.
-        let mut signable = std::collections::BTreeMap::<String, Value>::new();
-        signable.insert(urls::TARGET.into(), target.into());
-        signable.insert(urls::WRITE_BOOL.into(), write.into());
-        signable.insert(urls::EXPIRES_AT.into(), expires.into());
-        signable.insert(urls::SIGNER.into(), agent.subject.to_string().into());
-        if let Some(max) = max_usages {
-            signable.insert(urls::USAGES_LEFT.into(), max.into());
-        }
-        let message = serde_json::to_string(&signable).map_err(other)?;
-        let private_key = agent
-            .private_key
-            .as_deref()
-            .ok_or_else(|| AtomicError::invalid("This agent cannot sign"))?;
-        let signature =
-            atomic_lib::commit::sign_message(&message, private_key, &agent.public_key)
-                .map_err(other)?;
-        signable.insert(urls::SIGNATURE.into(), signature.into());
-        let json = serde_json::to_vec(&signable).map_err(other)?;
-        Ok(standard_base64(&json))
+        atomic_lib::invite_token::InviteToken::new(target, write, expires, &agent, max_usages)
+            .and_then(|token| token.encode())
+            .map_err(other)
     }
-}
-
-/// `btoa`: standard alphabet, padded (the server decodes with this).
-fn standard_base64(bytes: &[u8]) -> String {
-    let mut text: String = atomic_lib::agents::encode_base64(bytes)
-        .chars()
-        .map(|c| match c {
-            '-' => '+',
-            '_' => '/',
-            c => c,
-        })
-        .collect();
-    while text.len() % 4 != 0 {
-        text.push('=');
-    }
-    text
 }
 
 #[cfg(test)]
@@ -464,7 +429,7 @@ mod tests {
             .create_invite_token(drive.clone(), true, Some(4_102_444_800_000), Some(3))
             .unwrap();
         let bytes = base64_decode_standard(&token);
-        let mut json: serde_json::Map<String, serde_json::Value> =
+        let json: serde_json::Map<String, serde_json::Value> =
             serde_json::from_slice(&bytes).unwrap();
         assert_eq!(json[urls::TARGET], drive.as_str());
         assert_eq!(json[urls::WRITE_BOOL], true);
@@ -472,14 +437,10 @@ mod tests {
         let agent = store.db.get_default_agent().unwrap();
         assert_eq!(json[urls::SIGNER], agent.subject.to_string().as_str());
 
-        // The signature covers the other fields, sorted, without whitespace.
-        let signature = json.remove(urls::SIGNATURE).unwrap();
-        let sorted: std::collections::BTreeMap<_, _> = json.into_iter().collect();
-        let message = serde_json::to_string(&sorted).unwrap();
-        let expected =
-            atomic_lib::commit::sign_message(&message, agent.private_key.as_ref().unwrap(), &agent.public_key)
-                .unwrap();
-        assert_eq!(signature, expected.as_str());
+        // The shared lib decodes it and verifies the signature.
+        let decoded = atomic_lib::invite_token::InviteToken::decode(&token).unwrap();
+        assert_eq!(decoded.max_usages, Some(3));
+        decoded.verify_signature(&agent.public_key).unwrap();
 
         assert!(store
             .create_invite_token(drive.clone(), false, None, Some(0))

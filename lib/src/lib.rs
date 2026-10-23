@@ -101,6 +101,7 @@ pub mod history;
 pub mod host;
 pub mod identifiers;
 pub mod import_identity;
+pub mod invite_token;
 pub mod loro;
 pub mod mapping;
 pub mod metrics;

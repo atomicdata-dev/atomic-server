@@ -8,7 +8,7 @@ use atomic_lib::{
     Resource, Storelike, Subject, Value,
 };
 
-use crate::invite_token::{acceptance_lock, InviteToken};
+use crate::invite_token::{acceptance_lock, InviteToken, InviteTokenExt};
 
 fn read_token_from_subject(subject: &url::Url) -> Option<String> {
     for (k, v) in subject.query_pairs() {

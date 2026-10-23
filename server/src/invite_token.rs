@@ -1,6 +1,4 @@
-use atomic_lib::{db::trees::Tree, errors::AtomicResult, urls, Db, Resource, Storelike, Value};
-use base64::{engine::general_purpose, Engine};
-use serde::{Deserialize, Serialize};
+use atomic_lib::{db::trees::Tree, errors::AtomicResult, urls, Db, Storelike};
 
 /// Error shown when an invite has been accepted by as many agents as it allows.
 pub const INVITE_EXHAUSTED: &str = "This invite has no usages left. Ask for a new one.";
@@ -12,48 +10,20 @@ pub fn acceptance_lock() -> &'static tokio::sync::Mutex<()> {
     LOCK.get_or_init(|| tokio::sync::Mutex::new(()))
 }
 
-/// A stateless invite token that is signed by the user.
-/// It is a base64-encoded JSON-AD representation of a "virtual" Invite resource.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct InviteToken {
-    pub target: atomic_lib::Subject,
-    pub write: bool,
-    pub expires_at: i64,
-    pub signer: atomic_lib::Subject,
-    pub signature: String,
-    /// How many different agents may accept this invite. Part of the signed
-    /// payload, so the recipient cannot raise it. `None` means unlimited
-    /// (and is how tokens issued before the limit existed decode).
-    pub max_usages: Option<i64>,
+pub use atomic_lib::invite_token::InviteToken;
+
+/// Server-side behaviour of an [`InviteToken`]: acceptance records, signature
+/// and rights verification against the store.
+#[allow(async_fn_in_trait)]
+pub trait InviteTokenExt {
+    fn acceptances_key(&self) -> Vec<u8>;
+    fn accepted_by(&self, store: &Db) -> AtomicResult<Vec<String>>;
+    fn usages_left(&self, store: &Db) -> AtomicResult<Option<i64>>;
+    fn check_usages(&self, store: &Db, agent: &str) -> AtomicResult<()>;
+    fn record_acceptance(&self, store: &Db, agent: &str) -> AtomicResult<()>;
+    async fn verify(&self, store: &Db) -> AtomicResult<()>;
 }
-
-impl InviteToken {
-    /// The JSON-AD that the issuer signs: everything except the signature.
-    fn signable_json(&self) -> serde_json::Map<String, serde_json::Value> {
-        let mut map = serde_json::Map::new();
-        map.insert(
-            urls::TARGET.into(),
-            serde_json::Value::String(self.target.as_str().to_string()),
-        );
-        map.insert(urls::WRITE_BOOL.into(), serde_json::Value::Bool(self.write));
-        map.insert(
-            urls::EXPIRES_AT.into(),
-            serde_json::Value::Number(self.expires_at.into()),
-        );
-        map.insert(
-            urls::SIGNER.into(),
-            serde_json::Value::String(self.signer.as_str().to_string()),
-        );
-        // Only present when limited, so unlimited tokens keep their old bytes.
-        if let Some(max) = self.max_usages {
-            map.insert(
-                urls::USAGES_LEFT.into(),
-                serde_json::Value::Number(max.into()),
-            );
-        }
-        map
-    }
-
+impl InviteTokenExt for InviteToken {
     /// Key under which the agents that accepted this invite are recorded.
     /// The signature identifies the token: it covers every signed field.
     fn acceptances_key(&self) -> Vec<u8> {
@@ -61,7 +31,7 @@ impl InviteToken {
     }
 
     /// Agents that have accepted this invite so far.
-    pub fn accepted_by(&self, store: &Db) -> AtomicResult<Vec<String>> {
+    fn accepted_by(&self, store: &Db) -> AtomicResult<Vec<String>> {
         match store.kv.get(Tree::PluginMeta, &self.acceptances_key())? {
             Some(bytes) => serde_json::from_slice(&bytes)
                 .map_err(|e| format!("Malformed invite acceptance record: {e}").into()),
@@ -70,7 +40,7 @@ impl InviteToken {
     }
 
     /// How many agents can still accept, or `None` when unlimited.
-    pub fn usages_left(&self, store: &Db) -> AtomicResult<Option<i64>> {
+    fn usages_left(&self, store: &Db) -> AtomicResult<Option<i64>> {
         let Some(max) = self.max_usages else {
             return Ok(None);
         };
@@ -81,7 +51,7 @@ impl InviteToken {
     /// Errors with [`INVITE_EXHAUSTED`] when the limit is reached and `agent`
     /// has not accepted before. Someone who already accepted may open the
     /// link again: that grants nothing new, so it does not use a place.
-    pub fn check_usages(&self, store: &Db, agent: &str) -> AtomicResult<()> {
+    fn check_usages(&self, store: &Db, agent: &str) -> AtomicResult<()> {
         if self.usages_left(store)? == Some(0)
             && !self.accepted_by(store)?.iter().any(|a| a == agent)
         {
@@ -92,7 +62,7 @@ impl InviteToken {
 
     /// Records that `agent` accepted. Callers must hold [`acceptance_lock`]
     /// from before [`Self::check_usages`] until after this call.
-    pub fn record_acceptance(&self, store: &Db, agent: &str) -> AtomicResult<()> {
+    fn record_acceptance(&self, store: &Db, agent: &str) -> AtomicResult<()> {
         let mut accepted = self.accepted_by(store)?;
         if accepted.iter().any(|a| a == agent) {
             return Ok(());
@@ -104,121 +74,8 @@ impl InviteToken {
             &serde_json::to_vec(&accepted).map_err(|e| e.to_string())?,
         )
     }
-    /// Creates a new signed InviteToken
-    #[cfg(test)]
-    pub fn new(
-        target: String,
-        write: bool,
-        expires_at: i64,
-        signer_agent: &atomic_lib::agents::Agent,
-        max_usages: Option<i64>,
-    ) -> AtomicResult<Self> {
-        // Normalize the target through Subject parsing so the signed string
-        // matches what encode()/verify() will produce via self.target.as_str().
-        let mut token = Self {
-            target: atomic_lib::Subject::from(target),
-            write,
-            expires_at,
-            signer: signer_agent.subject.clone(),
-            signature: String::new(),
-            max_usages,
-        };
-
-        let serialized = serde_jcs::to_string(&token.signable_json())
-            .map_err(|e| format!("Failed to serialize invite data: {}", e))?;
-
-        token.signature = atomic_lib::commit::sign_message(
-            &serialized,
-            signer_agent
-                .private_key
-                .as_ref()
-                .ok_or("Agent has no private key")?,
-            &signer_agent.public_key,
-        )?;
-
-        Ok(token)
-    }
-
-    /// Encodes the InviteToken into a base64 string.
-    #[cfg(test)]
-    pub fn encode(&self) -> AtomicResult<String> {
-        let mut map = self.signable_json();
-        map.insert(
-            urls::SIGNATURE.into(),
-            serde_json::Value::String(self.signature.clone()),
-        );
-
-        let bytes = serde_json::to_vec(&map)
-            .map_err(|e| format!("Failed to serialize invite token: {}", e))?;
-
-        Ok(general_purpose::STANDARD.encode(bytes))
-    }
-
-    /// Decodes a base64 encoded JSON-AD token into an InviteToken.
-    pub fn decode(token: &str) -> AtomicResult<Self> {
-        let bytes = general_purpose::STANDARD
-            .decode(token)
-            .map_err(|e| format!("Invalid base64 in invite token: {}", e))?;
-
-        let json: serde_json::Value = serde_json::from_slice(&bytes)
-            .map_err(|e| format!("Invalid JSON in invite token: {}", e))?;
-
-        let target = json
-            .get(urls::TARGET)
-            .ok_or("Missing target in invite token")?
-            .as_str()
-            .ok_or("Target must be a string")?
-            .to_string();
-        let target = atomic_lib::Subject::from(target);
-
-        let write = json
-            .get(urls::WRITE_BOOL)
-            .ok_or("Missing write in invite token")?
-            .as_bool()
-            .ok_or("Write must be a boolean")?;
-
-        let expires_at = json
-            .get(urls::EXPIRES_AT)
-            .ok_or("Missing expires_at in invite token")?
-            .as_i64()
-            .ok_or("Expires_at must be an integer")?;
-
-        let signer_str = json
-            .get(urls::SIGNER)
-            .ok_or("Missing signer in invite token")?
-            .as_str()
-            .ok_or("Signer must be a string")?
-            .to_string();
-        let signer = atomic_lib::Subject::from(signer_str);
-
-        let signature = json
-            .get(urls::SIGNATURE)
-            .ok_or("Missing signature in invite token")?
-            .as_str()
-            .ok_or("Signature must be a string")?
-            .to_string();
-
-        let max_usages = match json.get(urls::USAGES_LEFT) {
-            None | Some(serde_json::Value::Null) => None,
-            Some(v) => Some(
-                v.as_i64()
-                    .filter(|n| *n >= 0)
-                    .ok_or("Usages must be a non-negative integer")?,
-            ),
-        };
-
-        Ok(Self {
-            target,
-            write,
-            expires_at,
-            signer,
-            signature,
-            max_usages,
-        })
-    }
-
     /// Verifies the token's signature and the signer's rights.
-    pub async fn verify(&self, store: &Db) -> AtomicResult<()> {
+    async fn verify(&self, store: &Db) -> AtomicResult<()> {
         tracing::debug!(
             "Verifying invite token: signer={}, target={}, expires_at={}",
             self.signer,
@@ -227,73 +84,22 @@ impl InviteToken {
         );
 
         // 1. Check expiration
-        let now = atomic_lib::utils::now();
-        if self.expires_at < now {
-            return Err("Invite token has expired".into());
-        }
+        self.check_expiry(atomic_lib::utils::now())?;
 
-        // 2. Verify signature
-        // We construct a temporary resource to use atomic_lib's validation logic
-        let mut resource = Resource::new("local:invite".into());
-        resource.set_unsafe(urls::TARGET.into(), Value::AtomicUrl(self.target.clone()))?;
-        resource.set_unsafe(urls::WRITE_BOOL.into(), Value::Boolean(self.write))?;
-        resource.set_unsafe(urls::EXPIRES_AT.into(), Value::Timestamp(self.expires_at))?;
-        resource.set_unsafe(urls::SIGNER.into(), Value::AtomicUrl(self.signer.clone()))?;
-        resource.set_unsafe(
-            urls::SIGNATURE.into(),
-            Value::String(self.signature.clone()),
-        )?;
-
-        // We need to verify that the signer signed this data.
-        // atomic_lib::commit::Commit::validate_signature uses a similar logic.
-        // But here we are not validating a Commit, but a signed virtual resource.
-
-        // Let's manually verify the signature for now, using the signer's public key.
+        // 2. Verify signature against the signer's public key.
         let signer_resource = store
             .get_resource(&self.signer)
             .await
             .map_err(|e| format!("Could not fetch invite issuer ({}): {}", self.signer, e))?;
 
-        tracing::debug!(
-            "Fetched signer resource, subject={}",
-            signer_resource.get_subject()
-        );
-
         let public_key = match signer_resource.get(urls::PUBLIC_KEY) {
             Ok(pk) => pk.to_string(),
-            Err(e) => {
-                if let Some(pk) = self
-                    .signer
-                    .as_str()
-                    .strip_prefix(atomic_lib::subject::DID_AD_AGENT_PREFIX)
-                {
-                    pk.to_string()
-                } else {
-                    return Err(e);
-                }
-            }
+            Err(e) => match self.signer_public_key() {
+                Some(pk) => pk.to_string(),
+                None => return Err(e),
+            },
         };
-        tracing::debug!("Public key for verification: {}", public_key);
-        let pubkey_bytes = atomic_lib::agents::decode_base64(&public_key)?;
-
-        // The data that was signed is the JSON-AD without the signature.
-        let signable_json = self.signable_json();
-
-        let serialized = serde_jcs::to_string(&signable_json)
-            .map_err(|e| format!("Failed to serialize invite data for verification: {}", e))?;
-
-        tracing::debug!("Serialized signable data for verification: {}", serialized);
-
-        let signature_bytes = atomic_lib::agents::decode_base64(&self.signature)?;
-
-        let peer_public_key =
-            ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, pubkey_bytes);
-        peer_public_key
-            .verify(serialized.as_bytes(), &signature_bytes)
-            .map_err(|_| format!(
-                "Invalid signature in invite token. signer={}, public_key={}, signature={}, serialized_data={}",
-                self.signer, public_key, self.signature, serialized
-            ))?;
+        self.verify_signature(&public_key)?;
 
         // 3. Check signer's rights to the target
         let target_resource = store
