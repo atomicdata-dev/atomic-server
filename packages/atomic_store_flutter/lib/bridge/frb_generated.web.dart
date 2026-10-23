@@ -164,6 +164,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   StoreAgentLoad dco_decode_store_agent_load(dynamic raw);
 
   @protected
+  StoreEvent dco_decode_store_event(dynamic raw);
+
+  @protected
   StoreRecovery dco_decode_store_recovery(dynamic raw);
 
   @protected
@@ -320,6 +323,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   StoreAgentLoad sse_decode_store_agent_load(SseDeserializer deserializer);
+
+  @protected
+  StoreEvent sse_decode_store_event(SseDeserializer deserializer);
 
   @protected
   StoreRecovery sse_decode_store_recovery(SseDeserializer deserializer);
@@ -488,6 +494,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_store_agent_load(
       StoreAgentLoad self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_store_event(StoreEvent self, SseSerializer serializer);
 
   @protected
   void sse_encode_store_recovery(StoreRecovery self, SseSerializer serializer);

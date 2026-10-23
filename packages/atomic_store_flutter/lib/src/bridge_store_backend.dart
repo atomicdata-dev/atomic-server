@@ -17,6 +17,8 @@ abstract interface class BridgeResourceApi {
   Future<String> newDrive(String name);
   Future<bridge.ResourceEvent> waitForResourceEvent(
       String subject, int timeoutMs);
+  Future<void> destroyResource(String subject);
+  Future<bridge.StoreEvent> waitForStoreEvent(int timeoutMs);
 }
 
 /// The default store: the one `openDb` opened, signing as the agent
@@ -54,6 +56,14 @@ class _DefaultStoreApi implements BridgeResourceApi {
   Future<bridge.ResourceEvent> waitForResourceEvent(
           String subject, int timeoutMs) =>
       bridge.waitForResourceEvent(subject: subject, timeoutMs: timeoutMs);
+
+  @override
+  Future<void> destroyResource(String subject) =>
+      bridge.destroyResource(subject: subject);
+
+  @override
+  Future<bridge.StoreEvent> waitForStoreEvent(int timeoutMs) =>
+      bridge.waitForStoreEvent(timeoutMs: timeoutMs);
 }
 
 /// One [bridge.AtomicStore] handle: its store, agent and drive.
@@ -92,6 +102,14 @@ class _HandleApi implements BridgeResourceApi {
   Future<bridge.ResourceEvent> waitForResourceEvent(
           String subject, int timeoutMs) =>
       _store.waitForResourceEvent(subject: subject, timeoutMs: timeoutMs);
+
+  @override
+  Future<void> destroyResource(String subject) =>
+      _store.destroyResource(subject: subject);
+
+  @override
+  Future<bridge.StoreEvent> waitForStoreEvent(int timeoutMs) =>
+      _store.waitForStoreEvent(timeoutMs: timeoutMs);
 }
 
 /// The [StoreBackend] of `package:atomic_store` over the Rust bridge: the
@@ -160,13 +178,25 @@ class BridgeStoreBackend implements StoreBackend {
       _guard(() async {
         final event =
             await _api.waitForResourceEvent(subject, timeout.inMilliseconds);
-        return switch (event) {
-          bridge.ResourceEvent.changed => ResourceEventKind.changed,
-          bridge.ResourceEvent.destroyed => ResourceEventKind.destroyed,
-          bridge.ResourceEvent.timeout => ResourceEventKind.timeout,
-        };
+        return _kind(event);
       }, subject);
+
+  @override
+  Future<void> destroyResource(String subject) =>
+      _guard(() => _api.destroyResource(subject), subject);
+
+  @override
+  Future<StoreEvent> waitForStoreEvent(Duration timeout) => _guard(() async {
+        final event = await _api.waitForStoreEvent(timeout.inMilliseconds);
+        return StoreEvent(_kind(event.kind), event.subject);
+      });
 }
+
+ResourceEventKind _kind(bridge.ResourceEvent event) => switch (event) {
+      bridge.ResourceEvent.changed => ResourceEventKind.changed,
+      bridge.ResourceEvent.destroyed => ResourceEventKind.destroyed,
+      bridge.ResourceEvent.timeout => ResourceEventKind.timeout,
+    };
 
 Future<T> _guard<T>(Future<T> Function() call, [String? subject]) async {
   try {

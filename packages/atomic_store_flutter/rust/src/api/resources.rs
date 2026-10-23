@@ -57,6 +57,15 @@ pub enum Datatype {
     Unsupported,
 }
 
+/// One change or destroy somewhere in the store (see
+/// [`AtomicStore::wait_for_store_event`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoreEvent {
+    pub kind: ResourceEvent,
+    /// The resource it happened to; empty for [`ResourceEvent::Timeout`].
+    pub subject: String,
+}
+
 /// A property value. `datatype` says which of the other fields carries it;
 /// the rest are empty. (One flat struct instead of an enum with fields:
 /// flutter_rust_bridge generates those with `freezed`, which this app does not
@@ -519,6 +528,24 @@ impl AtomicStore {
         Ok(subject)
     }
 
+    /// Destroy `subject` and, recursively, its children: a signed destroy
+    /// commit by this handle's agent, queued for the server like any write.
+    /// [`AtomicError::NotFound`] when this device does not have it.
+    pub async fn destroy_resource(&self, subject: String) -> Result<(), AtomicError> {
+        let subject = atomic_lib::Subject::from(subject.as_str());
+        let resource = self.db.get_resource(&subject).await?;
+        let agent = self.db.get_default_agent()?;
+        let mut builder = CommitBuilder::new(subject);
+        builder.destroy(true);
+        let commit = builder.sign(&agent, self.db.as_ref(), &resource).await?;
+        let response = self
+            .node()
+            .apply_local_commit(commit, &atomic_lib::host::own_commit_opts())
+            .await?;
+        self.push(&response).await;
+        Ok(())
+    }
+
     /// Create a drive named `name`, which this handle works in from now on.
     /// Returns its subject.
     pub async fn new_drive(&self, name: String) -> Result<String, AtomicError> {
@@ -612,6 +639,18 @@ impl AtomicStore {
     }
 }
 
+impl AtomicStore {
+    /// Wait until any resource in the store changes or is destroyed, or
+    /// `timeout_ms` passes: the building block of watching a list.
+    pub async fn wait_for_store_event(&self, timeout_ms: u32) -> Result<StoreEvent, AtomicError> {
+        Ok(super::simple::resource::wait_store_event(
+            &self.db,
+            std::time::Duration::from_millis(timeout_ms as u64),
+        )
+        .await)
+    }
+}
+
 /// What [`AtomicStore::load_agent`] found.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StoreAgentLoad {
@@ -683,6 +722,16 @@ pub async fn wait_for_resource_event(
     AtomicStore::global()?
         .wait_for_resource_event(subject, timeout_ms)
         .await
+}
+
+/// [`AtomicStore::destroy_resource`] on the default store.
+pub async fn destroy_resource(subject: String) -> Result<(), AtomicError> {
+    AtomicStore::global()?.destroy_resource(subject).await
+}
+
+/// [`AtomicStore::wait_for_store_event`] on the default store.
+pub async fn wait_for_store_event(timeout_ms: u32) -> Result<StoreEvent, AtomicError> {
+    AtomicStore::global()?.wait_for_store_event(timeout_ms).await
 }
 
 #[cfg(test)]
@@ -797,8 +846,65 @@ mod tests {
             .unwrap();
         assert!(prop(&get_resource_data(subject.clone()).await.unwrap(), urls::DESCRIPTION).is_none());
 
-        let children = get_child_subjects(drive, 100).await.unwrap();
+        let children = get_child_subjects(drive.clone(), 100).await.unwrap();
         assert!(children.contains(&subject));
+
+        let waiter = tokio::spawn(wait_for_store_event(10_000));
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        destroy_resource(subject.clone()).await.unwrap();
+        let event = waiter.await.unwrap().unwrap();
+        assert_eq!(event.kind, ResourceEvent::Destroyed);
+        assert_eq!(event.subject, subject);
+        assert_eq!(
+            get_resource_data(subject.clone()).await.unwrap_err().kind,
+            ErrorKind::NotFound
+        );
+        assert!(!get_child_subjects(drive, 100).await.unwrap().contains(&subject));
+        assert_eq!(
+            destroy_resource(subject).await.unwrap_err().kind,
+            ErrorKind::NotFound
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unknown_class_and_property_are_stored_and_read_back_typed() {
+        let drive = shared_drive().await.to_string();
+        let class = "https://example.com/classes/Task";
+        let done = "https://example.com/properties/done";
+        let subject = create_resource_with_values(vec![
+            PropValue {
+                property: urls::IS_A.into(),
+                value: AtomicValue {
+                    items: vec![scalar(Datatype::Link, class)],
+                    ..scalar(Datatype::Array, "")
+                },
+            },
+            text(urls::NAME, "Book flights"),
+            PropValue {
+                property: done.into(),
+                value: scalar(Datatype::Boolean, "false"),
+            },
+            PropValue {
+                property: urls::PARENT.into(),
+                value: scalar(Datatype::Link, &drive),
+            },
+        ])
+        .await
+        .unwrap();
+        save_resource_changes(
+            subject.clone(),
+            vec![PropValue {
+                property: done.into(),
+                value: scalar(Datatype::Boolean, "true"),
+            }],
+            vec![],
+        )
+        .await
+        .unwrap();
+        let data = get_resource_data(subject).await.unwrap();
+        assert_eq!(prop(&data, done), Some(&scalar(Datatype::Boolean, "true")));
+        let is_a = prop(&data, urls::IS_A).unwrap();
+        assert_eq!(is_a.items, vec![scalar(Datatype::Link, class)]);
     }
 
     #[tokio::test]

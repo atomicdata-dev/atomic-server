@@ -28,6 +28,17 @@ class SearchResult {
 /// What happened to a resource a backend was asked to wait for.
 enum ResourceEventKind { changed, destroyed, timeout }
 
+/// One change or destroy somewhere in the store, from
+/// [StoreBackend.waitForStoreEvent]. [subject] is empty for a timeout.
+class StoreEvent {
+  const StoreEvent(this.kind, this.subject);
+  final ResourceEventKind kind;
+  final String subject;
+
+  @override
+  String toString() => 'StoreEvent(${kind.name} $subject)';
+}
+
 /// Everything [Store] needs from a store of Atomic Data. The Flutter app
 /// implements it over its Rust bridge; [InMemoryBackend] (in
 /// `package:atomic_store/testing.dart`) implements it for tests.
@@ -57,4 +68,12 @@ abstract interface class StoreBackend {
 
   /// Wait until [subject] changes or is destroyed, or [timeout] passes.
   Future<ResourceEventKind> waitForEvent(String subject, Duration timeout);
+
+  /// Destroy [subject] and, recursively, its children, as one signed destroy
+  /// commit. [StoreErrorKind.notFound] when the store does not have it.
+  Future<void> destroyResource(String subject);
+
+  /// Wait until any resource changes or is destroyed, or [timeout] passes.
+  /// What [Store.watchChildren] is built on.
+  Future<StoreEvent> waitForStoreEvent(Duration timeout);
 }

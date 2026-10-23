@@ -18,7 +18,7 @@ import 'value.dart';
 class Store {
   /// [drive] is the default parent of [newResource] and the default scope of
   /// [search]. Who signs a write is the backend's agent (over the bridge, the
-  /// `AtomicStore` handle's; see `flutter/README.md`).
+  /// `AtomicStore` handle's, which `AtomicFlutter.open` creates).
   Store({required this.backend, this.drive});
 
   final StoreBackend backend;
@@ -96,7 +96,10 @@ class Store {
 
   /// The resource [subject] now and again after every change, until it is
   /// destroyed (the stream then ends) or the listener cancels. Each event is
-  /// the same [Resource] instance, reloaded.
+  /// the same [Resource] instance, reloaded. The first event is the current
+  /// value (read fresh), so a listener never waits for a change to see
+  /// something. After that one event per [ResourceEventKind.changed] of
+  /// [subject]; a quiet [timeout] (default 60 s) just waits again.
   Stream<Resource> watch(String subject,
       {Duration timeout = const Duration(seconds: 60)}) {
     late final StreamController<Resource> controller;
@@ -133,6 +136,76 @@ class Store {
     return controller.stream;
   }
 
+  /// The children of [parent] now and again whenever the list changes: a
+  /// child is added, removed, moved to or from [parent], or one of the
+  /// children changes. Each event is the full list, in display order
+  /// ([Resource.childSubjects]), as the same [Resource] instances reloaded.
+  /// Ends when [parent] is destroyed or the listener cancels.
+  ///
+  /// Built on [StoreBackend.waitForStoreEvent], which fires for every
+  /// [ResourceEventKind.changed] (a create, an edit, a move) and
+  /// [ResourceEventKind.destroyed] of any resource, local or synced. After
+  /// each one the child list is read again; an event is emitted when the list
+  /// differs or the event's resource is one of the children. Events in the
+  /// gap between two waits are not replayed, so the list is also re-read
+  /// after every [timeout] (default 60 s) and emitted if it changed then.
+  Stream<List<Resource>> watchChildren(String parent,
+      {Duration timeout = const Duration(seconds: 60), int limit = 1000}) {
+    late final StreamController<List<Resource>> controller;
+    var cancelled = false;
+
+    Future<List<Resource>> load(List<String> subjects, String? fresh) async {
+      final loaded = <Resource>[];
+      for (final s in subjects) {
+        try {
+          loaded.add(await getResource(s, fresh: s == fresh));
+        } on StoreException catch (e) {
+          if (e.kind != StoreErrorKind.notFound) rethrow;
+        }
+      }
+      return loaded;
+    }
+
+    bool same(List<String> a, List<String> b) =>
+        a.length == b.length && Iterable<int>.generate(a.length).every((i) => a[i] == b[i]);
+
+    Future<void> run() async {
+      try {
+        var known = await backend.childSubjects(parent, limit: limit);
+        final first = await load(known, null);
+        if (cancelled) return;
+        controller.add(first);
+        while (!cancelled) {
+          final event = await backend.waitForStoreEvent(timeout);
+          if (cancelled) return;
+          if (event.kind == ResourceEventKind.destroyed &&
+              event.subject == parent) {
+            _resources.remove(parent);
+            return;
+          }
+          final now = await backend.childSubjects(parent, limit: limit);
+          final touchedChild = event.kind != ResourceEventKind.timeout &&
+              (known.contains(event.subject) || now.contains(event.subject));
+          if (!touchedChild && same(known, now)) continue;
+          known = now;
+          final list =
+              await load(now, touchedChild ? event.subject : null);
+          if (!cancelled) controller.add(list);
+        }
+      } catch (e, st) {
+        if (!cancelled) controller.addError(e, st);
+      } finally {
+        if (!controller.isClosed) await controller.close();
+      }
+    }
+
+    controller = StreamController<List<Resource>>(
+      onListen: () => unawaited(run()),
+      onCancel: () => cancelled = true,
+    );
+    return controller.stream;
+  }
+
   /// [watch] with a callback, as `store.subscribe` in `@tomic/lib`. Cancel the
   /// returned subscription to unsubscribe.
   StreamSubscription<Resource> subscribe(
@@ -141,6 +214,9 @@ class Store {
 
   /// Forget the resources read so far (the next [getResource] reads again).
   void clearCache() => _resources.clear();
+
+  /// Used by [Resource.destroy].
+  void forget(String subject) => _resources.remove(subject);
 
   /// Used by [Resource.save] once a draft has its subject.
   void remember(Resource resource) {

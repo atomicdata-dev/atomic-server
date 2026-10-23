@@ -19,7 +19,8 @@ await for (final r in node.store.watch(note.subject)) { print(r.name); }
 
 `Store`, `Resource`, `Props`, `Classes` and `Value` come from
 `package:atomic_store`; read its README for the API (`getResource`, `set`,
-`save`, `search`, `children`, `watch`, errors).
+`save`, `destroy`, `search`, `children`, `watch`, `watchChildren`, errors, how
+to model your own data, testing with `InMemoryBackend`).
 
 ## Add it to your app
 
@@ -73,6 +74,57 @@ its dependencies, about 10 minutes cold.
 
 Open a database path **once per process**; a second open of a redb file in the
 same process is not safe. Keep the `AtomicNode`.
+
+## Identity, restart and sync
+
+**Identity is the agent secret.** The first `open` (no `agentSecret`) creates an
+Ed25519 agent and a private drive, both on this device only; nothing is sent
+anywhere. Keep what `node` tells you:
+
+```dart
+// First run
+final node = await AtomicFlutter.open(path: dir, agentName: 'Alice');
+await secureStorage.write(key: 'agent', value: node.agentSecret);
+await secureStorage.write(key: 'drive', value: node.drive!); // a second device needs it
+
+// Every later run, same `dir`
+final node = await AtomicFlutter.open(
+    path: dir, agentSecret: await secureStorage.read(key: 'agent'));
+print(node.drive);   // the same drive subject as the first run
+```
+
+With the saved `agentSecret` and the same `path`, the node signs as the same
+agent and `node.drive` is the drive it was last working in (the database
+remembers it), so everything written before is still there. Without the secret
+a new agent and a new empty drive are made: the old data stays in the file but
+is not yours to write to. Pass `drive:` to open on a specific drive. Open a
+path once per process.
+
+**`node.connect(serverOrigin)`** (for example `https://example.com`, no path)
+opens a WebSocket to that Atomic Server, **authenticates as the node's agent**
+(a signed challenge with the same secret; no password or account), subscribes
+to `node.drive`, fetches the drive from the server if this device lacks it, then
+applies the server's changes to the local store (so `watch` and `watchChildren`
+see them) and sends every local write that is waiting, in order. Later writes
+go out as they are made. Without a drive it authenticates and sends the waiting
+writes but subscribes to nothing. Writes always succeed locally first; offline,
+they wait on disk until the next `connect`. `disconnect()` stops the session.
+If the server refuses the agent or the drive, the drive fetch fails quietly
+(logged) and the node stays local-only for it; check by watching for the data.
+It does not retry or reconnect on its own: call `connect` again after a drop.
+
+**A second device**, same person: open there with the same `agentSecret` and a
+new `path`, and give it the drive, `drive: savedDriveSubject` (store it with the
+secret, as above), then `connect` to the server both use. The drive is fetched
+from the server and from then on both devices see each other's writes through
+it. This needs a server that holds the drive; two devices with no server can
+only pair over Iroh, which the app (`flutter/`) wires up but a node from
+`AtomicFlutter.open` does not take part in.
+
+**Sharing** with other people (inviting another agent, setting who may read or
+write) is not supported by this package; a drive belongs to its agent. The
+rights and invite resources exist in Atomic Data and are reachable through the
+raw bridge or the server, but there is no typed API here.
 
 ## Still on you
 

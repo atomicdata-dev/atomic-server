@@ -92,6 +92,39 @@ void main() {
       expect(api.waitedMs, 2000);
     });
 
+    test('destroy and the store-wide event map to the bridge calls', () async {
+      await backend.destroyResource('did:ad:gone');
+      expect(api.destroyed, ['did:ad:gone']);
+      api.storeEvent = const bridge.StoreEvent(
+          kind: bridge.ResourceEvent.destroyed, subject: 'did:ad:gone');
+      final e = await backend.waitForStoreEvent(const Duration(seconds: 3));
+      expect(e.kind, ResourceEventKind.destroyed);
+      expect(e.subject, 'did:ad:gone');
+      expect(api.waitedStoreMs, 3000);
+    });
+
+    test('a destroy error is a StoreException with the subject', () {
+      api.error = const bridge.AtomicError(
+          kind: bridge.ErrorKind.notFound, message: 'gone');
+      expect(
+          backend.destroyResource('did:ad:z'),
+          throwsA(isA<StoreException>()
+              .having((e) => e.kind, 'kind', StoreErrorKind.notFound)
+              .having((e) => e.subject, 'subject', 'did:ad:z')));
+    });
+
+    test('a resource destroyed through a Store is forgotten', () async {
+      api.data = bridge.ResourceData(subject: 'did:ad:a', props: [
+        bridge.PropValue(
+            property: Props.name, value: valueToBridge(const StringValue('A')))
+      ]);
+      final store = Store(backend: backend);
+      final r = await store.getResource('did:ad:a');
+      await r.destroy();
+      expect(api.destroyed, ['did:ad:a']);
+      expect(r.isDestroyed, isTrue);
+    });
+
     test('a bridge error is thrown as a StoreException with the subject', () {
       api.error = const bridge.AtomicError(
           kind: bridge.ErrorKind.notFound, message: 'gone');
@@ -113,6 +146,10 @@ class _FakeApi implements BridgeResourceApi {
   List<bridge.PropValue> created = [];
   (String, String?, int)? searched;
   int? waitedMs;
+  final List<String> destroyed = [];
+  bridge.StoreEvent storeEvent = const bridge.StoreEvent(
+      kind: bridge.ResourceEvent.timeout, subject: '');
+  int? waitedStoreMs;
 
   Future<T> _run<T>(T Function() f) async {
     final e = error;
@@ -151,5 +188,13 @@ class _FakeApi implements BridgeResourceApi {
       _run(() {
         waitedMs = timeoutMs;
         return event;
+      });
+  @override
+  Future<void> destroyResource(String subject) =>
+      _run(() => destroyed.add(subject));
+  @override
+  Future<bridge.StoreEvent> waitForStoreEvent(int timeoutMs) => _run(() {
+        waitedStoreMs = timeoutMs;
+        return storeEvent;
       });
 }

@@ -122,6 +122,26 @@ class Resource {
     await reload();
   }
 
+  /// `true` once [destroy] has deleted this resource.
+  bool get isDestroyed => _destroyed;
+  bool _destroyed = false;
+
+  /// Delete the resource and, recursively, its children, as a signed destroy
+  /// commit by the active agent. Mirrors `Resource.destroy()` of
+  /// `@tomic/lib`. Afterwards [isDestroyed] is `true`, the store forgets the
+  /// resource, [Store.watch] streams of it end and [Store.watchChildren]
+  /// lists of its parent drop it. A draft that was never saved is just
+  /// discarded. Throws [StoreException] ([StoreErrorKind.notFound] when it
+  /// is already gone).
+  Future<void> destroy() async {
+    if (_destroyed) return;
+    if (!_isNew) {
+      await _store.backend.destroyResource(subject);
+      _store.forget(subject);
+    }
+    _destroyed = true;
+  }
+
   /// Read the resource again from the store, keeping unsaved changes.
   Future<void> reload() async {
     if (_isNew) return;

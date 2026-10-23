@@ -11,7 +11,7 @@ import '../bridge/api/resources.dart' as bridge;
 /// await AtomicFlutter.init();                      // once, in main()
 /// final node = await AtomicFlutter.open(path: dir, agentName: 'Alice');
 /// final doc = node.store.newResource(
-///     isA: [Classes.document], props: {Props.name: 'Hello'});
+///     isA: [Classes.documentV2], props: {Props.name: 'Hello'});
 /// await doc.save();
 /// ```
 abstract final class AtomicFlutter {

@@ -206,6 +206,138 @@ void main() {
     });
   });
 
+  group('destroy', () {
+    test('removes the resource, its children and the cache entry', () async {
+      final b = backend();
+      b.resources['did:ad:test:a1'] = {
+        Props.name: const StringValue('Inside'),
+        Props.parent: const LinkValue('did:ad:test:a'),
+      };
+      final store = Store(backend: b);
+      final r = await store.getResource('did:ad:test:a');
+      await r.destroy();
+      expect(r.isDestroyed, isTrue);
+      expect(b.calls, contains('destroyResource did:ad:test:a'));
+      expect(b.resources.keys, isNot(contains('did:ad:test:a')));
+      expect(b.resources.keys, isNot(contains('did:ad:test:a1')));
+      expect(await store.getResourceOrNull('did:ad:test:a'), isNull);
+      await r.destroy(); // again: nothing happens
+      expect(b.calls.where((c) => c.startsWith('destroyResource')), hasLength(1));
+    });
+
+    test('ends a watch with the destroyed event, without a manual touch',
+        () async {
+      final b = backend();
+      final store = Store(backend: b);
+      final r = await store.getResource('did:ad:test:a');
+      final done = Completer0();
+      final sub = store.watch('did:ad:test:a').listen((_) {}, onDone: done.complete);
+      await pump();
+      await r.destroy();
+      await done.future;
+      await sub.cancel();
+    });
+
+    test('a missing resource is notFound; a draft is just discarded', () async {
+      final b = backend();
+      final store = Store(backend: b);
+      final r = await store.getResource('did:ad:test:b');
+      b.resources.remove('did:ad:test:b');
+      await expectLater(
+          r.destroy(),
+          throwsA(isA<StoreException>()
+              .having((e) => e.kind, 'kind', StoreErrorKind.notFound)));
+      final draft = store.newResource(parent: drive);
+      await draft.destroy();
+      expect(draft.isDestroyed, isTrue);
+      expect(b.calls.where((c) => c.startsWith('destroyResource')), hasLength(1));
+    });
+  });
+
+  group('watchChildren', () {
+    Future<(Store, InMemoryBackend, List<List<String?>>, StreamSubscription)>
+        watching() async {
+      final b = backend();
+      final store = Store(backend: b, drive: drive);
+      final lists = <List<String?>>[];
+      final sub = store
+          .watchChildren(drive)
+          .listen((l) => lists.add([for (final r in l) r.name]));
+      await pump();
+      return (store, b, lists, sub);
+    }
+
+    test('emits the current children first', () async {
+      final (_, _, lists, sub) = await watching();
+      expect(lists, [
+        ['Pelican notes', 'Heron']
+      ]);
+      await sub.cancel();
+    });
+
+    test('emits when a child is added, changed, moved away and destroyed',
+        () async {
+      final (store, b, lists, sub) = await watching();
+
+      final note = store.newResource(props: {Props.name: 'Egret'});
+      await note.save();
+      await pump();
+      expect(lists.last, ['Pelican notes', 'Heron', 'Egret']);
+
+      note.set(Props.name, 'Great egret');
+      await note.save();
+      await pump();
+      expect(lists.last, ['Pelican notes', 'Heron', 'Great egret']);
+
+      final other = store.newResource(props: {Props.name: 'Elsewhere'});
+      await other.save();
+      await pump();
+      final count = lists.length;
+      note.set(Props.parent, other.subject);
+      await note.save();
+      await pump();
+      expect(lists.length, count + 1);
+      expect(lists.last, ['Pelican notes', 'Heron', 'Elsewhere']);
+
+      await (await store.getResource('did:ad:test:b')).destroy();
+      await pump();
+      expect(lists.last, ['Pelican notes', 'Elsewhere']);
+      await sub.cancel();
+    });
+
+    test('does not emit for unrelated changes and ends with the parent',
+        () async {
+      final b = backend();
+      b.resources['did:ad:test:far'] = {Props.name: const StringValue('Far')};
+      final store = Store(backend: b);
+      var emitted = 0;
+      final done = Completer0();
+      final sub = store
+          .watchChildren('did:ad:test:a')
+          .listen((_) => emitted++, onDone: done.complete);
+      await pump();
+      expect(emitted, 1);
+      b.touch('did:ad:test:far');
+      await pump();
+      expect(emitted, 1);
+      b.destroy('did:ad:test:a');
+      await done.future;
+      await sub.cancel();
+    });
+  });
+
+  test('InMemoryBackend search matches name and description, any case',
+      () async {
+    final b = backend();
+    b.resources['did:ad:test:a']![Props.description] =
+        const StringValue('Large Seabird');
+    final store = Store(backend: b);
+    expect((await store.search('SEABIRD')).map((h) => h.subject),
+        ['did:ad:test:a']);
+    expect((await store.search('eron')).map((h) => h.subject),
+        ['did:ad:test:b']);
+  });
+
   group('Value.of', () {
     test('nested maps and equality', () {
       final v = Value.of({'a': 'x', 'b': 2});

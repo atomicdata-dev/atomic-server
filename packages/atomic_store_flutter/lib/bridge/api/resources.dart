@@ -9,7 +9,7 @@ import 'error.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `atomic_to_sub_resource`, `atomic_to_value`, `build`, `global`, `list_to_propvals`, `new_default`, `node`, `parse`, `pin_drive`, `propvals_to_list`, `push`, `pusher`, `scalar`, `sub_resource_to_value`, `value_to_atomic`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// [`AtomicStore::get_resource_data`] on the default store.
 Future<ResourceData> getResourceData({required String subject}) =>
@@ -50,6 +50,15 @@ Future<ResourceEvent> waitForResourceEvent(
     RustLib.instance.api.crateApiResourcesWaitForResourceEvent(
         subject: subject, timeoutMs: timeoutMs);
 
+/// [`AtomicStore::destroy_resource`] on the default store.
+Future<void> destroyResource({required String subject}) =>
+    RustLib.instance.api.crateApiResourcesDestroyResource(subject: subject);
+
+/// [`AtomicStore::wait_for_store_event`] on the default store.
+Future<StoreEvent> waitForStoreEvent({required int timeoutMs}) =>
+    RustLib.instance.api
+        .crateApiResourcesWaitForStoreEvent(timeoutMs: timeoutMs);
+
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<AtomicStore>>
 abstract class AtomicStore implements RustOpaqueInterface {
   /// The subject of the agent that signs, if one is set.
@@ -83,6 +92,11 @@ abstract class AtomicStore implements RustOpaqueInterface {
   /// genesis commit) holding `values`, signed by this handle's agent.
   /// Returns its subject. `values` should include `isA` and `parent`.
   Future<String> createResourceWithValues({required List<PropValue> values});
+
+  /// Destroy `subject` and, recursively, its children: a signed destroy
+  /// commit by this handle's agent, queued for the server like any write.
+  /// [`AtomicError::NotFound`] when this device does not have it.
+  Future<void> destroyResource({required String subject});
 
   /// The drive this handle works in: the one set on it, else the store's
   /// active drive.
@@ -330,6 +344,10 @@ abstract class AtomicStore implements RustOpaqueInterface {
   Future<ResourceEvent> waitForResourceEvent(
       {required String subject, required int timeoutMs});
 
+  /// Wait until any resource in the store changes or is destroyed, or
+  /// `timeout_ms` passes: the building block of watching a list.
+  Future<StoreEvent> waitForStoreEvent({required int timeoutMs});
+
   /// Read the search index once so the first keystroke is not cold. Call it
   /// after the first frame; it runs on a blocking thread and never fails.
   Future<void> warmSearch();
@@ -541,6 +559,31 @@ class StoreAgentLoad {
           runtimeType == other.runtimeType &&
           agentSubject == other.agentSubject &&
           needsSync == other.needsSync;
+}
+
+/// One change or destroy somewhere in the store (see
+/// [`AtomicStore::wait_for_store_event`]).
+class StoreEvent {
+  final ResourceEvent kind;
+
+  /// The resource it happened to; empty for [`ResourceEvent::Timeout`].
+  final String subject;
+
+  const StoreEvent({
+    required this.kind,
+    required this.subject,
+  });
+
+  @override
+  int get hashCode => kind.hashCode ^ subject.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is StoreEvent &&
+          runtimeType == other.runtimeType &&
+          kind == other.kind &&
+          subject == other.subject;
 }
 
 /// What [`AtomicStore::setup`] made.

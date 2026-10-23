@@ -99,6 +99,45 @@ pub(crate) async fn wait_resource_event(
     result.unwrap_or(ResourceEvent::Timeout)
 }
 
+/// Wait for the next change or destroy of any resource in the store, at most
+/// `timeout`. The subject is the pure id of the resource; empty on timeout.
+pub(crate) async fn wait_store_event(
+    store: &atomic_lib::Db,
+    timeout: std::time::Duration,
+) -> crate::api::resources::StoreEvent {
+    use crate::api::resources::{ResourceEvent, StoreEvent};
+    let mut rx = store.subscribe_events();
+    let result = tokio::time::timeout(timeout, async {
+        loop {
+            match rx.recv().await {
+                Ok(atomic_lib::DbEvent::Changed { subject, .. }) => {
+                    return StoreEvent {
+                        kind: ResourceEvent::Changed,
+                        subject: subject.to_string(),
+                    };
+                }
+                Ok(atomic_lib::DbEvent::Destroyed { subject, .. }) => {
+                    return StoreEvent {
+                        kind: ResourceEvent::Destroyed,
+                        subject: subject.to_string(),
+                    };
+                }
+                Ok(_) => continue,
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(_) => {
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    rx = store.subscribe_events();
+                }
+            }
+        }
+    })
+    .await;
+    result.unwrap_or(StoreEvent {
+        kind: ResourceEvent::Timeout,
+        subject: String::new(),
+    })
+}
+
 pub async fn watch_resource(subject: String) -> Result<String, String> {
     use crate::api::resources::ResourceEvent;
     let store = db()?;
