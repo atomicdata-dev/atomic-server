@@ -16,8 +16,9 @@ const lookups = new Map<string, Promise<string | undefined>>();
  * envelopes the server (and this client) kept: one history-attribution read
  * per resource, cached per edit time. `undefined` while loading or when no
  * envelope says; it never guesses. Does nothing unless `enabled`, and never
- * asks about a resource the server may not have yet (offline, still loading,
- * or with edits waiting in the outbox), which would only answer 404.
+ * asks about a resource the server may not have (offline, still loading,
+ * with edits waiting in the outbox, or in a local-only drive), which would
+ * only answer 404.
  */
 export function useLastEditor(
   subject: string,
@@ -28,8 +29,13 @@ export function useLastEditor(
   const resource = useResource(subject, { allowIncomplete: true });
   const connected = useServerConnected();
   const key = `${subject}@${at}`;
+  // A local-only drive never reaches the server, so asking would only 404.
   const ready =
-    enabled && connected && !resource.loading && !resource.hasPendingCommits;
+    enabled &&
+    connected &&
+    !resource.loading &&
+    !resource.hasPendingCommits &&
+    !store.isLocalOnlySubject(subject);
   const [loaded, setLoaded] = useState<{
     key: string;
     editor: string | undefined;

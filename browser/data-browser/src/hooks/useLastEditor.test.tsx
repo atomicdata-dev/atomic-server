@@ -5,7 +5,11 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { useLastEditor } from './useLastEditor';
 
 const getHistoryAttribution = vi.fn();
-const store = { getHistoryAttribution };
+const localOnly = new Set<string>();
+const store = {
+  getHistoryAttribution,
+  isLocalOnlySubject: (subject: string) => localOnly.has(subject),
+};
 let resource = { loading: false, hasPendingCommits: false };
 
 let connected = true;
@@ -28,6 +32,7 @@ describe('useLastEditor', () => {
     getHistoryAttribution.mockReset();
     resource = { loading: false, hasPendingCommits: false };
     connected = true;
+    localOnly.clear();
   });
 
   it('returns the newest signer and asks once for the same resource', async () => {
@@ -54,6 +59,14 @@ describe('useLastEditor', () => {
     await new Promise(resolve => setTimeout(resolve, 20));
     expect(getHistoryAttribution).not.toHaveBeenCalled();
     expect(result.current).toBeUndefined();
+  });
+
+  it('does not ask the server about a resource in a local-only drive', async () => {
+    localOnly.add('did:ad:local');
+    renderHook(() => useLastEditor('did:ad:local', 5, true));
+
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(getHistoryAttribution).not.toHaveBeenCalled();
   });
 
   it('does not ask while offline', async () => {
