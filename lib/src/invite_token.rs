@@ -24,7 +24,15 @@ pub struct InviteToken {
     /// payload, so the recipient cannot raise it. `None` means unlimited
     /// (and is how tokens issued before the limit existed decode).
     pub max_usages: Option<i64>,
+    /// The inviter's note (`@tomic/lib` signs it when set).
+    pub description: Option<String>,
+    /// How the invite travels when not through a server (`webrtc` for a
+    /// browser-peer invite). Signed by `@tomic/lib` when set.
+    pub transport: Option<String>,
 }
+
+/// Signed by `@tomic/lib` for invites between browsers.
+const TRANSPORT: &str = "https://atomicdata.dev/properties/invite/transport";
 
 impl InviteToken {
     /// Creates a new signed InviteToken.
@@ -44,6 +52,8 @@ impl InviteToken {
             signer: signer_agent.subject.clone(),
             signature: String::new(),
             max_usages,
+            description: None,
+            transport: None,
         };
 
         token.signature = crate::commit::sign_message(
@@ -80,6 +90,14 @@ impl InviteToken {
                 urls::USAGES_LEFT.into(),
                 serde_json::Value::Number(max.into()),
             );
+        }
+        // Optional keys `@tomic/lib` signs only when set: leaving them out of
+        // the signed bytes made such tokens fail verification.
+        if let Some(d) = &self.description {
+            map.insert(urls::DESCRIPTION.into(), serde_json::Value::String(d.clone()));
+        }
+        if let Some(t) = &self.transport {
+            map.insert(TRANSPORT.into(), serde_json::Value::String(t.clone()));
         }
         map
     }
@@ -157,6 +175,19 @@ impl InviteToken {
             ),
         };
 
+        let text = |key: &str| -> AtomicResult<Option<String>> {
+            match json.get(key) {
+                None | Some(serde_json::Value::Null) => Ok(None),
+                Some(v) => Ok(Some(
+                    v.as_str()
+                        .ok_or_else(|| format!("{key} must be a string in invite token"))?
+                        .to_string(),
+                )),
+            }
+        };
+        let description = text(urls::DESCRIPTION)?;
+        let transport = text(TRANSPORT)?;
+
         Ok(Self {
             target,
             write,
@@ -164,6 +195,8 @@ impl InviteToken {
             signer,
             signature,
             max_usages,
+            description,
+            transport,
         })
     }
 
@@ -298,5 +331,45 @@ mod test {
         let ours = InviteToken::new(target.into(), false, expires, &agent, Some(2)).unwrap();
         assert_eq!(ours.signable_string().unwrap(), signable);
         assert_eq!(ours.signature, signature);
+    }
+
+    #[test]
+    fn signs_the_description_and_transport_tomic_lib_adds() {
+        let agent = agent();
+        let signer = agent.subject.to_string();
+        let target = "did:ad:drive";
+        let expires = 4_102_444_800_000_i64;
+        // fast-json-stable-stringify of a browser-peer invite with a note.
+        let signable = format!(
+            concat!(
+                "{{\"https://atomicdata.dev/properties/description\":\"Come review\",",
+                "\"https://atomicdata.dev/properties/invite/expiresAt\":{expires},",
+                "\"https://atomicdata.dev/properties/invite/target\":\"{target}\",",
+                "\"https://atomicdata.dev/properties/invite/transport\":\"webrtc\",",
+                "\"https://atomicdata.dev/properties/invite/write\":true,",
+                "\"https://atomicdata.dev/properties/signer\":\"{signer}\"}}"
+            ),
+            signer = signer,
+            expires = expires,
+            target = target,
+        );
+        let signature = crate::commit::sign_message(
+            &signable,
+            agent.private_key.as_ref().unwrap(),
+            &agent.public_key,
+        )
+        .unwrap();
+        let mut map: serde_json::Map<String, serde_json::Value> =
+            serde_json::from_str(&signable).unwrap();
+        map.insert(urls::SIGNATURE.into(), signature.into());
+        let ts_token = general_purpose::STANDARD.encode(serde_json::to_vec(&map).unwrap());
+
+        let decoded = InviteToken::decode(&ts_token).unwrap();
+        assert_eq!(decoded.description.as_deref(), Some("Come review"));
+        assert_eq!(decoded.transport.as_deref(), Some("webrtc"));
+        decoded.verify_signature(&agent.public_key).unwrap();
+        // Re-encoding keeps both keys, so the token still verifies.
+        let again = InviteToken::decode(&decoded.encode().unwrap()).unwrap();
+        again.verify_signature(&agent.public_key).unwrap();
     }
 }

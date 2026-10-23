@@ -173,6 +173,8 @@ mod test {
             signer: agent.subject.clone(),
             signature,
             max_usages: None,
+            description: None,
+            transport: None,
         };
 
         let encoded = token.encode().expect("Failed to encode");
@@ -270,6 +272,8 @@ mod test {
             signer: agent.subject.clone(),
             signature: "invalid".to_string(),
             max_usages: None,
+            description: None,
+            transport: None,
         };
 
         let result = token.verify(&store).await;
