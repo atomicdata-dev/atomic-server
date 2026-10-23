@@ -1,0 +1,22 @@
+name: hello_atomic
+description: The smallest app on Atomic Data - create, read and watch a resource.
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  atomic_store:
+    path: ../../atomic_store
+  atomic_store_flutter:
+    path: ..
+  path_provider: ^2.1.5
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
