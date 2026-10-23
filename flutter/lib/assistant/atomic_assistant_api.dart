@@ -112,6 +112,7 @@ class AtomicAssistantApi extends AssistantApi {
       final p = await OwnProfile.load();
       return ProfileIdentity(
           name: p.name ?? agent.name,
+          subject: agent.subject,
           imageUrl: p.imageUrl,
           imageBytes: p.imageBytes,
           emoji: p.emoji,
@@ -119,7 +120,8 @@ class AtomicAssistantApi extends AssistantApi {
     } catch (e) {
       debugPrint('Own profile not read: $e');
       // Not read now: the shell keeps the picture it has and asks again.
-      return ProfileIdentity(name: agent.name, pendingImage: true);
+      return ProfileIdentity(
+          name: agent.name, subject: agent.subject, pendingImage: true);
     }
   }
 

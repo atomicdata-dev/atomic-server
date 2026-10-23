@@ -31,6 +31,7 @@ ShellController _controller(WidgetTester tester) =>
     tester.widget<ShellScope>(find.byType(ShellScope)).controller;
 
 void main() {
+  _menuTests();
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   testWidgets('before the identity is known: the person icon', (tester) async {
@@ -169,5 +170,74 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     expect(find.bySemanticsLabel('Joep, sync problem'), findsOneWidget);
     handle.dispose();
+  });
+}
+
+/// The profile button's hold menu.
+void _menuTests() {
+  Future<TestGesture> hold(WidgetTester tester) async {
+    final gesture = await tester.startGesture(tester.getCenter(find
+        .descendant(
+            of: find.byType(AppBottomBar),
+            matching: find.byWidgetPredicate((w) => w is HoldFan))
+        .last));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 200));
+    return gesture;
+  }
+
+  Future<void> pick(WidgetTester tester, TestGesture g, String item) async {
+    await g.moveTo(tester.getCenter(find.text(item).last));
+    await tester.pump();
+    await g.up();
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> open(WidgetTester tester, ProfileIdentity who) async {
+    ResourceView.serverFactory = () async => throw 'no server in a test';
+    _size(tester, const Size(360, 800));
+    await tester.pumpWidget(_shell(_Api(who)));
+    await tester.pump();
+    await tester.pump();
+  }
+
+  testWidgets('holding the avatar lists Settings and View profile',
+      (tester) async {
+    await open(tester,
+        const ProfileIdentity(name: 'Joep', subject: 'did:ad:agent:abc'));
+    final g = await hold(tester);
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('View profile'), findsOneWidget);
+    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+    await g.up();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('Settings opens the user page like a tap', (tester) async {
+    await open(tester,
+        const ProfileIdentity(name: 'Joep', subject: 'did:ad:agent:abc'));
+    final g = await hold(tester);
+    await pick(tester, g, 'Settings');
+    expect(find.text('profile page'), findsOneWidget);
+  });
+
+  testWidgets('View profile opens the agent as a resource', (tester) async {
+    await open(tester,
+        const ProfileIdentity(name: 'Joep', subject: 'did:ad:agent:abc'));
+    final g = await hold(tester);
+    await pick(tester, g, 'View profile');
+    expect(find.text('profile page'), findsNothing);
+    final view = tester.widget<ResourceView>(find.byType(ResourceView));
+    expect(view.subject, 'did:ad:agent:abc');
+  });
+
+  testWidgets('without an agent subject there is no View profile',
+      (tester) async {
+    await open(tester, const ProfileIdentity(name: 'Joep'));
+    final g = await hold(tester);
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('View profile'), findsNothing);
+    await g.up();
+    await tester.pumpAndSettle();
   });
 }

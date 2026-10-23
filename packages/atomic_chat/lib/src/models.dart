@@ -549,6 +549,10 @@ abstract final class AssistantJson {
 class ProfileIdentity {
   final String? name;
 
+  /// The agent's subject, to open its profile as a resource; null when
+  /// unknown (the profile menu then has no "View profile").
+  final String? subject;
+
   /// The picture's download URL.
   final String? imageUrl;
 
@@ -562,6 +566,7 @@ class ProfileIdentity {
 
   const ProfileIdentity(
       {this.name,
+      this.subject,
       this.imageUrl,
       this.imageBytes,
       this.emoji,
@@ -571,6 +576,7 @@ class ProfileIdentity {
   bool operator ==(Object other) =>
       other is ProfileIdentity &&
       other.name == name &&
+      other.subject == subject &&
       other.imageUrl == imageUrl &&
       other.pendingImage == pendingImage &&
       (identical(other.imageBytes, imageBytes) ||

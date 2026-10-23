@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColorsExt, HoldFan, HoldFanItem, HoldMenuStyle;
 import 'package:flutter/material.dart';
@@ -213,6 +215,7 @@ class AppBottomBar extends StatelessWidget {
                             // Next to the pages every slot is the same.
                             wide: roomy && !split && more == null,
                             onPressed: onUser,
+                            onViewProfile: _actions.viewProfile,
                           ),
                         ),
                         if (split)
@@ -358,6 +361,21 @@ class ShellActions {
             settings: settings));
   }
 
+  /// Opens the person's own agent as a resource page (the profile menu's
+  /// "View profile").
+  Future<void> viewProfile(ProfileIdentity who) {
+    final subject = who.subject;
+    if (subject == null) return Future.value();
+    return shell.openDetail<void>(
+      (_) => openResourceView(
+          api: api,
+          drive: shell.drive.value,
+          subject: subject,
+          title: who.name?.trim() ?? ''),
+      subject: subject,
+    );
+  }
+
   VoidCallback? get onUser =>
       shell.onUser ??
       switch (shell.profile) {
@@ -430,6 +448,8 @@ class _Current extends StatelessWidget {
   }
 }
 
+enum _ProfileChoice { settings, profile }
+
 /// The widest the name next to the avatar gets.
 const _profileNameWidth = 96.0;
 
@@ -442,6 +462,7 @@ class _ProfileButton extends StatelessWidget {
   final bool current;
   final bool wide;
   final VoidCallback? onPressed;
+  final void Function(ProfileIdentity who)? onViewProfile;
 
   const _ProfileButton({
     required this.shell,
@@ -449,6 +470,7 @@ class _ProfileButton extends StatelessWidget {
     required this.current,
     required this.wide,
     required this.onPressed,
+    this.onViewProfile,
   });
 
   @override
@@ -510,8 +532,51 @@ class _ProfileButton extends StatelessWidget {
             ),
           ],
         );
+        final content = Center(
+          widthFactor: 1,
+          heightFactor: 1,
+          child: showName
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    avatar,
+                    const SizedBox(width: 6),
+                    Flexible(
+                        child: ConstrainedBox(
+                      constraints:
+                          const BoxConstraints(maxWidth: _profileNameWidth),
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: current
+                                ? main
+                                : Theme.of(context).colorScheme.onSurfaceVariant),
+                      ),
+                    )),
+                  ]),
+                )
+              : avatar,
+        );
+        // The target is as wide as the avatar and the name (at least 48).
+        var width = 48.0;
+        if (showName) {
+          final text = TextPainter(
+            text: TextSpan(text: name, style: DefaultTextStyle.of(context).style),
+            maxLines: 1,
+            textDirection: Directionality.of(context),
+            textScaler: MediaQuery.textScalerOf(context),
+          )..layout(maxWidth: _profileNameWidth);
+          width = math.max(48, 8 + 24 + 6 + text.width + 2);
+          text.dispose();
+        }
+        final view = onViewProfile;
         return Tooltip(
           message: label,
+          // A hold opens the menu, not the tooltip.
+          triggerMode: TooltipTriggerMode.manual,
+          excludeFromSemantics: true,
           child: ValueListenableBuilder<BackgroundState>(
             valueListenable: act,
             builder: (context, sync, child) => Semantics(
@@ -521,46 +586,26 @@ class _ProfileButton extends StatelessWidget {
               onTap: current ? null : onPressed,
               child: child,
             ),
-            child: InkResponse(
-              mouseCursor: WidgetStateMouseCursor.clickable,
+            // A tap opens the user page; swipe or hold for the menu.
+            child: HoldFan<_ProfileChoice>(
+              opensOnDown: true,
+              defaultIndex: null,
+              menuLabel: 'Profile menu',
+              width: showName ? width : null,
               onTap: current ? null : onPressed,
-              splashFactory: NoSplash.splashFactory,
-              radius: 28,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-                // Its own height, whatever room the bar is given: without
-                // the factors it took all of it, and next to the pages the
-                // bar (with a signed-in person) then filled the sidebar.
-                child: Center(
-                  widthFactor: 1,
-                  heightFactor: 1,
-                  child: showName
-                      ? Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            avatar,
-                            const SizedBox(width: 6),
-                            Flexible(
-                                child: ConstrainedBox(
-                              constraints: const BoxConstraints(
-                                  maxWidth: _profileNameWidth),
-                              child: Text(
-                                name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    color: current
-                                        ? main
-                                        : Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant),
-                              ),
-                            )),
-                          ]),
-                        )
-                      : avatar,
-                ),
-              ),
+              items: [
+                if (onPressed != null)
+                  const HoldFanItem('Settings', _ProfileChoice.settings,
+                      icon: Icons.settings_outlined),
+                if (view != null && who.subject != null)
+                  const HoldFanItem('View profile', _ProfileChoice.profile,
+                      icon: Icons.person_outline),
+              ],
+              onSelected: (choice) => switch (choice) {
+                _ProfileChoice.settings => onPressed?.call(),
+                _ProfileChoice.profile => view?.call(who),
+              },
+              child: content,
             ),
           ),
         );

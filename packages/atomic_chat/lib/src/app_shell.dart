@@ -293,6 +293,7 @@ class ShellController extends ChangeNotifier {
           who.imageUrl == null) {
         who = ProfileIdentity(
             name: who.name,
+            subject: who.subject,
             imageUrl: before.imageUrl,
             imageBytes: before.imageBytes,
             emoji: who.emoji,
