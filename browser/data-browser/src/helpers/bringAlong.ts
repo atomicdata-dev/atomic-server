@@ -64,19 +64,20 @@ export async function handOverFrom(
 }
 
 /**
- * Whether `from` has anything worth asking about: a workspace holding at
- * least one drive besides its own home. Unreadable counts as yes, like the
- * reconcile gate: an identity that is merely offline must not be left behind
- * unasked.
+ * The drives `from` would bring along: those of its workspace besides its own
+ * home (and that home when it holds something). Empty when there is nothing
+ * to ask about; `undefined` when it cannot be read, which counts as work, like
+ * the reconcile gate: an identity that is merely offline must not be left
+ * behind unasked.
  */
-export async function hasWorkToBring(
+export async function workToBring(
   store: Store,
   from: string,
-): Promise<boolean> {
+): Promise<string[] | undefined> {
   const workspace = await localAgentWorkspace(store, from);
 
-  if (workspace === 'none') return false;
-  if (workspace === 'unknown') return true;
+  if (workspace === 'none') return [];
+  if (workspace === 'unknown') return undefined;
 
   try {
     const skip = skippedDrives();
@@ -86,22 +87,23 @@ export async function hasWorkToBring(
       store.getAgent()?.privateDrive,
     );
 
-    return drives.some(drive => !skip.includes(drive));
+    return drives.filter(drive => !skip.includes(drive));
   } catch {
-    return true;
+    return undefined;
   }
 }
 
 /**
  * Run before a sign-in replaces the stored identity. Always keeps the old
- * key. When the old identity has work, `ask` shows the question and resolves
- * with the answer; yes hands the drives to `to`. Throws when bringing them
+ * key. When the old identity has work, `ask` shows the question with the
+ * drives that would come along (empty when they could not be read) and
+ * resolves with the answer; yes hands the drives to `to`. Throws when bringing them
  * along fails, so the caller can stop before switching.
  */
 export async function prepareIdentitySwitch(
   store: Store,
   to: string | undefined,
-  ask: () => Promise<boolean>,
+  ask: (drives: string[]) => Promise<boolean>,
 ): Promise<SwitchOutcome> {
   const from = store.getAgent()?.subject;
 
@@ -117,9 +119,11 @@ export async function prepareIdentitySwitch(
     );
   }
 
-  if (!(await hasWorkToBring(store, from))) return 'left';
+  const drives = await workToBring(store, from);
 
-  if (!(await ask())) return 'left';
+  if (drives?.length === 0) return 'left';
+
+  if (!(await ask(drives ?? []))) return 'left';
 
   await handOverFrom(store, from, to);
 

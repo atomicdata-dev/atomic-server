@@ -33,7 +33,7 @@ vi.mock('../chunks/Templates/demoSession', () => ({
 }));
 vi.mock('@sentry/react', () => ({ captureException: m.capture }));
 
-import { hasWorkToBring, prepareIdentitySwitch } from './bringAlong';
+import { prepareIdentitySwitch, workToBring } from './bringAlong';
 
 const store = { getAgent: () => m.agent } as never;
 const A = 'did:ad:agent:a';
@@ -90,7 +90,7 @@ describe('prepareIdentitySwitch', () => {
 
     expect(await prepareIdentitySwitch(store, B, ask)).toBe('brought');
     expect(m.archive).toHaveBeenCalledWith(A);
-    expect(ask).toHaveBeenCalledOnce();
+    expect(ask).toHaveBeenCalledExactlyOnceWith(['did:ad:notes']);
     expect(m.handOver).toHaveBeenCalledWith(
       store,
       expect.objectContaining({ from: A, to: B }),
@@ -135,16 +135,16 @@ describe('prepareIdentitySwitch', () => {
   });
 });
 
-describe('hasWorkToBring', () => {
+describe('workToBring', () => {
   it('counts an unreadable workspace as work', async () => {
     m.workspace.mockResolvedValue('unknown');
 
-    expect(await hasWorkToBring(store, A)).toBe(true);
+    expect(await workToBring(store, A)).toBeUndefined();
   });
 
   it('counts an unreadable drive list as work', async () => {
     m.list.mockRejectedValue(new Error('offline'));
 
-    expect(await hasWorkToBring(store, A)).toBe(true);
+    expect(await workToBring(store, A)).toBeUndefined();
   });
 });

@@ -11,7 +11,8 @@ class AccountSwitch {
   /// The secret is the account that is signed in already: nothing to do.
   final bool same;
 
-  /// Drives of the account signed in before that the new one can use now.
+  /// Names of the drives of the account signed in before that the new one
+  /// can use now.
   final List<String> broughtAlong;
 
   /// The secret of the account signed in before, to keep.
@@ -32,11 +33,22 @@ Future<AccountSwitch> switchAccountOnDevice(String secret) async {
     final found = await handle.signIn(secret: secret);
     return AccountSwitch(
         same: found.agentSubject == current.subject,
-        broughtAlong: found.broughtAlong,
+        broughtAlong: [
+          for (final drive in found.broughtAlong) await _nameOf(drive)
+        ],
         previousSecret: found.previousSecret);
   } on bridge.AtomicError catch (e) {
     throw StateError(e.message);
   } finally {
     handle.dispose();
   }
+}
+
+Future<String> _nameOf(String drive) async {
+  try {
+    final name = await AtomicClient.getProperty(
+        drive, 'https://atomicdata.dev/properties/name');
+    if (name.trim().isNotEmpty) return name.trim();
+  } catch (_) {}
+  return 'Untitled drive';
 }

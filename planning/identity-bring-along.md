@@ -36,15 +36,19 @@ No work, no step: the sign-in is just a sign-in.
 
 ## Asking or not
 
-- **App (own phone):** no question. The sign-in ends on one result line:
-  "Your notes from before are in your account now." (with the number of
-  drives), and they are in the drive switcher.
+- **App (own phone):** no question. The sign-in ends on one result line that
+  names the drives: 'Added to your account: "Notes" and "Recipes".', and
+  they are in the drive switcher.
 - **Web:** a browser may be shared, so one question, only when A has work:
-  "Keep what you made here?" with **Bring it along** (default) and **Leave it
-  here** (archives A, lists nothing). One screen, no jargon.
+  "Add your work from this browser to your account?", listing the drives
+  (as resource rows) and saying "Nothing is copied or deleted". Buttons:
+  **Add to my account** (default) and **Don't add, keep it in this browser
+  only** (archives A, lists nothing). One screen, no jargon.
 
-Words used on screen: "what you made here", "your account", "this device".
-Not: agent, identity, drive rights, merge.
+Joep (23 Oct): "it" and "here" were too vague, and the buttons sounded like
+delete or copy. So the screen names what comes along and says what happens.
+Words used on screen: "your work", "your account", "this browser".
+Not: agent, identity, drive rights, merge, it, here.
 
 ## The flows
 

@@ -3,9 +3,9 @@ import { devDrive, FRONTEND_URL, getDevDriveSecret } from './test-utils';
 
 /**
  * Signing in with a secret on a browser that already holds another identity
- * with work: the question "Keep what you made here?" appears, and answering
- * "Bring it along" hands the old identity's drive to the new one (see
- * planning/identity-bring-along.md).
+ * with work: the card asks to add that work to the account and names the
+ * drive, and "Add to my account" hands the old identity's drive to the new
+ * one (see planning/identity-bring-along.md).
  *
  * B is the account (made in its own context). A is what this browser held
  * before: a fresh identity with a drive of its own.
@@ -50,8 +50,11 @@ test('signing in with a secret brings the previous identity’s drive along', as
   const card = page.getByTestId('bring-along');
   await expect(card).toBeVisible({ timeout: 60_000 });
   await expect(
-    card.getByText('Keep what you made here?', { exact: true }),
+    card.getByText('Add your work from this browser to your account?', {
+      exact: true,
+    }),
   ).toBeVisible();
+  await expect(card.getByText('Made before signing in')).toBeVisible();
   await card.getByTestId('bring-along-yes').click();
 
   // The app is B now.

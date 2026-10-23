@@ -414,7 +414,8 @@ class _SyncScreenState extends State<SyncScreen> {
   }
 
   /// The login screen's sign-in options, on top of this one. It comes back
-  /// with how many drives of the account signed in before came along.
+  /// with the names of the drives of the account signed in before that came
+  /// along.
   Future<void> _signInAsOther() async {
     final onLoggedIn = widget.onSignedInAsOther ?? () {};
     // Taken before leaving: showing the app as the other account may rebuild
@@ -422,17 +423,17 @@ class _SyncScreenState extends State<SyncScreen> {
     final toasts = ToastScope.maybeOf(context);
     final messenger = ScaffoldMessenger.maybeOf(context);
     final brought =
-        await Navigator.of(context).push<int>(MaterialPageRoute<int>(
+        await Navigator.of(context).push<List<String>>(MaterialPageRoute(
       builder: (_) =>
           widget.signInPage?.call(onLoggedIn) ??
           LoginScreen(switchAccount: true, onLoggedIn: onLoggedIn),
     ));
-    if (brought != null && brought > 0) {
-      const message = 'Your notes from before are in your account now.';
+    if (brought != null && brought.isNotEmpty) {
+      final message = broughtAlongMessage(brought);
       if (toasts != null) {
         toasts.show('signed-in-as-other', message, icon: Icons.check);
       } else {
-        messenger?.showSnackBar(const SnackBar(content: Text(message)));
+        messenger?.showSnackBar(SnackBar(content: Text(message)));
       }
     }
     if (mounted && brought != null) await _load();
@@ -845,4 +846,14 @@ class _SyncScreenState extends State<SyncScreen> {
           onTap: () => _link(portal),
         ),
       ]);
+}
+
+/// The line after signing in as another account: which drives of the one
+/// before are in this account now.
+String broughtAlongMessage(List<String> names) {
+  final quoted = [for (final n in names) '"$n"'];
+  final list = quoted.length == 1
+      ? quoted.single
+      : '${quoted.sublist(0, quoted.length - 1).join(', ')} and ${quoted.last}';
+  return 'Added to your account: $list.';
 }

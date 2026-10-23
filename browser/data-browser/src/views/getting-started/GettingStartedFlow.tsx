@@ -37,6 +37,7 @@ import { constructOpenURL } from '../../helpers/navigation';
 import { paths } from '../../routes/paths';
 import { Button } from '../../components/Button';
 import { Column } from '../../components/Row';
+import { ResourceRow } from '../ResourceRow';
 import { NewIdentitySection } from '../../components/NewIdentitySection';
 import {
   accountAddress,
@@ -286,6 +287,7 @@ export function GettingStartedFlow({
   >(null);
   /** The question before this browser's own work is left behind or brought along. */
   const [bringPrompt, setBringPrompt] = useState<{
+    drives: string[];
     answer: (bring: boolean) => void;
   } | null>(null);
   /** Shown only after blur/Enter — every prefix of a valid secret is invalid,
@@ -609,9 +611,9 @@ export function GettingStartedFlow({
       const outcome = await prepareIdentitySwitch(
         store,
         newAgent.subject,
-        () =>
+        drives =>
           new Promise<boolean>(resolve => {
-            setBringPrompt({ answer: resolve });
+            setBringPrompt({ drives, answer: resolve });
             setStep('bring-along');
           }),
       );
@@ -1656,18 +1658,26 @@ export function GettingStartedFlow({
           <OnboardingWrap>
             <OnboardingCard key='card' data-testid='bring-along'>
               <Column gap='1rem'>
-                <CardTitle key='title'>Keep what you made here?</CardTitle>
+                <CardTitle key='title'>
+                  Add your work from this browser to your account?
+                </CardTitle>
                 <p key='copy'>
-                  What you made in this browser goes to the account you&apos;re
-                  signing in to. If you leave it here, it stays on this device.
+                  Your account gets access to it. Nothing is copied or deleted.
                 </p>
+                {bringPrompt.drives.length > 0 && (
+                  <Column key='drives' gap='0.5rem'>
+                    {bringPrompt.drives.map(drive => (
+                      <ResourceRow key={drive} subject={drive} />
+                    ))}
+                  </Column>
+                )}
                 <Button
                   key='bring'
                   type='button'
                   data-testid='bring-along-yes'
                   onClick={() => bringPrompt.answer(true)}
                 >
-                  Bring it along
+                  Add to my account
                 </Button>
                 <Button
                   key='leave'
@@ -1676,7 +1686,7 @@ export function GettingStartedFlow({
                   data-testid='bring-along-no'
                   onClick={() => bringPrompt.answer(false)}
                 >
-                  Leave it here
+                  Don&apos;t add, keep it in this browser only
                 </Button>
               </Column>
             </OnboardingCard>

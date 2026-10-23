@@ -49,10 +49,13 @@ const state = vi.hoisted(() => ({
     (
       store: unknown,
       to: unknown,
-      ask: () => Promise<boolean>,
+      ask: (drives: string[]) => Promise<boolean>,
     ) => Promise<string>
   >(async () => 'plain'),
   applyBroughtAlong: vi.fn(async () => true),
+}));
+vi.mock('../ResourceRow', () => ({
+  ResourceRow: ({ subject }: { subject: string }) => <span>{subject}</span>,
 }));
 vi.mock('@tomic/react', async original => ({
   ...(await original<typeof import('@tomic/react')>()),
@@ -308,8 +311,11 @@ it('returns a drive link to that drive after secret sign-in', async () => {
 
 it('asks before leaving work behind, then brings it to the new home', async () => {
   state.prepareIdentitySwitch.mockImplementation(
-    async (_store: unknown, _to: unknown, ask: () => Promise<boolean>) =>
-      (await ask()) ? 'brought' : 'left',
+    async (
+      _store: unknown,
+      _to: unknown,
+      ask: (drives: string[]) => Promise<boolean>,
+    ) => ((await ask(['did:ad:notes'])) ? 'brought' : 'left'),
   );
   await show('?next=did%3Aad%3Ashared');
   await act(async () => {
@@ -317,11 +323,15 @@ it('asks before leaving work behind, then brings it to the new home', async () =
       target: { value: 'test-secret' },
     });
   });
-  expect(screen.getByText('Keep what you made here?')).toBeTruthy();
+  expect(
+    screen.getByText('Add your work from this browser to your account?'),
+  ).toBeTruthy();
+  // The card names what would come along.
+  expect(screen.getByText('did:ad:notes')).toBeTruthy();
   expect(state.setAgent).not.toHaveBeenCalled();
 
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: 'Bring it along' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add to my account' }));
   });
   expect(state.applyBroughtAlong).toHaveBeenCalledWith(
     state.store,

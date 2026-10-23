@@ -13343,17 +13343,17 @@ msgid "Could not send your identity"
 msgstr "Could not send your identity"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
-msgid "Keep what you made here?"
-msgstr "Keep what you made here?"
+msgid "Add your work from this browser to your account?"
+msgstr "Add your work from this browser to your account?"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
-msgid "What you made in this browser goes to the account you're signing in to. If you leave it here, it stays on this device."
-msgstr "What you made in this browser goes to the account you're signing in to. If you leave it here, it stays on this device."
+msgid "Your account gets access to it. Nothing is copied or deleted."
+msgstr "Your account gets access to it. Nothing is copied or deleted."
 
 #: src/views/getting-started/GettingStartedFlow.tsx
-msgid "Bring it along"
-msgstr "Bring it along"
+msgid "Add to my account"
+msgstr "Add to my account"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
-msgid "Leave it here"
-msgstr "Leave it here"
+msgid "Don't add, keep it in this browser only"
+msgstr "Don't add, keep it in this browser only"

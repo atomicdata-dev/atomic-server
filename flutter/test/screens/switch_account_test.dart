@@ -48,7 +48,7 @@ class _Backend extends shared.AtomicSettingsBackend {
 }
 
 const _entry = 'Sign in to another account';
-const _brought = 'Your notes from before are in your account now.';
+const _brought = 'Added to your account: "did:ad:a" and "did:ad:shared".';
 
 void main() {
   late Map<String, String> secure;

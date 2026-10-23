@@ -100,7 +100,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  int _broughtAlong = 0;
+  /// Names of the drives that came along.
+  List<String> _broughtAlong = const [];
 
   @override
   void dispose() {
@@ -415,7 +416,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (previous != null) {
           await AtomicSession.archivePreviousSecret(previous);
         }
-        _broughtAlong = switched.broughtAlong.length;
+        _broughtAlong = switched.broughtAlong;
       }
       final stored = await AtomicSession.save(
         serverUrl: _serverOrigin,
