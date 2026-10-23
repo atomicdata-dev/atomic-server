@@ -1417,6 +1417,14 @@ export class AtomicServer {
         this.source.directory('lib/test_files/loro-compat'),
       )
       .withFile('/Cargo.lock', this.source.file('Cargo.lock'))
+      // data-browser's identityHandback.test.ts opens the vector the Dart
+      // package tests against, by repository-root path. Mount only that file.
+      .withFile(
+        '/packages/atomic_flutter/test/fixtures/identity_handback_vector.json',
+        this.source.file(
+          'packages/atomic_flutter/test/fixtures/identity_handback_vector.json',
+        ),
+      )
       // Fixtures shared by the Rust and TS twins (class constraints, lenses,
       // JSON Schema interop, schema lockfiles), read by repository-root
       // path. Same /lib collision: mount only that directory.
