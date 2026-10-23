@@ -1886,7 +1886,10 @@ pub async fn sync_drive_with_peer_using_outcome(
     let attempt = match DIAL_GATE.begin(&remote_key, std::time::Instant::now(), force) {
         Ok(a) => a,
         Err(Skip::Backoff(left)) => {
-            tracing::debug!("[sync] not dialling {remote_short}: unreachable, retry in {}s", left.as_secs());
+            tracing::debug!(
+                "[sync] not dialling {remote_short}: unreachable, retry in {}s",
+                left.as_secs()
+            );
             return Err(format!(
                 "Iroh connect to {remote_short} skipped: recently unreachable (retry in {}s)",
                 left.as_secs()
@@ -1895,7 +1898,9 @@ pub async fn sync_drive_with_peer_using_outcome(
         }
         Err(Skip::InFlight) => {
             tracing::debug!("[sync] not dialling {remote_short}: an attempt is already running");
-            return Err(format!("Iroh connect to {remote_short} skipped: already connecting").into());
+            return Err(
+                format!("Iroh connect to {remote_short} skipped: already connecting").into(),
+            );
         }
     };
     let connected =
@@ -1905,23 +1910,22 @@ pub async fn sync_drive_with_peer_using_outcome(
         Ok(Ok(_)) => DIAL_GATE.record_success(&remote_key),
         _ => DIAL_GATE.record_failure(&remote_key, std::time::Instant::now()),
     }
-    let conn =
-        match connected {
-            Ok(Ok(c)) => c,
-            Ok(Err(e)) => {
-                tracing::error!("[sync] connect failed to {remote_short}: {e}");
-                return Err(format!("Iroh connect to {remote_short} failed: {e}").into());
-            }
-            Err(_) => {
-                tracing::error!("[sync] connect timed out to {remote_short}");
-                return Err(format!(
-                    "Iroh connect to {remote_short} timed out after {}s. \
+    let conn = match connected {
+        Ok(Ok(c)) => c,
+        Ok(Err(e)) => {
+            tracing::error!("[sync] connect failed to {remote_short}: {e}");
+            return Err(format!("Iroh connect to {remote_short} failed: {e}").into());
+        }
+        Err(_) => {
+            tracing::error!("[sync] connect timed out to {remote_short}");
+            return Err(format!(
+                "Iroh connect to {remote_short} timed out after {}s. \
                  Is the other device online, on the network, and running the app?",
-                    CONNECT_TIMEOUT.as_secs()
-                )
-                .into());
-            }
-        };
+                CONNECT_TIMEOUT.as_secs()
+            )
+            .into());
+        }
+    };
 
     tracing::info!("[sync] connected! Opening bi stream...");
 
@@ -4288,7 +4292,11 @@ mod unsaved_peers_tests {
             serde_json::from_str(r#"[{"node_id":"aaaa","name":"Paired"}]"#).unwrap();
         set_live_peer_name("bbbb_unsaved_test", "Visitor");
         let got = unsaved_peers(
-            vec!["aaaa".into(), "bbbb_unsaved_test".into(), "cccc_unsaved_test".into()],
+            vec![
+                "aaaa".into(),
+                "bbbb_unsaved_test".into(),
+                "cccc_unsaved_test".into(),
+            ],
             &known,
         );
         assert_eq!(

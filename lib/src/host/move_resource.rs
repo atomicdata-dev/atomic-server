@@ -8,11 +8,7 @@
 //! `createdAt`; `lists::list_children` sorts by the same rule. One resource is
 //! saved per move, so no sibling is renumbered.
 
-use super::{
-    lists::list_children,
-    rows::row_resource,
-    LocalWritePusher,
-};
+use super::{lists::list_children, rows::row_resource, LocalWritePusher};
 use crate::{
     errors::AtomicResult, runtime::AtomicNode, urls, Db, Resource, Storelike, Subject, Value,
 };

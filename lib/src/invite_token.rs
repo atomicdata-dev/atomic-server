@@ -94,7 +94,10 @@ impl InviteToken {
         // Optional keys `@tomic/lib` signs only when set: leaving them out of
         // the signed bytes made such tokens fail verification.
         if let Some(d) = &self.description {
-            map.insert(urls::DESCRIPTION.into(), serde_json::Value::String(d.clone()));
+            map.insert(
+                urls::DESCRIPTION.into(),
+                serde_json::Value::String(d.clone()),
+            );
         }
         if let Some(t) = &self.transport {
             map.insert(TRANSPORT.into(), serde_json::Value::String(t.clone()));

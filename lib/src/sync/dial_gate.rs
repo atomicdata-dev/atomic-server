@@ -81,7 +81,10 @@ impl DialGate {
             }
         }
         e.in_flight = true;
-        Ok(Attempt { gate: self, key: key.to_string() })
+        Ok(Attempt {
+            gate: self,
+            key: key.to_string(),
+        })
     }
 
     pub fn record_failure(&self, key: &str, now: Instant) {
@@ -134,7 +137,10 @@ mod tests {
         let t0 = Instant::now();
         drop(g.begin("a", t0, false).unwrap());
         g.record_failure("a", t0);
-        assert!(matches!(g.begin("a", t0 + Duration::from_secs(10), false), Err(Skip::Backoff(_))));
+        assert!(matches!(
+            g.begin("a", t0 + Duration::from_secs(10), false),
+            Err(Skip::Backoff(_))
+        ));
         // Other peers are unaffected.
         assert!(g.begin("b", t0, false).is_ok());
         assert!(g.begin("a", t0 + Duration::from_secs(31), false).is_ok());
