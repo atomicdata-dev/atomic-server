@@ -45,7 +45,13 @@ const state = vi.hoisted(() => ({
   identityProps: undefined as Record<string, unknown> | undefined,
   // What the identity this browser already holds has to bring along; see
   // helpers/bringAlong.test.ts for the decision itself.
-  prepareIdentitySwitch: vi.fn(async () => 'plain'),
+  prepareIdentitySwitch: vi.fn<
+    (
+      store: unknown,
+      to: unknown,
+      ask: () => Promise<boolean>,
+    ) => Promise<string>
+  >(async () => 'plain'),
   applyBroughtAlong: vi.fn(async () => true),
 }));
 vi.mock('@tomic/react', async original => ({
