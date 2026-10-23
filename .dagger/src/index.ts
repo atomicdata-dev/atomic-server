@@ -796,21 +796,14 @@ export class AtomicServer {
         // Persist the rustup toolchain so a layer-cache miss doesn't
         // re-download rustc. Idempotent install below.
         .withMountedCache('/root/.rustup', flutterRustup)
-        .withExec(['apt-get', 'update', '-qq'])
+        // One layer: a cached `apt-get update` layer can come back without
+        // its package lists, and the install then finds no packages.
         .withExec([
-          'apt-get',
-          'install',
-          '-y',
-          '--no-install-recommends',
-          'ca-certificates',
-          'curl',
-          'git',
-          'build-essential',
-          'cmake',
-          'ninja-build',
-          'pkg-config',
-          'libssl-dev',
-          'clang',
+          'sh',
+          '-c',
+          'apt-get update -qq && apt-get install -y --no-install-recommends ' +
+            'ca-certificates curl git build-essential cmake ninja-build ' +
+            'pkg-config libssl-dev clang',
         ])
         .withExec([
           'sh',
