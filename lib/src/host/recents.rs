@@ -286,9 +286,9 @@ const FRESH_ENVELOPE_MS: i64 = 2 * 60_000;
 ///   such a change stays unattributed.
 ///
 /// The store is read when the event is handled, so a commit that lands
-/// before the listener gets to the previous one's event lends it its signer;
-/// the listener runs as the events come, so in practice that is a burst of
-/// one agent's own edits.
+/// before the listener gets to the previous one's event lends it its signer
+/// (a creation excepted: its `createdBy` says who); the listener runs as the
+/// events come, so in practice that is a burst of one agent's own edits.
 fn attribute(
     store: &Db,
     subject: &str,
@@ -298,6 +298,21 @@ fn attribute(
     first_seen: bool,
 ) -> (Option<String>, i64, bool) {
     let now = crate::utils::now();
+    let created_at = resource
+        .get(urls::CREATED_AT)
+        .ok()
+        .and_then(|v| v.to_int().ok());
+    let creator = resource
+        .get(urls::CREATED_BY)
+        .ok()
+        .map(|v| v.to_string())
+        .filter(|s| !s.is_empty());
+    // A resource that is new names its creator, also when its event is handled
+    // after someone else's commit to it landed: that newest envelope is the
+    // later change's, not the genesis.
+    if is_new && creator.is_some() {
+        return (creator, created_at.unwrap_or(now), true);
+    }
     let latest = latest_signer(store, subject);
     if from_commit {
         return match latest {
@@ -305,24 +320,13 @@ fn attribute(
             None => (None, now, is_new),
         };
     }
-    let created_at = resource
-        .get(urls::CREATED_AT)
-        .ok()
-        .and_then(|v| v.to_int().ok());
     // A resource the log does not know yet names its creator, however old it
     // is: it reaches a device that joined late (or has not looked in a while)
     // as plain state, and its genesis is the one thing that says who made it
     // and when. Judging it by how recent it is hid everything older than two
     // minutes.
-    if is_new || first_seen {
-        let creator = resource
-            .get(urls::CREATED_BY)
-            .ok()
-            .map(|v| v.to_string())
-            .filter(|s| !s.is_empty());
-        if creator.is_some() {
-            return (creator, created_at.unwrap_or(now), true);
-        }
+    if first_seen && creator.is_some() {
+        return (creator, created_at.unwrap_or(now), true);
     }
     match latest {
         Some((actor, at)) if now - at < FRESH_ENVELOPE_MS => (Some(actor), at, is_new),
@@ -1291,6 +1295,42 @@ mod tests {
         );
         let one = d.recents.recent_chats(&d.store, 1).await.unwrap();
         assert_eq!(one.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_creation_handled_after_someone_elses_edit_stays_the_creators() {
+        let d = Device::new().await;
+        let own = d.store.get_default_agent().unwrap().subject.to_string();
+        let mut rx = d.store.subscribe_events();
+        let folder = d
+            .store
+            .create_resource(urls::FOLDER, &d.drive, "Made here", None)
+            .await
+            .unwrap();
+        // Bob's edit lands before the listener got to the creation's event.
+        let bob = crate::agents::Agent::new(Some("Bob")).unwrap();
+        let mut r = d.store.get_resource(&folder.as_str().into()).await.unwrap();
+        r.set_string(urls::NAME.into(), "Renamed by Bob", &d.store)
+            .await
+            .unwrap();
+        r.save_as(&bob, &d.store).await.unwrap();
+        d.pump(&mut rx).await;
+
+        let raw = d.recents.activity(500);
+        let of_folder: Vec<_> = raw.iter().filter(|a| a.subject == folder).collect();
+        let created = of_folder
+            .iter()
+            .find(|a| a.kind == ActivityKind::Created)
+            .unwrap();
+        assert!(same_agent(created.actor.as_deref().unwrap(), &own));
+        let changed = of_folder
+            .iter()
+            .find(|a| a.kind == ActivityKind::Changed)
+            .unwrap();
+        assert!(same_agent(
+            changed.actor.as_deref().unwrap(),
+            &bob.subject.to_string()
+        ));
     }
 
     #[tokio::test]
