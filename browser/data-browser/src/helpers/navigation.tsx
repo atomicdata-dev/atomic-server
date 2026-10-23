@@ -42,13 +42,6 @@ export function constructOpenURL(
   return path;
 }
 
-export function searchURL(query: string, scope?: string): string {
-  return constructURL(paths.search, {
-    query,
-    ...(scope ? { queryscope: scope } : {}),
-  });
-}
-
 /** Query parameters used by the `/new` route */
 export const newURLParams = {
   classSubject: 'classSubject',
@@ -81,10 +74,6 @@ export function editURL(subject: string): string {
   return constructURL(paths.edit, { subject });
 }
 
-export function shareURL(subject: string): string {
-  return constructURL(paths.share, { subject });
-}
-
 export function dataURL(subject: string): string {
   return constructURL(paths.data, { subject });
 }
@@ -99,21 +88,4 @@ export function importerURL(subject: string): string {
 
 export function historyURL(subject: string): string {
   return constructURL(paths.history, { subject });
-}
-
-/** Takes the cursor position, finds the nearest `about=` attributes in DOM nodes */
-export function getSubjectFromDom(): string | null {
-  const found: string[] = [];
-  // NodeList of items that the mouse is currently over in document order. The last element in the NodeList is the most specific, each preceding one should be a parent.
-  const nodeList = document.querySelectorAll(':hover');
-  nodeList.forEach(node => {
-    // The about attirbute should contain a Subject
-    const about = node.getAttribute('about');
-
-    if (about !== null) {
-      found.unshift(about);
-    }
-  });
-
-  return found[0];
 }
