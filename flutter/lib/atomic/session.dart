@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:atomic_flutter/atomic_flutter.dart'
     show normalizeServerUrl, sameOrigin;
 import 'package:flutter/foundation.dart';
@@ -280,6 +282,31 @@ class AtomicSession {
     await prefs.remove(_keyDrive);
     await prefs.remove(_keySecretUnsaved);
     lastLoadProblem = null;
+  }
+
+  // ── Secrets of accounts signed in before ───────────────────────────
+  //
+  // Signing in as someone else while signed in keeps the old secret, so that
+  // account can still be signed in as. Only ever appended to.
+
+  static const _keyPreviousSecrets = 'atomic_previous_secrets';
+
+  /// Secrets of the accounts this device was signed in as before, oldest first.
+  /// Throws when secure storage cannot be read.
+  static Future<List<String>> previousSecrets() async {
+    final raw = await _secure.read(key: _keyPreviousSecrets);
+    if (raw == null || raw.isEmpty) return const [];
+    return (jsonDecode(raw) as List).cast<String>();
+  }
+
+  /// Adds [secret] to the list (once). Unlike [save] it throws when secure
+  /// storage refuses: a secret that was not kept must not go unnoticed, and
+  /// nothing here repairs (deletes) storage that holds other secrets.
+  static Future<void> archivePreviousSecret(String secret) async {
+    final all = await previousSecrets();
+    if (all.contains(secret)) return;
+    await _secure.write(
+        key: _keyPreviousSecrets, value: jsonEncode([...all, secret]));
   }
 
   // ── Servers ───────────────────────────────────────────────────────

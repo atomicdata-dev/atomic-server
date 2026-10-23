@@ -341,6 +341,14 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
     });
   }
 
+  /// Signed in as another account from the settings: show its drives.
+  int _accountSwitches = 0;
+  void _signedInAsOther() {
+    _syncFailures = 0;
+    _startBackgroundSync();
+    setState(() => _accountSwitches++);
+  }
+
   void _signedOut() {
     _syncRetry?.cancel();
     _syncFailures = 0;
@@ -422,7 +430,9 @@ class _AtomicAppState extends State<AtomicApp> with WidgetsBindingObserver {
               : AppShell(
                   api: const AtomicAssistantApi(),
                   drive: AtomicClient.getActiveDrive() ?? '',
-                  profile: (_) => const SyncScreen(),
+                  key: ValueKey('app-$_accountSwitches'),
+                  profile: (_) =>
+                      SyncScreen(onSignedInAsOther: _signedInAsOther),
                   home: ChatsScreen(
                     api: const AtomicAssistantApi(),
                     drive: AtomicClient.getActiveDrive() ?? '',

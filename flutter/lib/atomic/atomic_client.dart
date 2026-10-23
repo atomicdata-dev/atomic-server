@@ -55,7 +55,13 @@ export 'package:atomic_store_flutter/bridge/api/simple/types.dart' show AgentInf
 class AtomicClient {
   // ── 1. Database ──────────────────────────────────────────────────────────
 
-  static Future<void> openDb(String path) => ffi.openDb(path: path);
+  /// Where the store was opened, for a second handle on the same file.
+  static String? dbPath;
+
+  static Future<void> openDb(String path) async {
+    await ffi.openDb(path: path);
+    dbPath = path;
+  }
 
   /// Set when `openDb` found the store damaged and set it aside.
   static StoreRecoveryNotice? storeRecovery() {

@@ -25,6 +25,7 @@ import '../atomic/settings_backend.dart';
 import '../theme.dart';
 import 'account_link_dialog.dart';
 import 'edit_profile_screen.dart';
+import 'login_screen.dart';
 import 'this_device_card.dart';
 
 /// The circle for an identity: its picture, else emoji, else initial.
@@ -70,8 +71,19 @@ class SyncScreen extends StatefulWidget {
   @visibleForTesting
   final Widget Function(ResourceWebView page)? portalPage;
 
+  /// Tells the app that another account was signed in, so it shows that
+  /// account's drives.
+  final VoidCallback? onSignedInAsOther;
+
+  /// Test seam for the sign-in screen the "Sign in to another account" entry
+  /// opens (it gets the callback for the signed-in app).
+  @visibleForTesting
+  final Widget Function(VoidCallback onLoggedIn)? signInPage;
+
   const SyncScreen({
     super.key,
+    this.onSignedInAsOther,
+    this.signInPage,
     this.backend,
     this.loadAccount,
     this.linkAccount,
@@ -401,6 +413,31 @@ class _SyncScreenState extends State<SyncScreen> {
     }
   }
 
+  /// The login screen's sign-in options, on top of this one. It comes back
+  /// with how many drives of the account signed in before came along.
+  Future<void> _signInAsOther() async {
+    final onLoggedIn = widget.onSignedInAsOther ?? () {};
+    // Taken before leaving: showing the app as the other account may rebuild
+    // this screen, and the line still has to be said.
+    final toasts = ToastScope.maybeOf(context);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final brought =
+        await Navigator.of(context).push<int>(MaterialPageRoute<int>(
+      builder: (_) =>
+          widget.signInPage?.call(onLoggedIn) ??
+          LoginScreen(switchAccount: true, onLoggedIn: onLoggedIn),
+    ));
+    if (brought != null && brought > 0) {
+      const message = 'Your notes from before are in your account now.';
+      if (toasts != null) {
+        toasts.show('signed-in-as-other', message, icon: Icons.check);
+      } else {
+        messenger?.showSnackBar(const SnackBar(content: Text(message)));
+      }
+    }
+    if (mounted && brought != null) await _load();
+  }
+
   bool _openingPortal = false;
 
   /// Opens the portal already signed in as the agent, so the person does not
@@ -679,6 +716,12 @@ class _SyncScreenState extends State<SyncScreen> {
                 label: 'Copy secret key',
                 onPressed: _copySecret,
               ),
+              if (_backend.signOut != null)
+                shared.SyncActionButton(
+                  icon: Icons.swap_horiz,
+                  label: 'Sign in to another account',
+                  onPressed: _signInAsOther,
+                ),
               if (_backend.signOut != null)
                 shared.SyncActionButton(
                   icon: Icons.logout,

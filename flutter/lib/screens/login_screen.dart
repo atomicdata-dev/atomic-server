@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../atomic/account_store.dart';
 import '../atomic/atomic_client.dart';
 import '../atomic/session.dart';
+import '../atomic/switch_account.dart';
 import '../theme.dart';
 import 'account_link_dialog.dart';
 import 'needs_sync_view.dart';
@@ -27,12 +28,29 @@ class LoginScreen extends StatefulWidget {
   final shared.AtomicAccountClient Function()? accountClient;
   final Future<void> Function(Uri url)? openBrowser;
 
+  /// Shown while already signed in, from the settings: the same ways to sign
+  /// in, without making a new account, and the work of the account signed in
+  /// now comes along. Pops with the number of drives that came along, or with
+  /// nothing when the person left or signed in as the same account.
+  final bool switchAccount;
+
+  /// Test seams: how a switch brings work along, and how the new sign-in is
+  /// started (its result is whether the drive is ready).
+  @visibleForTesting
+  final Future<AccountSwitch> Function(String secret)? switchAccountFn;
+  @visibleForTesting
+  final Future<bool> Function(String serverUrl, String secret, String? drive)?
+      activate;
+
   const LoginScreen(
       {super.key,
       required this.onLoggedIn,
       this.accountSignIn,
       this.accountClient,
-      this.openBrowser});
+      this.openBrowser,
+      this.switchAccount = false,
+      this.switchAccountFn,
+      this.activate});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -66,8 +84,23 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _tryAutoLogin();
+    if (widget.switchAccount) {
+      _step = _Step.welcome;
+    } else {
+      _tryAutoLogin();
+    }
   }
+
+  /// Signed in: tell the app, and when this screen was opened to switch, go
+  /// back to where it came from with what came along.
+  void _done() {
+    widget.onLoggedIn();
+    if (widget.switchAccount && mounted) {
+      Navigator.of(context).pop(_broughtAlong);
+    }
+  }
+
+  int _broughtAlong = 0;
 
   @override
   void dispose() {
@@ -135,7 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (status == 'ok' && await _driveReady()) {
-        widget.onLoggedIn();
+        _done();
         return;
       }
 
@@ -181,7 +214,7 @@ class _LoginScreenState extends State<LoginScreen> {
           await AtomicSession.setActiveServer(found);
           await AtomicSession.saveDrive(wanted);
           if (await _driveReady()) {
-            widget.onLoggedIn();
+            _done();
             return;
           }
         }
@@ -195,7 +228,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (drive != null && await _driveReady()) {
-        widget.onLoggedIn();
+        _done();
 
         return;
       }
@@ -350,12 +383,40 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Starts the session of [secret]; whether its drive is on this device.
+  Future<bool> _activate(String serverUrl, String secret, String? drive) async {
+    final status = await AtomicClient.resumeSession(
+      serverUrl: serverUrl,
+      secret: secret,
+      drive: drive,
+    );
+    final activeDrive = AtomicClient.getActiveDrive();
+    if (activeDrive != null) {
+      await AtomicSession.saveDrive(activeDrive);
+    }
+    return status == 'ok' && await _driveReady();
+  }
+
   Future<void> _signInWithSecret(String secret, {String? drive}) async {
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
+      if (widget.switchAccount) {
+        final switched =
+            await (widget.switchAccountFn ?? switchAccountOnDevice)(secret);
+        if (switched.same) {
+          if (mounted) Navigator.of(context).pop();
+          return;
+        }
+        // Before anything else changes: the old secret is never dropped.
+        final previous = switched.previousSecret;
+        if (previous != null) {
+          await AtomicSession.archivePreviousSecret(previous);
+        }
+        _broughtAlong = switched.broughtAlong.length;
+      }
       final stored = await AtomicSession.save(
         serverUrl: _serverOrigin,
         secret: secret,
@@ -370,22 +431,14 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
 
-      final status = await AtomicClient.resumeSession(
-        serverUrl: _serverOrigin,
-        secret: secret,
-        drive: drive,
-      );
-
-      final activeDrive = AtomicClient.getActiveDrive();
-      if (activeDrive != null) {
-        await AtomicSession.saveDrive(activeDrive);
-      }
+      final ready =
+          await (widget.activate ?? _activate)(_serverOrigin, secret, drive);
 
       // The secret was accepted: let the password manager offer to save it.
       TextInput.finishAutofillContext();
 
-      if (status == 'ok' && await _driveReady()) {
-        widget.onLoggedIn();
+      if (ready) {
+        _done();
       } else {
         setState(() {
           _busy = false;
@@ -432,6 +485,11 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_step == _Step.needsSync) return _buildNeedsSync(c);
     return Scaffold(
       backgroundColor: c.pageBg,
+      appBar: widget.switchAccount
+          ? AppBar(
+              backgroundColor: c.pageBg,
+              title: const Text('Sign in to another account'))
+          : null,
       body: SafeArea(
           child: Center(
         child: SingleChildScrollView(
@@ -485,16 +543,18 @@ class _LoginScreenState extends State<LoginScreen> {
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 40),
-        ElevatedButton(
-          onPressed: () => setState(() {
-            _step = _Step.createAgent;
-            _error = null;
-          }),
-          style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14)),
-          child: const Text('Get Started'),
-        ),
-        const SizedBox(height: 12),
+        if (!widget.switchAccount) ...[
+          ElevatedButton(
+            onPressed: () => setState(() {
+              _step = _Step.createAgent;
+              _error = null;
+            }),
+            style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14)),
+            child: const Text('Get Started'),
+          ),
+          const SizedBox(height: 12),
+        ],
         OutlinedButton(
           onPressed: () => setState(() {
             _step = _Step.signIn;
@@ -655,7 +715,7 @@ class _LoginScreenState extends State<LoginScreen> {
             // Leaving the form commits the autofill context: the manager
             // offers to save the new secret.
             TextInput.finishAutofillContext();
-            widget.onLoggedIn();
+            _done();
           },
           style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14)),
@@ -802,7 +862,7 @@ class _LoginScreenState extends State<LoginScreen> {
         final name = await AtomicClient.getProperty(
             drive, 'https://atomicdata.dev/properties/name');
         if (name.isNotEmpty) {
-          widget.onLoggedIn();
+          _done();
           return;
         }
       } catch (_) {}
@@ -875,8 +935,8 @@ class _LoginScreenState extends State<LoginScreen> {
           borderRadius: BorderRadius.circular(8),
         ),
         child: shared.ErrorText(_error!,
-            color: Theme.of(context).extension<AppColors>()?.alert ??
-                Colors.red,
+            color:
+                Theme.of(context).extension<AppColors>()?.alert ?? Colors.red,
             fontSize: 13),
       ),
     );
