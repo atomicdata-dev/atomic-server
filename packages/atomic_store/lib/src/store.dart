@@ -24,8 +24,9 @@ class Store {
   final StoreBackend backend;
 
   /// The drive this store works in; `null` searches every drive and makes
-  /// [newResource] require a `parent`.
-  final String? drive;
+  /// [newResource] require a `parent`. Assign it to follow a drive switch
+  /// (`node.drives.switchTo` does); resources already read stay cached.
+  String? drive;
 
   final Map<String, Resource> _resources = {};
 

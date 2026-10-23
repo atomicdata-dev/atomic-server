@@ -546,6 +546,17 @@ void main() {
     });
   });
 
+  group('drive', () {
+    test('can be switched, and new resources and search follow', () async {
+      final store = Store(backend: backend(), drive: drive);
+      store.drive = 'did:ad:test:a';
+      expect(store.newResource().parent, 'did:ad:test:a');
+      expect((await store.search('Pelican')).single.subject, 'did:ad:test:a');
+      store.drive = null;
+      expect(store.newResource, throwsA(isA<StoreException>()));
+    });
+  });
+
   group('Value.of', () {
     test('nested maps and equality', () {
       final v = Value.of({'a': 'x', 'b': 2});

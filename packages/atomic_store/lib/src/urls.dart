@@ -8,6 +8,16 @@ abstract final class Props {
   static const shortname = 'https://atomicdata.dev/properties/shortname';
   static const createdAt = 'https://atomicdata.dev/properties/createdAt';
 
+  /// Who may do what with a resource (and, through `parent`, everything
+  /// under it): lists of agent subjects, or [publicAgent] for everyone.
+  static const read = 'https://atomicdata.dev/properties/read';
+  static const write = 'https://atomicdata.dev/properties/write';
+  static const append = 'https://atomicdata.dev/properties/append';
+
+  /// The agent that stands for everyone, signed in or not: put it in
+  /// [read] to publish a resource.
+  static const publicAgent = 'https://atomicdata.dev/agents/publicAgent';
+
   /// The properties above that hold links, which [Resource.set] stores as
   /// links when you pass a plain `String` ([isA] as a list of one link). A
   /// property of your own is not in this set: use `LinkValue` for it.

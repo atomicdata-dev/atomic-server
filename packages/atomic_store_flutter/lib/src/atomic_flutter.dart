@@ -1,6 +1,11 @@
 import 'package:atomic_store/atomic_store.dart';
 
 import 'bridge_store_backend.dart';
+import 'drives.dart';
+import 'identity.dart';
+import 'peers.dart';
+import 'server_sync.dart';
+import 'sharing.dart';
 import 'init_native.dart' if (dart.library.js_interop) 'init_web.dart' as impl;
 import '../bridge/api/error.dart' as bridge;
 import '../bridge/api/resources.dart' as bridge;
@@ -78,28 +83,73 @@ abstract final class AtomicFlutter {
 }
 
 /// An open local node: the [store] to read and write through, the agent that
-/// signs, and the sync switch.
+/// signs, and everything around it an app needs: [identity], [drives], [sync]
+/// with a server, [peers] (device to device) and [sharing].
+///
+/// A node on its own is local only. Which of the parts you use is up to you;
+/// an app that never pairs devices never starts [peers].
 class AtomicNode {
-  AtomicNode._(this.handle, this.store, this.agentSecret, this.drive,
-      this.driveNeedsSync);
+  AtomicNode._(this.handle, this.store, String agentSecret, String? drive,
+      bool driveNeedsSync)
+      : _agentSecret = agentSecret,
+        _driveNeedsSync = driveNeedsSync {
+    identity = BridgeIdentity(handle, store, (secret, drive, needsSync) {
+      _agentSecret = secret;
+      _driveNeedsSync = needsSync;
+    }, agentSecret);
+    drives = BridgeDrives(handle, store);
+    sync = BridgeServerSync(handle, store);
+    peers = BridgePeers(handle);
+    sharing = Sharing(
+        store,
+        (target, write, expiresAt, maxUsages) => handle.createInviteToken(
+            target: target,
+            write: write,
+            expiresAt: expiresAt,
+            maxUsages: maxUsages));
+  }
 
-  /// The raw bridge handle, for what [Store] does not cover (peers, files,
+  /// The raw bridge handle, for what the typed parts do not cover (files,
   /// history, the assistant).
   final bridge.AtomicStore handle;
 
   /// The Dart `Store`, working in [drive].
   final Store store;
 
-  /// The secret of the signing agent. Persist it: it is the identity.
-  final String agentSecret;
+  String? _agentSecret;
+  bool _driveNeedsSync;
 
-  /// The drive [store] works in (a subject), when there is one.
-  final String? drive;
+  /// Who signs: create or load an agent, sign out, the profile. Keeping the
+  /// secret is the app's job (see [Identity]).
+  late final Identity identity;
 
-  /// `true` when [open] took [drive] from the agent secret on a device that
-  /// does not hold it yet: the store is empty until [connect] fetches the
-  /// drive from a server. `false` otherwise.
-  final bool driveNeedsSync;
+  /// The agent's drives: list, create, switch. [store] follows a switch.
+  late final Drives drives;
+
+  /// Sync with an Atomic Server: connect on start, status, finding the server
+  /// that hosts a drive.
+  late final ServerSync sync;
+
+  /// Sync between devices over Iroh, with QR pairing. Peers belong to the
+  /// process: see [Peers].
+  late final Peers peers;
+
+  /// Who may read or write a resource, and invite links.
+  late final Sharing sharing;
+
+  /// The secret of the signing agent. Persist it: it is the identity. Empty
+  /// after [Identity.signOut].
+  String get agentSecret => _agentSecret ?? '';
+
+  /// The drive [store] works in (a subject), when there is one. Follows
+  /// [Drives.switchTo], [Identity.signIn] and [Identity.create].
+  String? get drive => store.drive;
+
+  /// `true` when the drive [store] works in is not on this device yet (after
+  /// [open] with a secret from another device, or [Identity.signIn]): the
+  /// store is empty until [connect] fetches it from a server or [peers] pairs
+  /// with a device that has it.
+  bool get driveNeedsSync => _driveNeedsSync;
 
   /// The signing agent's subject (`did:ad:agent:...`).
   String? get agentSubject => handle.agentSubject();
@@ -108,14 +158,9 @@ class AtomicNode {
   /// `https://example.com`), subscribes to [drive] and keeps both in sync:
   /// local writes are sent and the server's changes are applied, so a
   /// `store.watch` sees them. Without it the node is local only.
-  Future<void> connect(String serverOrigin) async {
-    try {
-      await handle.openWsSync(serverOrigin: serverOrigin);
-    } on bridge.AtomicError catch (e) {
-      throw storeExceptionFromBridge(e);
-    }
-  }
+  /// Same as `sync.connect`.
+  Future<void> connect(String serverOrigin) => sync.connect(serverOrigin);
 
   /// Stops the server session. Writes wait on disk until [connect] again.
-  Future<void> disconnect() => handle.closeWsSync();
+  Future<void> disconnect() => sync.disconnect();
 }
