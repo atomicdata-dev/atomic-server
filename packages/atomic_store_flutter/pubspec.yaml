@@ -1,0 +1,38 @@
+name: atomic_store_flutter
+description: >-
+  Atomic Data for Flutter apps: a working Store backed by the Rust atomic_lib
+  node (local redb database, signed commits, search, optional server sync).
+  Builds the native library for you; add it as a path or git dependency.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+  flutter: '>=3.24.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  atomic_store:
+    path: ../atomic_store
+  flutter_rust_bridge: 2.12.0 # keep equal to rust/Cargo.toml and FRB_CODEGEN_VERSION in CI
+  plugin_platform_interface: ^2.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        ffiPlugin: true
+      ios:
+        ffiPlugin: true
+      linux:
+        ffiPlugin: true
+      macos:
+        ffiPlugin: true
+      windows:
+        ffiPlugin: true

@@ -5,7 +5,9 @@ A `Store` and `Resource` for Atomic Data in Dart that rhyme with
 `createDrive`, `newResource`, `watch`/`subscribe`; `resource.get`, `set`,
 `save`, `isA`, `children`. Pure Dart, no Flutter and no native code: every
 call goes through a `StoreBackend`. The atomic.place app implements it over its
-Rust bridge (`flutter/lib/atomic/bridge_store_backend.dart`); tests use
+Rust bridge (`BridgeStoreBackend` in
+[`packages/atomic_store_flutter`](../atomic_store_flutter/README.md), which is
+what a new Flutter app adds); tests use
 `InMemoryBackend`.
 
 ## Read, change, save
@@ -93,7 +95,7 @@ backend.touch('did:ad:a'); // wakes watchers, as a remote edit would
 
 Implement `StoreBackend` (seven methods, see `lib/src/backend.dart`) and throw
 `StoreException` only. In the Flutter app that is `BridgeStoreBackend`, over
-the typed functions of `flutter/rust/src/api/resources.rs`.
+the typed functions of `packages/atomic_store_flutter/rust/src/api/resources.rs`.
 
 ## Agent and drive
 

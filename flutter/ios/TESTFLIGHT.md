@@ -28,9 +28,9 @@ answers before testers can install it. Verify these in App Store Connect.
 
 The Flutter Rust crate vendors netdev 0.31 with a narrow iOS fix: its
 SCNetworkInterface metadata calls are macOS-only. Unix interface enumeration
-remains active on iOS. See `flutter/rust/vendor/netdev/ATOMIC_PATCH.md`. CI uses
+remains active on iOS. See `packages/atomic_store_flutter/rust/vendor/netdev/ATOMIC_PATCH.md`. CI uses
 `ATOMIC_CARGO_TARGET_DIR` to keep Cargokit's actual Rust artifacts in the cached
-`flutter/rust/target` directory, including after a failed Xcode build.
+`packages/atomic_store_flutter/rust/target` directory, including after a failed Xcode build.
 
 Signing is not tied to GitHub. The same `testflight.py prepare DIR`, Flutter
 IPA build, and `xcrun altool` upload commands in the workflow can run on another

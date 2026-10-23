@@ -15,12 +15,12 @@ dependencies:
     path: ../packages/atomic_flutter
   atomic_store:
     path: ../packages/atomic_store
+  atomic_store_flutter:
+    path: ../packages/atomic_store_flutter
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
   path_provider: ^2.1.5
-  atomic_flutter_rust:
-    path: rust_builder
   flutter_rust_bridge: 2.12.0
   http: ^1.3.0
   ed25519_edwards: ^0.3.1

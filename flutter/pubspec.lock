@@ -39,17 +39,17 @@ packages:
       relative: true
     source: path
     version: "0.1.0"
-  atomic_flutter_rust:
-    dependency: "direct main"
-    description:
-      path: rust_builder
-      relative: true
-    source: path
-    version: "0.0.1"
   atomic_store:
     dependency: "direct main"
     description:
       path: "../packages/atomic_store"
+      relative: true
+    source: path
+    version: "0.1.0"
+  atomic_store_flutter:
+    dependency: "direct main"
+    description:
+      path: "../packages/atomic_store_flutter"
       relative: true
     source: path
     version: "0.1.0"

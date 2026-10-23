@@ -31,11 +31,11 @@ Ed25519 keypairs (agents).
 
 - **Mobile (Android/iOS)**: FFI via `flutter_rust_bridge` — works with `dart:ffi`
 - **Web**: WASM compilation — `flutter_rust_bridge` handles this, but `dart:ffi` is unavailable on web, so the bridge generates WASM bindings automatically
-- Rust source lives in `/rust/src/` (crate `atomic_flutter_rust`). Keep it thin: logic that another host
+- Rust source lives in `../packages/atomic_store_flutter/rust/src/` (crate `atomic_flutter_rust`). Keep it thin: logic that another host
   (Tauri, a native shell, the CLI) could use goes in `atomic_lib::host`
   (`lib/src/host/`: lists, chats, conversations, recents, embed dispatcher) with
   its tests; the bridge binds it to the default store (`rust/src/host.rs`).
-- `atomic_lib` is referenced as a local path dependency: `../../../atomicdata-dev/atomic-server/lib`
+- `atomic_lib` is referenced as a local path dependency (`../../../lib` from the package's `rust/`)
 
 ### Package and identifier names
 
@@ -54,7 +54,6 @@ lib/
 ├── theme.dart                   # Re-exports AppColors (packages/atomic_flutter)
 ├── assistant/
 │   └── atomic_assistant_api.dart  # AssistantApi over the bridge (the screens are in packages/atomic_chat)
-├── rust_init.dart               # Platform-conditional Rust init
 ├── atomic/
 │   ├── atomic_client.dart       # FFI wrapper (conditional import)
 │   ├── session.dart             # Auth persistence (SharedPreferences)
@@ -63,8 +62,12 @@ lib/
 │   ├── login_screen.dart        # Agent auth screen
 │   ├── pair_screen.dart         # QR pairing
 │   └── sync_screen.dart         # Sync and servers
-└── src/rust/                    # Auto-generated flutter_rust_bridge
 ```
+
+The Rust crate, the generated bindings (`lib/bridge`), the cargokit native
+build and `BridgeStoreBackend` live in `../packages/atomic_store_flutter`
+(path dependency); the app imports the bridge as
+`package:atomic_store_flutter/bridge/...`.
 
 ## Dev Environment
 
@@ -75,8 +78,8 @@ lib/
 
 ## Gotchas
 
-- `flutter_rust_bridge` auto-generates files in `lib/src/rust/` and `rust/src/frb_generated.rs` — don't edit those manually. Regenerate with `flutter_rust_bridge_codegen generate` (version 2.12.0, as pinned); CI (`bridge-codegen` job in `.github/workflows/atomic-flutter.yml`) fails when the committed files differ from a fresh run. Delete a generated Dart file by hand when its Rust module is gone: the codegen leaves stale ones.
+- `flutter_rust_bridge` auto-generates files in `packages/atomic_store_flutter/lib/bridge/` and `rust/src/frb_generated.rs` — don't edit those manually. Regenerate with `cd packages/atomic_store_flutter && flutter_rust_bridge_codegen generate` (version 2.12.0, as pinned); CI (`bridge-codegen` job in `.github/workflows/atomic-flutter.yml`) fails when the committed files differ from a fresh run. Delete a generated Dart file by hand when its Rust module is gone: the codegen leaves stale ones.
 - Rust enums with fields need `freezed` in Dart; use a struct plus a unit enum instead
-- New generic bridge functions go in `rust/src/api/resources.rs` with `AtomicError`; the Dart face is `packages/atomic_store` (README layers in `README.md`)
+- New generic bridge functions go in `packages/atomic_store_flutter/rust/src/api/resources.rs` with `AtomicError`; the Dart face is `packages/atomic_store` (README layers in `README.md`)
 - `atomic_lib` path dependency means you need `atomicdata-dev` checked out alongside this repo
 - On web, `dart:ffi` is unavailable — the bridge handles this but any new Rust bindings must be tested on web too

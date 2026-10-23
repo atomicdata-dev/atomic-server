@@ -23,21 +23,21 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
     show PlatformInt64Util;
 import 'package:http/http.dart' as http;
-import '../src/rust/api/assistant.dart' as assistant;
-import '../src/rust/api/context.dart' as context;
-import '../src/rust/api/embed.dart' as embed;
+import 'package:atomic_store_flutter/bridge/api/assistant.dart' as assistant;
+import 'package:atomic_store_flutter/bridge/api/context.dart' as context;
+import 'package:atomic_store_flutter/bridge/api/embed.dart' as embed;
 import 'session.dart';
 import '../screens/store_recovery_screen.dart' show StoreRecoveryNotice;
-import '../src/rust/api/simple/agent.dart' as ffi;
-import '../src/rust/api/simple/drive.dart' as ffi;
-import '../src/rust/api/simple/files.dart' as ffi;
-import '../src/rust/api/simple/peers.dart' as ffi;
-import '../src/rust/api/simple/resource.dart' as ffi;
-import '../src/rust/api/simple/store.dart' as ffi;
-import '../src/rust/api/simple/sync.dart' as ffi;
-import '../src/rust/api/simple/types.dart' show AgentInfo, VersionMetadata;
+import 'package:atomic_store_flutter/bridge/api/simple/agent.dart' as ffi;
+import 'package:atomic_store_flutter/bridge/api/simple/drive.dart' as ffi;
+import 'package:atomic_store_flutter/bridge/api/simple/files.dart' as ffi;
+import 'package:atomic_store_flutter/bridge/api/simple/peers.dart' as ffi;
+import 'package:atomic_store_flutter/bridge/api/simple/resource.dart' as ffi;
+import 'package:atomic_store_flutter/bridge/api/simple/store.dart' as ffi;
+import 'package:atomic_store_flutter/bridge/api/simple/sync.dart' as ffi;
+import 'package:atomic_store_flutter/bridge/api/simple/types.dart' show AgentInfo, VersionMetadata;
 
-export '../src/rust/api/simple/types.dart' show AgentInfo, VersionMetadata;
+export 'package:atomic_store_flutter/bridge/api/simple/types.dart' show AgentInfo, VersionMetadata;
 
 /// Atomic Data SDK — local-first with optional sync.
 ///

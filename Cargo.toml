@@ -21,7 +21,7 @@ members = [
   "tools/cargo-bin",
   "tools/loadtest",
 ]
-exclude = ["flutter/rust"]
+exclude = ["packages/atomic_store_flutter/rust"]
 
 # Debuginfo dominates target/ size: with ~1460 deps (tauri, actix, iroh) the
 # default `debug = true` produces a multi-GB tree per build flavor, and this

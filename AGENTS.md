@@ -408,7 +408,7 @@ cargo test -p atomic_lib --features "iroh,db-redb" --lib -- sync::iroh_e2e -- --
 cargo test -p atomic_lib --features db-redb,iroh --test identity_durability  # identity/peers survive an unclean kill
 cargo test -p atomic_lib --features db-redb,iroh --test cross_process_sync   # two OS processes reconcile over Iroh
 cargo test -p atomic-server --test it iroh_pairing  # two servers pair via POST /iroh-sync
-cargo test --manifest-path flutter/rust/Cargo.toml  # Flutter bridge (workspace-excluded, needs --manifest-path)
+cargo test --manifest-path packages/atomic_store_flutter/rust/Cargo.toml  # Flutter bridge (workspace-excluded, needs --manifest-path)
 cd browser/lib && pnpm test                      # JS unit tests
 cd browser && pnpm run -r build                  # Full workspace build
 cd browser && pnpm run test-e2e:light            # Playwright @smoke (local diagnostic)

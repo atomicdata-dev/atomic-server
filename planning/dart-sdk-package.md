@@ -1,6 +1,6 @@
 # Dart SDK as a published package
 
-> **Status:** Proposal (2026-09-18). Nothing moved yet. Written alongside the
+> **Status:** Partly done (2026-10-23): the Rust crate, bindings, cargokit glue and `BridgeStoreBackend` now live in `packages/atomic_store_flutter` (see `flutter-developer-package.md`). The rest is still a proposal. Written alongside the
 > docs refresh that added `docs/src/flutter.md`; that page currently points at
 > a folder inside the reference app because there is nothing else to point at.
 

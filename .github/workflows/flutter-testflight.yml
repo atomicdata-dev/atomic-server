@@ -5,8 +5,8 @@ on:
     paths-ignore:
       - '.github/workflows/flutter-play.yml'
       - 'flutter/android/**'
-      - 'flutter/rust_builder/cargokit/gradle/**'
-      - 'flutter/rust_builder/cargokit/build_tool/lib/src/android_environment.dart'
+      - 'packages/atomic_store_flutter/cargokit/gradle/**'
+      - 'packages/atomic_store_flutter/cargokit/build_tool/lib/src/android_environment.dart'
       - 'flutter/.gitignore'
       - '**/*.md'
   workflow_dispatch:
@@ -20,7 +20,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 60
     env:
-      ATOMIC_CARGO_TARGET_DIR: ${{ github.workspace }}/flutter/rust/target
+      ATOMIC_CARGO_TARGET_DIR: ${{ github.workspace }}/packages/atomic_store_flutter/rust/target
       HAS_APP_STORE_CONNECT_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +38,7 @@ jobs:
         run: rustup target add aarch64-apple-ios
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: flutter/rust
+          workspaces: packages/atomic_store_flutter/rust
           key: flutter-ios
           cache-on-failure: true
       - name: Build embedded renderer

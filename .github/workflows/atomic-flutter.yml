@@ -1,15 +1,15 @@
 name: Atomic Flutter package
 on:
   pull_request:
-    paths: ['packages/atomic_flutter/**', 'packages/atomic_chat/**', 'packages/atomic_store/**', 'flutter/**', 'browser/**', '.github/workflows/atomic-flutter.yml']
+    paths: ['packages/atomic_flutter/**', 'packages/atomic_chat/**', 'packages/atomic_store/**', 'packages/atomic_store_flutter/**', 'flutter/**', 'browser/**', '.github/workflows/atomic-flutter.yml']
   push:
-    paths: ['packages/atomic_flutter/**', 'packages/atomic_chat/**', 'packages/atomic_store/**', 'flutter/**', 'browser/**', '.github/workflows/atomic-flutter.yml']
+    paths: ['packages/atomic_flutter/**', 'packages/atomic_chat/**', 'packages/atomic_store/**', 'packages/atomic_store_flutter/**', 'flutter/**', 'browser/**', '.github/workflows/atomic-flutter.yml']
 jobs:
   package:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        package: [atomic_flutter, atomic_chat, atomic_store]
+        package: [atomic_flutter, atomic_chat, atomic_store, atomic_store_flutter]
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -23,6 +23,21 @@ jobs:
         working-directory: packages/${{ matrix.package }}
       - run: flutter test
         working-directory: packages/${{ matrix.package }}
+  example:
+    # The hello_atomic example is what a new app starts from: it must resolve
+    # and analyze against the package as a path dependency.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.7'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+        working-directory: packages/atomic_store_flutter/example
+      - run: flutter analyze
+        working-directory: packages/atomic_store_flutter/example
   embed-size:
     runs-on: ubuntu-latest
     steps:
@@ -38,11 +53,12 @@ jobs:
       - name: Check the embed size budget
         run: bash flutter/scripts/check_embed_size.sh
   bridge-codegen:
-    # The generated bridge glue (flutter/lib/src/rust, flutter/rust/src/frb_generated.rs)
-    # must be exactly what the pinned codegen produces from flutter/rust/src/api.
+    # The generated bridge glue (packages/atomic_store_flutter/lib/bridge,
+    # packages/atomic_store_flutter/rust/src/frb_generated.rs)
+    # must be exactly what the pinned codegen produces from packages/atomic_store_flutter/rust/src/api.
     runs-on: ubuntu-latest
     env:
-      FRB_CODEGEN_VERSION: 2.12.0 # keep equal to flutter_rust_bridge in flutter/pubspec.yaml and flutter/rust/Cargo.toml
+      FRB_CODEGEN_VERSION: 2.12.0 # keep equal to flutter_rust_bridge in packages/atomic_store_flutter/pubspec.yaml and rust/Cargo.toml
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -62,9 +78,9 @@ jobs:
         if: steps.codegen-cache.outputs.cache-hit != 'true'
         run: cargo install flutter_rust_bridge_codegen --version "$FRB_CODEGEN_VERSION" --locked
       - run: flutter pub get
-        working-directory: flutter
+        working-directory: packages/atomic_store_flutter
       - name: Regenerate the bindings
         run: flutter_rust_bridge_codegen generate
-        working-directory: flutter
+        working-directory: packages/atomic_store_flutter
       - name: Fail when the committed bindings are stale
-        run: git diff --exit-code -- flutter/lib/src/rust flutter/rust/src/frb_generated.rs
+        run: git diff --exit-code -- packages/atomic_store_flutter/lib/bridge packages/atomic_store_flutter/rust/src/frb_generated.rs

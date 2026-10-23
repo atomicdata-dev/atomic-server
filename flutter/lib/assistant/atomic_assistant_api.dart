@@ -7,8 +7,8 @@ import 'package:flutter/foundation.dart' show Listenable, debugPrint;
 import '../atomic/account_store.dart';
 import '../atomic/atomic_client.dart';
 import '../atomic/own_profile.dart';
-import '../src/rust/api/assistant.dart' as ffi_assistant;
-import '../src/rust/api/simple/drive.dart' as ffi_simple;
+import 'package:atomic_store_flutter/bridge/api/assistant.dart' as ffi_assistant;
+import 'package:atomic_store_flutter/bridge/api/simple/drive.dart' as ffi_simple;
 import 'fake_ai.dart';
 
 /// The app's [AssistantApi]: the local node through [AtomicClient] (the Rust

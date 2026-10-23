@@ -763,7 +763,7 @@ export class AtomicServer {
 
   /**
    * Flutter unit/widget tests + static analysis. The FFI plugin (cargokit)
-   * compiles `flutter/rust` against repo-root `lib/` (`atomic_lib`);
+   * compiles `packages/atomic_store_flutter/rust` against repo-root `lib/` (`atomic_lib`);
    * both trees are mounted under `/workspace/`.
    */
   @func()
@@ -828,7 +828,7 @@ export class AtomicServer {
           '/workspace/packages',
           this.source.directory('packages'),
         )
-        .withMountedCache('/workspace/flutter/rust/target', flutterRustTarget, {
+        .withMountedCache('/workspace/packages/atomic_store_flutter/rust/target', flutterRustTarget, {
           sharing: CacheSharingMode.Locked,
         })
         .withWorkdir('/workspace/flutter')
@@ -872,7 +872,7 @@ export class AtomicServer {
           '-lc',
           `${pathPrefix} && ` +
             'if [ ! -x "$HOME/.cargo/bin/rustc" ]; then curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal; fi && ' +
-            'cargo test --manifest-path rust/Cargo.toml',
+            'cargo test --manifest-path ../packages/atomic_store_flutter/rust/Cargo.toml',
         ])
         .stdout()
     );

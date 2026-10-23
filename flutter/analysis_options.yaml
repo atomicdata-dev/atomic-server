@@ -31,7 +31,7 @@ linter:
 # Cargokit is a vendored standalone Dart package, checked in its own context.
 analyzer:
   exclude:
-    - rust_builder/cargokit/**
+    - ../packages/atomic_store_flutter/cargokit/**
     - build/**
     - android/**
     - ios/**

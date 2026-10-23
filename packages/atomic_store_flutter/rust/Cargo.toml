@@ -1,0 +1,56 @@
+[package]
+name = "atomic_flutter_rust"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+flutter_rust_bridge = "=2.12.0"
+async-trait = "0.1"
+getrandom = { version = "0.3", features = ["wasm_js"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+log = "0.4"
+urlencoding = "2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-android = "0.2"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+atomic_lib = { path = "../../../lib", default-features = false, features = ["db-redb", "iroh", "discovery", "ws"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "time", "sync"] }
+futures = "0.3"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+atomic_lib = { path = "../../../lib", default-features = false, features = ["db-redb", "wasm"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
+
+# This crate is outside the root workspace, so the root's profiles do not apply.
+# Without these a debug build carries full debug info for every dependency: a
+# library of hundreds of MB that is slow to link and to push over USB. The
+# dependencies are also optimised, so a debug app starts and syncs at a usable
+# speed; they compile once and stay cached. atomic_lib, which changes often,
+# keeps a quick compile.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+opt-level = 2
+
+[profile.dev.package.atomic_lib]
+opt-level = 1
+
+# What ships (cargokit builds `--release` for profile and release apps): one
+# codegen unit and fat LTO let the linker drop what the app never calls.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+
+# netdev 0.31 calls macOS-only SCNetworkInterface APIs on iOS.
+[patch.crates-io]
+netdev = { path = "vendor/netdev" }

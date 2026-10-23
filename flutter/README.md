@@ -50,7 +50,7 @@ To update the Android device IDs, edit `dev.sh` (`ANDROID1_ID` = tablet, `ANDROI
 
 ### Building the Android app
 
-The Rust library is built by cargokit (`rust_builder/cargokit`) during the Gradle build, with the toolchain pinned in the repo's `rust-toolchain.toml` (cargokit used to use rustup's `stable`: std 1.95 has no `File::try_lock` on Android, so redb's file lock silently did nothing). rustup installs that toolchain and the Android targets itself on first use; to do it up front:
+The Rust library is built by cargokit (`packages/atomic_store_flutter/cargokit`) during the Gradle build, with the toolchain pinned in the repo's `rust-toolchain.toml` (cargokit used to use rustup's `stable`: std 1.95 has no `File::try_lock` on Android, so redb's file lock silently did nothing). rustup installs that toolchain and the Android targets itself on first use; to do it up front:
 
 ```bash
 # from the repo root, so rustup picks up rust-toolchain.toml
@@ -95,8 +95,10 @@ NodeIDs are persistent (stored in the local DB), so a QR code stays valid across
 
 Three layers, each usable without the next:
 
-1. **The bridge** (`rust/src/api/`, generated glue in `lib/src/rust/`): thin
-   `flutter_rust_bridge` bindings over `atomic_lib`.
+1. **The bridge**, in the package [`packages/atomic_store_flutter`](../packages/atomic_store_flutter/README.md)
+   (`rust/src/api/`, generated glue in `lib/bridge/`): thin
+   `flutter_rust_bridge` bindings over `atomic_lib`, plus the native build
+   (cargokit). Any Flutter app can depend on that package; this app does.
    - `api/simple/` holds the older flat functions by domain: `agent`, `drive`,
      `resource`, `files`, `store` (open/flush/stats), `sync` (server) and
      `peers` (Iroh). Many return JSON strings and `String` errors; they stay
@@ -109,7 +111,7 @@ Three layers, each usable without the next:
    - `api/assistant.rs` holds the app-shaped functions (home lists, chats).
 2. **`packages/atomic_store`**: a pure Dart `Store`/`Resource` that rhymes with
    `@tomic/lib` (see its README), over an injectable `StoreBackend`. The app's
-   backend is `lib/atomic/bridge_store_backend.dart`.
+   backend is `BridgeStoreBackend` in `packages/atomic_store_flutter`.
 3. **App-specific APIs**: `AssistantApi` (`packages/atomic_chat`, implemented
    in `lib/assistant/atomic_assistant_api.dart`) for the screens, and
    `AtomicClient` (`lib/atomic/`) for sign-in, servers and sync.
@@ -119,7 +121,7 @@ pinned codegen (`flutter_rust_bridge_codegen` 2.12.0, same as the
 `flutter_rust_bridge` dependency) and fails on any diff:
 
 ```bash
-cd flutter && flutter_rust_bridge_codegen generate
+cd packages/atomic_store_flutter && flutter_rust_bridge_codegen generate
 ```
 
 Enums with fields would make the codegen require `freezed`; use a struct plus

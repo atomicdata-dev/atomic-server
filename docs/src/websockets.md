@@ -1063,7 +1063,7 @@ step when you touch any of them.
 | `server/src/serve.rs` | Relays Iroh `EPHEMERAL` into the commit monitor so local WebSocket subscribers see peer presence. |
 | `browser/lib/src/ws-v2.ts` | Frame encode and decode. |
 | `browser/lib/src/websockets.ts` | The browser client: auth, pending requests, subscriptions, commit over WS, liveness, drive reconcile. |
-| `flutter/rust/src/api/simple/ws_sync.rs` | The Flutter FRB bridge over `WsClient`. |
+| `packages/atomic_store_flutter/rust/src/api/simple/ws_sync.rs` | The Flutter FRB bridge over `WsClient`. |
 
 ## Known gaps
 
