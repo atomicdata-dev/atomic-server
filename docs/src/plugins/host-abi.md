@@ -301,7 +301,7 @@ A class extender is a **server module**: a component of world `server-module`. I
 | Export | When |
 | --- | --- |
 | `classes` | Once, when the module is loaded. The classes whose reads and commits it extends |
-| `before-commit(commit, after)` | Before a commit on one of the classes is stored. `after` is the resource as the commit leaves it; the state before is still readable with `store.get`. An `error` problem refuses the commit, a `warning` is logged. A trap or running out of fuel refuses it too |
+| `before-commit(commit, after)` | Before a commit on one of the classes is stored. `after` is the resource as the commit leaves it; the state before is still readable with `store.get`. An `error` problem refuses the commit, a `warning` is logged. A trap, running out of fuel or past the deadline refuses it too |
 | `after-commit(commit, after)` | After it is stored. A failure is logged and never undoes it |
 | `on-get(resource, agent, query)` | Before a resource is returned to `agent`. `query` is the request's query string as pairs. The answer (`resource` and `referenced`, subjects of other resources to send along, read with the module's grant) replaces it, `none` leaves it, an error fails the read. The subject of the answer is always the one asked for |
 
@@ -318,7 +318,7 @@ A module runs as its Installation's agent, which is the only identity it has: re
 Two things differ from an app, both because a module runs inside the server's own path and nobody is there to approve:
 
 - `net.fetch` may use operations whose `effect` is `write` (an app is limited to `read` and has to propose the rest).
-- A hook has no entry call to meter, only its own fuel and memory (the `extended-fuel` and `extended-memory` capabilities widen them).
+- A hook has no entry call to meter, only its own fuel and memory (the `extended-fuel` and `extended-memory` capabilities widen them) and a deadline of five seconds, host calls it waits on included. Past it the hook fails like one out of fuel.
 
 A module's `calls` reach the apps installed in its drive, through the same registry and the same checks as any other call: the interface must be in the module's manifest `uses`, and the module's agent is the caller, so a `write` or `external` export needs write on the drive (`full-drive-access`).
 
@@ -332,7 +332,7 @@ What the old `atomic:class-extender` interface became:
 | `fetch(http-request)` | `net.fetch` by operation id. A module declares `operations` in its manifest instead of `network.origins`, and gets no `wasi:http` or sockets |
 | `class-url`, `on-resource-get`, `before-commit`, `after-commit` | `hooks.classes`, `on-get`, `before-commit`, `after-commit` |
 
-A module's folder (`/`, with the `storage` capability writable) is kept.
+A module's `storage` folder (`/`, writable with the `storage` capability) is kept; the package's `assets/` are written into it.
 
 ### Built-in apps
 

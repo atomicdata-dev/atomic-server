@@ -12,7 +12,7 @@
 //! Each hook gets a fresh instance. A commit the module's own agent signed does
 //! not trigger it, so a module does not react to its own writes.
 
-use std::{path::PathBuf, sync::Arc};
+use std::{future::Future, path::PathBuf, sync::Arc, time::Duration};
 
 use atomic_lib::{
     agents::{Agent, ForAgent},
@@ -47,6 +47,27 @@ use crate::plugins::{
     manifest::{CapabilityName, Manifest},
 };
 
+/// What a hook gets, instantiation to answer, host calls it waits on included
+/// (fuel does not count those). A component yields at every fuel interval, so
+/// dropping the hook at the deadline stops it at once. Past it the hook fails
+/// like one out of fuel: a `before-commit` refuses the commit, an
+/// `after-commit` is logged.
+const HOOK_DEADLINE: Duration = Duration::from_secs(5);
+
+pub(super) async fn within<T>(
+    deadline: Duration,
+    hook: impl Future<Output = AtomicResult<T>>,
+) -> AtomicResult<T> {
+    tokio::time::timeout(deadline, hook)
+        .await
+        .unwrap_or_else(|_| {
+            Err(AtomicError::other_error(format!(
+                "Wasm plugin exceeded its time limit of {} seconds",
+                deadline.as_secs_f32()
+            )))
+        })
+}
+
 /// Where a module lives and who it is, as the loader found it.
 pub struct ModuleParts {
     /// The file it was loaded from; names its registration.
@@ -57,7 +78,7 @@ pub struct ModuleParts {
     /// The Installation's agent. Its key is held by the node.
     pub agent: Option<Agent>,
     /// A folder of its own, writable with the `storage` capability.
-    pub data_dir: Option<PathBuf>,
+    pub storage_dir: Option<PathBuf>,
     pub manifest: Option<Manifest>,
     /// The node's registry, so `calls` finds the apps of the drive.
     pub registry: Arc<HostAbiRegistry>,
@@ -281,10 +302,10 @@ impl ServerModule {
         let limits = host_core::limits(Runtime::ClassExtender, grants);
 
         let mut state = AbiState::new(host, limits.store_limits());
-        if let Some(dir) = &inner.parts.data_dir {
+        if let Some(dir) = &inner.parts.storage_dir {
             let writable = manifest.is_some_and(|m| m.has_capability(CapabilityName::Storage));
             state = state
-                .with_data_dir(dir, writable)
+                .with_storage_dir(dir, writable)
                 .map_err(AtomicError::other_error)?;
         }
         Ok((state, limits))
@@ -480,15 +501,15 @@ impl ServerModule {
             .classes(self.inner.classes.clone())
             .on_resource_get(ClassExtender::wrap_get_handler(move |context| {
                 let module = get.clone();
-                Box::pin(async move { module.on_get(context).await })
+                Box::pin(async move { within(HOOK_DEADLINE, module.on_get(context)).await })
             }))
             .before_commit(ClassExtender::wrap_commit_handler(move |context| {
                 let module = before.clone();
-                Box::pin(async move { module.before_commit(context).await })
+                Box::pin(async move { within(HOOK_DEADLINE, module.before_commit(context)).await })
             }))
             .after_commit(ClassExtender::wrap_commit_handler(move |context| {
                 let module = after.clone();
-                Box::pin(async move { module.after_commit(context).await })
+                Box::pin(async move { within(HOOK_DEADLINE, module.after_commit(context)).await })
             }))
             .scope(self.inner.parts.scope.clone());
         if let Some(subject) = self.inner.parts.installation.clone() {

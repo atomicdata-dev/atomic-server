@@ -2,11 +2,12 @@
 //! prebuilt into `testdata/host-abi/module.wasm`), installed through the same
 //! Installation path a class extender always took, in a temporary store.
 
-use std::io::Write;
+use std::{io::Write, time::Duration};
 
 use atomic_lib::{db::app_agent::AppAgentKey, urls, Db, Resource, Storelike, Value};
 use serde_json::json;
 
+use super::module::within;
 use super::tests::{
     count_of, counter_resource, install as install_app, owner, share, COUNTER_MANIFEST,
     COUNTER_WASM,
@@ -286,4 +287,22 @@ async fn a_module_that_does_not_declare_uses_cannot_call() {
     let note = extended_description(db, &folder).await;
     assert!(note.contains("call forbidden"), "{note}");
     assert_eq!(count_of(db, &subject, &property).await, 0);
+}
+
+#[tokio::test]
+async fn a_hook_that_never_answers_is_stopped_at_its_deadline() {
+    // What a looping component amounts to: it yields at every fuel interval
+    // and never returns.
+    let spin = async {
+        loop {
+            tokio::task::yield_now().await;
+        }
+        #[allow(unreachable_code)]
+        Ok(())
+    };
+    let err = within(Duration::from_millis(20), spin).await.unwrap_err();
+    assert!(err.to_string().contains("time limit"), "{err}");
+    within(Duration::from_secs(5), async { Ok(()) })
+        .await
+        .unwrap();
 }

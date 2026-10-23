@@ -285,7 +285,7 @@ impl AbiState {
 impl AbiState {
     /// The module's own folder as `/`: readable, and writable when its
     /// manifest holds the `storage` capability. Nothing else of the disk.
-    pub(super) fn with_data_dir(
+    pub(super) fn with_storage_dir(
         mut self,
         dir: &std::path::Path,
         writable: bool,

