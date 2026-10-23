@@ -32,6 +32,8 @@ export type HandoverResource = {
   push(property: string, values: string[], unique?: boolean): void;
   canWrite(agent?: string): Promise<[boolean, string | undefined]>;
   save(): Promise<unknown>;
+  /** Only read on the personal drive, to see whether it holds anything. */
+  getChildrenCollection?(pageSize?: number): Promise<{ totalMembers: number }>;
 };
 
 export type HandoverStore = {
@@ -135,7 +137,17 @@ async function drivesOf(
     return [];
   }
 
-  return drivesListedIn(home).filter(drive => drive !== personalDrive);
+  const listed = drivesListedIn(home).filter(drive => drive !== personalDrive);
+
+  // A home that holds documents of its own is work too; an empty one is only
+  // the list, and handing that over gave the account a second empty "My drive".
+  return (await holdsContent(home)) ? [...listed, personalDrive] : listed;
+}
+
+async function holdsContent(home: HandoverResource): Promise<boolean> {
+  if (!home.getChildrenCollection) return false;
+
+  return (await home.getChildrenCollection(1)).totalMembers > 0;
 }
 
 /**

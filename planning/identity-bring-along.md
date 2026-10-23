@@ -78,5 +78,5 @@ Sign out, and opens the same sign-in options as the login screen.
 - [x] atomic_lib `bring_along` + tests
 - [x] Bridge, `node.identity`, fake, Dart tests
 - [x] App: sign in while signed in, result line, widget tests
-- [x] Web: archive + question on secret sign-in, vitest (e2e still open)
+- [x] Web: archive + question on secret sign-in, vitest, e2e (`bring-along.spec.ts`)
 - [ ] Screenshots of every screen, app and web
