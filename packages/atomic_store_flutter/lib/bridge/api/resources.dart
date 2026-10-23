@@ -23,9 +23,12 @@ Future<List<String>> getChildSubjects(
 
 /// [`AtomicStore::search_resources`] on the default store.
 Future<List<SearchHit>> searchResources(
-        {required String query, String? drive, required int limit}) =>
+        {required String query,
+        String? drive,
+        required int limit,
+        String? isA}) =>
     RustLib.instance.api.crateApiResourcesSearchResources(
-        query: query, drive: drive, limit: limit);
+        query: query, drive: drive, limit: limit, isA: isA);
 
 /// [`AtomicStore::save_resource_changes`] on the default store.
 Future<void> saveResourceChanges(
@@ -310,9 +313,12 @@ abstract class AtomicStore implements RustOpaqueInterface {
       required int limit,
       required List<String> classes});
 
-  /// Full-text search, best first, across every drive or only in `drive`.
+  /// Full-text search, best first, across every drive or only under `drive`
+  /// (the hit is `drive` itself or has it among its ancestors). With `is_a`
+  /// (a class URL) only resources of that class are returned; the class is
+  /// filtered in the index, before `limit`.
   Future<List<SearchHit>> searchResources(
-      {required String query, String? drive, required int limit});
+      {required String query, String? drive, required int limit, String? isA});
 
   /// Post `text` in a meeting or chat room as this device's agent, as the web
   /// app does, so web clients show it. `reply_to` is the `id` of the message it

@@ -13,17 +13,24 @@ import 'value.dart';
 /// one and an edit by [touch]; [ResourceEventKind.destroyed] for a destroyed
 /// one and each of its descendants.
 ///
-/// It differs from the real backend in [search] (name and description,
-/// case-insensitive substring; the real index ranks, stems and covers more
-/// fields), in having no agent, signatures, sync or permissions, and in
-/// leaving the order of [childSubjects] to insertion order.
+/// [search] scopes like the real index: `drive:` matches that resource and
+/// everything below it by walking the `parent` chain, [SearchResult.drive] is
+/// the nearest ancestor that is a Drive and [SearchResult.className] the name
+/// of the first class. It differs from the real backend in matching (title
+/// and description, case-insensitive substring of the whole query; the real
+/// index ranks, tolerates typos, splits words and indexes document bodies),
+/// in ignoring the Trash, in having no agent, signatures, sync or
+/// permissions, and in leaving the order of [childSubjects] to insertion
+/// order.
 class InMemoryBackend implements StoreBackend {
   InMemoryBackend([Map<String, Map<String, Value>> resources = const {}]) {
     resources.forEach((subject, props) => this.resources[subject] = Map.of(props));
   }
 
-  /// The resources by subject. Change it directly and call [touch] to act as
-  /// "someone else edited this".
+  /// The resources by subject. Writing here directly changes the data but
+  /// announces nothing: a [Store.watch] or [Store.watchChildren] only sees the
+  /// edit once you call [touch] (or [destroy] for a delete) for the subject.
+  /// Writes through the [Store] (`save`, `destroy`) announce themselves.
   final Map<String, Map<String, Value>> resources = {};
 
   /// Every call made, as `method subject-or-query`.
@@ -140,25 +147,78 @@ class InMemoryBackend implements StoreBackend {
 
   @override
   Future<List<SearchResult>> search(String query,
-      {String? drive, int limit = 20}) async {
+      {String? drive, String? isA, int limit = 20}) async {
     _enter('search $query');
     final needle = query.toLowerCase();
     final hits = <SearchResult>[];
     for (final e in resources.entries) {
-      final name = e.value[Props.name];
-      final title = name is StringValue ? name.value : '';
-      final text = _text(e.value[Props.description]);
-      if (title.toLowerCase().contains(needle) ||
-          text.toLowerCase().contains(needle)) {
-        final parent = e.value[Props.parent];
-        final inDrive = parent is LinkValue ? parent.subject : '';
-        if (drive == null || drive == inDrive || drive == e.key) {
-          hits.add(SearchResult(
-              subject: e.key, title: title, drive: inDrive, score: 1));
-        }
+      final props = e.value;
+      final title = _title(props);
+      final text = _text(props[Props.description]);
+      if (!title.toLowerCase().contains(needle) &&
+          !text.toLowerCase().contains(needle)) {
+        continue;
       }
+      final classes = _classes(props);
+      if (isA != null && !classes.contains(isA)) continue;
+      if (drive != null && !_isUnder(e.key, drive)) continue;
+      hits.add(SearchResult(
+        subject: e.key,
+        title: title,
+        className: classes.isEmpty ? '' : _className(classes.first),
+        drive: _driveOf(e.key),
+        score: 1,
+      ));
     }
     return hits.take(limit).toList();
+  }
+
+  static List<String> _classes(Map<String, Value> props) =>
+      switch (props[Props.isA]) {
+        ArrayValue(:final links) => links,
+        LinkValue(:final subject) => [subject],
+        _ => const [],
+      };
+
+  /// `name`, else `shortname`, else `filename`, as the real index does.
+  static String _title(Map<String, Value> props) {
+    for (final p in [Props.name, Props.shortname, Props.filename]) {
+      final t = _text(props[p]);
+      if (t.isNotEmpty) return t;
+    }
+    return '';
+  }
+
+  String _className(String classUrl) {
+    final name = _text(resources[classUrl]?[Props.name]);
+    return name.isEmpty ? classUrl : name;
+  }
+
+  /// [subject] itself or one of its ancestors (the `parent` chain) is [scope].
+  bool _isUnder(String subject, String scope) {
+    final seen = <String>{};
+    String? current = subject;
+    while (current != null && seen.add(current)) {
+      if (current == scope) return true;
+      final parent = resources[current]?[Props.parent];
+      current = parent is LinkValue ? parent.subject : null;
+    }
+    return false;
+  }
+
+  /// The nearest resource up the `parent` chain (itself included) that is a
+  /// drive; empty when there is none.
+  String _driveOf(String subject) {
+    final seen = <String>{};
+    String? current = subject;
+    while (current != null && seen.add(current)) {
+      final props = resources[current];
+      if (props == null) return '';
+      if (_classes(props).contains(Classes.drive)) return current;
+      final parent = props[Props.parent];
+      current = parent is LinkValue ? parent.subject : null;
+    }
+    return '';
   }
 
   @override
@@ -183,7 +243,10 @@ class InMemoryBackend implements StoreBackend {
   }
 
   static String _text(Value? v) => switch (v) {
-        StringValue(:final value) || MarkdownValue(:final value) => value,
+        StringValue(:final value) ||
+        MarkdownValue(:final value) ||
+        SlugValue(:final value) =>
+          value,
         _ => '',
       };
 

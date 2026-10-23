@@ -33,6 +33,10 @@ abstract final class AtomicFlutter {
   ///   storage) and pass it back on the next start.
   /// - Later runs: pass the saved [agentSecret]; the store works in [drive],
   ///   or in the drive the node was last on.
+  /// - A new device (new [path]) for an existing agent: pass the
+  ///   [agentSecret] and no [drive]. The secret names the agent's private
+  ///   drive and the store works in it; [AtomicNode.driveNeedsSync] is `true`
+  ///   until [AtomicNode.connect] has fetched that drive from a server.
   ///
   /// A file is opened once per process: call this once and keep the result.
   static Future<AtomicNode> open({
@@ -47,6 +51,14 @@ abstract final class AtomicFlutter {
           path: path, agentSecret: agentSecret, drive: drive);
       var secret = agentSecret;
       var workingDrive = handle.drive();
+      var needsSync = false;
+      if (secret != null && workingDrive == null) {
+        // No drive given and none remembered by this file: a fresh device.
+        // Take the drive the secret carries, as `loadAgent` does.
+        final loaded = await handle.loadAgent(secret: secret);
+        needsSync = loaded.needsSync;
+        workingDrive = handle.drive();
+      }
       if (secret == null) {
         final created = await handle.setup(name: agentName);
         secret = created.agentSecret;
@@ -57,6 +69,7 @@ abstract final class AtomicFlutter {
         Store(backend: BridgeStoreBackend(handle), drive: workingDrive),
         secret,
         workingDrive,
+        needsSync,
       );
     } on bridge.AtomicError catch (e) {
       throw storeExceptionFromBridge(e);
@@ -67,7 +80,8 @@ abstract final class AtomicFlutter {
 /// An open local node: the [store] to read and write through, the agent that
 /// signs, and the sync switch.
 class AtomicNode {
-  AtomicNode._(this.handle, this.store, this.agentSecret, this.drive);
+  AtomicNode._(this.handle, this.store, this.agentSecret, this.drive,
+      this.driveNeedsSync);
 
   /// The raw bridge handle, for what [Store] does not cover (peers, files,
   /// history, the assistant).
@@ -81,6 +95,11 @@ class AtomicNode {
 
   /// The drive [store] works in (a subject), when there is one.
   final String? drive;
+
+  /// `true` when [open] took [drive] from the agent secret on a device that
+  /// does not hold it yet: the store is empty until [connect] fetches the
+  /// drive from a server. `false` otherwise.
+  final bool driveNeedsSync;
 
   /// The signing agent's subject (`did:ad:agent:...`).
   String? get agentSubject => handle.agentSubject();

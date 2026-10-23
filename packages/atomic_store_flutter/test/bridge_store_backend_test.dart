@@ -32,6 +32,13 @@ void main() {
     }
   });
 
+  test('a string list survives the bridge as JSON text', () {
+    final v = JsonValue.strings(['urgent', 'home office']);
+    final back = valueFromBridge(valueToBridge(v));
+    expect(back, isA<JsonValue>());
+    expect((back as JsonValue).data, ['urgent', 'home office']);
+  });
+
   test('a property list becomes a map and back', () {
     final props = {Props.name: const StringValue('x'), Props.parent: const LinkValue('d')};
     expect(propsFromBridge(propsToBridge(props)), props);
@@ -83,7 +90,9 @@ void main() {
       ];
       final hits = await backend.search('q', drive: 'd', limit: 5);
       expect(hits.single.title, 't');
-      expect(api.searched, ('q', 'd', 5));
+      expect(api.searched, ('q', 'd', 5, null));
+      await backend.search('q', isA: Classes.folder);
+      expect(api.searched, ('q', null, 20, Classes.folder));
       expect(await backend.childSubjects('p', limit: 3), ['x', 'y']);
       expect(await backend.createDrive('Work'), 'did:ad:drive');
       api.event = bridge.ResourceEvent.destroyed;
@@ -144,7 +153,7 @@ class _FakeApi implements BridgeResourceApi {
   bridge.AtomicError? error;
   (String, List<bridge.PropValue>, List<String>)? saved;
   List<bridge.PropValue> created = [];
-  (String, String?, int)? searched;
+  (String, String?, int, String?)? searched;
   int? waitedMs;
   final List<String> destroyed = [];
   bridge.StoreEvent storeEvent = const bridge.StoreEvent(
@@ -172,9 +181,9 @@ class _FakeApi implements BridgeResourceApi {
       });
   @override
   Future<List<bridge.SearchHit>> searchResources(
-          String query, String? drive, int limit) =>
+          String query, String? drive, int limit, String? isA) =>
       _run(() {
-        searched = (query, drive, limit);
+        searched = (query, drive, limit, isA);
         return hits;
       });
   @override

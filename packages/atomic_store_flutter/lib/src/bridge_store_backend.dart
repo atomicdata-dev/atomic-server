@@ -12,7 +12,7 @@ abstract interface class BridgeResourceApi {
       String subject, List<bridge.PropValue> changes, List<String> remove);
   Future<String> createResourceWithValues(List<bridge.PropValue> values);
   Future<List<bridge.SearchHit>> searchResources(
-      String query, String? drive, int limit);
+      String query, String? drive, int limit, String? isA);
   Future<List<String>> getChildSubjects(String parent, int limit);
   Future<String> newDrive(String name);
   Future<bridge.ResourceEvent> waitForResourceEvent(
@@ -42,8 +42,9 @@ class _DefaultStoreApi implements BridgeResourceApi {
 
   @override
   Future<List<bridge.SearchHit>> searchResources(
-          String query, String? drive, int limit) =>
-      bridge.searchResources(query: query, drive: drive, limit: limit);
+          String query, String? drive, int limit, String? isA) =>
+      bridge.searchResources(
+          query: query, drive: drive, limit: limit, isA: isA);
 
   @override
   Future<List<String>> getChildSubjects(String parent, int limit) =>
@@ -88,8 +89,9 @@ class _HandleApi implements BridgeResourceApi {
 
   @override
   Future<List<bridge.SearchHit>> searchResources(
-          String query, String? drive, int limit) =>
-      _store.searchResources(query: query, drive: drive, limit: limit);
+          String query, String? drive, int limit, String? isA) =>
+      _store.searchResources(
+          query: query, drive: drive, limit: limit, isA: isA);
 
   @override
   Future<List<String>> getChildSubjects(String parent, int limit) =>
@@ -151,9 +153,9 @@ class BridgeStoreBackend implements StoreBackend {
 
   @override
   Future<List<SearchResult>> search(String query,
-          {String? drive, int limit = 20}) =>
+          {String? drive, String? isA, int limit = 20}) =>
       _guard(() async {
-        final hits = await _api.searchResources(query, drive, limit);
+        final hits = await _api.searchResources(query, drive, limit, isA);
         return [
           for (final h in hits)
             SearchResult(

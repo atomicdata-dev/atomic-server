@@ -35,10 +35,29 @@ await doc.save();                             // one signed commit
 `get` returns the typed `Value`; `getString`, `getLink` and `getLinks` are
 shortcuts.
 
+> **Strings and links.** A plain `String` is stored as text, with one
+> exception: for the link properties of the store itself, `Props.parent` and
+> `Props.isA` (`Props.linkProperties`), `set` stores it as a link, so
+> `r.set(Props.parent, subject)` works (and `isA` becomes a list of that one
+> class). For a property of your **own** that holds a link, say so:
+> `r.set(owner, LinkValue(subject))`; a plain string there stays text.
+>
 > **A `List<String>` becomes links.** In `Value.of` (so in `set`) every string
 > in a list is a subject: `set(prop, ['a', 'b'])` stores two links, not two
 > texts. Arrays in Atomic Data hold links and nested resources only. For a list
-> of plain strings store one `JsonValue('["a","b"]')`, or one resource per item.
+> of plain strings (tags) use the JSON helpers, or one resource per item:
+>
+> ```dart
+> task.setStrings(tags, ['urgent', 'home office']);   // stored as JSON text
+> task.getStrings(tags);                              // ['urgent', 'home office']
+> task.setJson(meta, {'estimate': 3});                // any JSON
+> task.getJson(meta);                                 // {estimate: 3}
+> ```
+>
+> They store a `JsonValue` (`JsonValue.strings`, `JsonValue.encode`,
+> `.data`), which the bridge writes as the JSON datatype and reads back as the
+> same JSON (key order and whitespace may be normalised). `getStrings` is empty
+> for a property that is unset or not a JSON array.
 
 ## Create
 
@@ -71,10 +90,22 @@ Mirrors `Resource.destroy()` of `@tomic/lib`. The store forgets the resource,
 Destroying something already gone throws `notFound`; a never-saved draft is
 just discarded.
 
+## Move
+
+```dart
+note.moveTo(otherFolder.subject);   // sets Props.parent as a link, like set()
+await note.save();                  // one signed commit; a move does not save itself
+```
+
+`moveTo` is `set(Props.parent, LinkValue(parent))`, so it is local until
+`save()` and `isDirty` is `true` meanwhile. After the save the old parent's
+`watchChildren` drops the note and the new parent's lists it.
+
 ## Search, children, watch
 
 ```dart
-final hits = await store.search('pelican');   // in store.drive; drive: '' for all
+final hits = await store.search('pelican');   // under store.drive; drive: '' for all
+final tasks = await store.search('milk', isA: taskClass);   // one class only
 final kids = await folder.children();         // sidebar order, loaded once
 
 final sub = store.subscribe(subject, (r) => print('now ${r.name}'));
@@ -83,6 +114,9 @@ await sub.cancel();
 
 // A live list: the children of a parent, again whenever they change.
 store.watchChildren(folder.subject).listen((List<Resource> notes) { ... });
+
+// Only the children of one class; emits when that filtered list changes.
+store.watchChildren(board.subject, isA: taskClass).listen((tasks) { ... });
 ```
 
 **`watch(subject)`** emits the resource **now** (read fresh), then once per
@@ -100,6 +134,12 @@ out), then the full list again when:
 - a child's **properties change**.
 
 It ends when `parent` is destroyed. Nothing is emitted for changes elsewhere.
+
+With `isA: classUrl` the list holds only children of that class, and it is
+emitted when a child of that class is added, removed, edited, or when a child
+enters or leaves the class (its `isA` changes). Editing a child of another
+class emits nothing. The class filter runs in Dart after `limit` children were
+read.
 
 What the backends emit, exactly. A backend reports two events per resource,
 `changed` and `destroyed` (`ResourceEventKind`), through `waitForEvent(subject)`
@@ -145,25 +185,48 @@ try {
 ## Search semantics
 
 `store.search(query)` returns `SearchResult`s (`subject`, `title`, `className`,
-`drive`, `score`), best first, in `store.drive` unless you pass `drive:`
-(`drive: ''` searches every drive of the local store).
+`drive`, `score`), best first, under `store.drive` unless you pass `drive:`
+(`drive: ''` searches every drive of the local store). `isA: classUrl` keeps
+only instances of that class.
+
+**Scope is by ancestry.** `drive:` (any subject, usually a drive but a folder
+works too) matches that resource itself and every resource that has it
+somewhere up its `parent` chain, however deep, not only direct children. This
+is what the real index does (`parents` filter in `atomic_lib`'s search, which
+walks the indexed parent chain), and `InMemoryBackend` walks the chain the same
+way. A resource in the drive's Trash is hidden by the real index only.
+
+**What a hit holds.**
+
+- `title`: the `name`, else the `shortname`, else the `filename`.
+- `className`: the `name` of the hit's first class (`Folder`, `DocumentV2`);
+  when the store has no resource with a name for that class (a class of your
+  own that you did not publish) it is the **class URL**; empty without a class.
+  It is a label for display. To filter by class use `isA:` with the class URL.
+- `drive`: the drive the hit lives in (the nearest ancestor that is a drive),
+  not its parent; empty when unknown.
 
 **Real backend** (the `atomic_lib` full-text index, local, no network):
 
 - Indexed: the **title** (`name`, else `shortname`, else `filename`), the
   **`description`**, and the **body text** of rich-text documents
-  (`DocumentV2`). Other properties and links are not indexed.
+  (`DocumentV2`). **Custom properties are not indexed**, nor are links, tags
+  or JSON. To make your own data searchable, copy the text into
+  `Props.description` (for example a task's notes, or the tags joined with
+  spaces) when you save: `task.set(Props.description, notes)`.
 - The query is split into words and **all** words must match (AND). Matching
   is case-insensitive; the last word matches as a **prefix** (type-ahead:
   `peli` finds Pelican), and words of three or more letters also tolerate one
   typo (`avacado` finds `avocado`). One or two letters search titles only.
 - Ranked by relevance (BM25); a title hit beats a body hit, and the person's
   own resources come before built-in ontology classes and properties.
+- `isA:` is filtered inside the index, before `limit`.
 - A write is searchable once its commit is applied locally.
 
-**`InMemoryBackend` differs on purpose:** it matches `name` and `description`
-only, as a case-insensitive **substring** of the whole query, all scored 1. No
-prefix-per-word, typos, ranking or document bodies. Use it to test your code
+**`InMemoryBackend` differs on purpose:** it matches title and `description`
+only, as a case-insensitive **substring** of the whole query, all scored 1.
+No prefix-per-word, typos, ranking, Trash or document bodies. Scope, `isA`,
+`title`, `className` and `drive` behave as above. Use it to test your code
 path, not your relevance.
 
 ## Testing
@@ -182,7 +245,56 @@ backend.dispose();           // end pending waits at the end of a test
 ```
 
 `backend.resources` is the data, `backend.calls` the calls made. Writes
-through the `Store` (`save`, `destroy`) emit their events themselves.
+through the `Store` (`save`, `destroy`) emit their events themselves. A write
+straight into `backend.resources` does **not**: call `backend.touch(subject)`
+after it, or `watch` and `watchChildren` never see it.
+
+### Test recipe: streams
+
+A plain `test()` is enough for `watch` and `watchChildren`; no widgets needed.
+`expectLater` on the stream with `emitsInOrder`, then drive the changes. Let
+the stream start with `pumpEventQueue()` (from `package:test`) before the first
+change, and `addTearDown(backend.dispose)` so no wait timer outlives the test.
+(This is `packages/atomic_store/test/recipe_test.dart`.)
+
+```dart
+test('watch emits now, then once per change, and ends on destroy', () async {
+  final backend = InMemoryBackend({
+    'did:ad:a': {Props.name: const StringValue('Pelican')},
+  });
+  addTearDown(backend.dispose);
+  final store = Store(backend: backend);
+
+  final expectation = expectLater(
+    store.watch('did:ad:a').map((r) => r.name),
+    emitsInOrder(['Pelican', 'Heron', emitsDone]),
+  );
+  await pumpEventQueue();                       // first value delivered, wait started
+
+  // A direct write to `resources` announces nothing: `touch` does.
+  backend.resources['did:ad:a']![Props.name] = const StringValue('Heron');
+  backend.touch('did:ad:a');
+  await pumpEventQueue();
+
+  backend.destroy('did:ad:a');                  // someone else deletes it: stream ends
+  await expectation;
+});
+
+test('watchChildren emits the list, again when a child is added', () async {
+  const drive = 'did:ad:drive';
+  final backend = InMemoryBackend({drive: {Props.name: const StringValue('Home')}});
+  addTearDown(backend.dispose);
+  final store = Store(backend: backend, drive: drive);
+
+  final expectation = expectLater(
+    store.watchChildren(drive).map((l) => [for (final r in l) r.name]),
+    emitsInOrder([<String?>[], ['Buy milk']]),
+  );
+  await pumpEventQueue();
+  await store.newResource(props: {Props.name: 'Buy milk'}).save();
+  await expectation;
+});
+```
 
 ### Widget test
 

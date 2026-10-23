@@ -2638,6 +2638,7 @@ fn wire__crate__api__resources__AtomicStore_search_resources_impl(
             let api_query = <String>::sse_decode(&mut deserializer);
             let api_drive = <Option<String>>::sse_decode(&mut deserializer);
             let api_limit = <u32>::sse_decode(&mut deserializer);
+            let api_is_a = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::error::AtomicError>(
@@ -2664,6 +2665,7 @@ fn wire__crate__api__resources__AtomicStore_search_resources_impl(
                             api_query,
                             api_drive,
                             api_limit,
+                            api_is_a,
                         )
                         .await?;
                         Ok(output_ok)
@@ -6137,12 +6139,13 @@ fn wire__crate__api__resources__search_resources_impl(
             let api_query = <String>::sse_decode(&mut deserializer);
             let api_drive = <Option<String>>::sse_decode(&mut deserializer);
             let api_limit = <u32>::sse_decode(&mut deserializer);
+            let api_is_a = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, crate::api::error::AtomicError>(
                     (move || async move {
                         let output_ok = crate::api::resources::search_resources(
-                            api_query, api_drive, api_limit,
+                            api_query, api_drive, api_limit, api_is_a,
                         )
                         .await?;
                         Ok(output_ok)

@@ -79,13 +79,18 @@ class Store {
     return resource;
   }
 
-  /// Full-text search, best first. [drive] limits it to one drive (default:
-  /// this store's [drive]; pass an empty string to search every drive).
+  /// Full-text search, best first. [drive] limits it to that resource and
+  /// everything under it, however deep (default: this store's [drive]; pass
+  /// an empty string to search every drive). [isA], a class URL such as
+  /// [Classes.folder], keeps only instances of that class (the backend
+  /// filters before [limit], so a class with few matches is still found).
   Future<List<SearchResult>> search(String query,
-      {String? drive, int limit = 20}) {
+      {String? drive, String? isA, int limit = 20}) {
     final scope = drive ?? this.drive;
     return backend.search(query,
-        drive: (scope == null || scope.isEmpty) ? null : scope, limit: limit);
+        drive: (scope == null || scope.isEmpty) ? null : scope,
+        isA: (isA == null || isA.isEmpty) ? null : isA,
+        limit: limit);
   }
 
   /// Create a drive named [name] and return it.
@@ -149,8 +154,15 @@ class Store {
   /// differs or the event's resource is one of the children. Events in the
   /// gap between two waits are not replayed, so the list is also re-read
   /// after every [timeout] (default 60 s) and emitted if it changed then.
+  ///
+  /// With [isA] (a class URL) the lists hold only children of that class, and
+  /// an event is emitted only when that filtered list changes (a child enters
+  /// or leaves it, or one of its members changes). The filter is applied
+  /// here, after [limit] children were read.
   Stream<List<Resource>> watchChildren(String parent,
-      {Duration timeout = const Duration(seconds: 60), int limit = 1000}) {
+      {String? isA,
+      Duration timeout = const Duration(seconds: 60),
+      int limit = 1000}) {
     late final StreamController<List<Resource>> controller;
     var cancelled = false;
 
@@ -169,11 +181,15 @@ class Store {
     bool same(List<String> a, List<String> b) =>
         a.length == b.length && Iterable<int>.generate(a.length).every((i) => a[i] == b[i]);
 
+    List<Resource> only(List<Resource> all) =>
+        isA == null ? all : [for (final r in all) if (r.isA(isA)) r];
+
     Future<void> run() async {
       try {
         var known = await backend.childSubjects(parent, limit: limit);
-        final first = await load(known, null);
+        final first = only(await load(known, null));
         if (cancelled) return;
+        var shown = [for (final r in first) r.subject];
         controller.add(first);
         while (!cancelled) {
           final event = await backend.waitForStoreEvent(timeout);
@@ -189,8 +205,18 @@ class Store {
           if (!touchedChild && same(known, now)) continue;
           known = now;
           final list =
-              await load(now, touchedChild ? event.subject : null);
-          if (!cancelled) controller.add(list);
+              only(await load(now, touchedChild ? event.subject : null));
+          if (cancelled) return;
+          final subjects = [for (final r in list) r.subject];
+          // A filtered list only changes when a member enters, leaves or is
+          // edited; an edit of a child outside the filter is not news.
+          if (isA != null &&
+              same(shown, subjects) &&
+              !(touchedChild && subjects.contains(event.subject))) {
+            continue;
+          }
+          shown = subjects;
+          controller.add(list);
         }
       } catch (e, st) {
         if (!cancelled) controller.addError(e, st);

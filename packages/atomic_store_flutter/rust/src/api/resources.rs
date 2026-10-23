@@ -450,14 +450,19 @@ impl AtomicStore {
             .unwrap_or_default())
     }
 
-    /// Full-text search, best first, across every drive or only in `drive`.
+    /// Full-text search, best first, across every drive or only under `drive`
+    /// (the hit is `drive` itself or has it among its ancestors). With `is_a`
+    /// (a class URL) only resources of that class are returned; the class is
+    /// filtered in the index, before `limit`.
     pub async fn search_resources(
         &self,
         query: String,
         drive: Option<String>,
         limit: u32,
+        is_a: Option<String>,
     ) -> Result<Vec<SearchHit>, AtomicError> {
-        let rows = lists::search(&self.db, drive.as_deref(), &query, limit as usize)?;
+        let classes: Vec<String> = is_a.into_iter().filter(|c| !c.is_empty()).collect();
+        let rows = lists::search_classes(&self.db, drive.as_deref(), &query, limit as usize, &classes)?;
         let text =
             |row: &serde_json::Value, key: &str| row[key].as_str().unwrap_or_default().to_string();
         Ok(rows
@@ -689,8 +694,11 @@ pub async fn search_resources(
     query: String,
     drive: Option<String>,
     limit: u32,
+    is_a: Option<String>,
 ) -> Result<Vec<SearchHit>, AtomicError> {
-    AtomicStore::global()?.search_resources(query, drive, limit).await
+    AtomicStore::global()?
+        .search_resources(query, drive, limit, is_a)
+        .await
 }
 
 /// [`AtomicStore::save_resource_changes`] on the default store.
@@ -1040,5 +1048,123 @@ mod tests {
         assert!(handle.on_default_store());
         let other = open(&temp_dir("not-default")).await;
         assert!(!other.on_default_store());
+    }
+    fn link_prop(property: &str, subject: &str) -> PropValue {
+        PropValue {
+            property: property.into(),
+            value: scalar(Datatype::Link, subject),
+        }
+    }
+
+    #[tokio::test]
+    async fn search_matches_by_ancestry_filters_by_class_and_names_the_class() {
+        let dir = temp_dir("search");
+        let h = open(&dir).await;
+        let setup = h.setup("Searcher".into()).await.unwrap();
+        let drive = setup.drive.clone();
+        let task = "https://example.com/classes/Task";
+        let shelf = h
+            .create_resource_with_values(folder("Zebra shelf", &drive))
+            .await
+            .unwrap();
+        let note = h
+            .create_resource_with_values(vec![
+                PropValue {
+                    property: urls::IS_A.into(),
+                    value: AtomicValue {
+                        items: vec![scalar(Datatype::Link, task)],
+                        ..scalar(Datatype::Array, "")
+                    },
+                },
+                text(urls::NAME, "Zebra note"),
+                text(urls::DESCRIPTION, "stripes"),
+                link_prop(urls::PARENT, &shelf),
+                // Custom properties are stored and read back, not indexed.
+                PropValue {
+                    property: "https://example.com/properties/tags".into(),
+                    value: scalar(Datatype::Json, "[\"urgent\",\"home office\"]"),
+                },
+                text("https://example.com/properties/memo", "quokkaonly"),
+            ])
+            .await
+            .unwrap();
+        let other_drive = h.new_drive("Elsewhere".into()).await.unwrap();
+        let elsewhere = h
+            .create_resource_with_values(folder("Zebra elsewhere", &other_drive))
+            .await
+            .unwrap();
+
+        let subjects = |hits: &[SearchHit]| hits.iter().map(|x| x.subject.clone()).collect::<Vec<_>>();
+        let search = |drive: Option<&str>, is_a: Option<&str>| {
+            h.search_resources("zebra".into(), drive.map(Into::into), 20, is_a.map(Into::into))
+        };
+
+        // A drive scope matches every descendant, not only direct children.
+        let in_drive = search(Some(&drive), None).await.unwrap();
+        assert!(subjects(&in_drive).contains(&shelf), "{in_drive:?}");
+        assert!(subjects(&in_drive).contains(&note), "{in_drive:?}");
+        assert!(!subjects(&in_drive).contains(&elsewhere), "{in_drive:?}");
+        let hit = in_drive.iter().find(|x| x.subject == note).unwrap();
+        assert_eq!(hit.title, "Zebra note");
+        assert_eq!(hit.drive, drive, "a hit names its drive, not its parent");
+        // The class name is the class's `name`, the class URL when it has none.
+        assert_eq!(hit.class_name, task);
+        let shelf_hit = in_drive.iter().find(|x| x.subject == shelf).unwrap();
+        assert!(!shelf_hit.class_name.is_empty() && shelf_hit.class_name != urls::FOLDER);
+
+        // Any ancestor scopes, and so does the resource itself.
+        let in_shelf = search(Some(&shelf), None).await.unwrap();
+        assert!(subjects(&in_shelf).contains(&note) && subjects(&in_shelf).contains(&shelf));
+
+        // Without a scope every drive is searched.
+        let everywhere = search(None, None).await.unwrap();
+        assert!(subjects(&everywhere).contains(&elsewhere) && subjects(&everywhere).contains(&note));
+        assert!(!search(Some(&other_drive), None).await.unwrap().iter().any(|x| x.subject == note));
+
+        // The class filter keeps only that class (a URL).
+        let tasks = search(Some(&drive), Some(task)).await.unwrap();
+        assert_eq!(subjects(&tasks), vec![note.clone()]);
+        let folders = search(Some(&drive), Some(urls::FOLDER)).await.unwrap();
+        assert_eq!(subjects(&folders), vec![shelf.clone()]);
+
+        // A custom property is not in the index; the description is.
+        assert!(h
+            .search_resources("quokkaonly".into(), None, 20, None)
+            .await
+            .unwrap()
+            .is_empty());
+        let by_description = h.search_resources("stripes".into(), None, 20, None).await.unwrap();
+        assert_eq!(subjects(&by_description), vec![note.clone()]);
+
+        // JSON (a list of strings) is stored as JSON and read back as JSON text.
+        let data = h.get_resource_data(note).await.unwrap();
+        let tags = prop(&data, "https://example.com/properties/tags").unwrap();
+        assert_eq!(tags.datatype, Datatype::Json);
+        let decoded: Vec<String> = serde_json::from_str(&tags.text).unwrap();
+        assert_eq!(decoded, vec!["urgent", "home office"]);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[tokio::test]
+    async fn loading_the_secret_on_a_fresh_device_works_in_the_secrets_drive() {
+        let (dir_a, dir_b) = (temp_dir("secret-a"), temp_dir("secret-b"));
+        let a = open(&dir_a).await;
+        let made = a.setup("Alice".into()).await.unwrap();
+
+        // What `AtomicFlutter.open(agentSecret:)` does without a `drive:`.
+        let b = AtomicStore::open(
+            dir_b.to_string_lossy().into_owned(),
+            Some(made.agent_secret.clone()),
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(b.drive(), None, "a fresh device has no drive of its own");
+        let loaded = b.load_agent(made.agent_secret).await.unwrap();
+        assert_eq!(loaded.agent_subject, made.agent_subject);
+        assert!(loaded.needs_sync, "the drive is not on this device yet");
+        assert_eq!(b.drive(), Some(made.drive));
+        std::fs::remove_dir_all(dir_a).ok();
+        std::fs::remove_dir_all(dir_b).ok();
     }
 }

@@ -85,7 +85,6 @@ anywhere. Keep what `node` tells you:
 // First run
 final node = await AtomicFlutter.open(path: dir, agentName: 'Alice');
 await secureStorage.write(key: 'agent', value: node.agentSecret);
-await secureStorage.write(key: 'drive', value: node.drive!); // a second device needs it
 
 // Every later run, same `dir`
 final node = await AtomicFlutter.open(
@@ -114,10 +113,13 @@ If the server refuses the agent or the drive, the drive fetch fails quietly
 It does not retry or reconnect on its own: call `connect` again after a drop.
 
 **A second device**, same person: open there with the same `agentSecret` and a
-new `path`, and give it the drive, `drive: savedDriveSubject` (store it with the
-secret, as above), then `connect` to the server both use. The drive is fetched
-from the server and from then on both devices see each other's writes through
-it. This needs a server that holds the drive; two devices with no server can
+new `path`, and **no `drive:`**. The secret carries the agent's private drive,
+so the node works in it (`node.drive`) and `node.driveNeedsSync` is `true`: the
+drive is not on this device yet, so the store is empty until you `connect` to
+the server both devices use. The drive is fetched from the server and from then
+on both devices see each other's writes through it. (Pass `drive:` to work in
+another drive instead; a file that already remembers a drive keeps it, so you
+do not need to store the drive subject next to the secret.) This needs a server that holds the drive; two devices with no server can
 only pair over Iroh, which the app (`flutter/`) wires up but a node from
 `AtomicFlutter.open` does not take part in.
 

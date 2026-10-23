@@ -17,10 +17,18 @@ class SearchResult {
     this.score = 0,
   });
   final String subject;
+
+  /// The hit's `name` (else `shortname`, else `filename`).
   final String title;
+
+  /// The `name` of the hit's first class (`Folder`, `DocumentV2`), or the class
+  /// URL when the class has no name in the store (a class of your own that you
+  /// never published); empty when the hit has no class. A label for display:
+  /// filter with `search(isA: classUrl)`.
   final String className;
 
-  /// The drive the hit lives in, empty when unknown.
+  /// The drive the hit lives in (found by walking up `parent`), empty when
+  /// unknown. Not its direct parent.
   final String drive;
   final double score;
 }
@@ -56,9 +64,11 @@ abstract interface class StoreBackend {
   /// Create a resource holding [values] under a new subject; returns it.
   Future<String> createResource(Map<String, Value> values);
 
-  /// Full-text search, best first; in [drive] only when given.
+  /// Full-text search, best first. With [drive], only [drive] itself and what
+  /// has it among its ancestors (`parent` chain). With [isA] (a class URL),
+  /// only instances of that class; the class is filtered before [limit].
   Future<List<SearchResult>> search(String query,
-      {String? drive, int limit = 20});
+      {String? drive, String? isA, int limit = 20});
 
   /// The subjects under [parent], in display order.
   Future<List<String>> childSubjects(String parent, {int limit = 1000});

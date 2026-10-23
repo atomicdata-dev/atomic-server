@@ -338,6 +338,214 @@ void main() {
         ['did:ad:test:b']);
   });
 
+  group('moveTo', () {
+    test('sets the parent as a link, local until save', () async {
+      final b = backend();
+      final store = Store(backend: b, drive: drive);
+      final folder = await store.getResource('did:ad:test:a');
+      final heron = await store.getResource('did:ad:test:b');
+      heron.moveTo(folder.subject);
+      expect(heron.get(Props.parent), LinkValue(folder.subject));
+      expect(heron.isDirty, isTrue);
+      expect(b.resources['did:ad:test:b']![Props.parent], const LinkValue(drive));
+      await heron.save();
+      expect(b.resources['did:ad:test:b']![Props.parent],
+          LinkValue(folder.subject));
+      expect(await folder.childSubjects(), ['did:ad:test:b']);
+    });
+
+    test('watchChildren drops the child from the old parent and lists it in the new',
+        () async {
+      final b = backend();
+      addTearDown(b.dispose);
+      final store = Store(backend: b, drive: drive);
+      final heron = await store.getResource('did:ad:test:b');
+      final inDrive = <List<String>>[];
+      final inFolder = <List<String>>[];
+      final s1 = store
+          .watchChildren(drive, timeout: const Duration(seconds: 5))
+          .listen((l) => inDrive.add([for (final r in l) r.subject]));
+      final s2 = store
+          .watchChildren('did:ad:test:a', timeout: const Duration(seconds: 5))
+          .listen((l) => inFolder.add([for (final r in l) r.subject]));
+      await pumpEventQueue();
+      heron.moveTo('did:ad:test:a');
+      await heron.save();
+      await pumpEventQueue();
+      expect(inDrive.last, ['did:ad:test:a']);
+      expect(inFolder.last, ['did:ad:test:b']);
+      await s1.cancel();
+      await s2.cancel();
+    });
+  });
+
+  group('set coerces strings for link properties', () {
+    test('parent and isA are links', () async {
+      final store = Store(backend: backend(), drive: drive);
+      final r = await store.getResource('did:ad:test:b');
+      r.set(Props.parent, 'did:ad:test:a');
+      r.set(Props.isA, Classes.folder);
+      expect(r.get(Props.parent), const LinkValue('did:ad:test:a'));
+      expect(r.parent, 'did:ad:test:a');
+      expect(r.get(Props.isA), const ArrayValue([LinkValue(Classes.folder)]));
+      expect(r.isA(Classes.folder), isTrue);
+      await r.save();
+      expect(r.parent, 'did:ad:test:a');
+    });
+
+    test('newResource props use the same rule', () {
+      final store = Store(backend: backend(), drive: drive);
+      final r = store.newResource(props: {Props.parent: 'did:ad:test:a'});
+      expect(r.parent, 'did:ad:test:a');
+    });
+
+    test('a custom property keeps a plain string as text', () async {
+      const owner = 'https://example.com/properties/owner';
+      final store = Store(backend: backend(), drive: drive);
+      final r = await store.getResource('did:ad:test:b');
+      r.set(owner, 'did:ad:test:a');
+      expect(r.get(owner), const StringValue('did:ad:test:a'));
+      r.set(owner, const LinkValue('did:ad:test:a'));
+      expect(r.getLink(owner), 'did:ad:test:a');
+      r.set(owner, ['did:ad:test:a']);
+      expect(r.getLinks(owner), ['did:ad:test:a']);
+    });
+  });
+
+  group('search semantics', () {
+    InMemoryBackend deep() => InMemoryBackend({
+          drive: {
+            Props.isA: const ArrayValue([LinkValue(Classes.drive)]),
+            Props.name: const StringValue('Home'),
+          },
+          'did:ad:test:folder': {
+            Props.isA: const ArrayValue([LinkValue(Classes.folder)]),
+            Props.name: const StringValue('Boards'),
+            Props.parent: const LinkValue(drive),
+          },
+          'did:ad:test:task': {
+            Props.isA: const ArrayValue([LinkValue('https://example.com/Task')]),
+            Props.name: const StringValue('Zebra task'),
+            Props.parent: const LinkValue('did:ad:test:folder'),
+          },
+          'did:ad:test:doc': {
+            Props.isA: const ArrayValue([LinkValue(Classes.documentV2)]),
+            Props.shortname: const SlugValue('zebra-doc'),
+            Props.parent: const LinkValue('did:ad:test:folder'),
+          },
+          'did:ad:test:otherdrive': {
+            Props.isA: const ArrayValue([LinkValue(Classes.drive)]),
+            Props.name: const StringValue('Elsewhere zebra'),
+          },
+          Classes.folder: {Props.name: const StringValue('Folder')},
+        });
+
+    test('a drive scope matches descendants by ancestry, not direct children',
+        () async {
+      final store = Store(backend: deep(), drive: drive);
+      expect((await store.search('zebra')).map((h) => h.subject).toSet(),
+          {'did:ad:test:task', 'did:ad:test:doc'});
+      final all = await store.search('zebra', drive: '');
+      expect(all.map((h) => h.subject), contains('did:ad:test:otherdrive'));
+      // Any ancestor scopes, and so does the resource itself.
+      final inFolder =
+          await store.search('zebra', drive: 'did:ad:test:folder');
+      expect(inFolder, hasLength(2));
+      final self =
+          await store.search('boards', drive: 'did:ad:test:folder');
+      expect(self.single.subject, 'did:ad:test:folder');
+    });
+
+    test('hits carry the drive they live in, the class name and the title',
+        () async {
+      final store = Store(backend: deep(), drive: drive);
+      final hits = {
+        for (final h in await store.search('zebra', drive: ''))
+          h.subject: h
+      };
+      final task = hits['did:ad:test:task']!;
+      expect(task.drive, drive);
+      expect(task.className, 'https://example.com/Task'); // class has no name
+      final doc = hits['did:ad:test:doc']!;
+      expect(doc.title, 'zebra-doc'); // shortname when there is no name
+      expect(doc.className, Classes.documentV2);
+      expect(hits['did:ad:test:otherdrive']!.drive, 'did:ad:test:otherdrive');
+      final folder = (await store.search('boards')).single;
+      expect(folder.className, 'Folder'); // the class's name when it has one
+    });
+
+    test('isA keeps one class', () async {
+      final store = Store(backend: deep(), drive: drive);
+      final hits = await store.search('zebra', isA: 'https://example.com/Task');
+      expect(hits.single.subject, 'did:ad:test:task');
+      expect(await store.search('zebra', isA: Classes.folder), isEmpty);
+    });
+  });
+
+  group('JSON and string lists', () {
+    const tags = 'https://example.com/properties/tags';
+
+    test('setStrings and getStrings round-trip without jsonEncode', () async {
+      final b = backend();
+      final store = Store(backend: b, drive: drive);
+      final r = await store.getResource('did:ad:test:b');
+      expect(r.getStrings(tags), isEmpty);
+      r.setStrings(tags, ['urgent', 'home office']);
+      expect(r.get(tags), isA<JsonValue>());
+      expect(r.getStrings(tags), ['urgent', 'home office']);
+      await r.save();
+      final again = await store.getResource('did:ad:test:b', fresh: true);
+      expect(again.getStrings(tags), ['urgent', 'home office']);
+    });
+
+    test('getJson and setJson hold any JSON', () async {
+      final store = Store(backend: backend(), drive: drive);
+      final r = await store.getResource('did:ad:test:b');
+      r.setJson(tags, {'a': [1, 2], 'b': 'x'});
+      expect(r.getJson(tags), {'a': [1, 2], 'b': 'x'});
+      expect(r.getStrings(tags), isEmpty); // an object is not a string list
+      expect(r.getJson(Props.name), isNull); // not JSON
+      expect(JsonValue.strings(['a']).json, '["a"]');
+      expect(JsonValue.encode([1]).data, [1]);
+    });
+  });
+
+  group('watchChildren isA', () {
+    test('only children of the class are listed and news is filtered',
+        () async {
+      const task = 'https://example.com/Task';
+      final b = backend();
+      addTearDown(b.dispose);
+      final store = Store(backend: b, drive: drive);
+      final lists = <List<String>>[];
+      final sub = store
+          .watchChildren(drive, isA: task, timeout: const Duration(seconds: 5))
+          .listen((l) => lists.add([for (final r in l) r.subject]));
+      await pumpEventQueue();
+      expect(lists, [<String>[]]); // the folder and Heron are not tasks
+
+      await store.newResource(isA: [task], props: {Props.name: 'T1'}).save();
+      await pumpEventQueue();
+      expect(lists.last, ['did:ad:test:1']);
+      final count = lists.length;
+
+      // Editing a child that is not a task is not news for this list.
+      final heron = await store.getResource('did:ad:test:b');
+      heron.set(Props.name, 'Heron 2');
+      await heron.save();
+      await pumpEventQueue();
+      expect(lists, hasLength(count));
+
+      // A child that stops being a task leaves the list.
+      final t1 = await store.getResource('did:ad:test:1');
+      t1.set(Props.isA, Classes.folder);
+      await t1.save();
+      await pumpEventQueue();
+      expect(lists.last, isEmpty);
+      await sub.cancel();
+    });
+  });
+
   group('Value.of', () {
     test('nested maps and equality', () {
       final v = Value.of({'a': 'x', 'b': 2});

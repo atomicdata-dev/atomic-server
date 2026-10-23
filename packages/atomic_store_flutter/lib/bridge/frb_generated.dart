@@ -269,7 +269,8 @@ abstract class RustLibApi extends BaseApi {
       {required AtomicStore that,
       required String query,
       String? drive,
-      required int limit});
+      required int limit,
+      String? isA});
 
   Future<String> crateApiResourcesAtomicStoreSendChatRoomMessage(
       {required AtomicStore that,
@@ -508,7 +509,7 @@ abstract class RustLibApi extends BaseApi {
       required List<String> classes});
 
   Future<List<SearchHit>> crateApiResourcesSearchResources(
-      {required String query, String? drive, required int limit});
+      {required String query, String? drive, required int limit, String? isA});
 
   Future<String> crateApiAssistantSendChatRoomMessage(
       {required String subject, required String text, String? replyTo});
@@ -1866,7 +1867,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       {required AtomicStore that,
       required String query,
       String? drive,
-      required int limit}) {
+      required int limit,
+      String? isA}) {
     return handler.executeNormal(NormalTask(
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
@@ -1875,6 +1877,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(query, serializer);
         sse_encode_opt_String(drive, serializer);
         sse_encode_u_32(limit, serializer);
+        sse_encode_opt_String(isA, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
             funcId: 44, port: port_);
       },
@@ -1883,7 +1886,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         decodeErrorData: sse_decode_atomic_error,
       ),
       constMeta: kCrateApiResourcesAtomicStoreSearchResourcesConstMeta,
-      argValues: [that, query, drive, limit],
+      argValues: [that, query, drive, limit, isA],
       apiImpl: this,
     ));
   }
@@ -1891,7 +1894,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiResourcesAtomicStoreSearchResourcesConstMeta =>
       const TaskConstMeta(
         debugName: "AtomicStore_search_resources",
-        argNames: ["that", "query", "drive", "limit"],
+        argNames: ["that", "query", "drive", "limit", "isA"],
       );
 
   @override
@@ -4216,13 +4219,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @override
   Future<List<SearchHit>> crateApiResourcesSearchResources(
-      {required String query, String? drive, required int limit}) {
+      {required String query, String? drive, required int limit, String? isA}) {
     return handler.executeNormal(NormalTask(
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(query, serializer);
         sse_encode_opt_String(drive, serializer);
         sse_encode_u_32(limit, serializer);
+        sse_encode_opt_String(isA, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
             funcId: 135, port: port_);
       },
@@ -4231,7 +4235,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         decodeErrorData: sse_decode_atomic_error,
       ),
       constMeta: kCrateApiResourcesSearchResourcesConstMeta,
-      argValues: [query, drive, limit],
+      argValues: [query, drive, limit, isA],
       apiImpl: this,
     ));
   }
@@ -4239,7 +4243,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiResourcesSearchResourcesConstMeta =>
       const TaskConstMeta(
         debugName: "search_resources",
-        argNames: ["query", "drive", "limit"],
+        argNames: ["query", "drive", "limit", "isA"],
       );
 
   @override
@@ -6528,11 +6532,17 @@ class AtomicStoreImpl extends RustOpaque implements AtomicStore {
           limit: limit,
           classes: classes);
 
-  /// Full-text search, best first, across every drive or only in `drive`.
+  /// Full-text search, best first, across every drive or only under `drive`
+  /// (the hit is `drive` itself or has it among its ancestors). With `is_a`
+  /// (a class URL) only resources of that class are returned; the class is
+  /// filtered in the index, before `limit`.
   Future<List<SearchHit>> searchResources(
-          {required String query, String? drive, required int limit}) =>
+          {required String query,
+          String? drive,
+          required int limit,
+          String? isA}) =>
       RustLib.instance.api.crateApiResourcesAtomicStoreSearchResources(
-          that: this, query: query, drive: drive, limit: limit);
+          that: this, query: query, drive: drive, limit: limit, isA: isA);
 
   /// Post `text` in a meeting or chat room as this device's agent, as the web
   /// app does, so web clients show it. `reply_to` is the `id` of the message it

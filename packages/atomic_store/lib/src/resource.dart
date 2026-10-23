@@ -81,12 +81,60 @@ class Resource {
         _ => const [],
       };
 
+  /// The decoded JSON in [property] (`List`, `Map`, ...), when it holds a
+  /// [JsonValue]; `null` otherwise. See [setJson].
+  Object? getJson(String property) => switch (get(property)) {
+        JsonValue(:final data) => data,
+        _ => null,
+      };
+
+  /// The strings in the JSON array [property] holds (see [setStrings]); empty
+  /// when it is not set or not a JSON array. Items that are not strings are
+  /// left out.
+  List<String> getStrings(String property) => switch (getJson(property)) {
+        List<Object?> l => l.whereType<String>().toList(),
+        _ => const [],
+      };
+
+  /// Set [property] to a JSON array of [items], for a list of plain strings
+  /// such as tags (a `List<String>` given to [set] would be links). Read it
+  /// back with [getStrings]. Local until [save].
+  void setStrings(String property, Iterable<String> items) =>
+      set(property, JsonValue.strings(items));
+
+  /// Set [property] to [data] as JSON (see [JsonValue.encode]). Read it back
+  /// with [getJson]. Local until [save].
+  void setJson(String property, Object? data) =>
+      set(property, JsonValue.encode(data));
+
   /// Set [property] to [value] (see [Value.of] for how plain Dart values are
   /// read). Local until [save].
+  ///
+  /// A plain `String` is a string, except for the link properties of
+  /// [Props.linkProperties] (`parent`, `isA`): there it is stored as a link
+  /// (`isA` as a list of one class), so `set(Props.parent, subject)` is a
+  /// move. For a property of your own that holds a link pass
+  /// `LinkValue(subject)` (or a `List` of subjects for several); a plain
+  /// string stays text.
   void set(String property, Object value) {
-    _changes[property] = Value.of(value);
+    _changes[property] = _coerce(property, value);
     _removed.remove(property);
   }
+
+  static Value _coerce(String property, Object value) {
+    if (value is String && Props.linkProperties.contains(property)) {
+      return property == Props.isA
+          ? ArrayValue([LinkValue(value)])
+          : LinkValue(value);
+    }
+    return Value.of(value);
+  }
+
+  /// Move the resource under [parent] (a subject): sets [Props.parent] as a
+  /// link. Like [set] it is local until [save] (a move does not save itself).
+  /// After the save the old parent's [Store.watchChildren]
+  /// drops the resource and the new parent's lists it.
+  void moveTo(String parent) => set(Props.parent, LinkValue(parent));
 
   /// Remove [property]. Local until [save].
   void remove(String property) {

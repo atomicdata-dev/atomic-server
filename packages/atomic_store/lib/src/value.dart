@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'exceptions.dart';
 
 /// A property value, typed like the datatype of its property. Compare with
@@ -187,10 +189,28 @@ final class NestedValue extends Value {
   String toString() => '{${props.entries.map((e) => '${e.key}: ${e.value}').join(', ')}}';
 }
 
-/// JSON text.
+/// JSON text. The way to store what other datatypes cannot: a list of plain
+/// strings (arrays hold links only), a small map, a list of numbers.
+///
+/// ```dart
+/// todo.set(tags, JsonValue.strings(['urgent', 'home']));   // or todo.setStrings
+/// todo.getStrings(tags);                                   // ['urgent', 'home']
+/// ```
 final class JsonValue extends Value {
   const JsonValue(this.json);
+
+  /// [data] (anything `jsonEncode` accepts) as JSON text.
+  factory JsonValue.encode(Object? data) => JsonValue(jsonEncode(data));
+
+  /// A JSON array of [items].
+  factory JsonValue.strings(Iterable<String> items) =>
+      JsonValue(jsonEncode(items.toList()));
+
   final String json;
+
+  /// The decoded JSON (`List`, `Map`, `String`, `num`, `bool` or `null`).
+  /// Throws [FormatException] when [json] is not JSON.
+  Object? get data => jsonDecode(json);
   @override
   bool operator ==(Object other) => other is JsonValue && other.json == json;
   @override
