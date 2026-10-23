@@ -9,6 +9,7 @@ const m = vi.hoisted(() => ({
   applyPending: vi.fn(),
   capture: vi.fn(),
   agent: undefined as { subject: string; privateDrive?: string } | undefined,
+  guests: [] as string[],
 }));
 
 vi.mock('./agentStorage', () => ({ archiveStoredAgent: m.archive }));
@@ -35,13 +36,17 @@ vi.mock('@sentry/react', () => ({ captureException: m.capture }));
 
 import { prepareIdentitySwitch, workToBring } from './bringAlong';
 
-const store = { getAgent: () => m.agent } as never;
+const store = {
+  getAgent: () => m.agent,
+  isLocalOnlyDrive: (subject: string) => m.guests.includes(subject),
+} as never;
 const A = 'did:ad:agent:a';
 const B = 'did:ad:agent:b';
 
 beforeEach(() => {
   vi.clearAllMocks();
   m.agent = { subject: A, privateDrive: 'did:ad:homeA' };
+  m.guests = [];
   m.archive.mockResolvedValue(undefined);
   m.workspace.mockResolvedValue('some');
   m.list.mockResolvedValue(['did:ad:notes']);
@@ -91,6 +96,18 @@ describe('prepareIdentitySwitch', () => {
     expect(await prepareIdentitySwitch(store, B, ask)).toBe('brought');
     expect(m.archive).toHaveBeenCalledWith(A);
     expect(ask).toHaveBeenCalledExactlyOnceWith(['did:ad:notes']);
+    expect(m.handOver).toHaveBeenCalledWith(
+      store,
+      expect.objectContaining({ from: A, to: B }),
+    );
+  });
+
+  it('brings a demo guest along without asking', async () => {
+    m.guests = [A];
+    const ask = vi.fn();
+
+    expect(await prepareIdentitySwitch(store, B, ask)).toBe('brought');
+    expect(ask).not.toHaveBeenCalled();
     expect(m.handOver).toHaveBeenCalledWith(
       store,
       expect.objectContaining({ from: A, to: B }),

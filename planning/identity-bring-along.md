@@ -39,6 +39,8 @@ No work, no step: the sign-in is just a sign-in.
 - **App (own phone):** no question. The sign-in ends on one result line that
   names the drives: 'Added to your account: "Notes" and "Recipes".', and
   they are in the drive switcher.
+- **Web, demo guest:** a guest has no account of its own, so its work always
+  comes along, no question (as `IdentityReconcileGate` does).
 - **Web:** a browser may be shared, so one question, only when A has work:
   "Add your work from this browser to your account?", listing the drives
   (as resource rows) and saying "Nothing is copied or deleted". Buttons:

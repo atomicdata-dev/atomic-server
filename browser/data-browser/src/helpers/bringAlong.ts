@@ -123,7 +123,11 @@ export async function prepareIdentitySwitch(
 
   if (drives?.length === 0) return 'left';
 
-  if (!(await ask(drives ?? []))) return 'left';
+  // A demo guest has no account of its own: its work goes with whoever signs
+  // in here, as the reconcile gate does, so there is nothing to ask.
+  const guest = store.isLocalOnlyDrive(from);
+
+  if (!guest && !(await ask(drives ?? []))) return 'left';
 
   await handOverFrom(store, from, to);
 
