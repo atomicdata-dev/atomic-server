@@ -67,7 +67,9 @@ its dependencies, about 10 minutes cold.
     private drive; persist the secret (e.g. `flutter_secure_storage`) and pass
     it back as `agentSecret` on the next start;
   - `node.connect(serverOrigin)` / `disconnect()`: sync with an Atomic Server
-    over WebSocket;
+    over WebSocket (same as `node.sync.connect`);
+  - `node.identity`, `node.drives`, `node.sync`, `node.peers`, `node.sharing`:
+    the typed parts, below;
   - `node.handle`: the raw bridge handle for everything else.
 - `BridgeStoreBackend`: the `StoreBackend` itself, for building a `Store` on a
   raw handle yourself.
@@ -119,25 +121,132 @@ drive is not on this device yet, so the store is empty until you `connect` to
 the server both devices use. The drive is fetched from the server and from then
 on both devices see each other's writes through it. (Pass `drive:` to work in
 another drive instead; a file that already remembers a drive keeps it, so you
-do not need to store the drive subject next to the secret.) This needs a server that holds the drive; two devices with no server can
-only pair over Iroh, which the app (`flutter/`) wires up but a node from
-`AtomicFlutter.open` does not take part in.
+do not need to store the drive subject next to the secret.) This needs a server that holds the drive, or a paired device: two devices
+with no server pair over Iroh (`node.peers`).
 
-**Sharing** with other people (inviting another agent, setting who may read or
-write) is not supported by this package; a drive belongs to its agent. The
-rights and invite resources exist in Atomic Data and are reachable through the
-raw bridge or the server, but there is no typed API here.
+## Identity, drives, sync, peers, sharing
+
+Everything below lives in Rust (`atomic_lib`) and is reached through the node,
+so an app writes screens, not sync logic. Each part is an interface
+(`Identity`, `Drives`, `ServerSync`, `Peers`, `Sharing`) with a fake in
+`package:atomic_store_flutter/testing.dart`; take the interface in your
+widgets and pass `node.peers` etc. in production.
+
+### Identity (`node.identity`)
+
+```dart
+final made = await node.identity.create('Alice');    // new agent + private drive
+await secureStorage.write(key: 'agent', value: made.secret);
+
+final found = await node.identity.signIn(secret);    // an existing agent
+if (found.needsSync) { /* drive is not here yet: node.sync or node.peers */ }
+await node.identity.updateProfile(name: 'Alice B');
+final me = await node.identity.profile();
+await node.identity.signOut();                       // forget the agent here
+```
+
+**Keeping the secret is your job**: the package never writes it anywhere.
+Whoever has it is the agent. `signIn` makes the store work in the drive the
+secret names (`node.drive`, `node.store.drive`).
+
+### Drives (`node.drives`)
+
+```dart
+final list = await node.drives.list();               // names, icons, current first
+final work = await node.drives.create('Work');       // and switches to it
+await node.drives.switchTo(list.first.subject);      // remembered for next start
+node.drives.watchCurrent().listen(...);              // node.store.drive follows
+```
+
+### Server (`node.sync`)
+
+```dart
+final status = await node.sync.resume(savedOrigin);  // on app start, 10 s at most
+// ResumeStatus.ready | offline | needsSync
+node.sync.watchStatus().listen((s) => print(s.connected));
+
+// A drive that is not here and no server is saved: look it up. Its public
+// record (pkarr) names servers; each must prove it hosts the drive.
+final origin = await node.sync.discover(drive);      // connects to the first that proves it
+```
+
+`resume` never throws for an unreachable server (`offline`: writes wait on
+disk). `connect(origin)`, `disconnect()`, `pushPending()` and
+`verifiedOrigins(drive)` are there too. Which server to use, and remembering
+it, is the app's.
+
+### Devices (`node.peers`)
+
+Sync between devices over Iroh (QUIC), no server: pair with a QR code and the
+devices keep each other's drive up to date while both are online.
+
+```dart
+await node.peers.start();                            // once; own node id
+showQr(node.peers.pairingCode);                      // 'atomic:node:<id>:<device name>'
+await node.peers.pair(scannedText);                  // device B: parse, sync, remember
+node.peers.watchKnown().listen(...);                 // paired devices, live flag
+node.peers.watchLive().listen(...);                  // connected right now
+await node.peers.syncNow();                          // all paired + connected
+node.peers.rename(id, 'Kitchen tablet'); node.peers.remove(id);
+```
+
+`PairingCode.parse(text)` reads what a scanner returns (it also reads the
+`atomic://pair?…` codes the web and desktop apps show) and returns `null` for
+anything else. A code is routing only: the device dialed proves it holds the
+same agent key before anything crosses. Call `node.peers.setForeground(bool)`
+from the app lifecycle so the background search stops.
+
+**Peers belong to the process.** Iroh runs one endpoint per process and it
+serves the store of the first node that calls `peers.start()`; another node
+in the same process gets an error from it. With one node per app (the only
+supported use) there is nothing to do. The node's database must be the
+`path` you opened (a path is opened once per process).
+
+### Sharing (`node.sharing`)
+
+Sharing in Atomic Data is two things, both mirrored from `@tomic/lib` and the
+web app's Share dialog:
+
+- **Rights** are the `read` and `write` properties of a resource: lists of
+  agent subjects, inherited down `parent`. `sharing.grant`, `revoke`,
+  `setPublic` and `rights` edit and read them, as an ordinary signed write.
+- **Invites** are stateless tokens the inviting agent signs for a target
+  resource; the server that hosts it grants the right when someone accepts.
+
+```dart
+await node.sharing.grant(folder, friendAgentSubject, ShareRole.write);
+await node.sharing.setPublic(folder, ShareRole.read);    // anyone with the link may read
+final link = node.sharing.inviteLink('https://my.server', folder,
+    role: ShareRole.read, maxUsages: 5);               // <server>/app/invite?token=…
+```
+
+Accepting an invite happens in the server's web app (`/app/invite`) or its
+`/invites` endpoint; the package only creates invites. An invite needs a
+resource on a server, so connect the node first, and the inviter must be
+allowed to write the target (the server checks).
+
+## Testing without the native library
+
+```dart
+final store = Store(backend: InMemoryBackend());              // atomic_store/testing.dart
+final peers = FakePeers(deviceName: 'Test phone')..reachable.add(otherId);
+final sync = FakeServerSync()..servers.add('https://s.example');
+final drives = FakeDrives(store);
+final identity = FakeIdentity(store);
+final sharing = Sharing(store, (t, w, e, m) => 'token');      // real rights logic
+```
+
+`FakePeers.connect(id)` / `disconnect(id)` simulate a device coming and going;
+`HomeServerDiscovery` takes an `http.Client` (use `MockClient`).
 
 ## Still on you
 
-- Where to keep the agent secret, and sign-in / account UI. This package has no
-  login screen; the atomic.place app (`flutter/`) has one.
-- Pointing at a server: `connect` takes an origin you choose. Discovering a
-  user's servers and drives is app code (`flutter/lib/atomic/`).
-- Peer-to-peer sync (Iroh pairing, QR codes) is process-wide and only wired to
-  the app's default store (`flutter/lib/atomic/atomic_client.dart`, the raw
-  `bridge/api/simple/peers.dart`). A node you open with `AtomicFlutter.open`
-  does not take part in it.
+- Where to keep the agent secret, and the sign-in / account screens. The
+  package gives you `identity`, not UI; the atomic.place app (`flutter/`) has
+  screens you can read.
+- Which server to use and remembering it: `sync.connect` takes an origin you
+  choose, `sync.discover(drive)` finds one for a drive.
+- Accepting an invite (opening the invite link on the receiving side).
 - Files/blobs, history and the assistant/chat calls exist in the raw bridge
   (`package:atomic_store_flutter/bridge/api/...`, generated and unstable; `node.handle` is the
   `AtomicStore` of `bridge/api/resources.dart`) but
@@ -147,7 +256,9 @@ raw bridge or the server, but there is no typed API here.
 ## Layout and maintenance
 
 ```
-lib/atomic_store_flutter.dart   AtomicFlutter, AtomicNode, BridgeStoreBackend
+lib/atomic_store_flutter.dart   AtomicFlutter, AtomicNode, BridgeStoreBackend,
+                                Peers, ServerSync, Drives, Identity, Sharing
+lib/testing.dart                fakes of the above (no native library)
 lib/bridge/                     GENERATED Dart bindings (do not edit); public
                                 as package:atomic_store_flutter/bridge/api/*.dart
 rust/                           the Rust crate atomic_flutter_rust (workspace-excluded)
