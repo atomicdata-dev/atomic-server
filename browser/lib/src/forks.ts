@@ -1,4 +1,5 @@
 import { core } from './ontologies/core.js';
+import { copyResource, NON_COPIED_PROPS } from './copy.js';
 import { forks } from './ontologies/forks.js';
 import type { AtomicValue } from './value.js';
 import type { JSONValue } from './value.js';
@@ -22,19 +23,15 @@ import type { Store } from './store.js';
  * `isA` and the fork's own bookkeeping are excluded here too, and handled
  * explicitly by the merge.
  */
-const NON_CONTENT_PROPS: ReadonlySet<string> = new Set<string>([
-  core.properties.parent,
-  core.properties.isA,
-  core.properties.localId,
-  core.properties.read,
-  core.properties.write,
-  'https://atomicdata.dev/properties/append',
-  'https://atomicdata.dev/properties/drive',
-  'https://atomicdata.dev/properties/genesis',
-  'https://atomicdata.dev/properties/lastCommit',
+const FORK_PROPS: ReadonlySet<string> = new Set<string>([
   forks.properties.originalSubject,
   forks.properties.forkBase,
   forks.properties.forkVersion,
+]);
+
+const NON_CONTENT_PROPS: ReadonlySet<string> = new Set<string>([
+  ...NON_COPIED_PROPS,
+  ...FORK_PROPS,
 ]);
 
 const contentPropsOf = (resource: Resource): Record<string, AtomicValue> =>
@@ -138,12 +135,14 @@ export async function forkResource(
   original: Resource,
   parent: string,
 ): Promise<Resource> {
-  const fork = await store.newResource({
+  // A document/canvas body lives in a Loro container, not in propvals; the
+  // copy seeds it from the original so the fork's body shares its causal
+  // history. That is what lets the merge be a real CRDT merge, not an overwrite.
+  const { copy: fork, version } = await copyResource(store, original, {
     parent,
-    deferGenesis: original.hasLoroBody(),
-    isA: [...original.getClasses(), forks.classes.fork],
+    classes: [...original.getClasses(), forks.classes.fork],
+    exclude: FORK_PROPS,
     propVals: {
-      ...contentPropsOf(original),
       [forks.properties.originalSubject]: original.subject,
       // Freeze the forked-from content so a later merge can tell what the fork
       // actually changed, rather than overwriting the original wholesale. Stored
@@ -155,23 +154,8 @@ export async function forkResource(
     },
   });
 
-  // A document/canvas body lives in a Loro container, not in propvals, so
-  // `newResource` above gave the fork an empty body. Seed it from the original
-  // so the fork's body shares the original's causal history — that is what lets
-  // the merge be a real CRDT merge rather than an overwrite.
-  if (original.hasLoroBody()) {
-    // Seeding overwrites the fork's propvals with the original's, so snapshot
-    // the fork's own propvals first and re-assert them afterward.
-    const identity = fork.getPropVals();
-    const forkVersion = fork.seedLoroBodyFrom(original);
-
-    for (const [prop, value] of Object.entries(identity)) {
-      await fork.set(prop, value as AtomicValue, false);
-    }
-
-    if (forkVersion) {
-      await fork.set(forks.properties.forkVersion, forkVersion, false);
-    }
+  if (version) {
+    await fork.set(forks.properties.forkVersion, version, false);
   }
 
   await fork.save();

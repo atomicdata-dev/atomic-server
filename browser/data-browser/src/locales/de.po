@@ -11894,7 +11894,6 @@ msgstr ""
 msgid "A property can't be moved to another ontology."
 msgstr ""
 
-#: src/components/SideBar/useSidebarDnd.ts
 #: src/helpers/moveResource.ts
 msgid "A property can't be moved to another parent."
 msgstr ""
@@ -13239,6 +13238,22 @@ msgstr ""
 msgid "A resource can't be moved into something inside it."
 msgstr ""
 
-#: src/helpers/moveResource.ts
-msgid "Moving to another drive is not supported yet."
+#: src/components/MoveResourceDialog.tsx
+msgid "You don't have write access to the original."
+msgstr ""
+
+#: src/components/MoveResourceDialog.tsx
+msgid "The original is moved to the Trash of its drive."
+msgstr ""
+
+#: src/components/MoveResourceDialog.tsx
+msgid "Moving to another drive"
+msgstr ""
+
+#: src/components/MoveResourceDialog.tsx
+msgid "This makes a copy with a new identifier, so its link changes. Links and references elsewhere keep pointing at the old identifier; they only keep working through the redirect. Access follows the new parent."
+msgstr ""
+
+#: src/components/MoveResourceDialog.tsx
+msgid "<0/> Leave a redirect at the old location"
 msgstr ""
