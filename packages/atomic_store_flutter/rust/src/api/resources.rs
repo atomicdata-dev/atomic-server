@@ -857,21 +857,24 @@ mod tests {
         let children = get_child_subjects(drive.clone(), 100).await.unwrap();
         assert!(children.contains(&subject));
 
-        // Other tests write to this store at the same time: wait for ours.
-        let mine = subject.clone();
-        let waiter = tokio::spawn(async move {
+        // Other tests write to this store at the same time. Each
+        // `wait_for_store_event` subscribes anew, so looping over it can miss
+        // ours between two calls: hold one subscription instead.
+        let mut events = AtomicStore::global().unwrap().db.subscribe_events();
+        destroy_resource(subject.clone()).await.unwrap();
+        let destroyed = tokio::time::timeout(std::time::Duration::from_secs(10), async {
             loop {
-                let event = wait_for_store_event(10_000).await.unwrap();
-                if event.subject == mine || event.kind == ResourceEvent::Timeout {
-                    return event;
+                match events.recv().await {
+                    Ok(atomic_lib::DbEvent::Destroyed { subject: s, .. }) if s.to_string() == subject => {
+                        return true;
+                    }
+                    Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(_) => return false,
                 }
             }
-        });
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        destroy_resource(subject.clone()).await.unwrap();
-        let event = waiter.await.unwrap();
-        assert_eq!(event.kind, ResourceEvent::Destroyed);
-        assert_eq!(event.subject, subject);
+        })
+        .await;
+        assert_eq!(destroyed, Ok(true));
         assert_eq!(
             get_resource_data(subject.clone()).await.unwrap_err().kind,
             ErrorKind::NotFound
