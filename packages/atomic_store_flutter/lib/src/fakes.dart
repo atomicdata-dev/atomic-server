@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:atomic_store/atomic_store.dart';
 
+import 'atomic_flutter.dart' show AtomicParts;
+import 'sharing.dart';
 import 'src_exports.dart';
 
 /// [value] now, then again after every event of [changes]. (Not `async*`: such
@@ -133,7 +135,8 @@ class FakePeers implements Peers {
           .compareTo(a.lastSynced?.millisecondsSinceEpoch ?? 0));
 
   @override
-  Stream<List<KnownPeer>> watchKnown() => _current(() => known, _changed.stream);
+  Stream<List<KnownPeer>> watchKnown() =>
+      _current(() => known, _changed.stream);
 
   @override
   void add(String nodeId, [String name = '']) {
@@ -223,8 +226,7 @@ class FakeServerSync implements ServerSync {
   }
 
   @override
-  Stream<SyncStatus> watchStatus() =>
-      _current(() => _status, _changes.stream);
+  Stream<SyncStatus> watchStatus() => _current(() => _status, _changes.stream);
 
   @override
   Future<void> connect(String origin) async {
@@ -391,4 +393,29 @@ class FakeIdentity implements Identity {
     _profiles[_secret!] =
         Profile(subject: subject!, name: name.trim(), description: description);
   }
+}
+
+/// A node made of the fakes, to test screens that take an [AtomicParts] such
+/// as `AtomicAccountButton`. Its sharing is the real rights logic with a
+/// fake signer.
+class FakeNode implements AtomicParts {
+  FakeNode(this.store, {String? secret, Iterable<DriveInfo> drives = const []})
+      : identity = FakeIdentity(store, secret: secret),
+        drives = FakeDrives(store, drives),
+        sync = FakeServerSync(),
+        peers = FakePeers(),
+        sharing = Sharing(store, (t, w, e, m) => 'token-$t-${w ? 'w' : 'r'}');
+
+  @override
+  final Store store;
+  @override
+  final FakeIdentity identity;
+  @override
+  final FakeDrives drives;
+  @override
+  final FakeServerSync sync;
+  @override
+  final FakePeers peers;
+  @override
+  final Sharing sharing;
 }

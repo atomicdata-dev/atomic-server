@@ -1,5 +1,6 @@
 import 'package:atomic_store/atomic_store.dart';
 
+import 'agent_secrets.dart';
 import 'bridge_store_backend.dart';
 import 'drives.dart';
 import 'identity.dart';
@@ -25,7 +26,8 @@ abstract final class AtomicFlutter {
   /// Loads the native library. Call it once before anything else (after
   /// `WidgetsFlutterBinding.ensureInitialized()`). Calling it again returns
   /// the first call's result: the library only loads once per process.
-  static Future<void> init() => _init ??= impl.initRustBridge().onError((e, st) {
+  static Future<void> init() =>
+      _init ??= impl.initRustBridge().onError((e, st) {
         _init = null; // let the caller retry after a failed load
         Error.throwWithStackTrace(e!, st);
       });
@@ -43,14 +45,24 @@ abstract final class AtomicFlutter {
   ///   drive and the store works in it; [AtomicNode.driveNeedsSync] is `true`
   ///   until [AtomicNode.connect] has fetched that drive from a server.
   ///
+  /// Without an [agentSecret], the one [secretStore] kept for this [path] is
+  /// used, so reopening keeps the same agent (the Rust node forgets its agent
+  /// when the process ends). The secret in use is written back to
+  /// [secretStore] on open and on every [Identity.create], [Identity.signIn]
+  /// and [Identity.signOut] (which deletes it). Pass [MemoryAgentSecrets] to
+  /// keep nothing.
+  ///
   /// A file is opened once per process: call this once and keep the result.
   static Future<AtomicNode> open({
     required String path,
     String? agentSecret,
     String agentName = 'Me',
     String? drive,
+    AgentSecretStore secretStore = const SecureAgentSecrets(),
   }) async {
     await init();
+    final key = 'atomic_agent:$path';
+    agentSecret ??= await secretStore.read(key);
     try {
       final handle = await bridge.AtomicStore.open(
           path: path, agentSecret: agentSecret, drive: drive);
@@ -69,17 +81,31 @@ abstract final class AtomicFlutter {
         secret = created.agentSecret;
         workingDrive = created.drive;
       }
+      await secretStore.write(key, secret);
       return AtomicNode._(
         handle,
         Store(backend: BridgeStoreBackend(handle), drive: workingDrive),
         secret,
         workingDrive,
         needsSync,
+        secretStore,
+        key,
       );
     } on bridge.AtomicError catch (e) {
       throw storeExceptionFromBridge(e);
     }
   }
+}
+
+/// What the account UI needs of a node. [AtomicNode] is one; tests pass a
+/// `FakeNode` from `package:atomic_store_flutter/testing.dart`.
+abstract interface class AtomicParts {
+  Store get store;
+  Identity get identity;
+  Drives get drives;
+  ServerSync get sync;
+  Peers get peers;
+  Sharing get sharing;
 }
 
 /// An open local node: the [store] to read and write through, the agent that
@@ -88,14 +114,23 @@ abstract final class AtomicFlutter {
 ///
 /// A node on its own is local only. Which of the parts you use is up to you;
 /// an app that never pairs devices never starts [peers].
-class AtomicNode {
+class AtomicNode implements AtomicParts {
   AtomicNode._(this.handle, this.store, String agentSecret, String? drive,
-      bool driveNeedsSync)
+      bool driveNeedsSync, this._secrets, this._secretKey)
       : _agentSecret = agentSecret,
         _driveNeedsSync = driveNeedsSync {
-    identity = BridgeIdentity(handle, store, (secret, drive, needsSync) {
+    identity = BridgeIdentity(handle, store,
+        (secret, drive, needsSync, previousSecret) async {
       _agentSecret = secret;
       _driveNeedsSync = needsSync;
+      if (secret == null) {
+        await _secrets.delete(_secretKey);
+      } else {
+        await _secrets.write(_secretKey, secret);
+      }
+      if (previousSecret != null) {
+        await _secrets.archive(_secretKey, previousSecret);
+      }
     }, agentSecret);
     drives = BridgeDrives(handle, store);
     sync = BridgeServerSync(handle, store);
@@ -114,27 +149,36 @@ class AtomicNode {
   final bridge.AtomicStore handle;
 
   /// The Dart `Store`, working in [drive].
+  @override
   final Store store;
+
+  final AgentSecretStore _secrets;
+  final String _secretKey;
 
   String? _agentSecret;
   bool _driveNeedsSync;
 
   /// Who signs: create or load an agent, sign out, the profile. Keeping the
   /// secret is the app's job (see [Identity]).
+  @override
   late final Identity identity;
 
   /// The agent's drives: list, create, switch. [store] follows a switch.
+  @override
   late final Drives drives;
 
   /// Sync with an Atomic Server: connect on start, status, finding the server
   /// that hosts a drive.
+  @override
   late final ServerSync sync;
 
   /// Sync between devices over Iroh, with QR pairing. Peers belong to the
   /// process: see [Peers].
+  @override
   late final Peers peers;
 
   /// Who may read or write a resource, and invite links.
+  @override
   late final Sharing sharing;
 
   /// The secret of the signing agent. Persist it: it is the identity. Empty

@@ -54,8 +54,41 @@ its dependencies, about 10 minutes cold.
   Android/iOS targets cargokit asks for) on first build.
 - Linux desktop: `clang cmake ninja-build pkg-config libgtk-3-dev`.
 - Android: the NDK (Android Studio SDK Manager). iOS/macOS: Xcode.
+- macOS: the plugin needs macOS 12 and Apple Silicon. A new `flutter create` app
+  targets 10.15, so in `macos/Podfile` set `platform :osx, '12.0'` and add
+
+  ```ruby
+  post_install do |installer|
+    installer.pods_project.targets.each do |target|
+      flutter_additional_macos_build_settings(target)   # already there
+      target.build_configurations.each do |config|
+        config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = '12.0'
+        config.build_settings['ARCHS'] = 'arm64'
+      end
+    end
+  end
+  ```
+
+  (see `example/macos/Podfile`). Also set the macOS deployment target to 12.0
+  in Xcode (Runner target) if it still says 10.15.
+- iOS: set `platform :ios, '15.0'` in `ios/Podfile`.
 - Web is not supported: there is no native node in a browser. Use a
   different `StoreBackend` there.
+
+## Account and sharing
+
+One line in your app bar gives people a sheet to change their name, switch or
+create drives, sign in with a secret, copy their secret, share the drive by
+link, add another device and sign out:
+
+```dart
+AppBar(title: Text('Notes'), actions: [AtomicAccountButton(node: node)])
+```
+
+(`showAtomicAccountSheet(context, node)` opens the same sheet from anywhere.)
+Sharing needs a server (`node.connect(origin)`). "Sign in with atomic.place" in
+the browser is not part of the package: it lives in the app in `flutter/`
+together with its account client, so paste-the-secret is the way in here.
 
 ## What you get
 
@@ -64,8 +97,8 @@ its dependencies, about 10 minutes cold.
   database in `path`, and returns an `AtomicNode`:
   - `node.store`: the `Store`, working in `node.drive`;
   - `node.agentSecret`: **the identity**. First run creates a new agent and a
-    private drive; persist the secret (e.g. `flutter_secure_storage`) and pass
-    it back as `agentSecret` on the next start;
+    private drive. `open` keeps the secret in the OS keychain and uses it on the
+    next start (see below);
   - `node.connect(serverOrigin)` / `disconnect()`: sync with an Atomic Server
     over WebSocket (same as `node.sync.connect`);
   - `node.identity`, `node.drives`, `node.sync`, `node.peers`, `node.sharing`:
@@ -79,20 +112,23 @@ same process is not safe. Keep the `AtomicNode`.
 
 ## Identity, restart and sync
 
-**Identity is the agent secret.** The first `open` (no `agentSecret`) creates an
-Ed25519 agent and a private drive, both on this device only; nothing is sent
-anywhere. Keep what `node` tells you:
+**Identity is the agent secret.** The first `open` creates an Ed25519 agent and
+a private drive, both on this device only; nothing is sent anywhere. The Rust
+node does not remember its agent in the database file, so `open` keeps the
+secret itself: in `flutter_secure_storage` (the keychain on macOS/iOS), under a
+key made from `path`, and uses it when you pass no `agentSecret`. It is
+rewritten on every `create` / `signIn` and deleted on `signOut`.
 
 ```dart
-// First run
 final node = await AtomicFlutter.open(path: dir, agentName: 'Alice');
-await secureStorage.write(key: 'agent', value: node.agentSecret);
-
-// Every later run, same `dir`
-final node = await AtomicFlutter.open(
-    path: dir, agentSecret: await secureStorage.read(key: 'agent'));
-print(node.drive);   // the same drive subject as the first run
+// Every later run, same `dir`: the same agent and drive, no code needed.
+print(node.drive);
 ```
+
+Pass `secretStore: MemoryAgentSecrets()` to keep nothing, or your own
+`AgentSecretStore` to keep it elsewhere. An explicit `agentSecret` wins and is
+stored. The secrets of agents you signed in as before are archived next to it
+(`<key>.old`). On Linux the plugin needs `libsecret`.
 
 With the saved `agentSecret` and the same `path`, the node signs as the same
 agent and `node.drive` is the drive it was last working in (the database
@@ -145,16 +181,15 @@ final me = await node.identity.profile();
 await node.identity.signOut();                       // forget the agent here
 ```
 
-**Keeping the secret is your job**: the package never writes it anywhere.
-Whoever has it is the agent. `signIn` makes the store work in the drive the
+**Whoever has the secret is the agent.** `open` keeps it (see above). `signIn` makes the store work in the drive the
 secret names (`node.drive`, `node.store.drive`).
 
 Signing in as a *different* agent brings the old one's work along: the old agent
 adds the new one to `write` on every drive it can write (its private drive only
 if it holds something), and they are listed for the new agent. `SignIn.broughtAlong`
 has those drive subjects (show "your notes are in your account now"), and
-`SignIn.previousSecret` is the old agent's secret, which the package does not
-keep: archive it. Nothing is copied; a second sign-in brings nothing.
+`SignIn.previousSecret` is the old agent's secret; the node archives it in the
+`AgentSecretStore`. Nothing is copied; a second sign-in brings nothing.
 
 ### Drives (`node.drives`)
 
@@ -248,9 +283,7 @@ final sharing = Sharing(store, (t, w, e, m) => 'token');      // real rights log
 
 ## Still on you
 
-- Where to keep the agent secret, and the sign-in / account screens. The
-  package gives you `identity`, not UI; the atomic.place app (`flutter/`) has
-  screens you can read.
+- Sign in through the atomic.place website; the app in `flutter/` has it.
 - Which server to use and remembering it: `sync.connect` takes an origin you
   choose, `sync.discover(drive)` finds one for a drive.
 - Accepting an invite (opening the invite link on the receiving side).

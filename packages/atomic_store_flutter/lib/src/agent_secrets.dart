@@ -1,0 +1,62 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+/// Where an app keeps the agent secret between starts. [AtomicFlutter.open]
+/// reads it when no `agentSecret` is passed, and the node writes it on every
+/// sign-in and deletes it on sign-out.
+abstract interface class AgentSecretStore {
+  Future<String?> read(String key);
+  Future<void> write(String key, String secret);
+  Future<void> delete(String key);
+
+  /// Keeps the secret of an agent that was signed in before, so it can still
+  /// be signed in as (see `SignIn.previousSecret`). Stored under `$key.old`,
+  /// one per line.
+  Future<void> archive(String key, String secret);
+}
+
+/// The default: the OS keychain / keystore (`flutter_secure_storage`).
+/// On macOS it uses the login keychain, which needs no entitlement.
+class SecureAgentSecrets implements AgentSecretStore {
+  const SecureAgentSecrets();
+
+  static const _storage = FlutterSecureStorage(
+      mOptions: MacOsOptions(useDataProtectionKeyChain: false));
+
+  @override
+  Future<String?> read(String key) => _storage.read(key: key);
+
+  @override
+  Future<void> write(String key, String secret) =>
+      _storage.write(key: key, value: secret);
+
+  @override
+  Future<void> delete(String key) => _storage.delete(key: key);
+
+  @override
+  Future<void> archive(String key, String secret) async {
+    final old = (await _storage.read(key: '$key.old'))?.split('\n') ?? [];
+    if (old.contains(secret)) return;
+    await _storage.write(key: '$key.old', value: [...old, secret].join('\n'));
+  }
+}
+
+/// Keeps secrets in memory only: for tests, or an app that wants a new
+/// identity every start.
+class MemoryAgentSecrets implements AgentSecretStore {
+  final Map<String, String> values = {};
+
+  @override
+  Future<String?> read(String key) async => values[key];
+
+  @override
+  Future<void> write(String key, String secret) async => values[key] = secret;
+
+  @override
+  Future<void> delete(String key) async => values.remove(key);
+
+  @override
+  Future<void> archive(String key, String secret) async {
+    final old = values['$key.old'];
+    values['$key.old'] = old == null ? secret : '$old\n$secret';
+  }
+}

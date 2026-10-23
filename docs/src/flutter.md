@@ -54,6 +54,7 @@ Everything up to sync is purely local: nothing touches the network until you cal
 | `node.sync` | Sync with a server over WebSocket: `connect`, `resume`, `discover`, `watchStatus` |
 | `node.peers` | Device to device over Iroh: start, pairing code, `pair`, known and live devices |
 | `node.sharing` | Rights (`grant`, `revoke`, `setPublic`, `rights`) and invite links |
+| `AtomicAccountButton` | An app bar button that opens a sheet for name, drives, sign in, secret, sharing, adding a device and sign out |
 | `node.handle` | The raw bridge handle, for everything not wrapped yet |
 
 Connecting to a server *fetches* a Drive this device lacks and sends the writes that are waiting.
@@ -140,8 +141,9 @@ The package READMEs have recipes for testing streams and widgets.
   The node creates invite links; accepting happens in the server's web app (`/app/invite`) or its `/invites` endpoint.
 - Files and blobs, and history (time travel over a Resource's Loro oplog).
   They exist in the raw bridge (`package:atomic_store_flutter/bridge/api/...`, generated and unstable) but have no typed Dart wrapper.
-- Where to keep the agent secret, which server to use and remembering it, and the sign-in screens.
-  The package gives you `identity` and `sync`, not UI.
+- Which server to use and remembering it.
+  `open` remembers the agent secret in the OS keychain; `AtomicAccountButton` is the account screen.
+  Signing in through the atomic.place website is not in the package.
 
 ## Signing HTTP requests from Dart
 

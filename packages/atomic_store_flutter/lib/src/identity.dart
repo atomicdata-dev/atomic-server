@@ -102,14 +102,16 @@ abstract interface class Identity {
 }
 
 /// [Identity] over one node's handle. [onChange] tells the node its secret and
-/// drive changed.
+/// drive changed (and the [SignIn.previousSecret] to archive, if any).
 class BridgeIdentity implements Identity {
   BridgeIdentity(this._handle, this._store, this._onChange, String? secret)
       : _secret = secret;
 
   final bridge.AtomicStore _handle;
   final Store _store;
-  final void Function(String? secret, String? drive, bool needsSync) _onChange;
+  final Future<void> Function(
+          String? secret, String? drive, bool needsSync, String? previousSecret)
+      _onChange;
   String? _secret;
 
   Future<T> _guard<T>(Future<T> Function() run) async {
@@ -132,7 +134,7 @@ class BridgeIdentity implements Identity {
     final made = await _guard(() => _handle.setup(name: name));
     _secret = made.agentSecret;
     _store.drive = made.drive;
-    _onChange(made.agentSecret, made.drive, false);
+    await _onChange(made.agentSecret, made.drive, false, null);
     return (
       secret: made.agentSecret,
       agentSubject: made.agentSubject,
@@ -147,7 +149,7 @@ class BridgeIdentity implements Identity {
     final drive = _handle.drive();
     _store.drive = drive;
     _store.clearCache();
-    _onChange(secret, drive, loaded.needsSync);
+    await _onChange(secret, drive, loaded.needsSync, loaded.previousSecret);
     return SignIn(
         agentSubject: loaded.agentSubject,
         drive: drive,
@@ -161,7 +163,7 @@ class BridgeIdentity implements Identity {
     await _handle.signOut();
     _secret = null;
     _store.clearCache();
-    _onChange(null, _store.drive, false);
+    await _onChange(null, _store.drive, false, null);
   }
 
   @override

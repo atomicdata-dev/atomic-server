@@ -16,6 +16,7 @@ dependencies:
   atomic_store:
     path: ../atomic_store
   http: ^1.3.0
+  flutter_secure_storage: ^9.2.4
   flutter_rust_bridge: 2.12.0 # keep equal to rust/Cargo.toml and FRB_CODEGEN_VERSION in CI
   plugin_platform_interface: ^2.0.2
 
