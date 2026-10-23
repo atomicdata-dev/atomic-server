@@ -6,6 +6,7 @@
 import '../frb_generated.dart';
 import 'assistant.dart';
 import 'error.dart';
+import 'node.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `atomic_to_sub_resource`, `atomic_to_value`, `build`, `global`, `list_to_propvals`, `new_default`, `node`, `parse`, `pin_drive`, `propvals_to_list`, `push`, `pusher`, `scalar`, `sub_resource_to_value`, `value_to_atomic`
@@ -64,6 +65,9 @@ Future<StoreEvent> waitForStoreEvent({required int timeoutMs}) =>
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<AtomicStore>>
 abstract class AtomicStore implements RustOpaqueInterface {
+  /// Remember a paired device. A non-empty `name` renames a known one.
+  void addKnownPeer({required String nodeId, required String name});
+
   /// The subject of the agent that signs, if one is set.
   String? agentSubject();
 
@@ -85,6 +89,20 @@ abstract class AtomicStore implements RustOpaqueInterface {
   /// app's AI sidebar does. Returns the chat's subject.
   Future<String> createAiChat({required String name});
 
+  /// A signed invite for `target` (a drive or any resource): whoever opens
+  /// the link `<server>/app/invite?token=<token>` and accepts gets read, or
+  /// with `write` read and write, access. Stateless, like `generateInviteToken`
+  /// of `@tomic/lib` (nothing is stored here); the server that hosts `target`
+  /// checks the signature and that this agent may share it.
+  ///
+  /// `expires_at` is Unix milliseconds (default: 30 days from now);
+  /// `max_usages` limits how many agents may accept (default: unlimited).
+  String createInviteToken(
+      {required String target,
+      required bool write,
+      PlatformInt64? expiresAt,
+      PlatformInt64? maxUsages});
+
   /// Create a resource of `class_url` named `name` ("Untitled" when empty)
   /// under `drive`, signed by this device's agent, and push it like every other
   /// local write. Returns its subject.
@@ -100,6 +118,9 @@ abstract class AtomicStore implements RustOpaqueInterface {
   /// commit by this handle's agent, queued for the server like any write.
   /// [`AtomicError::NotFound`] when this device does not have it.
   Future<void> destroyResource({required String subject});
+
+  /// The name this device shows other devices.
+  String deviceName();
 
   /// The drive this handle works in: the one set on it, else the store's
   /// active drive.
@@ -131,6 +152,9 @@ abstract class AtomicStore implements RustOpaqueInterface {
 
   /// Whether the session is open now.
   bool isSyncing();
+
+  /// The paired devices.
+  List<KnownPeerInfo> knownPeers();
 
   /// What changed lately in every drive, newest first, by whom. Read from the
   /// recents index, which the store's change events keep.
@@ -171,6 +195,10 @@ abstract class AtomicStore implements RustOpaqueInterface {
   /// `conversation`, which the app opens natively.
   Future<String> listConversations({required int limit});
 
+  /// The agent's drives in the order a drive list shows them: the one in
+  /// use, the most recently used, the rest by name.
+  Future<List<DriveSummary>> listDrivesInfo();
+
   /// The person's favorites (all drives), newest added first, as JSON
   /// `[{subject, title, class_name, opened_at}]` (`opened_at` is always 0).
   /// Favorites that are gone or unreadable are left out.
@@ -187,6 +215,9 @@ abstract class AtomicStore implements RustOpaqueInterface {
   /// are left out.
   Future<String> listRecentResources(
       {required String drive, required int limit});
+
+  /// Devices connected right now that are not paired.
+  List<LivePeerInfo> liveUnpairedPeers();
 
   /// Sign as the agent of `secret` from now on (this handle only). When
   /// the secret names a drive, this handle works in it. `needs_sync` says
@@ -227,6 +258,10 @@ abstract class AtomicStore implements RustOpaqueInterface {
   /// what waits in the store's outbox. Replaces the session this handle had.
   /// Writes through this handle go out over it from now on.
   Future<void> openWsSync({required String serverOrigin});
+
+  /// The profile of the signing agent: what the store holds, else what the
+  /// connected server has.
+  Future<ProfileInfo> profile();
 
   /// Send what waits in the outbox over this handle's session now. `true`
   /// when nothing is left waiting; without a session nothing is attempted.
@@ -285,6 +320,9 @@ abstract class AtomicStore implements RustOpaqueInterface {
   Future<String> readConversationPage(
       {required String subject, String? before, required int limit});
 
+  /// Forget a paired device.
+  void removeKnownPeer({required String nodeId});
+
   /// The emojis of `subjects` as JSON `{subject: emoji}`, only for those that
   /// have one. For rows that do not carry their icon themselves (the activity
   /// feed), read from the stored propvals like the other rows.
@@ -333,8 +371,15 @@ abstract class AtomicStore implements RustOpaqueInterface {
   Future<String> sendConversationMessage(
       {required String subject, required String text});
 
+  /// Change the name this device shows other devices.
+  void setDeviceName({required String name});
+
   /// Work in `drive` from now on (this handle only).
   void setDrive({required String drive});
+
+  /// Save the signing agent's name and description (empty removes the
+  /// description) as a signed commit, synced like any edit.
+  Future<void> setProfile({required String name, required String description});
 
   /// Create an agent named `name` and its private drive in this store, and
   /// sign with that agent from now on, working in the new drive. Returns
@@ -343,6 +388,27 @@ abstract class AtomicStore implements RustOpaqueInterface {
 
   /// Whether both handles are on the same open store.
   bool sharesStoreWith({required AtomicStore other});
+
+  /// Stop signing: the agent is forgotten by this handle (the data stays in
+  /// the store; keep the secret to sign in again). Closes the server session.
+  Future<void> signOut();
+
+  /// Start the Iroh peer (once per process) and return this device's node
+  /// id. The peer serves this handle's store when it is the first to start
+  /// one; later handles on other stores get an `Other` error. Search for the
+  /// account's other devices starts with it.
+  Future<String> startPeer();
+
+  /// Work in `drive` from now on, and remember it: the next
+  /// [`AtomicStore::open`] of this file starts there.
+  Future<void> switchDrive({required String drive});
+
+  /// Sync this handle's drive with one device, in both directions.
+  Future<PeerSyncOutcome> syncWithPeer({required String nodeId});
+
+  /// Sync this handle's drive with every paired and every connected device,
+  /// at once, each bounded in time. Starts the peer when needed.
+  Future<PeersSyncOutcome> syncWithPeers();
 
   /// Wait until `subject` changes or is destroyed, or `timeout_ms` passes.
   /// Call it in a loop (re-reading the resource on `Changed`) to watch a

@@ -7,10 +7,37 @@ use super::*;
 /// Start the Iroh peer node. Returns the NodeID.
 /// Call this before any sync operations.
 pub async fn start_peer() -> Result<String, String> {
+    start_peer_for(db()?.clone()).await
+}
+
+/// The store the process's Iroh peer serves, as the address of its key-value
+/// store: the first one that started it. Iroh is one endpoint per process, so
+/// every other store handle is refused instead of being quietly left out.
+static PEER_STORE: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+
+fn store_key(store: &atomic_lib::Db) -> usize {
+    std::sync::Arc::as_ptr(&store.kv) as *const () as usize
+}
+
+/// Whether a store with the key `store` may use the peer that serves `bound`.
+pub(crate) fn peer_serves(bound: Option<usize>, store: usize) -> Result<(), String> {
+    match bound {
+        Some(other) if other != store => Err(
+            "Peer sync runs once per process and already serves another store. \
+             Use the node that started it for peers."
+                .into(),
+        ),
+        _ => Ok(()),
+    }
+}
+
+/// [`start_peer`] for the store `store`: the peer serves it when it is the
+/// first to start one, else this fails (see [`PEER_STORE`]).
+pub(crate) async fn start_peer_for(store: std::sync::Arc<atomic_lib::Db>) -> Result<String, String> {
+    peer_serves(PEER_STORE.get().copied(), store_key(&store))?;
     // One endpoint per process: a second caller (the background start after a
     // resume, a sync button) waits for the first instead of binding another.
     // A failed start is not remembered: the next caller tries again.
-    let store = db()?;
     let node_id = peer_search::PEER_SEARCH
         .start_with(|| async {
             tracing::info!("[start_peer] called");
@@ -29,6 +56,8 @@ pub async fn start_peer() -> Result<String, String> {
             Ok(node_id.to_string())
         })
         .await?;
+    let _ = PEER_STORE.set(store_key(&store));
+    peer_serves(PEER_STORE.get().copied(), store_key(&store))?;
     // Returns at once when the loop already runs.
     peer_search::spawn(store.as_ref().clone(), node_id.clone());
     Ok(node_id)

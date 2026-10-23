@@ -6,6 +6,7 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+// These functions are ignored because they are not marked as `pub`: `peer_serves`, `start_peer_for`, `store_key`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `PeerSyncReport`
 
 /// Start the Iroh peer node. Returns the NodeID.

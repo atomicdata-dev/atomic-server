@@ -7,6 +7,7 @@ import 'api/assistant.dart';
 import 'api/context.dart';
 import 'api/embed.dart';
 import 'api/error.dart';
+import 'api/node.dart';
 import 'api/resources.dart';
 import 'api/simple/agent.dart';
 import 'api/simple/drive.dart';
@@ -84,7 +85,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   StoreRecovery dco_decode_box_autoadd_store_recovery(dynamic raw);
 
   @protected
+  int dco_decode_box_autoadd_u_32(dynamic raw);
+
+  @protected
   Datatype dco_decode_datatype(dynamic raw);
+
+  @protected
+  DriveSummary dco_decode_drive_summary(dynamic raw);
 
   @protected
   ErrorKind dco_decode_error_kind(dynamic raw);
@@ -99,6 +106,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_i_64(dynamic raw);
 
   @protected
+  KnownPeerInfo dco_decode_known_peer_info(dynamic raw);
+
+  @protected
   List<String> dco_decode_list_String(dynamic raw);
 
   @protected
@@ -106,6 +116,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<AtomicValue> dco_decode_list_atomic_value(dynamic raw);
+
+  @protected
+  List<DriveSummary> dco_decode_list_drive_summary(dynamic raw);
+
+  @protected
+  List<KnownPeerInfo> dco_decode_list_known_peer_info(dynamic raw);
+
+  @protected
+  List<LivePeerInfo> dco_decode_list_live_peer_info(dynamic raw);
 
   @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
@@ -126,6 +145,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<VersionMetadata> dco_decode_list_version_metadata(dynamic raw);
 
   @protected
+  LivePeerInfo dco_decode_live_peer_info(dynamic raw);
+
+  @protected
   String? dco_decode_opt_String(dynamic raw);
 
   @protected
@@ -138,7 +160,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   StoreRecovery? dco_decode_opt_box_autoadd_store_recovery(dynamic raw);
 
   @protected
+  int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
+
+  @protected
   Uint8List? dco_decode_opt_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  PeerSyncOutcome dco_decode_peer_sync_outcome(dynamic raw);
+
+  @protected
+  PeersSyncOutcome dco_decode_peers_sync_outcome(dynamic raw);
+
+  @protected
+  ProfileInfo dco_decode_profile_info(dynamic raw);
 
   @protected
   PropValue dco_decode_prop_value(dynamic raw);
@@ -240,7 +274,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       SseDeserializer deserializer);
 
   @protected
+  int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
   Datatype sse_decode_datatype(SseDeserializer deserializer);
+
+  @protected
+  DriveSummary sse_decode_drive_summary(SseDeserializer deserializer);
 
   @protected
   ErrorKind sse_decode_error_kind(SseDeserializer deserializer);
@@ -255,6 +295,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
 
   @protected
+  KnownPeerInfo sse_decode_known_peer_info(SseDeserializer deserializer);
+
+  @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
@@ -263,6 +306,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<AtomicValue> sse_decode_list_atomic_value(SseDeserializer deserializer);
+
+  @protected
+  List<DriveSummary> sse_decode_list_drive_summary(
+      SseDeserializer deserializer);
+
+  @protected
+  List<KnownPeerInfo> sse_decode_list_known_peer_info(
+      SseDeserializer deserializer);
+
+  @protected
+  List<LivePeerInfo> sse_decode_list_live_peer_info(
+      SseDeserializer deserializer);
 
   @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
@@ -285,6 +340,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       SseDeserializer deserializer);
 
   @protected
+  LivePeerInfo sse_decode_live_peer_info(SseDeserializer deserializer);
+
+  @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
 
   @protected
@@ -299,7 +357,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       SseDeserializer deserializer);
 
   @protected
+  int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
   Uint8List? sse_decode_opt_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  PeerSyncOutcome sse_decode_peer_sync_outcome(SseDeserializer deserializer);
+
+  @protected
+  PeersSyncOutcome sse_decode_peers_sync_outcome(SseDeserializer deserializer);
+
+  @protected
+  ProfileInfo sse_decode_profile_info(SseDeserializer deserializer);
 
   @protected
   PropValue sse_decode_prop_value(SseDeserializer deserializer);
@@ -403,7 +473,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       StoreRecovery self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
+
+  @protected
   void sse_encode_datatype(Datatype self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_drive_summary(DriveSummary self, SseSerializer serializer);
 
   @protected
   void sse_encode_error_kind(ErrorKind self, SseSerializer serializer);
@@ -418,6 +494,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
+  void sse_encode_known_peer_info(KnownPeerInfo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
@@ -427,6 +506,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_atomic_value(
       List<AtomicValue> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_drive_summary(
+      List<DriveSummary> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_known_peer_info(
+      List<KnownPeerInfo> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_live_peer_info(
+      List<LivePeerInfo> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
@@ -452,6 +543,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       List<VersionMetadata> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_live_peer_info(LivePeerInfo self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
@@ -467,8 +561,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       StoreRecovery? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_list_prim_u_8_strict(
       Uint8List? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_peer_sync_outcome(
+      PeerSyncOutcome self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_peers_sync_outcome(
+      PeersSyncOutcome self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_profile_info(ProfileInfo self, SseSerializer serializer);
 
   @protected
   void sse_encode_prop_value(PropValue self, SseSerializer serializer);
