@@ -19,6 +19,8 @@ function mockFetch(opts: {
   account?: { email: string } | null;
   enrollments?: ManagedEnrollmentSummary[];
   recovery?: { agent_subject: string } | null;
+  /** What `GET /drives/host` answers, per drive. */
+  driveHosts?: Record<string, string>;
 }) {
   vi.stubEnv('VITE_MANAGED_API_BASE', 'https://portal.example/api');
   setManagedDeviceToken(null);
@@ -31,6 +33,17 @@ function mockFetch(opts: {
       }
 
       return Promise.resolve(Response.json(opts.account));
+    }
+
+    if (url.includes('/drives/host?')) {
+      const drive = new URL(url).searchParams.get('drive') ?? '';
+      const origin = opts.driveHosts?.[drive];
+
+      return Promise.resolve(
+        origin
+          ? Response.json({ http_origin: origin })
+          : new Response(null, { status: 204 }),
+      );
     }
 
     if (url.endsWith('/sync-enrollments')) {
@@ -416,5 +429,64 @@ describe('localAgentIsDisposable', () => {
     const store = { getResource: () => Promise.reject(new Error('down')) };
 
     expect(await localAgentIsDisposable(store, 'did:ad:agent:a')).toBe(false);
+  });
+});
+
+describe('connectHostedDrive for a drive this account did not enroll', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  function store() {
+    return {
+      setServerUrl: vi.fn(),
+      unregisterLocalOnlyDrive: vi.fn(),
+      waitForServerConnected: vi.fn(async () => true),
+    };
+  }
+
+  it('finds the node from the drive itself, signed in to another account', async () => {
+    mockFetch({
+      account: { email: 'member@example.com' },
+      enrollments: [],
+      driveHosts: { 'did:ad:shared': 'https://node1.atomic.place/x' },
+    });
+    const s = store();
+    const persist = vi.fn();
+
+    expect(await connectHostedDrive(s, 'did:ad:shared', persist)).toBe(true);
+    expect(s.unregisterLocalOnlyDrive).toHaveBeenCalledWith('did:ad:shared');
+    expect(s.setServerUrl).toHaveBeenCalledWith('https://node1.atomic.place');
+    expect(persist).toHaveBeenCalledWith('https://node1.atomic.place');
+  });
+
+  it('finds the node without an account session', async () => {
+    mockFetch({
+      account: null,
+      driveHosts: { 'did:ad:shared': 'https://node1.atomic.place' },
+    });
+
+    expect(await connectHostedDrive(store(), 'did:ad:shared', vi.fn())).toBe(
+      true,
+    );
+  });
+
+  it('leaves a drive nobody hosts alone', async () => {
+    mockFetch({ account: null });
+    const s = store();
+
+    expect(await connectHostedDrive(s, 'did:ad:mine', vi.fn())).toBe(false);
+    expect(s.setServerUrl).not.toHaveBeenCalled();
+  });
+
+  it('never follows a non-http origin', async () => {
+    mockFetch({
+      account: null,
+      driveHosts: { 'did:ad:shared': 'javascript:alert(1)' },
+    });
+
+    expect(await connectHostedDrive(store(), 'did:ad:shared', vi.fn())).toBe(
+      false,
+    );
   });
 });

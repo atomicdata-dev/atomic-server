@@ -9,6 +9,7 @@ import {
   getManagedEnrollments,
   type ManagedEnrollmentSummary,
 } from './enrollmentApi';
+import { hasManagedApi, managedFetch } from './api';
 import { getRecoverySecret, sameAgent } from './recovery';
 import { getManagedAccount, type ManagedAccount } from './session';
 
@@ -146,10 +147,10 @@ export type ServerReconcileResult =
   | { ok: false; expectedOrigin: string };
 
 /**
- * Returns whether the Store's current `serverUrl` origin matches the node
- * actually hosting the active drive, per the signed-in account's
- * enrollments. When there is no Managed session, always ok (self-hosted /
- * local-only) — mirrors `evaluateIdentityReconciliation`'s short-circuit.
+ * Returns the node actually hosting the active drive: per the signed-in
+ * account's enrollments, else per the control plane's answer for the drive
+ * itself. Undefined when neither knows (self-hosted, local-only, or no
+ * control plane).
  *
  * This exists because `serverUrl` is a single client-side setting (see
  * `Store.setServerUrl`) that isn't derived from a drive's `did:` subject —
@@ -160,6 +161,22 @@ export type ServerReconcileResult =
  * this drive actually live right now."
  */
 async function resolveHostedDriveOrigin(
+  currentDriveSubject: string | undefined,
+): Promise<string | undefined> {
+  const fromAccount = await accountHostedDriveOrigin(currentDriveSubject);
+
+  if (fromAccount) return fromAccount;
+
+  // Hosting belongs to the drive, not to whoever pays for it: a member of a
+  // drive someone else hosts has no enrollment of their own, and neither does
+  // a device that is not signed in to the account yet. Ask about the drive.
+  return currentDriveSubject
+    ? driveHostedOrigin(currentDriveSubject)
+    : undefined;
+}
+
+/** The node this account's own enrollments put the drive on. */
+async function accountHostedDriveOrigin(
   currentDriveSubject: string | undefined,
 ): Promise<string | undefined> {
   const managedAccount = await getManagedAccount().catch(() => null);
@@ -193,10 +210,40 @@ async function resolveHostedDriveOrigin(
       ? withOrigin[0]
       : undefined;
 
-  if (!match?.http_origin) return undefined;
+  return httpOrigin(match?.http_origin);
+}
+
+/**
+ * The node hosting `drive`, whoever enrolled it. The control plane answers
+ * for the drive alone (`GET /drives/host`), the same rule as above: a served
+ * enrollment whose node already holds data. A control plane too old to know
+ * the route, or none at all, answers nothing, which keeps today's behaviour.
+ */
+async function driveHostedOrigin(drive: string): Promise<string | undefined> {
+  if (!hasManagedApi()) return undefined;
 
   try {
-    const url = new URL(match.http_origin);
+    const response = await managedFetch(
+      `/drives/host?${new URLSearchParams({ drive })}`,
+    );
+
+    if (!response.ok || response.status === 204) return undefined;
+
+    const body = (await response.json()) as { http_origin?: unknown };
+
+    return httpOrigin(
+      typeof body.http_origin === 'string' ? body.http_origin : undefined,
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+function httpOrigin(value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
+
+  try {
+    const url = new URL(value);
 
     return ['http:', 'https:'].includes(url.protocol) ? url.origin : undefined;
   } catch {
