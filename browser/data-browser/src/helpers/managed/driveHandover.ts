@@ -286,6 +286,8 @@ export async function applyPendingDriveHandover(
   store: Pick<HandoverStore, 'getResource'>,
   agent: string,
   importCarriedDrives: (agent: string) => Promise<string[]> = async () => [],
+  /** `agent`'s home when the caller knows it: its agent resource may not be readable yet. */
+  knownPersonalDrive?: string,
 ): Promise<boolean> {
   try {
     const imported = await importCarriedDrives(agent);
@@ -301,10 +303,14 @@ export async function applyPendingDriveHandover(
   if (!pending || !sameAgent(pending.agent, agent)) return false;
 
   try {
-    const agentResource = await store.getResource(agent);
-    const personalDrive = agentResource.error
-      ? undefined
-      : personalDriveOf(agentResource);
+    let personalDrive = knownPersonalDrive;
+
+    if (!personalDrive) {
+      const agentResource = await store.getResource(agent);
+      personalDrive = agentResource.error
+        ? undefined
+        : personalDriveOf(agentResource);
+    }
 
     if (!personalDrive) return false;
 

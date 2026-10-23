@@ -126,9 +126,20 @@ export async function prepareIdentitySwitch(
   return 'brought';
 }
 
-/** After the switch: import carried-over drives and list the handed-over ones. */
-export function applyBroughtAlong(store: Store, agent: string): void {
-  void applyPendingDriveHandover(store, agent, subject =>
-    importDriveCarryOver(store, subject),
+/**
+ * After the switch, once `home` (the new identity's own drive) is on this
+ * device: import carried-over drives and list the handed-over ones there.
+ * Until it succeeds the record stays and the reconcile gate tries again.
+ */
+export function applyBroughtAlong(
+  store: Store,
+  agent: string,
+  home?: string,
+): Promise<boolean> {
+  return applyPendingDriveHandover(
+    store,
+    agent,
+    subject => importDriveCarryOver(store, subject),
+    home,
   );
 }

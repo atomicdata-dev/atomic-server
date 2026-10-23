@@ -620,8 +620,6 @@ export function GettingStartedFlow({
       setStep('opening-workspace');
       setAgent(newAgent);
       await saveAgentToIDB(secret);
-      if (outcome === 'brought' && newAgent.subject)
-        applyBroughtAlong(store, newAgent.subject);
       // However they got in — passkey, code, or secret — the device is open
       // again, so start the clock fresh (see deviceLock.ts).
       beat();
@@ -760,8 +758,15 @@ export function GettingStartedFlow({
           ? await openPrivateHome(store, target, true)
           : undefined;
 
+      // The drives brought along are listed in the home, so only once it is here.
+      const listBroughtAlong = async () => {
+        if (outcome === 'brought' && newAgent.subject && target)
+          await applyBroughtAlong(store, newAgent.subject, target);
+      };
+
       if (home) {
         if (home === 'created') privateHomeNudge();
+        await listBroughtAlong();
         navigate(constructOpenURL(target!));
       } else if (hasData) {
         // The home drive is derived from the key rather than looked up, so
@@ -789,6 +794,7 @@ export function GettingStartedFlow({
         // the whole drive, and sign-in should not wait on an upload.
         void ensureVaultBackup(store, target!);
 
+        await listBroughtAlong();
         navigate(returnPath ?? constructOpenURL(target!));
       } else if (returnPath) {
         // Passkey management needs the key, not a downloaded copy of the drive.

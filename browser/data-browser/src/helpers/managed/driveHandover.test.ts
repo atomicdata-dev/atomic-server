@@ -402,6 +402,22 @@ describe('listing handed-over drives after the switch', () => {
     expect(home.save).toHaveBeenCalledOnce();
   });
 
+  it('lists them in a known home when the agent itself cannot be read yet', async () => {
+    pending(['did:ad:kept']);
+    const home = fake({});
+    const store = fixture({ 'did:ad:accounthome': home });
+
+    expect(
+      await applyPendingDriveHandover(
+        store,
+        account,
+        async () => [],
+        'did:ad:accounthome',
+      ),
+    ).toBe(true);
+    expect(home.get(server.properties.drives)).toEqual(['did:ad:kept']);
+  });
+
   it('lists them for the account signed in under the other spelling', async () => {
     pending(['did:ad:kept']);
     const signedIn = account.replace('did:ad:', 'atomic:');
