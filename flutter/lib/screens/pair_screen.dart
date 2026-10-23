@@ -12,49 +12,12 @@ import 'package:atomic_flutter/atomic_flutter.dart'
         SyncToneColors,
         syncColors;
 import 'package:flutter/services.dart';
+import 'package:atomic_store_flutter/atomic_store_flutter.dart' show PairingCode;
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../atomic/atomic_client.dart';
 import '../atomic/session.dart';
 import 'scanner_frame.dart';
-
-/// Node identifier prefixes (canonical + legacy).
-const _atomicPrefix = 'atomic:';
-const _didAdPrefix = 'did:ad:';
-const _nodePrefix = 'atomic:node:';
-const _nodeDidPrefix = 'did:ad:node:';
-
-/// Legacy `atomic://pair` URI. New codes are `atomic:node:{id}?v=1&drives=*`.
-const _pairingUriPrefix = 'atomic://pair?';
-
-bool _isLegacyAtomicLink(String raw) => raw.startsWith('atomic://');
-
-String _toOpaqueAtomic(String raw) => _isLegacyAtomicLink(raw)
-    ? '$_atomicPrefix${raw.substring('atomic://'.length)}'
-    : raw;
-
-String? _opaqueAtomicBody(String raw) {
-  final opaque = _toOpaqueAtomic(raw);
-  if (!opaque.startsWith(_atomicPrefix) || _isLegacyAtomicLink(opaque)) {
-    return null;
-  }
-  return opaque.substring(_atomicPrefix.length).split(RegExp(r'[?#]')).first;
-}
-
-bool _isLegacyPairingUri(String raw) => _opaqueAtomicBody(raw) == 'pair';
-
-bool _isNodeIdentifier(String raw) {
-  final body = raw.startsWith(_atomicPrefix) && !_isLegacyAtomicLink(raw)
-      ? raw.substring(_atomicPrefix.length)
-      : raw.startsWith(_didAdPrefix)
-          ? raw.substring(_didAdPrefix.length)
-          : null;
-  if (body == null) {
-    return false;
-  }
-  final ident = body.split(RegExp(r'[?#]')).first;
-  return ident.startsWith('node:') && ident.length > 'node:'.length;
-}
 
 enum _Step { loading, showQr, syncing, done, error }
 
@@ -93,121 +56,19 @@ class PairScreen extends StatefulWidget {
   }
 
   /// Parse a QR code value into a PeerInfo. Null when it is not a pairing code
-  /// this app understands.
-  ///
-  /// Formats:
-  ///  - `atomic://pair?v=1&node=did:ad:node:<hex>&url=<server>&drives=<a>&drives=<b>`
-  ///    — what the data-browser and Tauri apps show, including the code a
-  ///    browser shows for the server its drives live on.
-  ///  - `did:ad:node:<hex>:<name>` / `did:ad:node:<hex>` / raw hex / `iroh:<hex>`
-  ///    — this app's own code, and anything pasted by hand.
+  /// this app understands. The formats are `PairingCode.parse`'s (the package
+  /// owns them): `atomic://pair?…` from the web and desktop apps,
+  /// `atomic:node:<id>`, `did:ad:node:<id>[:<name>]`, raw hex and `iroh:<id>`.
   static PeerInfo? parsePeerInfo(String input) {
-    final trimmed = input.trim();
-
-    if (_isLegacyPairingUri(trimmed)) {
-      final opaque = _toOpaqueAtomic(trimmed);
-      final qIndex = opaque.indexOf('?');
-      final query = qIndex == -1 ? '' : opaque.substring(qIndex + 1);
-      return _parsePairingUri('$_pairingUriPrefix$query');
-    }
-
-    final opaque = _toOpaqueAtomic(trimmed);
-
-    if (_isNodeIdentifier(opaque.split(RegExp(r'[?#]')).first)) {
-      final ident = opaque.split(RegExp(r'[?#]')).first;
-      final prefix =
-          ident.startsWith(_nodePrefix) ? _nodePrefix : _nodeDidPrefix;
-      var value = ident.substring(prefix.length);
-      if (RegExp(r'^[a-f0-9]{64}$', caseSensitive: false).hasMatch(value)) {
-        final qIndex = opaque.indexOf('?');
-        if (qIndex == -1) {
-          return PeerInfo(value.toLowerCase());
-        }
-        return _parseNodeQuery(
-            value.toLowerCase(), opaque.substring(qIndex + 1));
-      }
-    }
-
-    var value = trimmed;
-    String name = '';
-
-    if (value.startsWith(_nodePrefix) || value.startsWith(_nodeDidPrefix)) {
-      value = value.startsWith(_nodePrefix)
-          ? value.substring(_nodePrefix.length)
-          : value.substring(_nodeDidPrefix.length);
-      // Check for :<name> suffix after the 64-char hex
-      if (value.length > 64 && value[64] == ':') {
-        name = Uri.decodeComponent(value.substring(65));
-        value = value.substring(0, 64);
-      }
-    }
-    if (value.startsWith('iroh:')) value = value.substring(5);
-    if (RegExp(r'^[a-f0-9]{64}$').hasMatch(value)) {
-      return PeerInfo(value, name);
-    }
-    return null;
-  }
-
-  /// Reads an `atomic://pair?…` envelope.
-  ///
-  /// An unknown version is refused rather than read as far as it parses: a
-  /// newer code may mean something this app would get wrong, and dialing the
-  /// wrong node on a half-understood code is worse than saying no.
-  static PeerInfo? _parsePairingUri(String uri) {
-    final params =
-        Uri.splitQueryString(uri.substring(_pairingUriPrefix.length));
-
-    final version = params['v'];
-
-    if (version != null && version != '1') return null;
-
-    final node = params['node'];
-
-    if (node == null) return null;
-    final nodeId = node.startsWith(_nodePrefix)
-        ? node.substring(_nodePrefix.length)
-        : node.startsWith(_nodeDidPrefix)
-            ? node.substring(_nodeDidPrefix.length)
-            : null;
-    if (nodeId == null) return null;
-
-    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(nodeId)) return null;
-
-    // `drives` repeats for multiple drives, which splitQueryString collapses to
-    // the last one — so read them off the raw query instead. `*` means all.
-    final drives = Uri.parse(uri)
-        .queryParametersAll['drives']
-        ?.where((d) => d != '*')
-        .toList();
-
-    return PeerInfo(
-      nodeId,
-      '',
-      params['url'],
-      drives == null || drives.isEmpty ? null : drives,
-    );
+    final code = PairingCode.parse(input);
+    return code == null
+        ? null
+        : PeerInfo(code.nodeId, code.name, code.serverUrl, code.drives);
   }
 
   /// Format a QR code value with optional device name.
-  static String formatQrValue(String nodeId, String deviceName) {
-    if (deviceName.isEmpty) return '$_nodePrefix$nodeId';
-    return '$_nodePrefix$nodeId:${Uri.encodeComponent(deviceName)}';
-  }
-
-  static PeerInfo? _parseNodeQuery(String nodeId, String query) {
-    final uri = Uri.parse('atomic:node:$nodeId?$query');
-    final version = uri.queryParameters['v'];
-    if (version != null && version != '1') return null;
-    if (uri.queryParameters.containsKey('secret')) return null;
-    final drives =
-        uri.queryParametersAll['drives']?.where((d) => d != '*').toList();
-    return PeerInfo(
-      nodeId,
-      '',
-      uri.queryParameters['url'],
-      drives == null || drives.isEmpty ? null : drives,
-    );
-  }
+  static String formatQrValue(String nodeId, String deviceName) =>
+      PairingCode.format(nodeId, deviceName);
 
   /// Get the local device name from the OS.
   static Future<String> getDeviceName() async {

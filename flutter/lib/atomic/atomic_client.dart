@@ -23,6 +23,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
     show PlatformInt64Util;
 import 'package:http/http.dart' as http;
+import 'package:atomic_store_flutter/atomic_store_flutter.dart'
+    show HomeServerDiscovery;
 import 'package:atomic_store_flutter/bridge/api/assistant.dart' as assistant;
 import 'package:atomic_store_flutter/bridge/api/context.dart' as context;
 import 'package:atomic_store_flutter/bridge/api/embed.dart' as embed;
@@ -504,53 +506,20 @@ class AtomicClient {
     Duration timeout = const Duration(seconds: 4),
     int maxOrigins = 3,
   }) async {
-    final origins =
-        (await (resolve ?? _resolveOrigins)(drive)).take(maxOrigins).toList();
-    if (origins.isEmpty) return null;
-
-    final http_ = client ?? http.Client();
-    final found = Completer<String?>();
-    var pending = origins.length;
-
-    Future<void> probe(String origin) async {
-      var ok = false;
-      try {
-        final request = http.Request(
-            'GET',
-            Uri.parse('$origin/genesis')
-                .replace(queryParameters: {'subject': drive}))
-          ..followRedirects = false
-          ..headers['Accept'] = 'application/ad+json';
-        final response = await _sendWithRetry(http_, request, timeout);
-        ok = response.statusCode == 200 &&
-            (verifies ?? _verifies)(response.body, drive);
-        if (!ok) {
-          discoveryLog.add(response.statusCode == 200
-              ? '$origin: its answer is not this drive\'s certificate'
-              : '$origin: HTTP ${response.statusCode}');
-        }
-      } catch (e) {
-        discoveryLog.add('$origin: ${_short(e)}');
-      }
-      debugPrint('[home] $origin serves the genesis: $ok');
-      if (ok && !found.isCompleted) found.complete(origin);
-      if (--pending == 0 && !found.isCompleted) found.complete(null);
-    }
-
-    for (final origin in origins) {
-      unawaited(probe(origin));
-    }
-    final origin = await found.future;
-    if (client == null) http_.close();
-    if (origin == null) return null;
-    discoveryLog.add('$origin: certificate verified, connecting');
+    // The logic lives in the package (HomeServerDiscovery); this keeps the
+    // app's log and its default-store connect.
+    final discovery = HomeServerDiscovery(
+        resolve: resolve ?? _resolveOrigins,
+        verifies: verifies ?? _verifies,
+        client: client,
+        timeout: timeout);
+    discoveryLog.clear();
     try {
-      await (connect ?? _connect)(origin);
-    } catch (e) {
-      discoveryLog.add('$origin: ${_short(e)}');
-      rethrow;
+      return await discovery.discover(drive,
+          connect: connect ?? _connect, maxOrigins: maxOrigins);
+    } finally {
+      discoveryLog.addAll(discovery.log);
     }
-    return origin;
   }
 
   /// Every https origin [drive]'s pkarr record names whose `/genesis`
@@ -563,60 +532,13 @@ class AtomicClient {
     bool Function(String body, String drive)? verifies,
     Duration timeout = const Duration(seconds: 4),
     int maxOrigins = 6,
-  }) async {
-    final origins =
-        (await (resolve ?? _resolveOrigins)(drive)).take(maxOrigins).toList();
-    if (origins.isEmpty) return const [];
-    final http_ = client ?? http.Client();
-    try {
-      final ok = await Future.wait(origins.map((origin) async {
-        try {
-          final request = http.Request(
-              'GET',
-              Uri.parse('$origin/genesis')
-                  .replace(queryParameters: {'subject': drive}))
-            ..followRedirects = false
-            ..headers['Accept'] = 'application/ad+json';
-          final response = await http.Response.fromStream(
-              await http_.send(request).timeout(timeout));
-          return response.statusCode == 200 &&
-              (verifies ?? _verifies)(response.body, drive);
-        } catch (_) {
-          return false;
-        }
-      }));
-      return [
-        for (var i = 0; i < origins.length; i++)
-          if (ok[i]) origins[i]
-      ];
-    } finally {
-      if (client == null) http_.close();
-    }
-  }
-
-  /// One quick retry when the connection is closed before a response: a
-  /// pooled keep-alive connection the server already dropped fails this way
-  /// ("Connection closed before full header was received") and works again on
-  /// a fresh one.
-  static Future<http.Response> _sendWithRetry(
-      http.Client c, http.Request request, Duration timeout) async {
-    Future<http.Response> once() async =>
-        http.Response.fromStream(await c.send(_copy(request)).timeout(timeout));
-    try {
-      return await once();
-    } on http.ClientException {
-      return once();
-    }
-  }
-
-  static http.Request _copy(http.Request r) => http.Request(r.method, r.url)
-    ..followRedirects = r.followRedirects
-    ..headers.addAll(r.headers);
-
-  static String _short(Object e) {
-    final text = '$e'.replaceFirst('Exception: ', '');
-    return text.length > 140 ? '${text.substring(0, 140)}…' : text;
-  }
+  }) =>
+      HomeServerDiscovery(
+              resolve: resolve ?? _resolveOrigins,
+              verifies: verifies ?? _verifies,
+              client: client,
+              timeout: timeout)
+          .verifiedOrigins(drive, maxOrigins: maxOrigins);
 
   static Future<List<String>> _resolveOrigins(String drive) =>
       ffi.resolveDriveOrigins(drive: drive);
