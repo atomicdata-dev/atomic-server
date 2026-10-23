@@ -43,6 +43,10 @@ const state = vi.hoisted(() => ({
   },
   restoreVault: vi.fn(),
   identityProps: undefined as Record<string, unknown> | undefined,
+  // What the identity this browser already holds has to bring along; see
+  // helpers/bringAlong.test.ts for the decision itself.
+  prepareIdentitySwitch: vi.fn(async () => 'plain'),
+  applyBroughtAlong: vi.fn(async () => true),
 }));
 vi.mock('@tomic/react', async original => ({
   ...(await original<typeof import('@tomic/react')>()),
@@ -115,6 +119,10 @@ vi.mock('../../helpers/discoverHomeServer', () => ({
   discoverHomeServerForApp: async () => false,
 }));
 vi.mock('../../helpers/agentStorage', () => ({ saveAgentToIDB: vi.fn() }));
+vi.mock('../../helpers/bringAlong', () => ({
+  prepareIdentitySwitch: state.prepareIdentitySwitch,
+  applyBroughtAlong: state.applyBroughtAlong,
+}));
 vi.mock('../../helpers/deviceLock', () => ({ beat: vi.fn() }));
 vi.mock('../../helpers/privateDrive', () => ({
   fetchPrivateDriveSubject: async () => 'did:ad:home',
@@ -193,6 +201,7 @@ beforeEach(() => {
     status: 'no-backup',
     reason: 'no backup',
   });
+  state.prepareIdentitySwitch.mockResolvedValue('plain');
   vi.spyOn(Agent, 'fromSecret').mockResolvedValue({
     subject: 'did:ad:agent:test',
   } as Agent);
@@ -286,6 +295,33 @@ it('returns a drive link to that drive after secret sign-in', async () => {
       target: { value: 'test-secret' },
     });
   });
+  expect(state.navigate).toHaveBeenCalledWith(
+    '/app/show?subject=did:ad:shared',
+  );
+});
+
+it('asks before leaving work behind, then brings it to the new home', async () => {
+  state.prepareIdentitySwitch.mockImplementation(
+    async (_store: unknown, _to: unknown, ask: () => Promise<boolean>) =>
+      (await ask()) ? 'brought' : 'left',
+  );
+  await show('?next=did%3Aad%3Ashared');
+  await act(async () => {
+    fireEvent.change(screen.getByLabelText('Agent secret'), {
+      target: { value: 'test-secret' },
+    });
+  });
+  expect(screen.getByText('Keep what you made here?')).toBeTruthy();
+  expect(state.setAgent).not.toHaveBeenCalled();
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Bring it along' }));
+  });
+  expect(state.applyBroughtAlong).toHaveBeenCalledWith(
+    state.store,
+    'did:ad:agent:test',
+    'did:ad:shared',
+  );
   expect(state.navigate).toHaveBeenCalledWith(
     '/app/show?subject=did:ad:shared',
   );
