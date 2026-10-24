@@ -113,8 +113,25 @@ class AtomicNodeSettings extends ui.AtomicSettingsBackend {
 
   @override
   Future<List<Map<String, String>>> getKnownPeers() async => [
-        for (final p in node.peers.known) {'node_id': p.nodeId, 'name': p.name}
+        for (final p in node.peers.known)
+          {
+            'node_id': p.nodeId,
+            'name': p.name,
+            if (p.lastSynced != null)
+              'last_synced': '${p.lastSynced!.millisecondsSinceEpoch}',
+            if (p.lastSent != null) 'last_sent': '${p.lastSent}',
+            if (p.lastReceived != null) 'last_received': '${p.lastReceived}',
+          }
       ];
+
+  /// Also what makes the devices list follow who is connected: the panel
+  /// re-reads the live devices while a search status is shown.
+  @override
+  ui.PeerSearchInfo? peerSearchStatus() {
+    final s = node.peers.searchStatus;
+    if (s.state.isEmpty) return null;
+    return ui.PeerSearchInfo(state: s.state, message: s.message);
+  }
 
   @override
   Future<Set<String>> livePeerIds() async => node.peers.liveIds;

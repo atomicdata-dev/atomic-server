@@ -119,7 +119,8 @@ void main() {
     expect(find.text('PS'), findsOneWidget);
     expect(find.text('Shared with you'), findsOneWidget);
     expect(find.text('Connected'), findsOneWidget);
-    expect(find.textContaining('Last synced just now'), findsOneWidget);
+    // Connected: every change flows as it is made, so no stale stamp.
+    expect(find.textContaining('Up to date, syncing live'), findsOneWidget);
   });
 
   testWidgets('my own device says so and keeps its device icon',

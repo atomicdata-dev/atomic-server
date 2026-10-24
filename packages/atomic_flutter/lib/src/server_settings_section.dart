@@ -11,6 +11,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -91,11 +92,14 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
     super.dispose();
   }
 
-  /// Unpaired visitors come and go without the search state changing.
+  /// Unpaired visitors, and a second device, come and go without the search
+  /// state changing.
   Future<void> _refreshUnsaved() async {
     try {
+      final live = await widget.backend.livePeerIds();
       final unsaved = await widget.backend.liveUnsavedPeers();
       if (!mounted) return;
+      if (!setEquals(live, _livePeerIds)) setState(() => _livePeerIds = live);
       final same = unsaved.length == _unsaved.length &&
           [
             for (var i = 0; i < unsaved.length; i++)
@@ -715,9 +719,14 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
                   child: Text(
                     [
                       if (isServer) 'Server, address unknown',
-                      lastSynced != null
-                          ? 'Last synced ${_relativeTime(lastSynced)}'
-                          : 'Not synced yet',
+                      // Connected devices exchange every change as it is
+                      // made; a stamp only comes from a full sync round.
+                      if (isLive)
+                        'Up to date, syncing live'
+                      else if (lastSynced != null)
+                        'Last synced ${_relativeTime(lastSynced)}'
+                      else
+                        'Not synced yet',
                       if (relay.isNotEmpty)
                         'via ${relay.replaceAll(RegExp(r'\.$'), '')}',
                     ].join(' · '),

@@ -246,6 +246,24 @@ void main() {
     expect(node.peers.known.single.nodeId, other);
   });
 
+  testWidgets('a connected device reads as up to date, and follows',
+      (tester) async {
+    final node = newNode();
+    final peers = node.peers as FakePeers;
+    peers.status = const PeerSearchStatus('connected');
+    const other =
+        'aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11';
+    peers.add(other, 'Mac.home');
+    await openPanel(tester, node);
+    expect(find.textContaining('Not synced yet'), findsOneWidget);
+
+    peers.connect(other);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Up to date, syncing live'), findsOneWidget);
+    expect(find.textContaining('Not synced yet'), findsNothing);
+  });
+
   testWidgets('your name and the device name are told apart', (tester) async {
     final node = newNode();
     await tester.runAsync(() => node.identity.create('Alice'));
