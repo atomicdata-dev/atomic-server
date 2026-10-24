@@ -1,3 +1,5 @@
+import 'package:atomic_store/atomic_store.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Where an app keeps the agent secret between starts. [AtomicFlutter.open]
@@ -22,8 +24,19 @@ class SecureAgentSecrets implements AgentSecretStore {
   static const _storage = FlutterSecureStorage(
       mOptions: MacOsOptions(useDataProtectionKeyChain: false));
 
+  /// A refused or cancelled keychain prompt is a [StoreException]: making a
+  /// new agent instead would quietly split the person in two.
   @override
-  Future<String?> read(String key) => _storage.read(key: key);
+  Future<String?> read(String key) async {
+    try {
+      return await _storage.read(key: key);
+    } on PlatformException catch (e) {
+      throw StoreException(
+          StoreErrorKind.storage,
+          'This app may not read its saved account from the keychain '
+          '(${e.message ?? e.code}). Start it again and allow access.');
+    }
+  }
 
   @override
   Future<void> write(String key, String secret) =>

@@ -81,6 +81,11 @@ its dependencies, about 10 minutes cold.
   <key>com.apple.security.network.server</key>
   <true/>
   ```
+- macOS: the keychain ties the stored secret to the app's code signature. An
+  unsigned or ad-hoc signed debug build gets a new signature on every build,
+  so macOS asks again for access to the secret; if nobody allows it, `open`
+  throws a `StoreException` saying so. Set a development team in Xcode
+  (Runner target, Signing & Capabilities) to keep one signature across builds.
 - iOS: set `platform :ios, '15.0'` in `ios/Podfile`.
 - Finding devices on the same Wi-Fi (or machine) without the internet: see
   [Offline discovery](#offline-discovery) below. iOS needs two `Info.plist`
