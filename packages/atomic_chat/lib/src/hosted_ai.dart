@@ -675,9 +675,9 @@ class HostedAi {
   /// provider offers none. Throws when the provider cannot be reached. The
   /// host reads the session from its own storage.
   static Future<HostedAi?> forSession(String session) async {
-    final client = shared.AtomicAccountClient(
-      shared.AtomicAccountClient.sessionOrigin(session).toString(),
-    )..restoreSession(session);
+    final origin = shared.AtomicAccountClient.sessionOrigin(session);
+    final client = shared.AtomicAccountClient(origin.toString())
+      ..restoreSession(session);
     final status = await client.aiStatus();
     if (status == null) {
       client.close();
@@ -691,6 +691,7 @@ class HostedAi {
       transcribe: (wav, {language}) =>
           client.transcribe(wav, language: language),
       voiceStatus: client.voiceStatus,
+      portal: origin,
     );
   }
 }
