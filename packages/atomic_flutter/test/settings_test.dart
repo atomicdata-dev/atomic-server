@@ -15,6 +15,15 @@ class TestBackend extends AtomicSettingsBackend {
   bool signingIn = false;
   bool inviting = false;
   bool failInvite = false;
+  bool opening = false;
+  String? openedInvite;
+  @override
+  Future<String> Function(String linkOrToken)? get openInvite => opening
+      ? (link) async {
+          openedInvite = link;
+          return 'You can now read "Music", and it is open.';
+        }
+      : null;
   String? signedInWith;
   @override
   Future<String> Function(String secret)? get signInWithSecret => signingIn
@@ -195,6 +204,26 @@ void main() {
     await tester.tap(find.text('Copy invite link'));
     await tester.pumpAndSettle();
     expect(find.text('https://invite.example/edit'), findsOneWidget);
+  });
+
+  testWidgets('no Open an invite row without a backend that can',
+      (tester) async {
+    await showSettings(tester, TestBackend());
+    expect(find.text('Open an invite'), findsNothing);
+  });
+
+  testWidgets('Open an invite asks for a link and says what it did',
+      (tester) async {
+    final backend = TestBackend()..opening = true;
+    await showSettings(tester, backend);
+    await tester.tap(find.text('Open an invite'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'atomic:invite?token=abc');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+    expect(backend.openedInvite, 'atomic:invite?token=abc');
+    expect(
+        find.text('You can now read "Music", and it is open.'), findsOneWidget);
   });
 
   Future<void> openDialog(WidgetTester tester, TestBackend backend) async {

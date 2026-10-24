@@ -65,6 +65,14 @@ Future<StoreEvent> waitForStoreEvent({required int timeoutMs}) =>
 
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<AtomicStore>>
 abstract class AtomicStore implements RustOpaqueInterface {
+  /// Open an invite that needs no server. `token` is the token of a link
+  /// made by `create_invite_token`. The device that made it is found through
+  /// the target drive's pkarr record (the Iroh node ids of the devices that
+  /// hold it), dialled, and asked to grant this agent the right; it does so
+  /// only for a token it signed itself and may still share. Then the drive is
+  /// synced from that device. Errors are sentences for the person.
+  Future<AcceptedInvite> acceptInvite({required String token});
+
   /// Remember a paired device. A non-empty `name` renames a known one.
   void addKnownPeer({required String nodeId, required String name});
 

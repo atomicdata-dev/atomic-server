@@ -8,7 +8,7 @@
 //! This module is transport- and storage-free (no database, no async). The
 //! server layers acceptance records and rights checks on top of it.
 
-use crate::{agents::Agent, errors::AtomicResult, urls, Subject};
+use crate::{agents::Agent, errors::AtomicResult, urls, Storelike, Subject};
 use base64::{engine::general_purpose, Engine};
 use serde::{Deserialize, Serialize};
 
@@ -203,6 +203,59 @@ impl InviteToken {
         })
     }
 
+    /// Verifies expiry, the signature and that the signer may still write the
+    /// target, all against `store`. Needs no network: the signer's public key
+    /// is read from its `did:ad:agent:` subject when the store lacks the
+    /// agent resource. Shared by the server's `/invites` endpoint and the
+    /// peer-to-peer `INVITE` frame (`sync::invite`).
+    pub async fn verify(&self, store: &impl Storelike) -> AtomicResult<()> {
+        tracing::debug!(
+            "Verifying invite token: signer={}, target={}, expires_at={}",
+            self.signer,
+            self.target,
+            self.expires_at
+        );
+
+        self.check_expiry(crate::utils::now())?;
+
+        let signer_resource = store
+            .get_resource(&self.signer)
+            .await
+            .map_err(|e| format!("Could not fetch invite issuer ({}): {}", self.signer, e))?;
+        let public_key = match signer_resource.get(urls::PUBLIC_KEY) {
+            Ok(pk) => pk.to_string(),
+            Err(e) => match self.signer_public_key() {
+                Some(pk) => pk.to_string(),
+                None => return Err(e),
+            },
+        };
+        self.verify_signature(&public_key)?;
+
+        self.check_signer_may_write(store).await
+    }
+
+    /// Errors unless the signer may still write the target in `store`.
+    pub async fn check_signer_may_write(&self, store: &impl Storelike) -> AtomicResult<()> {
+        let target_resource = store
+            .get_resource(&self.target.clone())
+            .await
+            .map_err(|_| format!("Target resource not found: {}", self.target))?;
+
+        crate::hierarchy::check_write(
+            store,
+            &target_resource,
+            &crate::agents::ForAgent::AgentSubject(self.signer.clone()),
+        )
+        .await
+        .map_err(|_| {
+            format!(
+                "Invite issuer ( { } ) no longer has write rights to the target resource ( { } )",
+                self.signer, self.target
+            )
+        })?;
+        Ok(())
+    }
+
     /// Errors when the token has expired at `now` (Unix milliseconds).
     pub fn check_expiry(&self, now: i64) -> AtomicResult<()> {
         if self.expires_at < now {
@@ -238,6 +291,43 @@ impl InviteToken {
         key.verify(serialized.as_bytes(), &Signature::from_bytes(&sig_bytes))
             .map_err(|_| invalid().into())
     }
+}
+
+/// Adds the requested rights to the target resource, as the store's agent.
+/// Overwrites the target resource to include the new rights.
+/// Checks if the Agent has a valid URL.
+/// Will not throw an error if the Agent already has the rights.
+pub async fn add_rights(
+    agent: &str,
+    target: &str,
+    write: bool,
+    store: &impl Storelike,
+) -> AtomicResult<()> {
+    grant_rights(agent, target, write, store).await.map(|_| ())
+}
+
+/// [`add_rights`], returning the signed commit so a caller that keeps an
+/// outbox can queue it (nothing is queued when the agent already had the
+/// right: the commit is then empty and unsigned).
+#[tracing::instrument(skip(store))]
+pub async fn grant_rights(
+    agent: &str,
+    target: &str,
+    write: bool,
+    store: &impl Storelike,
+) -> AtomicResult<crate::commit::CommitResponse> {
+    let agent_subject = Subject::from_raw(agent, store.get_base_domain().as_deref());
+    if !agent_subject.is_did() {
+        crate::utils::check_valid_url(agent)?;
+    }
+    let mut target = store.get_resource(&target.into()).await?;
+    let right = if write { urls::WRITE } else { urls::READ };
+
+    target.push(right, agent.into(), true)?;
+    target
+        .save_locally(store)
+        .await
+        .map_err(|e| format!("Unable to save updated target resource. {}", e).into())
 }
 
 #[cfg(test)]

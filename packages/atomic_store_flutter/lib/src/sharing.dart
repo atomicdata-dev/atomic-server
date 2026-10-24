@@ -35,6 +35,46 @@ class Access {
 typedef InviteSigner = String Function(
     String target, bool write, int? expiresAtMs, int? maxUsages);
 
+/// Opens a token a person was given and returns what it let them into: the
+/// node's bridge call (see `AtomicNode`). Throws a [StoreException] with a
+/// sentence for the person.
+typedef InviteAcceptor = Future<AcceptedInvite> Function(String token);
+
+/// What opening an invite did.
+class AcceptedInvite {
+  const AcceptedInvite({
+    required this.drive,
+    required this.write,
+    this.imported = 0,
+    this.syncPending = false,
+  });
+
+  /// The drive (or resource) the invite was for.
+  final String drive;
+
+  /// The invite lets this agent edit it, not only read.
+  final bool write;
+
+  /// Resources received by the first sync from the inviter's device.
+  final int imported;
+
+  /// The first sync did not finish; the drive fills in on the next sync.
+  final bool syncPending;
+
+  @override
+  String toString() =>
+      'AcceptedInvite($drive, ${write ? 'write' : 'read'}, imported: $imported)';
+}
+
+/// An invite link taken apart: the signed token, and the server the link
+/// names (null for the serverless form).
+class InviteLink {
+  const InviteLink(this.token, {this.serverOrigin});
+
+  final String token;
+  final String? serverOrigin;
+}
+
 /// Who may read or write a resource, and how to invite someone.
 ///
 /// **Rights** are the `read` and `write` properties of a resource (lists of
@@ -48,22 +88,33 @@ typedef InviteSigner = String Function(
 /// resource (see `generateInviteToken` in `@tomic/lib`). Nothing is stored;
 /// whoever opens `<server>/app/invite?token=<token>` and accepts is granted
 /// the right by the server that hosts the target, which checks the token's
-/// signature and that the inviter may share it. Accepting an invite happens
-/// in that server's web app (or its `/invites` endpoint); this package only
-/// creates them. An invite only works for a resource on a server, so connect
-/// the node (`node.sync`) first.
+/// signature and that the inviter may share it.
+///
+/// **Without a server** the same token travels as `atomic:invite?token=<token>`
+/// (pass a `null` origin to [inviteLink]). [acceptInvite] finds the target's
+/// devices through the pkarr directory, asks the one that holds the inviter's
+/// agent to sign the right, and syncs the drive from it. That device must be
+/// online (and the inviter's agent on it) when the invite is opened. A usage
+/// limit is not counted for this form.
 ///
 /// ```dart
 /// await node.sharing.grant(folder, friendAgent, ShareRole.write);
 /// await node.sharing.setPublic(folder, ShareRole.read);   // anyone may read
 /// final link = node.sharing.inviteLink('https://my.server', folder,
 ///     role: ShareRole.read, maxUsages: 5);
+/// final local = node.sharing.inviteLink(null, folder);    // atomic:invite?...
+/// final joined = await node.sharing.acceptInvite(pastedLink);
 /// ```
 class Sharing {
-  Sharing(this._store, this._sign);
+  Sharing(this._store, this._sign, {InviteAcceptor? acceptor})
+      : _accept = acceptor;
 
   final Store _store;
   final InviteSigner _sign;
+  final InviteAcceptor? _accept;
+
+  /// Whether this node can open an invite ([acceptInvite]).
+  bool get canAccept => _accept != null;
 
   /// The agent that stands for everyone, signed in or not.
   static const publicAgent = Props.publicAgent;
@@ -135,8 +186,9 @@ class Sharing {
         expiresAt?.millisecondsSinceEpoch, maxUsages);
   }
 
-  /// The link to give a person: `<serverOrigin>/app/invite?token=<token>`.
-  String inviteLink(String serverOrigin, String target,
+  /// The link to give a person: `<serverOrigin>/app/invite?token=<token>`, or
+  /// with a `null` [serverOrigin] (no server) `atomic:invite?token=<token>`.
+  String inviteLink(String? serverOrigin, String target,
           {ShareRole role = ShareRole.read,
           DateTime? expiresAt,
           int? maxUsages}) =>
@@ -146,6 +198,66 @@ class Sharing {
               role: role, expiresAt: expiresAt, maxUsages: maxUsages));
 
   /// The invite link for an existing [token].
-  static String inviteUrl(String serverOrigin, String token) =>
-      '${serverOrigin.trim().replaceAll(RegExp(r'/+$'), '')}/app/invite?token=${Uri.encodeComponent(token)}';
+  static String inviteUrl(String? serverOrigin, String token) => serverOrigin ==
+          null
+      ? '$peerInvitePrefix${Uri.encodeComponent(token)}'
+      : '${serverOrigin.trim().replaceAll(RegExp(r'/+$'), '')}/app/invite?token=${Uri.encodeComponent(token)}';
+
+  /// How a link that needs no server starts.
+  static const peerInvitePrefix = 'atomic:invite?token=';
+
+  /// Takes a pasted [text] apart: `atomic:invite?token=…`, a server link
+  /// (`https://…/app/invite?token=…`) or the bare token. `null` when it is
+  /// none of these.
+  static InviteLink? parseInvite(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return null;
+    final uri = Uri.tryParse(t);
+    if (uri != null && uri.hasScheme) {
+      final token = uri.queryParameters['token'];
+      if (uri.scheme == 'atomic' && uri.path == 'invite') {
+        return token == null || token.isEmpty ? null : InviteLink(token);
+      }
+      if ((uri.scheme == 'https' || uri.scheme == 'http') &&
+          uri.path.endsWith('/invite') &&
+          token != null &&
+          token.isNotEmpty) {
+        return InviteLink(token, serverOrigin: uri.origin);
+      }
+      return null;
+    }
+    // A bare token is base64 of JSON: no spaces, no scheme.
+    return RegExp(r'^[A-Za-z0-9+/=_-]{20,}$').hasMatch(t)
+        ? InviteLink(t)
+        : null;
+  }
+
+  /// Opens an invite from a pasted link or token and returns what it let this
+  /// agent into; the drive is synced from the inviter's device. Throws a
+  /// [StoreException] with a sentence for the person (the link is damaged, it
+  /// has expired, the device that made it is offline).
+  ///
+  /// A server link is opened the same way, through the inviter's devices: this
+  /// package has no client for a server's `/invites` endpoint, so when no
+  /// device answers the error points at the link's own server.
+  Future<AcceptedInvite> acceptInvite(String linkOrToken) async {
+    final accept = _accept;
+    if (accept == null) {
+      throw const StoreException(StoreErrorKind.invalid,
+          'This app cannot open invites without the native node.');
+    }
+    final link = parseInvite(linkOrToken);
+    if (link == null) {
+      throw const StoreException(StoreErrorKind.invalid,
+          'That is not an invite link. Paste the whole link you were sent.');
+    }
+    try {
+      return await accept(link.token);
+    } on StoreException catch (e) {
+      final origin = link.serverOrigin;
+      if (origin == null || e.kind != StoreErrorKind.network) rethrow;
+      throw StoreException(
+          e.kind, '${e.message} You can also open this link at $origin.');
+    }
+  }
 }

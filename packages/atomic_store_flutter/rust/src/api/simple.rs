@@ -7,7 +7,7 @@ mod compaction_check;
 mod dial_tests;
 #[cfg(test)]
 mod peer_tests;
-mod directory;
+pub(crate) mod directory;
 mod peer_search;
 pub(crate) mod state;
 #[cfg(test)]

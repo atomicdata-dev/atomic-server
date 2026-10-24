@@ -245,6 +245,68 @@ void main() {
     });
   });
 
+  group('serverless invite links', () {
+    Sharing sharing({InviteAcceptor? accept}) => Sharing(
+        Store(backend: InMemoryBackend(), drive: 'did:ad:test:home'),
+        (t, w, e, m) => 'tok+en/=',
+        acceptor: accept);
+
+    test('without a server origin the link names no server', () {
+      final link = sharing().inviteLink(null, 'did:ad:test:home');
+      expect(link, 'atomic:invite?token=tok%2Ben%2F%3D');
+      final parsed = Sharing.parseInvite(link)!;
+      expect(parsed.token, 'tok+en/=');
+      expect(parsed.serverOrigin, isNull);
+    });
+
+    test('a server link, a bare token and rubbish are told apart', () {
+      final server = Sharing.parseInvite(
+          'https://my.server/app/invite?token=tok%2Ben%2F%3D')!;
+      expect((server.token, server.serverOrigin),
+          ('tok+en/=', 'https://my.server'));
+      final bare = Sharing.parseInvite('  ${'A' * 40}== ')!;
+      expect(bare.token, '${'A' * 40}==');
+      expect(Sharing.parseInvite(''), isNull);
+      expect(Sharing.parseInvite('hello there'), isNull);
+      expect(Sharing.parseInvite('atomic:invite'), isNull);
+      expect(
+          Sharing.parseInvite('https://my.server/app/other?token=x'), isNull);
+    });
+
+    test('acceptInvite hands the token, not the link, to the node', () async {
+      final seen = <String>[];
+      final s = sharing(accept: (token) async {
+        seen.add(token);
+        return const AcceptedInvite(drive: 'did:ad:test:shared', write: false);
+      });
+      expect(s.canAccept, isTrue);
+      final joined = await s.acceptInvite('atomic:invite?token=tok%2Ben%2F%3D');
+      expect(seen, ['tok+en/=']);
+      expect(joined.drive, 'did:ad:test:shared');
+      await expectLater(
+          s.acceptInvite('not a link'),
+          throwsA(isA<StoreException>().having(
+              (e) => e.message, 'message', contains('not an invite link'))));
+    });
+
+    test('without a node that can accept, it says so', () async {
+      expect(sharing().canAccept, isFalse);
+      await expectLater(sharing().acceptInvite('atomic:invite?token=abc'),
+          throwsA(isA<StoreException>()));
+    });
+
+    test('a failed server link points at its server', () async {
+      final s = sharing(
+          accept: (_) async => throw const StoreException(
+              StoreErrorKind.network,
+              'The device that made this invite is offline.'));
+      await expectLater(
+          s.acceptInvite('https://my.server/app/invite?token=abc'),
+          throwsA(isA<StoreException>().having((e) => e.message, 'message',
+              endsWith('You can also open this link at https://my.server.'))));
+    });
+  });
+
   group('HomeServerDiscovery', () {
     HomeServerDiscovery discovery(Map<String, int> status,
             {List<String>? names}) =>

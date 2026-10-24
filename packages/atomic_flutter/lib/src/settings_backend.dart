@@ -74,6 +74,11 @@ abstract class AtomicSettingsBackend {
   /// line to show. Throws for a text that is no secret. Null: no such row.
   Future<String> Function(String secret)? get signInWithSecret => null;
 
+  /// Opens a pasted invite (a link or its token), makes the invited workspace
+  /// the active one and says what happened, in a line to show. Throws a
+  /// sentence for a link that does not work. Null: no "Open an invite" row.
+  Future<String> Function(String linkOrToken)? get openInvite => null;
+
   /// A link that invites someone to the active workspace. Null: no invite row.
   Future<String> Function({required bool canEdit})? get inviteLink => null;
 

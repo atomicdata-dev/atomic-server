@@ -123,6 +123,29 @@ impl Db {
         Ok(!self.bringable_drives(from).await?.is_empty())
     }
 
+    /// Lists `drive` among the signed-in agent's drives (on its private
+    /// drive, signed by it), so a drive someone shared with it stays in its
+    /// drive list after it switches away. Idempotent.
+    pub async fn list_drive_in_home(&self, drive: &str) -> AtomicResult<()> {
+        let agent = self.get_default_agent()?;
+        let home_subject = self.ensure_private_drive().await?;
+        if home_subject == drive {
+            return Ok(());
+        }
+        let mut home = self.get_resource(&home_subject.as_str().into()).await?;
+        let mut listed: Vec<crate::values::SubResource> = match home.get(urls::DRIVES) {
+            Ok(Value::ResourceArray(arr)) => arr.clone(),
+            _ => Vec::new(),
+        };
+        if listed.iter().any(|d| d.to_string() == drive) {
+            return Ok(());
+        }
+        listed.push(drive.into());
+        home.set_unsafe(urls::DRIVES.into(), Value::ResourceArray(listed))?;
+        home.save_as(&agent, self).await?;
+        Ok(())
+    }
+
     /// Make `from`'s work `to`'s too: `from` adds `to` to `write` on each drive
     /// it can write, then those drives are listed on `to`'s private drive,
     /// signed by `to`. Both writes are applied locally and sync like any edit.

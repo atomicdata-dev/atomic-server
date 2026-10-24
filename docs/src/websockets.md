@@ -131,6 +131,8 @@ logged and dropped, not answered.
 | `0x42` | `CHALLENGE` | WS server, as its first frame | client only. Never sent on an Iroh stream. |
 | `0x50` | `CALL` | Iroh dialer, after `AUTH` | `atomic_lib::sync::call`, answered by the server's host ABI. Iroh only; the WS server answers it with an `ERROR`. |
 | `0x51` | `CALL_RESULT` | Iroh responder | the dialer of the `CALL`. |
+| `0x52` | `INVITE` | Iroh dialer, after `AUTH` | `atomic_lib::sync::invite`. Iroh only; the WS server answers it with an `ERROR`. |
+| `0x53` | `INVITE_OK` | Iroh responder | the dialer of the `INVITE`. A refusal is an `ERROR` with code 13 (`INVITE_REFUSED`). |
 
 ## Frame layouts
 
@@ -317,6 +319,40 @@ key never reaches it. The responder runs the call for `caller` (all the usual
 checks), and in addition needs the node's agent to be able to read the drive,
 and to write it wherever a hop writes. A `caller` of `sudo` or the public agent
 is refused.
+
+### INVITE (0x52) and INVITE_OK (0x53)
+
+```
+[0x52] [json {"token": "<base64 invite token>"}]              // INVITE
+[0x53] [json {"drive": "did:ad:…", "write": false}]           // INVITE_OK
+```
+
+Redeem an invite token (`generateInviteToken` of `@tomic/lib`, signed by the
+inviter) at a device of the inviter, without a server. Iroh only. The dialer
+finds the device the way it finds any device of a drive: the pkarr record of
+the token's target lists the Iroh node ids (`_atomic_nodes`). It sends `AUTH`
+for the token's target (`drive#nodeId`, as for a sync), which proves who the
+invitee is, and then `INVITE`. The frame is accepted from any authenticated
+agent, paired or not: the token is the authority, and `INVITE` for a drive other
+than the `AUTH`'s is refused like a `SYNC` for the wrong drive.
+
+The responder grants only when all of these hold, and otherwise answers
+`ERROR` with code 13 and a plain sentence as message (nothing is granted):
+
+- the token has not expired ("This invite has expired. Ask for a new one.");
+- the token's signer is the responder's **own** agent and the signature
+  verifies, because only then can this node sign the change as the inviter
+  ("This device did not make this invite, so it cannot accept it.");
+- that agent may still write the target in the responder's store.
+
+It then adds the invitee to the target's `read` list (and `write` for a write
+invite) in a commit signed by its agent, queues that commit for the inviter's
+servers and lets live peers carry it to the inviter's other devices, and
+answers `INVITE_OK`. The invitee then syncs the drive from the same device with
+an ordinary `SYNC`, which the sync policy admits because the invitee can now
+read. `max_usages` of the token is not counted: that needs state shared by all
+the inviter's devices. In the link form of the Flutter package this is
+`atomic:invite?token=<token>`; the web app does not parse that form yet.
 
 ### EPHEMERAL (0x40)
 

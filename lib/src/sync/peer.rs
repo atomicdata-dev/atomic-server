@@ -2758,6 +2758,7 @@ fn handshake_frame_drive(buf: &[u8]) -> Option<String> {
             super::protocol::decode_sync_push(&buf[1..]).map(|p| p.drive)
         }
         super::protocol::tag::CALL => super::call::frame_drive(&buf[1..]),
+        super::protocol::tag::INVITE => super::invite::frame_drive(&buf[1..]),
         _ => None,
     }
 }
@@ -2915,6 +2916,10 @@ async fn handle_stream(
                 )
                 .await
             }
+        } else if tag == super::protocol::tag::INVITE {
+            // Open to any authenticated agent: the token, not a pairing, is
+            // the invitee's authority.
+            super::invite::serve(&buf[1..], &store, &agent).await
         } else if tag == super::protocol::tag::CALL {
             super::call::serve(
                 &buf[1..],

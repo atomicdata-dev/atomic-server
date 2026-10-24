@@ -58,6 +58,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   String dco_decode_String(dynamic raw);
 
   @protected
+  AcceptedInvite dco_decode_accepted_invite(dynamic raw);
+
+  @protected
   ActivityEntry dco_decode_activity_entry(dynamic raw);
 
   @protected
@@ -246,6 +249,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
+
+  @protected
+  AcceptedInvite sse_decode_accepted_invite(SseDeserializer deserializer);
 
   @protected
   ActivityEntry sse_decode_activity_entry(SseDeserializer deserializer);
@@ -446,6 +452,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_String(String self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_accepted_invite(
+      AcceptedInvite self, SseSerializer serializer);
 
   @protected
   void sse_encode_activity_entry(ActivityEntry self, SseSerializer serializer);

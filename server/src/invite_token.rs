@@ -1,4 +1,4 @@
-use atomic_lib::{db::trees::Tree, errors::AtomicResult, urls, Db, Storelike};
+use atomic_lib::{db::trees::Tree, errors::AtomicResult, Db};
 
 /// Error shown when an invite has been accepted by as many agents as it allows.
 pub const INVITE_EXHAUSTED: &str = "This invite has no usages left. Ask for a new one.";
@@ -21,7 +21,6 @@ pub trait InviteTokenExt {
     fn usages_left(&self, store: &Db) -> AtomicResult<Option<i64>>;
     fn check_usages(&self, store: &Db, agent: &str) -> AtomicResult<()>;
     fn record_acceptance(&self, store: &Db, agent: &str) -> AtomicResult<()>;
-    async fn verify(&self, store: &Db) -> AtomicResult<()>;
 }
 impl InviteTokenExt for InviteToken {
     /// Key under which the agents that accepted this invite are recorded.
@@ -74,59 +73,12 @@ impl InviteTokenExt for InviteToken {
             &serde_json::to_vec(&accepted).map_err(|e| e.to_string())?,
         )
     }
-    /// Verifies the token's signature and the signer's rights.
-    async fn verify(&self, store: &Db) -> AtomicResult<()> {
-        tracing::debug!(
-            "Verifying invite token: signer={}, target={}, expires_at={}",
-            self.signer,
-            self.target,
-            self.expires_at
-        );
-
-        // 1. Check expiration
-        self.check_expiry(atomic_lib::utils::now())?;
-
-        // 2. Verify signature against the signer's public key.
-        let signer_resource = store
-            .get_resource(&self.signer)
-            .await
-            .map_err(|e| format!("Could not fetch invite issuer ({}): {}", self.signer, e))?;
-
-        let public_key = match signer_resource.get(urls::PUBLIC_KEY) {
-            Ok(pk) => pk.to_string(),
-            Err(e) => match self.signer_public_key() {
-                Some(pk) => pk.to_string(),
-                None => return Err(e),
-            },
-        };
-        self.verify_signature(&public_key)?;
-
-        // 3. Check signer's rights to the target
-        let target_resource = store
-            .get_resource(&self.target.clone())
-            .await
-            .map_err(|_| format!("Target resource not found: {}", self.target))?;
-
-        atomic_lib::hierarchy::check_write(
-            store,
-            &target_resource,
-            &atomic_lib::agents::ForAgent::AgentSubject(self.signer.clone()),
-        )
-        .await
-        .map_err(|_| {
-            format!(
-                "Invite issuer ( { } ) no longer has write rights to the target resource ( { } )",
-                self.signer, self.target
-            )
-        })?;
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use atomic_lib::urls;
     use atomic_lib::Storelike;
 
     #[tokio::test]

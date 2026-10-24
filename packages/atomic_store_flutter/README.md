@@ -89,7 +89,7 @@ its dependencies, about 10 minutes cold.
 
 One line in your app bar opens the shared user panel (the one the Atomic app
 shows as its User page) in a dialog: change your name, switch or create
-workspaces, show your secret or sign in with one, copy an invite link, add
+workspaces, show your secret or sign in with one, copy or open an invite link, add
 another device and sign out. The secret and sign-in rows stay closed until
 tapped.
 
@@ -274,7 +274,8 @@ web app's Share dialog:
   agent subjects, inherited down `parent`. `sharing.grant`, `revoke`,
   `setPublic` and `rights` edit and read them, as an ordinary signed write.
 - **Invites** are stateless tokens the inviting agent signs for a target
-  resource; the server that hosts it grants the right when someone accepts.
+  resource. With a server, the server that hosts it grants the right when
+  someone accepts. Without one, the device that holds the inviter's agent does.
 
 ```dart
 await node.sharing.grant(folder, friendAgentSubject, ShareRole.write);
@@ -283,10 +284,35 @@ final link = node.sharing.inviteLink('https://my.server', folder,
     role: ShareRole.read, maxUsages: 5);               // <server>/app/invite?token=…
 ```
 
-Accepting an invite happens in the server's web app (`/app/invite`) or its
-`/invites` endpoint; the package only creates invites. An invite needs a
-resource on a server, so connect the node first, and the inviter must be
-allowed to write the target (the server checks).
+Two link forms carry the same token:
+
+| Link | Opened by |
+| --- | --- |
+| `https://<server>/app/invite?token=<token>` | the server's web app (or its `/invites` endpoint) |
+| `atomic:invite?token=<token>` (no server) | `node.sharing.acceptInvite(link)` |
+
+`inviteLink` gives the first when the node is connected to a server and the
+second when you pass a `null` origin (the user panel does this on its own).
+The `atomic:` form needs no server address: `acceptInvite` looks the target
+drive up in the pkarr directory, dials the Iroh nodes that hold it and sends an
+`INVITE` frame (`docs/src/websockets.md`). The device that made the invite
+checks the signature and expiry, that it holds the inviter's agent and may
+still write the drive, signs the right for the invitee and answers; the drive
+then syncs from it like from any peer. So the inviter's device (or another one
+signed in as the same agent) has to be online when the link is opened; if not,
+the error says so. A usage limit (`maxUsages`) is not counted for this form.
+`acceptInvite` also takes a server link or a bare token, but it opens those
+through the inviter's devices as well: this package has no client for a
+server's `/invites` endpoint.
+
+```dart
+final link = node.sharing.inviteLink(null, drive);          // atomic:invite?token=…
+final joined = await node.sharing.acceptInvite(pastedLink); // AcceptedInvite
+await node.drives.switchTo(joined.drive);
+```
+
+The user panel shows an "Open an invite" row for this when the node can accept
+(`AtomicNodeSettings.openInvite`); it switches to the drive afterwards.
 
 ## Testing without the native library
 
@@ -307,7 +333,8 @@ final sharing = Sharing(store, (t, w, e, m) => 'token');      // real rights log
 - Sign in through the atomic.place website; the app in `flutter/` has it.
 - Which server to use and remembering it: `sync.connect` takes an origin you
   choose, `sync.discover(drive)` finds one for a drive.
-- Accepting an invite (opening the invite link on the receiving side).
+- Catching an `atomic:invite` link opened from outside the app (a URL scheme or
+  app link in your manifest); pass it to `acceptInvite`.
 - Files/blobs, history and the assistant/chat calls exist in the raw bridge
   (`package:atomic_store_flutter/bridge/api/...`, generated and unstable; `node.handle` is the
   `AtomicStore` of `bridge/api/resources.dart`) but

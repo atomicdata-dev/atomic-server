@@ -137,7 +137,7 @@ void main() {
     expect(find.text(node.identity.secret!), findsNothing);
   });
 
-  testWidgets('an invite without a server explains it in one line',
+  testWidgets('without a server the invite link needs no server address',
       (tester) async {
     final node = newNode();
     await tester.runAsync(() => node.identity.create('Alice'));
@@ -146,10 +146,66 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Copy invite link'));
     await real(tester, () async {});
-    expect(
-        find.textContaining(
-            'Sharing needs a server, and this app is not connected to one.'),
-        findsWidgets);
+    expect(find.textContaining('atomic:invite?token='), findsOneWidget);
+    expect(find.textContaining('Sharing needs a server'), findsNothing);
+    expect(node.peers.nodeId, isNotNull,
+        reason: 'this device must announce itself for the link to work');
+  });
+
+  testWidgets('Open an invite is only offered when the node can accept',
+      (tester) async {
+    final node = newNode();
+    await tester.runAsync(() => node.identity.create('Alice'));
+    await openPanel(tester, node);
+    expect(find.text('Open an invite'), findsNothing);
+  });
+
+  testWidgets('Open an invite joins the drive, switches to it and says so',
+      (tester) async {
+    const shared = 'did:ad:test:shared';
+    final tokens = <String>[];
+    final node = FakeNode(
+      Store(
+          backend: InMemoryBackend({
+            drive: {Props.name: const StringValue('Home')}
+          }),
+          drive: drive),
+      drives: const [DriveInfo(subject: shared, name: 'Band')],
+      acceptInvite: (token) async {
+        tokens.add(token);
+        return const AcceptedInvite(drive: shared, write: true);
+      },
+    );
+    await tester.runAsync(() => node.identity.create('Alice'));
+    await openPanel(tester, node);
+    await tester.tap(find.text('Open an invite'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byType(TextField), 'atomic:invite?token=abc%2Bdef%3D%3D');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await real(tester, () async {});
+    expect(tokens, ['abc+def==']);
+    expect(node.store.drive, shared);
+    expect(find.textContaining('You can now edit "Band", and it is open.'),
+        findsOneWidget);
+  });
+
+  testWidgets('Open an invite says why a link does not work', (tester) async {
+    final node = FakeNode(
+      Store(backend: InMemoryBackend(), drive: drive),
+      acceptInvite: (token) async => throw const StoreException(
+          StoreErrorKind.network,
+          'The device that made this invite is offline. Ask them to open the app, then try again.'),
+    );
+    await tester.runAsync(() => node.identity.create('Alice'));
+    await openPanel(tester, node);
+    await tester.tap(find.text('Open an invite'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'atomic:invite?token=abc');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await real(tester, () async {});
+    expect(find.textContaining('The device that made this invite is offline'),
+        findsOneWidget);
   });
 
   testWidgets('with a server the invite link is copied', (tester) async {

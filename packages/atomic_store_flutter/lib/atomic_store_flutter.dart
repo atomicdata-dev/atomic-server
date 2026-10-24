@@ -30,7 +30,15 @@ export 'src/server_sync.dart'
         HomeServerDiscovery,
         ResumeStatus,
         SyncStatus;
-export 'src/sharing.dart' show Sharing, ShareRole, Access, InviteSigner;
+export 'src/sharing.dart'
+    show
+        Sharing,
+        ShareRole,
+        Access,
+        InviteSigner,
+        InviteAcceptor,
+        AcceptedInvite,
+        InviteLink;
 export 'src/init_native.dart' if (dart.library.js_interop) 'src/init_web.dart'
     show nativeLibrary;
 export 'src/bridge_store_backend.dart'

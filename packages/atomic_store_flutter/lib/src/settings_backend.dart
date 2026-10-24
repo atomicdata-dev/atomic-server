@@ -168,15 +168,45 @@ class AtomicNodeSettings extends ui.AtomicSettingsBackend {
   @override
   Future<String> Function({required bool canEdit})? get inviteLink =>
       ({required canEdit}) async {
-        final status = node.sync.status;
         final drive = node.store.drive;
-        if (!status.connected || status.origin == null || drive == null) {
-          throw StateError(
-              'Sharing needs a server, and this app is not connected to one.');
+        if (drive == null) {
+          throw StateError('There is no workspace to invite to.');
         }
-        return node.sharing.inviteLink(status.origin!, drive,
+        final status = node.sync.status;
+        final origin = status.connected ? status.origin : null;
+        if (origin == null) {
+          // No server: the link is opened at one of this account's devices,
+          // which must be findable, so this device starts announcing now.
+          try {
+            await node.peers.start();
+          } on StoreException catch (e) {
+            throw StateError(
+                'This device cannot be reached by others right now. ${e.message}');
+          }
+        }
+        return node.sharing.inviteLink(origin, drive,
             role: canEdit ? ShareRole.write : ShareRole.read);
       };
+
+  @override
+  Future<String> Function(String linkOrToken)? get openInvite =>
+      !node.sharing.canAccept
+          ? null
+          : (linkOrToken) async {
+              final joined = await node.sharing.acceptInvite(linkOrToken);
+              await node.drives.switchTo(joined.drive);
+              final name = (await node.drives.list())
+                  .where((d) => d.subject == joined.drive)
+                  .map((d) => d.name)
+                  .firstOrNull;
+              final what =
+                  name == null || name.isEmpty ? 'the workspace' : '"$name"';
+              return [
+                'You can now ${joined.write ? 'edit' : 'read'} $what, and it is open.',
+                if (joined.syncPending)
+                  'It is still loading from the other device.',
+              ].join(' ');
+            };
 }
 
 String _synced(PeerSyncResult r) => r.inSync

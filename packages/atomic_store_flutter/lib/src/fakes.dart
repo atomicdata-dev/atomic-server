@@ -418,12 +418,16 @@ class FakeIdentity implements Identity {
 /// as `AtomicAccountButton`. Its sharing is the real rights logic with a
 /// fake signer.
 class FakeNode implements AtomicParts {
-  FakeNode(this.store, {String? secret, Iterable<DriveInfo> drives = const []})
+  FakeNode(this.store,
+      {String? secret,
+      Iterable<DriveInfo> drives = const [],
+      InviteAcceptor? acceptInvite})
       : identity = FakeIdentity(store, secret: secret),
         drives = FakeDrives(store, drives),
         sync = FakeServerSync(),
         peers = FakePeers(),
-        sharing = Sharing(store, (t, w, e, m) => 'token-$t-${w ? 'w' : 'r'}');
+        sharing = Sharing(store, (t, w, e, m) => 'token-$t-${w ? 'w' : 'r'}',
+            acceptor: acceptInvite);
 
   @override
   final Store store;

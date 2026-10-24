@@ -1178,3 +1178,248 @@ async fn a_fresh_device_finds_the_other_through_the_peer_search() {
         .await
         .expect("B has the page made on A");
 }
+
+// ---- Invites redeemed at the inviter's device (no server) ----
+
+/// Alice's device (a router), a private drive of hers with one document, and
+/// Bob: another agent with his own store and endpoint.
+struct InvitePair {
+    db_a: Db,
+    agent_a: crate::agents::Agent,
+    db_b: Db,
+    agent_b: crate::agents::Agent,
+    drive: String,
+    doc: String,
+    node_id_a: String,
+    _router_a: Router,
+    ep_b: iroh::Endpoint,
+}
+
+async fn invite_pair(prefix: &str) -> InvitePair {
+    use crate::sync::peer;
+
+    let db_a = Db::init_temp(&format!("{prefix}_a")).await.unwrap();
+    let (agent_a, drive) = db_a.setup("Alice").await.unwrap();
+    // `create_drive` makes a drive public-read; the invite must be what lets
+    // Bob in, so Alice's is private.
+    let mut drive_resource = db_a.get_resource(&drive.clone().into()).await.unwrap();
+    drive_resource
+        .set(
+            crate::urls::READ.into(),
+            vec![agent_a.subject.to_string()].into(),
+            &db_a,
+        )
+        .await
+        .unwrap();
+    drive_resource.save(&db_a).await.unwrap();
+    let doc = db_a
+        .create_resource(
+            crate::urls::CLASS,
+            &drive,
+            "Secret Doc",
+            Some(vec![
+                (
+                    crate::urls::DESCRIPTION,
+                    crate::Value::String("top secret".into()),
+                ),
+                (
+                    crate::urls::SHORTNAME,
+                    crate::Value::Slug("secret-doc".into()),
+                ),
+            ]),
+        )
+        .await
+        .unwrap();
+
+    let db_b = Db::init_temp(&format!("{prefix}_b")).await.unwrap();
+    let (agent_b, _) = db_b.setup("Bob").await.unwrap();
+
+    let (node_id_a, router_a) = peer::start(db_a.clone()).await.unwrap();
+    let ep_b = iroh::Endpoint::builder()
+        .discovery_n0()
+        .discovery_local_network()
+        .bind()
+        .await
+        .unwrap();
+    ep_b.add_node_addr(router_a.endpoint().node_addr().await.unwrap())
+        .unwrap();
+
+    InvitePair {
+        db_a,
+        agent_a,
+        db_b,
+        agent_b,
+        drive,
+        doc,
+        node_id_a: node_id_a.to_string(),
+        _router_a: router_a,
+        ep_b,
+    }
+}
+
+fn token_for(pair: &InvitePair, signer: &crate::agents::Agent, write: bool, expires: i64) -> String {
+    crate::invite_token::InviteToken::new(pair.drive.clone(), write, expires, signer, None)
+        .unwrap()
+        .encode()
+        .unwrap()
+}
+
+fn in_an_hour() -> i64 {
+    crate::utils::now() + 3_600_000
+}
+
+async fn lists(db: &Db, drive: &str, property: &str, agent: &crate::agents::Agent) -> bool {
+    db.get_resource(&drive.into())
+        .await
+        .unwrap()
+        .get(property)
+        .map(|v| v.to_string().contains(agent.subject.as_str()))
+        .unwrap_or(false)
+}
+
+/// The whole path: Bob is refused before the invite, redeems it at Alice's
+/// node by node id (no pkarr, no server), and then syncs the drive from it.
+#[tokio::test]
+async fn e2e_invite_redeemed_at_the_inviters_device_lets_the_invitee_sync() {
+    use crate::sync::{invite, peer};
+
+    let p = invite_pair("invite_read").await;
+
+    let before =
+        peer::sync_drive_with_peer_using(&p.ep_b, &p.node_id_a, &p.drive, &p.db_b, true).await;
+    assert!(before.is_err(), "Bob may read nothing before the invite");
+    assert!(!p.db_b.has_resource_locally(&p.doc));
+
+    let token = token_for(&p, &p.agent_a, false, in_an_hour());
+    let granted = invite::redeem_at(&p.ep_b, &p.db_b, &p.node_id_a, &token)
+        .await
+        .expect("Alice's device grants a valid invite");
+    assert_eq!(granted.drive, p.drive);
+    assert!(!granted.write);
+    assert!(lists(&p.db_a, &p.drive, crate::urls::READ, &p.agent_b).await);
+    assert!(
+        !lists(&p.db_a, &p.drive, crate::urls::WRITE, &p.agent_b).await,
+        "a read invite grants no write"
+    );
+
+    let imported =
+        peer::sync_drive_with_peer_using(&p.ep_b, &p.node_id_a, &p.drive, &p.db_b, true)
+            .await
+            .expect("Bob syncs the drive after the invite");
+    assert!(imported > 0);
+    let doc = p.db_b.get_resource(&p.doc.as_str().into()).await.unwrap();
+    assert_eq!(
+        doc.get(crate::urls::NAME).unwrap().to_string(),
+        "Secret Doc"
+    );
+
+    // Opening the link again changes nothing.
+    invite::redeem_at(&p.ep_b, &p.db_b, &p.node_id_a, &token)
+        .await
+        .expect("a second redemption is harmless");
+}
+
+#[tokio::test]
+async fn e2e_a_write_invite_makes_the_invitee_a_reader_and_writer() {
+    use crate::sync::invite;
+
+    let p = invite_pair("invite_write").await;
+    let token = token_for(&p, &p.agent_a, true, in_an_hour());
+    let granted = invite::redeem_at(&p.ep_b, &p.db_b, &p.node_id_a, &token)
+        .await
+        .unwrap();
+    assert!(granted.write);
+    assert!(lists(&p.db_a, &p.drive, crate::urls::WRITE, &p.agent_b).await);
+    assert!(lists(&p.db_a, &p.drive, crate::urls::READ, &p.agent_b).await);
+}
+
+/// Alice's node holds the drive but not Carol's key: it cannot sign for her,
+/// so a token Carol signed is refused even though the signature is genuine.
+#[tokio::test]
+async fn e2e_an_invite_signed_by_another_agent_is_refused() {
+    use crate::sync::invite;
+
+    let p = invite_pair("invite_stranger").await;
+    let carol = crate::agents::Agent::new(Some("carol")).unwrap();
+    let token = token_for(&p, &carol, true, in_an_hour());
+
+    let err = invite::redeem_at(&p.ep_b, &p.db_b, &p.node_id_a, &token)
+        .await
+        .expect_err("a token from someone this device is not must be refused");
+    assert!(err.reached, "{err}");
+    assert!(err.message.contains("did not make this invite"), "{err}");
+    assert!(!lists(&p.db_a, &p.drive, crate::urls::READ, &p.agent_b).await);
+    assert!(!lists(&p.db_a, &p.drive, crate::urls::WRITE, &p.agent_b).await);
+}
+
+#[tokio::test]
+async fn e2e_a_tampered_invite_is_refused() {
+    use crate::sync::invite;
+
+    let p = invite_pair("invite_tampered").await;
+    let token = token_for(&p, &p.agent_a, false, in_an_hour());
+    let mut forged = crate::invite_token::InviteToken::decode(&token).unwrap();
+    forged.write = true;
+    let err = invite::redeem_at(
+        &p.ep_b,
+        &p.db_b,
+        &p.node_id_a,
+        &forged.encode().unwrap(),
+    )
+    .await
+    .expect_err("an edited token must not verify");
+    assert!(err.message.contains("damaged"), "{err}");
+    assert!(!lists(&p.db_a, &p.drive, crate::urls::WRITE, &p.agent_b).await);
+}
+
+/// Expiry is judged by the responder too, not only by the dialer: the
+/// dialer's clock or code cannot be trusted.
+#[tokio::test]
+async fn e2e_an_expired_invite_is_refused_by_both_ends() {
+    use crate::sync::{invite, protocol};
+
+    let p = invite_pair("invite_expired").await;
+    let token = token_for(&p, &p.agent_a, false, crate::utils::now() - 1_000);
+
+    // The dialer says so without dialling.
+    let err = invite::redeem_at(&p.ep_b, &p.db_b, &p.node_id_a, &token)
+        .await
+        .expect_err("expired");
+    assert!(!err.reached);
+    assert_eq!(err.message, invite::EXPIRED);
+
+    // The responder says so to a dialer that does not check.
+    let frame = protocol::encode_invite(&token);
+    let answer = invite::serve(
+        &frame[1..],
+        &p.db_a,
+        &ForAgent::AgentSubject(p.agent_b.subject.clone()),
+    )
+    .await;
+    let error = protocol::decode_error(&answer[0][1..]).expect("an ERROR frame");
+    assert_eq!(error.code, protocol::error_code::INVITE_REFUSED);
+    assert_eq!(error.message, invite::EXPIRED);
+    assert!(!lists(&p.db_a, &p.drive, crate::urls::READ, &p.agent_b).await);
+}
+
+#[tokio::test]
+async fn e2e_an_invite_without_a_reachable_device_says_the_device_is_offline() {
+    use crate::sync::invite;
+
+    let p = invite_pair("invite_offline").await;
+    let token = token_for(&p, &p.agent_a, false, in_an_hour());
+    let err = invite::redeem_at_any(&p.ep_b, &p.db_b, &[], &token)
+        .await
+        .expect_err("no devices");
+    assert!(!err.reached);
+    assert_eq!(err.message, invite::OFFLINE);
+
+    // A refusal from a device that answered is reported in preference to
+    // "offline" from one that did not.
+    let carol = crate::agents::Agent::new(Some("carol")).unwrap();
+    let stranger = token_for(&p, &carol, false, in_an_hour());
+    let err = invite::redeem_at_any(&p.ep_b, &p.db_b, &[p.node_id_a.clone()], &stranger)
+        .await
+        .expect_err("refused");
+    assert!(err.reached);
+}

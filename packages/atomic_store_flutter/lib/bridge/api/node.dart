@@ -7,7 +7,46 @@ import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `other`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `assert_fields_are_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+
+/// What opening an invite did.
+class AcceptedInvite {
+  /// The drive (or resource) the invite was for.
+  final String drive;
+
+  /// The invite let this agent edit it, not only read.
+  final bool write;
+
+  /// Resources received by the first sync from the inviter's device.
+  final int imported;
+
+  /// The first sync did not finish; the drive fills in on the next sync.
+  final bool syncPending;
+
+  const AcceptedInvite({
+    required this.drive,
+    required this.write,
+    required this.imported,
+    required this.syncPending,
+  });
+
+  @override
+  int get hashCode =>
+      drive.hashCode ^
+      write.hashCode ^
+      imported.hashCode ^
+      syncPending.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AcceptedInvite &&
+          runtimeType == other.runtimeType &&
+          drive == other.drive &&
+          write == other.write &&
+          imported == other.imported &&
+          syncPending == other.syncPending;
+}
 
 /// A drive of the signed-in agent.
 class DriveSummary {

@@ -82,6 +82,14 @@ pub mod tag {
     pub const CALL: u8 = 0x50;
     /// Responder → dialer: `[0x51] [request_id: u16] [json CallResponse]`.
     pub const CALL_RESULT: u8 = 0x51;
+    /// Iroh only, invitee → inviter's device: redeem a signed invite token.
+    /// `[0x52] [json {"token": "<base64 token>"}]`, after an `AUTH` for the
+    /// token's target drive. Answered by `INVITE_OK` or `ERROR`
+    /// (`error_code::INVITE_REFUSED`). See `sync::invite`.
+    pub const INVITE: u8 = 0x52;
+    /// Responder → invitee: `[0x53] [json {"drive": "...", "write": bool}]`,
+    /// after the rights were granted to the `AUTH`-ed agent.
+    pub const INVITE_OK: u8 = 0x53;
 }
 
 /// Feature names a responder advertises in the `AUTH_OK` payload and both
@@ -307,6 +315,10 @@ pub mod error_code {
     /// do not retry it over another transport. A client that predates this
     /// code sees an unknown code and retries generically.
     pub const BUSY: u16 = 12;
+    /// An `INVITE` was refused (expired, not signed by this node's agent, the
+    /// signer may no longer share the drive, ...). The message is a plain
+    /// sentence for the person. Nothing was granted.
+    pub const INVITE_REFUSED: u16 = 13;
 }
 
 /// Pull the `retry_after_ms=<n>` hint out of a `BUSY` error message (or an
@@ -555,6 +567,51 @@ pub fn decode_call(data: &[u8]) -> Option<(u16, CallRequest)> {
 /// Decode CALL_RESULT (after the tag).
 pub fn decode_call_result(data: &[u8]) -> Option<(u16, CallResponse)> {
     decode_call_frame(data)
+}
+
+/// `INVITE` payload.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct InviteRequest {
+    pub token: String,
+}
+
+/// `INVITE_OK` payload: the drive the invitee may now sync, and whether it
+/// may also write.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct InviteGranted {
+    pub drive: String,
+    pub write: bool,
+}
+
+/// Encode INVITE: `[0x52] [json InviteRequest]`.
+pub fn encode_invite(token: &str) -> Vec<u8> {
+    let mut buf = vec![tag::INVITE];
+    buf.extend_from_slice(
+        &serde_json::to_vec(&InviteRequest {
+            token: token.to_string(),
+        })
+        .unwrap_or_default(),
+    );
+    buf
+}
+
+/// Decode INVITE (after the tag): the token.
+pub fn decode_invite(data: &[u8]) -> Option<String> {
+    serde_json::from_slice::<InviteRequest>(data)
+        .ok()
+        .map(|r| r.token)
+}
+
+/// Encode INVITE_OK: `[0x53] [json InviteGranted]`.
+pub fn encode_invite_ok(granted: &InviteGranted) -> Vec<u8> {
+    let mut buf = vec![tag::INVITE_OK];
+    buf.extend_from_slice(&serde_json::to_vec(granted).unwrap_or_default());
+    buf
+}
+
+/// Decode INVITE_OK (after the tag).
+pub fn decode_invite_ok(data: &[u8]) -> Option<InviteGranted> {
+    serde_json::from_slice(data).ok()
 }
 
 // ---- Encoding ----

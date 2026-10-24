@@ -16,6 +16,9 @@ pub mod discover;
 pub mod engine;
 #[cfg(all(test, feature = "iroh", feature = "db"))]
 mod iroh_e2e;
+/// Redeeming a signed invite token at the inviter's device, without a server.
+#[cfg(all(feature = "iroh", feature = "db"))]
+pub mod invite;
 /// The durable dirty-subject queue a device drains to a hub.
 #[cfg(feature = "db")]
 pub mod outbox;

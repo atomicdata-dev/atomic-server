@@ -72,6 +72,19 @@ pub struct DriveSummary {
     pub active: bool,
 }
 
+/// What opening an invite did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AcceptedInvite {
+    /// The drive (or resource) the invite was for.
+    pub drive: String,
+    /// The invite let this agent edit it, not only read.
+    pub write: bool,
+    /// Resources received by the first sync from the inviter's device.
+    pub imported: u32,
+    /// The first sync did not finish; the drive fills in on the next sync.
+    pub sync_pending: bool,
+}
+
 /// The profile of the signed-in agent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProfileInfo {
@@ -325,6 +338,72 @@ impl AtomicStore {
         atomic_lib::invite_token::InviteToken::new(target, write, expires, &agent, max_usages)
             .and_then(|token| token.encode())
             .map_err(other)
+    }
+
+    /// Open an invite that needs no server. `token` is the token of a link
+    /// made by `create_invite_token`. The device that made it is found through
+    /// the target drive's pkarr record (the Iroh node ids of the devices that
+    /// hold it), dialled, and asked to grant this agent the right; it does so
+    /// only for a token it signed itself and may still share. Then the drive is
+    /// synced from that device. Errors are sentences for the person.
+    pub async fn accept_invite(&self, token: String) -> Result<AcceptedInvite, AtomicError> {
+        use atomic_lib::sync::invite;
+        let parsed = atomic_lib::invite_token::InviteToken::decode(token.trim())
+            .map_err(|_| AtomicError::invalid("This is not a valid invite. Check the link and try again."))?;
+        parsed
+            .check_expiry(atomic_lib::utils::now())
+            .map_err(|_| AtomicError::invalid(invite::EXPIRED))?;
+        let target = parsed.target.to_string();
+        let mine = self.start_peer().await?;
+        let endpoint = atomic_lib::sync::peer::endpoint()
+            .ok_or_else(|| AtomicError::network("Peer not started."))?;
+
+        // Devices that hold the drive: the ones that announced it, and the
+        // ones this device already syncs it with.
+        let mut nodes: Vec<String> = Vec::new();
+        if let Ok(record) = super::simple::directory::resolve_record(
+            &target,
+            super::simple::directory::DEFAULT_TTL,
+            true,
+        )
+        .await
+        {
+            nodes = super::simple::directory::others(&record, Some(&mine));
+        }
+        for peer in atomic_lib::sync::peer::get_known_peers(&self.db) {
+            if peer.drives.iter().any(|d| d == &target) && !nodes.contains(&peer.node_id) {
+                nodes.push(peer.node_id);
+            }
+        }
+
+        let (granted, node_id) =
+            invite::redeem_at_any(endpoint, &self.db, &nodes, token.trim())
+                .await
+                .map_err(|e| AtomicError::network(e.message))?;
+
+        // The drive is ours now: keep it in the list and work in it.
+        atomic_lib::sync::peer::add_known_peer_for_drive(&self.db, &node_id, "", &granted.drive);
+        let _ = self.db.list_drive_in_home(&granted.drive).await;
+        let (imported, sync_pending) = match atomic_lib::sync::peer::sync_drive_with_peer_outcome(
+            &node_id,
+            &granted.drive,
+            &self.db,
+        )
+        .await
+        {
+            Ok(outcome) => (outcome.count as u32, false),
+            Err(e) => {
+                tracing::warn!("first sync after an invite failed: {e}");
+                (0, true)
+            }
+        };
+        self.switch_drive(granted.drive.clone())?;
+        Ok(AcceptedInvite {
+            drive: granted.drive,
+            write: granted.write,
+            imported,
+            sync_pending,
+        })
     }
 }
 

@@ -344,6 +344,19 @@ class _AtomicUserPanelState extends State<AtomicUserPanel> {
     }
   }
 
+  Future<void> _openInvite() async {
+    final link = await _ask('Open an invite', 'Paste the invite link');
+    if (link == null || link.isEmpty) return;
+    try {
+      final line = await _backend.openInvite!(link);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(line)));
+      await _load();
+    } catch (e) {
+      if (mounted) _fail('Could not open the invite', e);
+    }
+  }
+
   Future<void> _invite() async {
     final link = _backend.inviteLink!;
     await showDialog<void>(
@@ -374,8 +387,11 @@ class _AtomicUserPanelState extends State<AtomicUserPanel> {
                   const SizedBox(height: SyncGap.m),
                   SelectableText(copied!),
                   const SizedBox(height: SyncGap.s),
-                  const Text(
-                      'Link copied. Anyone with it can open this workspace.'),
+                  Text(copied!.startsWith('atomic:')
+                      // No server: the invite is redeemed by this device.
+                      ? 'Link copied. Whoever has it can open this workspace '
+                          'in their Atomic app, while this device is online.'
+                      : 'Link copied. Anyone with it can open this workspace.'),
                 ],
                 // Inline: this dialog sits above the panel's own messenger.
                 if (failed != null) ...[
@@ -634,6 +650,12 @@ class _AtomicUserPanelState extends State<AtomicUserPanel> {
             icon: Icons.person_add_alt_outlined,
             title: 'Invite someone',
             onTap: _invite,
+          ),
+        if (_backend.openInvite != null)
+          SyncRow(
+            icon: Icons.link,
+            title: 'Open an invite',
+            onTap: _openInvite,
           ),
       ]),
     );

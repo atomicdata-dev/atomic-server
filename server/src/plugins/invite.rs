@@ -4,8 +4,7 @@ use atomic_lib::{
     errors::AtomicResult,
     storelike::ResourceResponse,
     urls,
-    utils::check_valid_url,
-    Resource, Storelike, Subject, Value,
+    Resource, Storelike, Value,
 };
 
 use crate::invite_token::{acceptance_lock, InviteToken, InviteTokenExt};
@@ -177,33 +176,7 @@ pub fn handle_invite_post<'a>(
     })
 }
 
-/// Adds the requested rights to the target resource.
-/// Overwrites the target resource to include the new rights.
-/// Checks if the Agent has a valid URL.
-/// Will not throw an error if the Agent already has the rights.
-#[tracing::instrument(skip(store))]
-pub async fn add_rights(
-    agent: &str,
-    target: &str,
-    write: bool,
-    store: &impl Storelike,
-) -> AtomicResult<()> {
-    let agent_subject = Subject::from_raw(agent, store.get_base_domain().as_deref());
-    if !agent_subject.is_did() {
-        check_valid_url(agent)?;
-    }
-    // Get the Resource that the user is being invited to
-    let mut target = store.get_resource(&target.into()).await?;
-    let right = if write { urls::WRITE } else { urls::READ };
-
-    target.push(right, agent.into(), true)?;
-    target
-        .save_locally(store)
-        .await
-        .map_err(|e| format!("Unable to save updated target resource. {}", e))?;
-
-    Ok(())
-}
+pub use atomic_lib::invite_token::add_rights;
 
 #[cfg(test)]
 mod tests {
