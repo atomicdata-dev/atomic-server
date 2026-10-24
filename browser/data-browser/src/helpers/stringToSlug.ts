@@ -16,16 +16,6 @@ export function stringToSlug(str: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-export function stringToSlugStrict(str: string): string {
-  return str
-    .toLowerCase()
-    .replace(/[^\w\s-]+/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
 /**
  * `stringToSlug` is a *final form* — it strips leading and trailing dashes,
  * which is right for turning a name like "Meat & fish" into a shortname in one
