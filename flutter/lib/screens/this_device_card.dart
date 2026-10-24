@@ -174,6 +174,11 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: shared.SyncText.caption(c)),
+                      // Not the name in the account block: that one follows
+                      // the person to every device, this one does not.
+                      Text('Device name, only on this device. Tap to rename.',
+                          key: const Key('this-device-name-hint'),
+                          style: shared.SyncText.caption(c)),
                     ],
                   ),
                 ),

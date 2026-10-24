@@ -230,6 +230,9 @@ void main() {
     node.peers.reachable.add(other);
     await tester.runAsync(() => node.identity.create('Alice'));
     await openPanel(tester, node);
+    // The panel grew (longer device-name hint): scroll the button into view.
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, -300));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Pair with QR code'));
     await real(tester, () async {});
     expect(find.text(node.peers.pairingCode!), findsOneWidget);
@@ -241,6 +244,18 @@ void main() {
     await real(tester, () async {});
     expect(find.textContaining('Device added'), findsOneWidget);
     expect(node.peers.known.single.nodeId, other);
+  });
+
+  testWidgets('your name and the device name are told apart', (tester) async {
+    final node = newNode();
+    await tester.runAsync(() => node.identity.create('Alice'));
+    await openPanel(tester, node);
+    // The name is the person's; the device name stays on this device.
+    expect(find.text('Edit your name'), findsOneWidget);
+    expect(find.text('Edit profile'), findsNothing);
+    expect(find.text('Device name, only on this device. Tap to rename.'),
+        findsOneWidget);
+    expect(find.text('Tap to rename'), findsNothing);
   });
 
   testWidgets('signing out asks first', (tester) async {

@@ -32,6 +32,16 @@ impl PeerDirectory for PkarrDirectory {
     async fn announce(&self, drive: &str, me: &str) -> Result<(), String> {
         directory::announce(drive, me).await
     }
+
+    /// Devices on the same machine or Wi-Fi that advertised the drive over
+    /// mDNS: found without pkarr, so also offline.
+    async fn nearby(&self, drive: &str, me: &str) -> Vec<String> {
+        atomic_lib::sync::local_directory::nearby(drive, me)
+    }
+
+    fn advertise_nearby(&self, drives: &[String]) {
+        atomic_lib::sync::local_directory::advertise(drives);
+    }
 }
 
 struct IrohDialer {

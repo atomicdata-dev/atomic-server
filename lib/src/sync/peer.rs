@@ -152,6 +152,10 @@ pub async fn start(store: Db) -> anyhow::Result<(NodeId, Router)> {
     let node_id = endpoint.node_id();
     NODE_ID.set(node_id.to_string()).ok();
     ENDPOINT.set(endpoint.clone()).ok();
+    // Offline discovery of the devices that hold a drive: listen to the tags
+    // other devices advertise on the local network, and advertise ours.
+    super::local_directory::listen(&endpoint);
+    super::local_directory::advertise_on(&endpoint, &super::local_directory::advertised_drives());
 
     // Wait for relay connection so discovery_n0 can find us
     let relay = endpoint.home_relay();

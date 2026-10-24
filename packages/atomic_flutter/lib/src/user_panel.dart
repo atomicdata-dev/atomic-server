@@ -221,7 +221,7 @@ class _AtomicUserPanelState extends State<AtomicUserPanel> {
 
   Future<void> _rename() async {
     final name =
-        await _ask('Device name', 'Name this device', initial: _deviceName);
+        await _ask('Device name', 'Only on this device', initial: _deviceName);
     if (name == null || name.isEmpty) return;
     try {
       await _backend.setDeviceName(name);
@@ -241,7 +241,8 @@ class _AtomicUserPanelState extends State<AtomicUserPanel> {
     if (open != null) {
       await open(context, agent);
     } else {
-      final name = await _ask('Your name', 'Name', initial: agent.name ?? '');
+      final name = await _ask('Your name', 'Name, seen on all your devices',
+          initial: agent.name ?? '');
       if (name == null || name.isEmpty) return;
       try {
         await _backend.saveProfile!(
@@ -463,7 +464,7 @@ class _AtomicUserPanelState extends State<AtomicUserPanel> {
               SyncRow(
                 icon: Icons.smartphone,
                 title: _deviceName.isEmpty ? 'This device' : _deviceName,
-                subtitle: 'Tap to rename',
+                subtitle: 'Device name, only on this device. Tap to rename.',
                 onTap: _rename,
               ),
             ]),
@@ -547,7 +548,9 @@ class _AtomicUserPanelState extends State<AtomicUserPanel> {
           if (canEdit)
             SyncActionButton(
               icon: Icons.edit_outlined,
-              label: 'Edit profile',
+              label: widget.openProfile != null
+                  ? 'Edit profile'
+                  : 'Edit your name',
               onPressed: _openProfile,
             ),
           if (agent != null)

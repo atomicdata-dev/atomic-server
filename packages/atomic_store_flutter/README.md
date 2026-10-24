@@ -82,6 +82,9 @@ its dependencies, about 10 minutes cold.
   <true/>
   ```
 - iOS: set `platform :ios, '15.0'` in `ios/Podfile`.
+- Finding devices on the same Wi-Fi (or machine) without the internet: see
+  [Offline discovery](#offline-discovery) below. iOS needs two `Info.plist`
+  keys for it.
 - Web is not supported: there is no native node in a browser. Use a
   different `StoreBackend` there.
 
@@ -264,6 +267,52 @@ serves the store of the first node that calls `peers.start()`; another node
 in the same process gets an error from it. With one node per app (the only
 supported use) there is nothing to do. The node's database must be the
 `path` you opened (a path is opened once per process).
+
+#### Offline discovery
+
+Devices of the same agent on the same machine or Wi-Fi find each other without
+pkarr or a relay. Each device advertises, over Iroh's mDNS discovery, a short
+opaque tag for every drive it searches (the first 8 bytes of the SHA-256 of
+the drive subject, never the subject itself), and the device search dials the
+nodes whose tags match before it asks pkarr. At most 20 drives are advertised
+(Iroh's user data is limited to 245 bytes); the active drive comes first, any
+drive past the 20th is only found through pkarr.
+
+Platform setup (what the code shows, see "Not verified on a device" below):
+
+- The service Iroh's mDNS discovery browses and registers is
+  `_iroh.local.swarm._udp.local.` (`iroh-0.35` `discovery/mdns.rs` names it
+  `iroh.local.swarm`, `swarm-discovery` builds `_{name}._udp.local.`). It sends
+  and receives plain UDP multicast on 224.0.0.251 / ff02::fb port 5353 itself.
+- iOS: add to `ios/Runner/Info.plist`, or iOS 14+ blocks local network access
+  and the search finds nothing without telling anyone:
+
+  ```xml
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Find your other devices on this network.</string>
+  <key>NSBonjourServices</key>
+  <array>
+    <string>_iroh.local.swarm._udp</string>
+  </array>
+  ```
+
+  The example app has both. macOS needs neither key (its sandbox entitlements
+  above are enough).
+- Android: Wi-Fi drivers drop most multicast packets unless the app holds a
+  `WifiManager.MulticastLock`, which needs
+  `<uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>`
+  in `AndroidManifest.xml`. Neither Iroh nor this plugin takes the lock, so
+  the app must (a platform method channel is enough). Without it, devices
+  still find each other through pkarr, just not offline.
+
+Not verified on a device: the iOS keys and the Android lock above come from
+reading the Iroh / swarm-discovery source and Apple's and Android's rules for
+multicast; no iOS or Android device was available. Apple may additionally
+require the `com.apple.developer.networking.multicast` entitlement for apps
+that use raw multicast sockets (it is granted by Apple on request); if iOS
+devices do not see each other, check that first. What is tested: two Iroh
+endpoints in one process (no relay, no pkarr) find each other through the
+advertised tags (`sync::local_directory` tests in `atomic_lib`).
 
 ### Sharing (`node.sharing`)
 

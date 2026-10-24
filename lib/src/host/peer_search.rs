@@ -39,6 +39,19 @@ pub trait PeerDirectory: Send + Sync {
 
     /// Announce this device for `drive`.
     async fn announce(&self, drive: &str, me: &str) -> Result<(), String>;
+
+    /// Devices on this machine or network that hold `drive`, known without
+    /// any network service (mDNS tags, see `sync::local_directory`). Answers
+    /// at once and cannot fail; it works offline. These are dialled before
+    /// the ones [`Self::announced`] names. Default: none.
+    async fn nearby(&self, _drive: &str, _me: &str) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// The drives this device searches changed: advertise them to nearby
+    /// devices. Called by [`PeerSearch::run`] before the first round and
+    /// whenever the list changes. Default: nothing.
+    fn advertise_nearby(&self, _drives: &[String]) {}
 }
 
 /// How devices are reached.
@@ -300,6 +313,62 @@ impl PeerSearch {
         self.started.lock().await.clone()
     }
 
+    /// Dial up to [`DIALS_PER_ROUND`] of `candidates` that are not live, not
+    /// dialled this round and not recently dead (unless `forced`), and keep
+    /// the books on the ones that did not answer.
+    async fn dial_candidates(
+        &self,
+        candidates: &[(String, String)],
+        dialer: &dyn PeerDialer,
+        forced: bool,
+        dialled: &mut Vec<String>,
+        dial_errors: &mut Vec<String>,
+    ) {
+        let live: Vec<String> = dialer.live().iter().map(|i| norm(i)).collect();
+        let now = Instant::now();
+        let to_dial: Vec<(String, String)> = {
+            let dead = self.dead.lock().unwrap();
+            candidates
+                .iter()
+                .filter(|(id, _)| !live.contains(id) && !dialled.contains(id))
+                .filter(|(id, _)| {
+                    forced
+                        || dead
+                            .get(id)
+                            .and_then(|d| d.retry_at)
+                            .is_none_or(|at| at <= now)
+                })
+                .take(DIALS_PER_ROUND)
+                .cloned()
+                .collect()
+        };
+        let results = futures::future::join_all(
+            to_dial
+                .iter()
+                .map(|(id, drive)| async move { (id.clone(), dialer.dial(id, drive).await) }),
+        )
+        .await;
+        dialled.extend(to_dial.iter().map(|(id, _)| id.clone()));
+        let mut dead = self.dead.lock().unwrap();
+        for (id, result) in &results {
+            match result {
+                Ok(()) => {
+                    dead.remove(id);
+                }
+                Err(e) => {
+                    let entry = dead.entry(id.clone()).or_default();
+                    entry.failures += 1;
+                    let cap = self.schedule.idle_wait(u32::MAX) * 8;
+                    let wait = (self.schedule.dead_node
+                        * 2u32.saturating_pow(entry.failures.saturating_sub(1)))
+                    .min(cap.max(self.schedule.dead_node));
+                    entry.retry_at = Some(Instant::now() + wait);
+                    dial_errors.push(format!("{}: {e}", &id[..id.len().min(12)]));
+                }
+            }
+        }
+    }
+
     /// One round: announce (when asked), look up every drive, dial the
     /// devices that are not this one and not live yet. Sets the status.
     pub async fn search_once(
@@ -328,8 +397,28 @@ impl PeerSearch {
             }
         }
 
-        // Each other device with the first drive it was announced for.
+        // Devices heard on the local network come first, and are dialled
+        // before the (slower, online) directory is asked: offline they are
+        // the only ones there are.
         let mut announced: Vec<(String, String)> = Vec::new();
+        for drive in &drives {
+            for id in directory.nearby(drive, &me).await {
+                let id = norm(&id);
+                if id.is_empty() || id == me || announced.iter().any(|(a, _)| *a == id) {
+                    continue;
+                }
+                announced.push((id, drive.to_string()));
+            }
+        }
+        let nearby_count = announced.len();
+        let mut dialled: Vec<String> = Vec::new();
+        let mut dial_errors = Vec::new();
+        if !announced.is_empty() {
+            self.dial_candidates(&announced, dialer, forced, &mut dialled, &mut dial_errors)
+                .await;
+        }
+
+        // Each other device with the first drive it was announced for.
         let mut lookup_errors = Vec::new();
         for drive in &drives {
             match directory.announced(drive).await {
@@ -347,58 +436,14 @@ impl PeerSearch {
                 Err(e) => lookup_errors.push(e),
             }
         }
-
-        let live: Vec<String> = dialer.live().iter().map(|i| norm(i)).collect();
-        let now = Instant::now();
-        let to_dial: Vec<(String, String)> = {
-            let dead = self.dead.lock().unwrap();
-            announced
-                .iter()
-                .filter(|(id, _)| !live.contains(id))
-                .filter(|(id, _)| {
-                    forced
-                        || dead
-                            .get(id)
-                            .and_then(|d| d.retry_at)
-                            .is_none_or(|at| at <= now)
-                })
-                .take(DIALS_PER_ROUND)
-                .cloned()
-                .collect()
-        };
-
-        let results = futures::future::join_all(
-            to_dial
-                .iter()
-                .map(|(id, drive)| async move { (id.clone(), dialer.dial(id, drive).await) }),
-        )
-        .await;
-        let mut dial_errors = Vec::new();
-        {
-            let mut dead = self.dead.lock().unwrap();
-            for (id, result) in &results {
-                match result {
-                    Ok(()) => {
-                        dead.remove(id);
-                    }
-                    Err(e) => {
-                        let entry = dead.entry(id.clone()).or_default();
-                        entry.failures += 1;
-                        let cap = self.schedule.idle_wait(u32::MAX) * 8;
-                        let wait = (self.schedule.dead_node
-                            * 2u32.saturating_pow(entry.failures.saturating_sub(1)))
-                        .min(cap.max(self.schedule.dead_node));
-                        entry.retry_at = Some(Instant::now() + wait);
-                        dial_errors.push(format!("{}: {e}", &id[..id.len().min(12)]));
-                    }
-                }
-            }
-        }
+        let remote = announced[nearby_count..].to_vec();
+        self.dial_candidates(&remote, dialer, forced, &mut dialled, &mut dial_errors)
+            .await;
 
         let live_after = dialer.live().len();
         let outcome = RoundOutcome {
             announced: announced.iter().map(|(id, _)| id.clone()).collect(),
-            dialled: to_dial.iter().map(|(id, _)| id.clone()).collect(),
+            dialled,
             live: live_after,
         };
         tracing::info!(
@@ -485,6 +530,9 @@ impl PeerSearch {
         // sign-in moved this device to the secret's drive) announces at once:
         // the other devices look for us in that drive, not in the old one.
         let mut announced_for: Vec<String> = Vec::new();
+        // The drives advertised to nearby devices; the list is advertised
+        // before the round that looks for them.
+        let mut advertised: Option<Vec<String>> = None;
         loop {
             // In the background: no directory traffic at all. A resume (or
             // anything else that wakes the loop) is noticed here.
@@ -492,6 +540,10 @@ impl PeerSearch {
                 self.wake.notified().await;
             }
             let list = drives();
+            if advertised.as_ref() != Some(&list) {
+                directory.advertise_nearby(&list);
+                advertised = Some(list.clone());
+            }
             let announce = last_announce.is_none_or(|t| t.elapsed() >= announce_every)
                 || (!list.is_empty() && list != announced_for);
             let wait = if list.is_empty() {
@@ -541,6 +593,9 @@ mod tests {
         answers: Mutex<Vec<Result<Vec<String>, String>>>,
         lookups: AtomicUsize,
         announces: AtomicUsize,
+        /// What the local network knows, and the drive lists advertised.
+        near: Mutex<Vec<String>>,
+        advertised: Mutex<Vec<Vec<String>>>,
     }
 
     impl FakeDirectory {
@@ -574,6 +629,12 @@ mod tests {
         async fn announce(&self, _drive: &str, _me: &str) -> Result<(), String> {
             self.announces.fetch_add(1, Ordering::SeqCst);
             Ok(())
+        }
+        async fn nearby(&self, _drive: &str, _me: &str) -> Vec<String> {
+            self.near.lock().unwrap().clone()
+        }
+        fn advertise_nearby(&self, drives: &[String]) {
+            self.advertised.lock().unwrap().push(drives.to_vec());
         }
     }
 
@@ -682,6 +743,90 @@ mod tests {
         let status = search.status();
         assert_eq!(status.state, PeerSearchState::Connected { devices: 1 });
         assert_eq!(status.message, "Connected to 1 device");
+    }
+
+    /// Offline: the directory cannot be reached, but a device on the same
+    /// network advertised the drive. It is found and dialled anyway.
+    #[tokio::test]
+    async fn a_nearby_device_is_found_while_the_directory_is_unreachable() {
+        let search = PeerSearch::new(fast());
+        let directory = FakeDirectory::answering(vec![Err("dns error")]);
+        *directory.near.lock().unwrap() = vec![OTHER.to_string(), ME.to_string()];
+        let dialer = FakeDialer::reaching(&[OTHER]);
+        let outcome = search
+            .search_once(ME, &drives(), directory.as_ref(), dialer.as_ref(), false)
+            .await;
+        assert_eq!(outcome.announced, vec![OTHER], "own id left out");
+        assert_eq!(*dialer.dials.lock().unwrap(), vec![OTHER]);
+        assert_eq!(
+            search.status().state,
+            PeerSearchState::Connected { devices: 1 }
+        );
+    }
+
+    /// Nearby devices come first, and a device both lists name is dialled once.
+    #[tokio::test]
+    async fn nearby_devices_are_dialled_before_the_announced_ones() {
+        let search = PeerSearch::new(fast());
+        let directory = FakeDirectory::answering(vec![Ok(vec!["far1", "far2", OTHER, ME])]);
+        *directory.near.lock().unwrap() = vec![OTHER.to_string()];
+        let dialer = FakeDialer::reaching(&["far1", "far2", OTHER]);
+        let outcome = search
+            .search_once(ME, &drives(), directory.as_ref(), dialer.as_ref(), false)
+            .await;
+        assert_eq!(outcome.announced, vec![OTHER, "far1", "far2"]);
+        let dials = dialer.dials.lock().unwrap().clone();
+        assert_eq!(dials[0], OTHER, "the nearby one first");
+        assert_eq!(dials.iter().filter(|d| *d == OTHER).count(), 1);
+        assert_eq!(dials.len(), 3);
+    }
+
+    /// The nearby device that does not answer is not retried every round
+    /// either, and the directory's devices are still tried.
+    #[tokio::test]
+    async fn a_nearby_device_that_does_not_answer_does_not_stop_the_others() {
+        let search = PeerSearch::new(fast());
+        let directory = FakeDirectory::answering(vec![Ok(vec![OTHER])]);
+        *directory.near.lock().unwrap() = vec!["stale".to_string()];
+        let dialer = FakeDialer::reaching(&[OTHER]);
+        search
+            .search_once(ME, &drives(), directory.as_ref(), dialer.as_ref(), false)
+            .await;
+        assert_eq!(*dialer.dials.lock().unwrap(), vec!["stale", OTHER]);
+        assert_eq!(
+            search.status().state,
+            PeerSearchState::Connected { devices: 1 }
+        );
+    }
+
+    /// The drives advertised on the network follow the drive list.
+    #[tokio::test]
+    async fn the_advertised_drives_follow_the_drive_list() {
+        let search = PeerSearch::new(fast());
+        let directory = FakeDirectory::answering(vec![Ok(vec![ME])]);
+        let dialer = FakeDialer::reaching(&[]);
+        let current = Arc::new(Mutex::new(vec!["did:ad:old".to_string()]));
+        let seen = current.clone();
+        let run = tokio::spawn(search.clone().run(
+            ME.into(),
+            move || seen.lock().unwrap().clone(),
+            directory.clone(),
+            dialer.clone(),
+            Duration::from_secs(3600),
+        ));
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Several rounds with the same list advertise once.
+        assert_eq!(
+            *directory.advertised.lock().unwrap(),
+            vec![vec!["did:ad:old".to_string()]]
+        );
+        *current.lock().unwrap() = vec!["did:ad:new".to_string(), "did:ad:old".to_string()];
+        search.search_again();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let advertised = directory.advertised.lock().unwrap().clone();
+        assert_eq!(advertised.len(), 2);
+        assert_eq!(advertised[1], vec!["did:ad:new", "did:ad:old"]);
+        run.abort();
     }
 
     #[tokio::test]

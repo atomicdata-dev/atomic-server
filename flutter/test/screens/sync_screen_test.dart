@@ -884,7 +884,9 @@ void main() {
                       of: f, matching: find.byKey(const Key('kv-subtitle')))
                   .evaluate()
                   .isEmpty) {
-                singleLineHeights.add(rect.height);
+                // Rounded: a scroll offset at a fraction adds float noise.
+                singleLineHeights.add(
+                    (rect.height * 100).roundToDouble() / 100);
               }
               // Everything stays inside the card's inner 16 dp.
               expect(rect.left, cardRect.left + 1);

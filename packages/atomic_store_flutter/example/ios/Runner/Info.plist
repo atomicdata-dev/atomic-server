@@ -24,6 +24,12 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_iroh.local.swarm._udp</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Find your other devices on this network.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

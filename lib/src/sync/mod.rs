@@ -19,6 +19,8 @@ pub mod engine;
 pub mod invite;
 #[cfg(all(test, feature = "iroh", feature = "db"))]
 mod iroh_e2e;
+#[cfg(feature = "iroh")]
+pub mod local_directory;
 /// The durable dirty-subject queue a device drains to a hub.
 #[cfg(feature = "db")]
 pub mod outbox;
