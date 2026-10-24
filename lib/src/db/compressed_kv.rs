@@ -29,8 +29,9 @@ use crate::errors::AtomicResult;
 use super::{
     kv_store::{KvIter, KvPair, KvStore},
     trees::{Method, Operation, Tree},
+    write_log::{logged_subject, WriteLog},
 };
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 const MARKER: u8 = 0;
 const CODEC_RAW: u8 = 0;
@@ -214,13 +215,47 @@ fn decode_value(
     }
 }
 
+fn logged_ops(operations: &[Operation]) -> Vec<String> {
+    operations
+        .iter()
+        .filter_map(|op| logged_subject(op.tree, &op.key))
+        .collect()
+}
+
 pub struct CompressedKv {
     inner: Arc<dyn KvStore>,
+    log: Arc<WriteLog>,
+    /// Subjects written since `begin_batch`; logged once `commit_batch`
+    /// succeeds, so the log never counts a write a reader cannot see yet.
+    batched: Mutex<Option<Vec<String>>>,
 }
 
 impl CompressedKv {
+    #[cfg(test)]
     pub fn new(inner: Arc<dyn KvStore>) -> Self {
-        Self { inner }
+        Self::with_log(inner, Arc::new(WriteLog::default()))
+    }
+
+    pub fn with_log(inner: Arc<dyn KvStore>, log: Arc<WriteLog>) -> Self {
+        Self {
+            inner,
+            log,
+            batched: Mutex::new(None),
+        }
+    }
+
+    /// Log a finished write (or buffer it while batching).
+    fn wrote(&self, subjects: Vec<String>) {
+        if subjects.is_empty() {
+            return;
+        }
+        match self.batched.lock() {
+            Ok(mut batch) => match batch.as_mut() {
+                Some(buffer) => buffer.extend(subjects),
+                None => self.log.record(subjects),
+            },
+            Err(_) => self.log.invalidate_all(),
+        }
     }
 
     fn decoded(&self, tree: Tree, iter: KvIter) -> KvIter {
@@ -312,14 +347,18 @@ impl KvStore for CompressedKv {
     fn insert(&self, tree: Tree, key: &[u8], val: &[u8]) -> AtomicResult<()> {
         if is_compressed_tree(tree) {
             self.inner
-                .insert(tree, key, &self.encoded(tree, key, val, &[]))
+                .insert(tree, key, &self.encoded(tree, key, val, &[]))?;
         } else {
-            self.inner.insert(tree, key, val)
+            self.inner.insert(tree, key, val)?;
         }
+        self.wrote(logged_subject(tree, key).into_iter().collect());
+        Ok(())
     }
 
     fn remove(&self, tree: Tree, key: &[u8]) -> AtomicResult<()> {
-        self.inner.remove(tree, key)
+        self.inner.remove(tree, key)?;
+        self.wrote(logged_subject(tree, key).into_iter().collect());
+        Ok(())
     }
 
     fn contains_key(&self, tree: Tree, key: &[u8]) -> AtomicResult<bool> {
@@ -387,7 +426,11 @@ impl KvStore for CompressedKv {
     }
 
     fn clear_tree(&self, tree: Tree) -> AtomicResult<()> {
-        self.inner.clear_tree(tree)
+        self.inner.clear_tree(tree)?;
+        if matches!(tree, Tree::Resources | Tree::LoroSnapshots) {
+            self.log.invalidate_all();
+        }
+        Ok(())
     }
 
     fn apply_batch(&self, operations: &[Operation]) -> AtomicResult<()> {
@@ -395,7 +438,9 @@ impl KvStore for CompressedKv {
             .iter()
             .any(|op| is_compressed_tree(op.tree) && op.val.is_some())
         {
-            return self.inner.apply_batch(operations);
+            self.inner.apply_batch(operations)?;
+            self.wrote(logged_ops(operations));
+            return Ok(());
         }
         let encoded: Vec<Operation> = operations
             .iter()
@@ -412,7 +457,9 @@ impl KvStore for CompressedKv {
                 },
             })
             .collect();
-        self.inner.apply_batch(&encoded)
+        self.inner.apply_batch(&encoded)?;
+        self.wrote(logged_ops(operations));
+        Ok(())
     }
 
     fn flush(&self) -> AtomicResult<()> {
@@ -420,11 +467,22 @@ impl KvStore for CompressedKv {
     }
 
     fn begin_batch(&self) {
+        if let Ok(mut batch) = self.batched.lock() {
+            batch.get_or_insert_with(Vec::new);
+        }
         self.inner.begin_batch()
     }
 
     fn commit_batch(&self) -> AtomicResult<()> {
-        self.inner.commit_batch()
+        let committed = self.inner.commit_batch();
+        let buffered = self.batched.lock().ok().and_then(|mut b| b.take());
+        if let Err(e) = committed {
+            // Unknown how much landed.
+            self.log.invalidate_all();
+            return Err(e);
+        }
+        self.wrote(buffered.unwrap_or_default());
+        Ok(())
     }
 
     fn len(&self, tree: Tree) -> AtomicResult<usize> {
