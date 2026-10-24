@@ -1,0 +1,3 @@
+[crates.atomic_kotlin_rust.bindings.kotlin]
+package_name = "place.atomic.app.kotlin.core"
+cdylib_name = "atomic_kotlin_rust"

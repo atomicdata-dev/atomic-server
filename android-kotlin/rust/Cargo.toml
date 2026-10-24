@@ -1,0 +1,52 @@
+[package]
+name = "atomic_kotlin_rust"
+version = "0.1.0"
+edition = "2021"
+description = "UniFFI bindings of atomic_lib::host for the native Kotlin Android app"
+
+# Outside the root workspace, like flutter/rust: own lockfile, own profiles.
+[workspace]
+
+[lib]
+name = "atomic_kotlin_rust"
+# cdylib is what the app loads; lib lets the tests and uniffi-bindgen link it.
+crate-type = ["cdylib", "lib"]
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["cli"]
+
+[features]
+# The bindgen CLI (Kotlin generator) is only built for the Gradle task.
+cli = ["uniffi/cli"]
+
+[dependencies]
+uniffi = { version = "0.32", features = ["tokio"] }
+async-trait = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-android = "0.2"
+atomic_lib = { path = "../../lib", default-features = false, features = ["db-redb", "iroh", "discovery", "ws"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros", "time", "sync"] }
+futures = "0.3"
+
+# Same profiles as flutter/rust (see the comments there): dependencies are
+# optimised even in debug, atomic_lib compiles quickly, release is fat LTO.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+opt-level = 2
+
+[profile.dev.package.atomic_lib]
+opt-level = 1
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+# uniffi-bindgen reads its metadata from the symbol table, so symbols must stay.
+strip = "debuginfo"

@@ -1,0 +1,16 @@
+# Build output, SDK, local config, generated bindings, screenshots: never committed.
+.gradle/
+build/
+**/build/
+.kotlin/
+local.properties
+*.apk
+*.aab
+*.png.tmp
+rust/target/
+/captures/
+.idea/
+*.iml
+# Roborazzi output; screenshots live outside the repo (see README).
+**/screenshots/
+**/src/test/snapshots/
