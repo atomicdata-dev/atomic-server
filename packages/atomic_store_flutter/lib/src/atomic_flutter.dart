@@ -12,6 +12,7 @@ import 'sharing.dart';
 import 'init_native.dart' if (dart.library.js_interop) 'init_web.dart' as impl;
 import '../bridge/api/error.dart' as bridge;
 import '../bridge/api/resources.dart' as bridge;
+import '../bridge/api/simple/store.dart' as bridge_store;
 
 /// Entry point of `package:atomic_store_flutter`.
 ///
@@ -121,6 +122,12 @@ abstract interface class AtomicParts {
   ServerSync get sync;
   Peers get peers;
   Sharing get sharing;
+
+  /// How much this device stores, the bridge's `store_stats` JSON.
+  Future<String> storeStatsJson();
+
+  /// What this build is, the bridge's `device_info` JSON.
+  String deviceInfoJson();
 }
 
 /// An open local node: the [store] to read and write through, the agent that
@@ -172,6 +179,12 @@ class AtomicNode implements AtomicParts {
       }
     });
   }
+
+  @override
+  Future<String> storeStatsJson() => bridge_store.storeStats();
+
+  @override
+  String deviceInfoJson() => bridge_store.deviceInfo();
 
   /// The raw bridge handle, for what the typed parts do not cover (files,
   /// history, the assistant).

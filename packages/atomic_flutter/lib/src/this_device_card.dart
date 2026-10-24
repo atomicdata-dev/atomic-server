@@ -1,12 +1,13 @@
 import 'dart:async';
 
-import 'package:atomic_chat/atomic_chat.dart'
-    show BackgroundActivity, BackgroundState, timeAgo;
-import 'package:atomic_flutter/atomic_flutter.dart' as shared;
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-/// The Sync screen's "This device" section: who this device is, what it runs,
+import 'device_stats.dart';
+import 'settings_backend.dart';
+import 'sync_widgets.dart';
+import 'theme.dart';
+
+/// The "This device" section: who this device is, what it runs,
 /// how much of your data it stores (per workspace), and how it syncs. Every
 /// line is read from the host; what it cannot tell is left out.
 ///
@@ -23,9 +24,12 @@ class ThisDeviceCard extends StatefulWidget {
     required this.driveNames,
     required this.onRename,
     this.onOpenStorage,
+    this.extraRows = const [],
+    this.loadExpanded,
+    this.saveExpanded,
   });
 
-  final shared.AtomicSettingsBackend backend;
+  final AtomicSettingsBackend backend;
   final String deviceName;
 
   /// This device's node id, null while it is not online.
@@ -43,15 +47,21 @@ class ThisDeviceCard extends StatefulWidget {
   /// Without it the drive rows are not tappable.
   final void Function(String subject, String name)? onOpenStorage;
 
-  /// Where the Storage row's expanded state is kept.
-  static const expandedKey = 'sync_storage_expanded';
+  /// Rows only the host has (what it runs in the background), shown after
+  /// the status.
+  final List<Widget> extraRows;
+
+  /// Where the Storage row's expanded state is kept; collapsed, and not
+  /// remembered, without them.
+  final Future<bool> Function()? loadExpanded;
+  final Future<void> Function(bool expanded)? saveExpanded;
 
   @override
   State<ThisDeviceCard> createState() => _ThisDeviceCardState();
 }
 
 class _ThisDeviceCardState extends State<ThisDeviceCard> {
-  shared.StoreStats? _stats;
+  StoreStats? _stats;
   bool _counting = true;
   List<Map<String, String>> _peers = const [];
   Set<String> _live = const {};
@@ -63,19 +73,11 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
     unawaited(_loadExpanded());
     unawaited(_count());
     unawaited(_loadPeers());
-    BackgroundActivity.instance.start();
-  }
-
-  @override
-  void dispose() {
-    BackgroundActivity.instance.stop();
-    super.dispose();
   }
 
   Future<void> _loadExpanded() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final v = prefs.getBool(ThisDeviceCard.expandedKey) ?? false;
+      final v = await widget.loadExpanded?.call() ?? false;
       if (mounted && v != _expanded) setState(() => _expanded = v);
     } catch (_) {
       // No stored choice: collapsed.
@@ -85,8 +87,7 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
   Future<void> _toggle() async {
     setState(() => _expanded = !_expanded);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(ThisDeviceCard.expandedKey, _expanded);
+      await widget.saveExpanded?.call(_expanded);
     } catch (_) {
       // Kept for this session only.
     }
@@ -94,7 +95,7 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
 
   Future<void> _count({bool refresh = false}) async {
     setState(() => _counting = true);
-    shared.StoreStats? stats;
+    StoreStats? stats;
     try {
       stats = await widget.backend.storeStats(refresh: refresh);
     } catch (_) {
@@ -136,14 +137,14 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
 
   @override
   Widget build(BuildContext context) {
-    final c = shared.syncColors(context);
+    final c = syncColors(context);
     final info = widget.backend.deviceInfo();
     final online = widget.peerId != null;
     final name = widget.deviceName.isEmpty ? 'This device' : widget.deviceName;
     final last = _lastSyncedMs;
     final stats = _stats;
 
-    return shared.SyncSection(
+    return SyncSection(
       title: 'This device',
       children: [
         InkWell(
@@ -154,13 +155,13 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
             constraints: const BoxConstraints(minHeight: 64),
             child: Padding(
               padding: const EdgeInsets.only(
-                  left: shared.SyncGap.l,
-                  right: shared.KeyValueGrid.rightInset,
-                  top: shared.SyncGap.s,
-                  bottom: shared.SyncGap.s),
+                  left: SyncGap.l,
+                  right: KeyValueGrid.rightInset,
+                  top: SyncGap.s,
+                  bottom: SyncGap.s),
               child: Row(children: [
                 Icon(Icons.phone_android, size: 24, color: c.main),
-                const SizedBox(width: shared.SyncGap.m),
+                const SizedBox(width: SyncGap.m),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -168,22 +169,22 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
                       Text(name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: shared.SyncText.bodyStrong(c)),
+                          style: SyncText.bodyStrong(c)),
                       if (info != null && info.platformLine.isNotEmpty)
                         Text(info.platformLine,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: shared.SyncText.caption(c)),
+                            style: SyncText.caption(c)),
                       // Not the name in the account block: that one follows
                       // the person to every device, this one does not.
                       Text('Device name, only on this device. Tap to rename.',
                           key: const Key('this-device-name-hint'),
-                          style: shared.SyncText.caption(c)),
+                          style: SyncText.caption(c)),
                     ],
                   ),
                 ),
                 SizedBox(
-                  width: shared.KeyValueGrid.trailingSlot,
+                  width: KeyValueGrid.trailingSlot,
                   child: Center(
                       child: Icon(Icons.edit_outlined,
                           size: 20, color: c.textSecondary)),
@@ -192,49 +193,34 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
             ),
           ),
         ),
-        shared.KeyValueRow(
+        KeyValueRow(
           key: const Key('this-device-status'),
           label: 'Status',
           icon: Icons.circle_outlined,
-          valueWidget: shared.StatusChip(online ? 'Online' : 'Offline',
-              tone: online ? shared.SyncTone.success : shared.SyncTone.neutral),
+          valueWidget: StatusChip(online ? 'Online' : 'Offline',
+              tone: online ? SyncTone.success : SyncTone.neutral),
         ),
-        ValueListenableBuilder<BackgroundState>(
-          valueListenable: BackgroundActivity.instance,
-          builder: (context, activity, _) => shared.KeyValueRow(
-            key: const Key('background-activity-row'),
-            label: 'Background activity',
-            value: activity.summary,
-            // A failure's text is copied with a tap.
-            copy: activity.problem ? activity.lastError : null,
-            copyLabel: 'Error',
-            icon: activity.busy
-                ? Icons.sync
-                : activity.problem
-                    ? Icons.sync_problem
-                    : Icons.check_circle_outline,
-          ),
-        ),
+        ...widget.extraRows,
         if (info?.appVersion != null)
-          shared.KeyValueRow(
+          KeyValueRow(
               label: 'Version',
               value: info!.appVersion!,
               icon: Icons.info_outline),
         if (widget.peerId != null)
-          shared.KeyValueRow(
+          KeyValueRow(
             key: const Key('copy-device-id'),
             label: 'Device ID',
-            value: shared.shortId(widget.peerId!),
+            value: shortId(widget.peerId!),
             copy: widget.peerId,
             copyLabel: 'Device ID',
             icon: Icons.fingerprint,
             mono: true,
           ),
         if (widget.identity != null)
-          shared.KeyValueRow(
+          KeyValueRow(
             key: const Key('copy-identity'),
             label: 'Identity',
-            value: shared.shortId(widget.identity!),
+            value: shortId(widget.identity!),
             copy: widget.identity,
             copyLabel: 'Identity',
             icon: Icons.badge_outlined,
@@ -242,7 +228,7 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
           ),
         ..._storage(c, stats),
         if (_peers.isNotEmpty)
-          shared.KeyValueRow(
+          KeyValueRow(
             label: 'Synced with',
             value: _syncedWith == 0
                 ? 'No device yet'
@@ -250,10 +236,10 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
             icon: Icons.sync,
           ),
         if (last != null)
-          shared.KeyValueRow(
-              label: 'Last sync', value: timeAgo(last), icon: Icons.schedule),
+          KeyValueRow(
+              label: 'Last sync', value: relativeTime(last), icon: Icons.schedule),
         if (_peers.isNotEmpty)
-          shared.KeyValueRow(
+          KeyValueRow(
             label: 'Connected now',
             value: _peers.where((p) => _live.contains(p['node_id'])).isEmpty
                 ? 'None'
@@ -264,15 +250,15 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
     );
   }
 
-  List<Widget> _storage(shared.AppColors c, shared.StoreStats? stats) {
+  List<Widget> _storage(AppColors c, StoreStats? stats) {
     if (stats == null) {
       // Counting: a spinner. Failed or unsupported: nothing.
       return [
         if (_counting)
-          const shared.KeyValueRow(
+          const KeyValueRow(
             key: Key('stats-loading'),
             label: 'Storage',
-            valueWidget: shared.SyncSpinner(),
+            valueWidget: SyncSpinner(),
             icon: Icons.storage_outlined,
           ),
       ];
@@ -280,19 +266,19 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
     final total = stats.barTotal;
     final n = stats.drives.length;
     final caption = [
-      shared.formatResources(stats.resources),
-      if (stats.fileBytes > 0) '${shared.formatBytes(stats.fileBytes)} files',
+      formatResources(stats.resources),
+      if (stats.fileBytes > 0) '${formatBytes(stats.fileBytes)} files',
     ].join(' · ');
     return [
       Column(
         key: const Key('stats-group'),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          shared.KeyValueRow(
+          KeyValueRow(
             key: const Key('stats-total'),
             label: 'Storage',
             value:
-                '${shared.formatBytes(stats.dataBytes)} · $n ${n == 1 ? 'drive' : 'drives'}',
+                '${formatBytes(stats.dataBytes)} · $n ${n == 1 ? 'drive' : 'drives'}',
             subtitle: caption,
             icon: Icons.storage_outlined,
             expanded: _expanded,
@@ -313,19 +299,19 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
                         _driveRow(c, d, total == 0 ? 0 : d.bytes / total),
                       Padding(
                         padding: const EdgeInsets.only(
-                            left: shared.SyncGap.m, bottom: shared.SyncGap.xs),
+                            left: SyncGap.m, bottom: SyncGap.xs),
                         child: _counting
                             ? const SizedBox(
                                 height: 48,
                                 child: Padding(
                                     padding: EdgeInsets.only(
-                                        left: 40 + shared.SyncGap.m),
+                                        left: 40 + SyncGap.m),
                                     child: Align(
                                         alignment: Alignment.centerLeft,
-                                        child: shared.SyncSpinner())))
+                                        child: SyncSpinner())))
                             : Padding(
                                 padding: const EdgeInsets.only(left: 40),
-                                child: shared.SyncTextAction(
+                                child: SyncTextAction(
                                     key: const Key('stats-recount'),
                                     label: 'Count again',
                                     icon: Icons.refresh,
@@ -339,10 +325,10 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
         ],
       ),
       if (stats.diskBytes != null)
-        shared.KeyValueRow(
+        KeyValueRow(
           key: const Key('stats-disk'),
           label: 'On disk',
-          value: shared.formatBytes(stats.diskBytes!),
+          value: formatBytes(stats.diskBytes!),
           icon: Icons.sd_storage_outlined,
         ),
     ];
@@ -350,7 +336,7 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
 
   /// One drive: name and size on the label/value grid's left edge, the share
   /// bar below, a chevron in the trailing slot when the page can open.
-  Widget _driveRow(shared.AppColors c, shared.DriveStats d, double share) {
+  Widget _driveRow(AppColors c, DriveStats d, double share) {
     final name = d.name.isNotEmpty
         ? d.name
         : (widget.driveNames[d.subject]?.isNotEmpty ?? false)
@@ -359,14 +345,14 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
     final open = widget.onOpenStorage;
     final row = ConstrainedBox(
       constraints:
-          const BoxConstraints(minHeight: shared.KeyValueGrid.rowHeight),
+          const BoxConstraints(minHeight: KeyValueGrid.rowHeight),
       child: Padding(
         // Text starts at the label column (16 + 24 icon + 12 gap).
         padding: const EdgeInsets.only(
-            left: shared.SyncGap.l + 24 + shared.SyncGap.m,
-            right: shared.KeyValueGrid.rightInset,
-            top: shared.SyncGap.s,
-            bottom: shared.SyncGap.s),
+            left: SyncGap.l + 24 + SyncGap.m,
+            right: KeyValueGrid.rightInset,
+            top: SyncGap.s,
+            bottom: SyncGap.s),
         child: Row(children: [
           Expanded(
             child: Column(
@@ -376,23 +362,23 @@ class _ThisDeviceCardState extends State<ThisDeviceCard> {
                   Expanded(
                       child: Text(name,
                           maxLines: 1,
-                          style: shared.SyncText.body(c),
+                          style: SyncText.body(c),
                           overflow: TextOverflow.ellipsis)),
-                  const SizedBox(width: shared.SyncGap.m),
-                  Text(shared.formatBytes(d.bytes),
-                      maxLines: 1, style: shared.SyncText.caption(c)),
+                  const SizedBox(width: SyncGap.m),
+                  Text(formatBytes(d.bytes),
+                      maxLines: 1, style: SyncText.caption(c)),
                 ]),
-                Text(shared.formatResources(d.resources),
+                Text(formatResources(d.resources),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: shared.SyncText.caption(c)),
-                const SizedBox(height: shared.SyncGap.s),
-                shared.ShareBar(share),
+                    style: SyncText.caption(c)),
+                const SizedBox(height: SyncGap.s),
+                ShareBar(share),
               ],
             ),
           ),
           SizedBox(
-            width: shared.KeyValueGrid.trailingSlot,
+            width: KeyValueGrid.trailingSlot,
             child: Center(
                 child: open == null
                     ? null

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart' show WebViewCookie;
 
@@ -14,6 +15,8 @@ import 'package:atomic_chat/atomic_chat.dart'
         ResourceView,
         ResourceWebView,
         openResourceView,
+        BackgroundActivity,
+        BackgroundState,
         timeAgo,
         ToastScope;
 
@@ -23,7 +26,49 @@ import '../atomic/settings_backend.dart';
 import 'account_link_dialog.dart';
 import 'edit_profile_screen.dart';
 import 'login_screen.dart';
-import 'this_device_card.dart';
+
+/// Where the Storage row's expanded state is kept.
+const _storageExpandedKey = 'sync_storage_expanded';
+
+/// What the app does in the background; counts only while it is shown.
+class _BackgroundActivityRow extends StatefulWidget {
+  const _BackgroundActivityRow();
+
+  @override
+  State<_BackgroundActivityRow> createState() => _BackgroundActivityRowState();
+}
+
+class _BackgroundActivityRowState extends State<_BackgroundActivityRow> {
+  @override
+  void initState() {
+    super.initState();
+    BackgroundActivity.instance.start();
+  }
+
+  @override
+  void dispose() {
+    BackgroundActivity.instance.stop();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<BackgroundState>(
+        valueListenable: BackgroundActivity.instance,
+        builder: (context, activity, _) => shared.KeyValueRow(
+          key: const Key('background-activity-row'),
+          label: 'Background activity',
+          value: activity.summary,
+          // A failure's text is copied with a tap.
+          copy: activity.problem ? activity.lastError : null,
+          copyLabel: 'Error',
+          icon: activity.busy
+              ? Icons.sync
+              : activity.problem
+                  ? Icons.sync_problem
+                  : Icons.check_circle_outline,
+        ),
+      );
+}
 
 /// The circle for an identity: its picture, else emoji, else initial.
 Widget agentAvatar(shared.AtomicIdentity? agent, {double radius = 16}) =>
@@ -215,7 +260,7 @@ class _SyncScreenState extends State<SyncScreen> {
               portalCookie: widget.portalCookie,
               portalPage: widget.portalPage,
             ),
-            thisDeviceBuilder: (context, info) => ThisDeviceCard(
+            thisDeviceBuilder: (context, info) => shared.ThisDeviceCard(
               backend: _backend,
               deviceName: info.deviceName,
               peerId: info.peerId,
@@ -223,6 +268,13 @@ class _SyncScreenState extends State<SyncScreen> {
               driveNames: info.driveNames,
               onRename: info.rename,
               onOpenStorage: _openStorage,
+              extraRows: const [_BackgroundActivityRow()],
+              loadExpanded: () async =>
+                  (await SharedPreferences.getInstance())
+                      .getBool(_storageExpandedKey) ??
+                  false,
+              saveExpanded: (v) async => (await SharedPreferences.getInstance())
+                  .setBool(_storageExpandedKey, v),
             ),
           ),
         ),

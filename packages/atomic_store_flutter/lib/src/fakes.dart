@@ -441,4 +441,14 @@ class FakeNode implements AtomicParts {
   final FakePeers peers;
   @override
   final Sharing sharing;
+
+  /// What [storeStatsJson] and [deviceInfoJson] answer.
+  String statsJson = '{"drives": []}';
+  String deviceJson = '{}';
+
+  @override
+  Future<String> storeStatsJson() async => statsJson;
+
+  @override
+  String deviceInfoJson() => deviceJson;
 }

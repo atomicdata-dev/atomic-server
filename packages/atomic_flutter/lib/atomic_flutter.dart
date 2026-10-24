@@ -23,3 +23,4 @@ export 'src/device_stats.dart';
 export 'src/paired_device.dart';
 export 'src/peer_details_sheet.dart';
 export 'src/sync_widgets.dart';
+export 'src/this_device_card.dart';

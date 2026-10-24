@@ -9,6 +9,7 @@ import 'error_snack.dart';
 import 'server_settings_section.dart';
 import 'settings_backend.dart';
 import 'sync_widgets.dart';
+import 'this_device_card.dart';
 import 'theme.dart';
 
 /// What the panel knows, for the sections a host adds ([AtomicUserPanel]'s
@@ -80,7 +81,7 @@ class AtomicUserPanel extends StatefulWidget {
   final Widget Function(BuildContext context, AtomicUserInfo info)?
       accountBuilder;
 
-  /// This device's section; a row with its name by default.
+  /// This device's section; the [ThisDeviceCard] by default.
   final Widget Function(BuildContext context, AtomicUserInfo info)?
       thisDeviceBuilder;
 
@@ -460,14 +461,14 @@ class _AtomicUserPanelState extends State<AtomicUserPanel> {
         if (widget.accountBuilder != null)
           widget.accountBuilder!(context, info),
         widget.thisDeviceBuilder?.call(context, info) ??
-            SyncSection(title: 'This device', children: [
-              SyncRow(
-                icon: Icons.smartphone,
-                title: _deviceName.isEmpty ? 'This device' : _deviceName,
-                subtitle: 'Device name, only on this device. Tap to rename.',
-                onTap: _rename,
-              ),
-            ]),
+            ThisDeviceCard(
+              backend: _backend,
+              deviceName: _deviceName,
+              peerId: _peerId,
+              identity: _agent?.subject,
+              driveNames: _drives,
+              onRename: _rename,
+            ),
         // Servers, paired devices and the pairing code: the browser's
         // Devices list.
         ServerSettingsSection(backend: _backend, onServerChanged: _load),

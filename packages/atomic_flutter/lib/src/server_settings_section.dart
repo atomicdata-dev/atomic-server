@@ -18,6 +18,7 @@ import 'package:flutter/services.dart';
 import 'paired_device.dart';
 import 'peer_details_sheet.dart';
 import 'settings_backend.dart';
+import 'device_stats.dart';
 import 'server_info.dart';
 import 'server_url.dart';
 import 'sync_widgets.dart';
@@ -535,7 +536,7 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
                   else
                     'Paired',
                   if (peerSynced != null)
-                    'last synced ${_relativeTime(peerSynced)}',
+                    'last synced ${relativeTime(peerSynced)}',
                 ].join(' · '),
                 style: SyncText.caption(c),
               ),
@@ -724,7 +725,7 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
                       if (isLive)
                         'Up to date, syncing live'
                       else if (lastSynced != null)
-                        'Last synced ${_relativeTime(lastSynced)}'
+                        'Last synced ${relativeTime(lastSynced)}'
                       else
                         'Not synced yet',
                       if (relay.isNotEmpty)
@@ -788,19 +789,6 @@ class _ServerSettingsSectionState extends State<ServerSettingsSection> {
     } else {
       await _refreshPeers();
     }
-  }
-
-  /// Coarse "2m ago" / "3h ago" / "5d ago" for a unix-millis timestamp — enough
-  /// to tell "just now" from "days back" without a date library.
-  String _relativeTime(int millis) {
-    final delta =
-        DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(millis));
-
-    if (delta.inSeconds < 60) return 'just now';
-    if (delta.inMinutes < 60) return '${delta.inMinutes}m ago';
-    if (delta.inHours < 24) return '${delta.inHours}h ago';
-
-    return '${delta.inDays}d ago';
   }
 
   /// Show a QR code for another device to scan, then reload so the freshly

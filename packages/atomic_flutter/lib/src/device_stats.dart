@@ -139,3 +139,16 @@ class DeviceInfo {
 String shortId(String id) => id.length <= 22
     ? id
     : '${id.substring(0, 12)}…${id.substring(id.length - 6)}';
+
+/// Coarse "2m ago" / "3h ago" / "5d ago" for a unix-millis timestamp — enough
+/// to tell "just now" from "days back" without a date library.
+String relativeTime(int millis) {
+  final delta =
+      DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(millis));
+
+  if (delta.inSeconds < 60) return 'just now';
+  if (delta.inMinutes < 60) return '${delta.inMinutes}m ago';
+  if (delta.inHours < 24) return '${delta.inHours}h ago';
+
+  return '${delta.inDays}d ago';
+}

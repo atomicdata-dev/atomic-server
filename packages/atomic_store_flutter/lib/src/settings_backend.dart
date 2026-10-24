@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:atomic_flutter/atomic_flutter.dart' as ui;
 import 'package:atomic_store/atomic_store.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -101,6 +103,32 @@ class AtomicNodeSettings extends ui.AtomicSettingsBackend {
 
   @override
   Future<void> switchDrive(String drive) => node.drives.switchTo(drive);
+
+  @override
+  Future<ui.StoreStats?> storeStats({bool refresh = false}) async =>
+      ui.StoreStats.fromJson(jsonDecode(await node.storeStatsJson()));
+
+  @override
+  ui.DeviceInfo? deviceInfo() {
+    final Object? info;
+    try {
+      info = jsonDecode(node.deviceInfoJson());
+    } catch (_) {
+      return null;
+    }
+    if (info is! Map) return null;
+    return ui.DeviceInfo(
+        platform: switch (defaultTargetPlatform) {
+          TargetPlatform.android => 'Android',
+          TargetPlatform.iOS => 'iOS',
+          TargetPlatform.macOS => 'macOS',
+          TargetPlatform.windows => 'Windows',
+          TargetPlatform.linux => 'Linux',
+          TargetPlatform.fuchsia => 'Fuchsia',
+        },
+        appVersion: info['version'] as String?,
+        arch: info['arch'] as String?);
+  }
 
   @override
   Future<String?> getPeerId() async => node.peers.nodeId;

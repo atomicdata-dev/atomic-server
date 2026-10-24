@@ -322,4 +322,32 @@ void main() {
     await real(tester, () async {});
     expect(find.text('Garden'), findsOneWidget);
   });
+
+  testWidgets('this device shows its node id and the storage used',
+      (tester) async {
+    final node = newNode();
+    node.statsJson = '{"loro_bytes": 3145728, "blob_bytes": 1048576, '
+        '"resources": 1200, "disk_bytes": 8388608, "drives": ['
+        '{"subject": "did:ad:test:home", "name": "Home", "resources": 1200, '
+        '"bytes": 4194304}]}';
+    node.deviceJson = '{"version": "1.2.3", "os": "linux", "arch": "arm64"}';
+    await tester.runAsync(() => node.peers.start());
+    await openPanel(tester, node);
+    await real(tester, () async {});
+
+    expect(find.text('This device'), findsWidgets);
+    expect(find.text('Fake device'), findsOneWidget);
+    expect(find.text('Device name, only on this device. Tap to rename.'),
+        findsOneWidget);
+    // The node id, shortened, with a copy button that puts all of it away.
+    expect(find.text('ffffffffffff…ffffff'), findsOneWidget);
+    expect(find.text('Device ID'), findsOneWidget);
+    expect(find.byKey(const Key('copy-device-id')), findsOneWidget);
+    expect(find.text('1.2.3'), findsOneWidget);
+    // Storage used by atomic, and the file on disk.
+    expect(find.text('Storage'), findsOneWidget);
+    expect(find.textContaining('4.0 MB'), findsWidgets);
+    expect(find.text('On disk'), findsOneWidget);
+    expect(find.textContaining('8.0 MB'), findsOneWidget);
+  });
 }
