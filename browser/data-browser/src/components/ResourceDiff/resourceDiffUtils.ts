@@ -35,7 +35,7 @@ export function isPropEqual(
   return oldProp === newProp;
 }
 
-function getChangedProps(
+export function getChangedProps(
   oldResource: Resource | undefined,
   newResource: Resource,
 ): string[] {

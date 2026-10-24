@@ -149,6 +149,60 @@ describe('aiCall', () => {
   });
 });
 
+describe('reviewing the model’s edits', () => {
+  const held = ['a', 'b'];
+  const review = {
+    list: async () =>
+      held.map(subject => ({
+        subject,
+        title: subject,
+        summary: 'Changed name',
+      })),
+    accept: vi.fn(async (s?: string) => {
+      for (const x of s ? [s] : [...held]) held.splice(held.indexOf(x), 1);
+    }),
+    revert: vi.fn(async () => {
+      held.length = 0;
+    }),
+  };
+
+  it('lists, accepts one and reverts all, answering the edits left', async () => {
+    registerAiTools({ tools: {}, systemPrompt: async () => '', review });
+
+    const posted: Record<string, unknown>[] = [];
+    const post = (m: string) => posted.push(JSON.parse(m));
+    const left = (i: number) =>
+      (JSON.parse(posted[i].payload as string) as { subject: string }[]).map(
+        c => c.subject,
+      );
+
+    await aiCall(post, 1, 'changes');
+    await aiCall(post, 2, 'accept', ['a']);
+    await aiCall(post, 3, 'revert', []);
+
+    expect(left(0)).toEqual(['a', 'b']);
+    expect(review.accept).toHaveBeenCalledWith('a');
+    expect(left(1)).toEqual(['b']);
+    expect(review.revert).toHaveBeenCalledWith(undefined);
+    expect(left(2)).toEqual([]);
+  });
+
+  it('fails without a review', async () => {
+    registerAiTools({ tools: {}, systemPrompt: async () => '' });
+
+    const posted: Record<string, unknown>[] = [];
+
+    await aiCall(m => posted.push(JSON.parse(m)), 1, 'changes');
+
+    expect(posted[0].ok).toBe(false);
+  });
+
+  it('offers edit_document_resource, no longer refused', async () => {
+    expect(EMBED_TOOL_DENYLIST).not.toHaveProperty('edit_document_resource');
+    expect(EMBED_TOOL_DENYLIST).toHaveProperty('delete_resource');
+  });
+});
+
 describe('the denylist', () => {
   it('only names tools the web chat has, each with a reason', () => {
     const names = new Set<string>(Object.values(TOOL_NAMES));

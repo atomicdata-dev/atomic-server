@@ -148,10 +148,11 @@ declare global {
       /** Swipe-back needs of the page; the host hears changes. */
       setGestures(mode: 'default' | 'horizontal'): void;
       /** The app's AI chat (`?ai=1`): `aiCall(id, 'tools' | 'prompt' |
-       * 'run', args)` answers with an `aiResult` message (`aiTools.ts`). */
+       * 'run' | 'changes' | 'accept' | 'revert', args)` answers with an
+       * `aiResult` message (`aiTools.ts`). */
       aiCall(
         id: number,
-        method: 'tools' | 'prompt' | 'run',
+        method: 'tools' | 'prompt' | 'run' | 'changes' | 'accept' | 'revert',
         args?: unknown[],
       ): void;
     };

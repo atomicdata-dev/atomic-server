@@ -21,6 +21,9 @@ import {
 import { getDefaultAgent } from '../chunks/AI/AgentConfig';
 import { useTools } from '../chunks/AI/useTools';
 import { LazyMCPContext } from '../components/AI/MCP/LazyMCPProvider';
+import { LazyAIChangesContext } from '../components/AI/AIChanges/LazyAIChangesProvider';
+import { useAIChanges } from '../components/AIChangesContext';
+import { createAiReview } from './aiReview';
 import atomicAgentPrompt from '../chunks/AI/system-prompts/atomic-agent.md?raw';
 import {
   fillAgentPrompt,
@@ -51,9 +54,19 @@ export function AiToolsHost({ drive }: { drive?: string }): null {
   const settings = useSettings();
   const router = useRouter();
   const getDriveTree = useGetDriveStructure();
+
+  // The model's edits are held for the person to keep or undo, as in the web
+  // chat; the app lists and decides them (see `aiReview.ts`).
+  const { load: loadReview, isRuntimeReady: reviewReady } =
+    useContext(LazyAIChangesContext);
+  const aiChanges = useAIChanges();
+
+  useEffect(() => loadReview(), [loadReview]);
+
   const { tools: atomic } = useAtomicMCPTools({
     editModel: { id: 'app', provider: AIProvider.Hosted },
     hosted: true,
+    onResourceEdited: aiChanges.reportAIEdit,
   });
 
   // The agent's MCP tools (web search), as the web chat gets them.
@@ -87,7 +100,8 @@ export function AiToolsHost({ drive }: { drive?: string }): null {
   }, [router]);
 
   const current = settings.drive;
-  const ready = (!drive || current === drive) && (mcpLoaded || mcpGaveUp);
+  const ready =
+    (!drive || current === drive) && (mcpLoaded || mcpGaveUp) && reviewReady;
 
   useEffect(() => {
     if (!ready) return;
@@ -111,6 +125,7 @@ export function AiToolsHost({ drive }: { drive?: string }): null {
     registerAiTools({
       tools: all,
       uiEffects: () => effects.count,
+      review: createAiReview(store, aiChanges),
       systemPrompt: () =>
         fillAgentPrompt(atomicAgentPrompt, {
           drive: current,

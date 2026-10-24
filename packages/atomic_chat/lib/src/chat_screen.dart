@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'dart:async';
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, ValueListenable;
 import 'dart:math' as math;
 
 import 'app_top_bar.dart';
@@ -347,6 +347,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       final own = _ownBridge;
       if (own is WebViewToolBridge) own.close();
     }
+    _pending.dispose();
     _window.removeListener(_windowChanged);
     _window.dispose();
     _keeper.dispose();
@@ -366,6 +367,91 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   bool _ownBridgeOpenUntilDone = false;
+
+  /// The model's edits held for the person to keep or undo (see
+  /// [ReviewableBridge]). The page holding them lives only as long as this
+  /// screen, so leaving with some pending asks first ([_confirmLeave]);
+  /// the app going to the background changes nothing: the screen and the
+  /// page stay, and the bar is still there when the app is back.
+  final _pending = ValueNotifier<List<PendingChange>>(const []);
+
+  ReviewableBridge? get _reviewer {
+    final bridge = widget.toolBridge ?? _ownBridge;
+    return bridge is ReviewableBridge ? bridge as ReviewableBridge : null;
+  }
+
+  Future<void> _refreshPending() async {
+    final reviewer = _reviewer;
+    if (reviewer == null) return;
+    try {
+      final held = await reviewer.pendingChanges();
+      if (mounted) _pending.value = held;
+    } catch (_) {}
+  }
+
+  /// Keeps ([keep]) or undoes the edit of [subject], or all of them.
+  Future<void> _decide({required bool keep, String? subject}) async {
+    final reviewer = _reviewer;
+    if (reviewer == null) return;
+    try {
+      final left = keep
+          ? await reviewer.acceptChanges(subject)
+          : await reviewer.revertChanges(subject);
+      if (mounted) _pending.value = left;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+            content: Text(
+                'Could not ${keep ? 'keep' : 'undo'} the changes. Try again.')));
+      }
+    }
+  }
+
+  /// Back with changes pending: they are lost with the page, so ask.
+  Future<void> _confirmLeave() async {
+    final choice = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(_pendingTitle(_pending.value.length)),
+        content: const Text(
+            'Keep them to save them, or undo them. They cannot wait until '
+            'you come back.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Stay')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Undo all')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Keep all')),
+        ],
+      ),
+    );
+    if (choice == null || !mounted) return;
+    await _decide(keep: choice);
+    if (mounted && _pending.value.isEmpty) Navigator.maybePop(context);
+  }
+
+  static String _pendingTitle(int n) =>
+      n == 1 ? '1 change by AI' : '$n changes by AI';
+
+  /// The list of changes, each with Keep and Undo.
+  void _openReview() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheet) => _ReviewSheet(
+        pending: _pending,
+        onDecide: (keep, subject) => _decide(keep: keep, subject: subject),
+        onOpen: (subject) {
+          Navigator.pop(sheet);
+          _openLink(subject);
+        },
+      ),
+    );
+  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -1137,6 +1223,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   (p) => p is ToolPart && p.toolCallId == part.toolCallId);
               at < 0 ? parts.add(part) : parts[at] = part;
               _showNow(parts);
+              unawaited(_refreshPending());
           }
         },
         onError: (Object e, StackTrace st) {
@@ -1195,6 +1282,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         });
       }
       lap('done');
+      unawaited(_refreshPending());
       _live?.parts.value = List.of(parts);
       // The run is over once its answer is written (or given up on).
       _persistTail.whenComplete(() {
@@ -1288,20 +1376,40 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     return ChatTextScope(
         child: SectionBack(
             section: HomeSection.chats,
-            child: Scaffold(
-              backgroundColor: c.bgBody,
-              appBar: AppTopBar(
-                compact: true,
-                title: _headerTitle,
-                titleWidget: ChatHeader(
-                  title: _headerTitle,
-                  subtitle: 'AI assistant',
-                  icon: Icons.auto_awesome_outlined,
-                ),
-              ),
-              body: ListAndField(
-                  fullWidthField: true, list: _list(c), field: _composer(c)),
-            )));
+            child: ValueListenableBuilder<List<PendingChange>>(
+                valueListenable: _pending,
+                builder: (context, pending, scaffold) => PopScope(
+                      canPop: pending.isEmpty,
+                      onPopInvokedWithResult: (didPop, _) {
+                        if (!didPop) _confirmLeave();
+                      },
+                      child: scaffold!,
+                    ),
+                child: Scaffold(
+                  backgroundColor: c.bgBody,
+                  appBar: AppTopBar(
+                    compact: true,
+                    title: _headerTitle,
+                    titleWidget: ChatHeader(
+                      title: _headerTitle,
+                      subtitle: 'AI assistant',
+                      icon: Icons.auto_awesome_outlined,
+                    ),
+                  ),
+                  body: ListAndField(
+                      fullWidthField: true,
+                      list: _list(c),
+                      field: Column(mainAxisSize: MainAxisSize.min, children: [
+                        ValueListenableBuilder<List<PendingChange>>(
+                            valueListenable: _pending,
+                            builder: (context, pending, _) => pending.isEmpty
+                                ? const SizedBox.shrink()
+                                : _ReviewBar(
+                                    count: pending.length,
+                                    onReview: _openReview)),
+                        _composer(c),
+                      ])),
+                ))));
   }
 
   Widget _list(AppColors c) {
@@ -2408,6 +2516,95 @@ class _VoiceSheetState extends State<_VoiceSheet> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// "N changes by AI" above the composer, with Review.
+class _ReviewBar extends StatelessWidget {
+  final int count;
+  final VoidCallback onReview;
+  const _ReviewBar({required this.count, required this.onReview});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
+      decoration: BoxDecoration(
+          color: c.bgBody, border: Border(top: BorderSide(color: c.border))),
+      child: Row(children: [
+        Icon(Icons.auto_awesome_outlined, size: 18, color: c.textSecondary),
+        const SizedBox(width: 8),
+        Expanded(
+            child: Text(_ChatScreenState._pendingTitle(count),
+                style: TextStyle(color: c.textPrimary))),
+        TextButton(onPressed: onReview, child: const Text('Review')),
+      ]),
+    );
+  }
+}
+
+/// The changes held for review: each resource with Keep and Undo, and Keep
+/// all / Undo all. Closes when none are left.
+class _ReviewSheet extends StatelessWidget {
+  final ValueListenable<List<PendingChange>> pending;
+  final void Function(bool keep, String? subject) onDecide;
+  final void Function(String subject) onOpen;
+  const _ReviewSheet(
+      {required this.pending, required this.onDecide, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    return ValueListenableBuilder<List<PendingChange>>(
+      valueListenable: pending,
+      builder: (context, changes, _) {
+        if (changes.isEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) Navigator.maybePop(context);
+          });
+        }
+        return SafeArea(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+              child: Row(children: [
+                Expanded(
+                    child: Text(_ChatScreenState._pendingTitle(changes.length),
+                        style: TextStyle(
+                            color: c.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600))),
+                TextButton(
+                    onPressed: () => onDecide(false, null),
+                    child: const Text('Undo all')),
+                FilledButton(
+                    onPressed: () => onDecide(true, null),
+                    child: const Text('Keep all')),
+              ]),
+            ),
+            Flexible(
+              child: ListView(shrinkWrap: true, children: [
+                for (final change in changes)
+                  ResourceRow(
+                    title: change.title,
+                    detail: change.summary.isEmpty ? null : change.summary,
+                    onTap: () => onOpen(change.subject),
+                    trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      TextButton(
+                          onPressed: () => onDecide(false, change.subject),
+                          child: const Text('Undo')),
+                      TextButton(
+                          onPressed: () => onDecide(true, change.subject),
+                          child: const Text('Keep')),
+                    ]),
+                  ),
+              ]),
+            ),
+          ]),
+        );
+      },
     );
   }
 }

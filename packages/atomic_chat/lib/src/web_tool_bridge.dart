@@ -56,6 +56,57 @@ abstract class WebToolBridge {
   Future<String> run(String name, Map<String, dynamic> args);
 }
 
+/// An edit of the model that is held for the person to keep or undo.
+class PendingChange {
+  final String subject;
+  final String title;
+
+  /// A short line on what changed, e.g. `Changed name, text`.
+  final String summary;
+
+  const PendingChange(
+      {required this.subject, required this.title, this.summary = ''});
+
+  /// `{subject, title, summary}`; null when [json] is no change.
+  static PendingChange? fromJson(Object? json) {
+    if (json is! Map || json['subject'] is! String) return null;
+    final subject = json['subject'] as String;
+    final title = json['title'];
+    final summary = json['summary'];
+    return PendingChange(
+      subject: subject,
+      title: title is String && title.isNotEmpty ? title : subject,
+      summary: summary is String ? summary : '',
+    );
+  }
+}
+
+/// A [WebToolBridge] whose page holds the model's edits for review, as the
+/// web chat does, instead of saving them at once. Each call answers the
+/// edits still held.
+abstract class ReviewableBridge {
+  /// The edits held now.
+  Future<List<PendingChange>> pendingChanges();
+
+  /// Saves the edits of [subject], or all of them.
+  Future<List<PendingChange>> acceptChanges([String? subject]);
+
+  /// Undoes the edits of [subject], or all of them.
+  Future<List<PendingChange>> revertChanges([String? subject]);
+}
+
+List<PendingChange> _parseChanges(String json) {
+  final decoded = jsonDecode(json);
+  final changes = <PendingChange>[];
+  if (decoded is List) {
+    for (final c in decoded) {
+      final change = PendingChange.fromJson(c);
+      if (change != null) changes.add(change);
+    }
+  }
+  return changes;
+}
+
 /// Async calls to the page over its JavaScript channel, as the page's
 /// `atomicEmbed.aiCall(id, method, args)` answers them: a message
 /// `{method: 'aiResult', callId, ok, payload}` on the channel. (A script run
@@ -124,7 +175,7 @@ class AiCallChannel {
 
 /// A [WebToolBridge] over an [AiCallChannel]. The tool list is kept for the
 /// session ([invalidate] when the drive changes).
-class ChannelToolBridge implements WebToolBridge {
+class ChannelToolBridge implements WebToolBridge, ReviewableBridge {
   ChannelToolBridge(this.channel);
 
   final AiCallChannel channel;
@@ -161,13 +212,25 @@ class ChannelToolBridge implements WebToolBridge {
   @override
   Future<String> run(String name, Map<String, dynamic> args) =>
       channel.call('run', [name, jsonEncode(args)]);
+
+  @override
+  Future<List<PendingChange>> pendingChanges() async =>
+      _parseChanges(await channel.call('changes', const []));
+
+  @override
+  Future<List<PendingChange>> acceptChanges([String? subject]) async =>
+      _parseChanges(await channel.call('accept', [subject]));
+
+  @override
+  Future<List<PendingChange>> revertChanges([String? subject]) async =>
+      _parseChanges(await channel.call('revert', [subject]));
 }
 
 /// The web app's tools in a hidden web view: the embedded page loaded as
 /// `?ai=1&drive=…`, which shows nothing and only offers its tools. It reads
 /// and writes this device's store through [api], like any embedded page. The
 /// page loads on the first use.
-class WebViewToolBridge implements WebToolBridge {
+class WebViewToolBridge implements WebToolBridge, ReviewableBridge {
   WebViewToolBridge({required this.api, required this.drive});
 
   final AssistantApi api;
@@ -261,7 +324,20 @@ class WebViewToolBridge implements WebToolBridge {
   Future<String> run(String name, Map<String, dynamic> args) async =>
       (await _open()).run(name, args);
 
-  /// Drops the page.
+  // A page that never opened holds nothing.
+  @override
+  Future<List<PendingChange>> pendingChanges() async =>
+      await _bridge?.pendingChanges() ?? const [];
+
+  @override
+  Future<List<PendingChange>> acceptChanges([String? subject]) async =>
+      await _bridge?.acceptChanges(subject) ?? const [];
+
+  @override
+  Future<List<PendingChange>> revertChanges([String? subject]) async =>
+      await _bridge?.revertChanges(subject) ?? const [];
+
+  /// Drops the page. Edits it still holds are lost (see [ChatScreen]).
   void close() {
     _closed = true;
     _bridge?.channel.close();

@@ -15,10 +15,15 @@
  *   aiCall(id, method, args)   one of these, answered on the app's channel:
  *                              `{method:'aiResult', callId, ok, payload}`
  *
+ * Edits of the model are held for review, as in the web chat (`aiReview.ts`):
+ * `aiCall` also takes `changes` (the held edits), `accept` and `revert` (one
+ * subject, or all when none is given); each answers the edits still held.
+ *
  * Tools that need the web app's own screen are left out ({@link
  * EMBED_TOOL_DENYLIST}): the app has no page to navigate, no dialog to open.
  */
 import { asSchema } from 'ai';
+import type { AiReview } from './aiReview';
 
 /** What the page needs of an AI SDK tool. */
 export interface EmbedAiTool {
@@ -51,8 +56,6 @@ export const EMBED_TOOL_DENYLIST: Record<string, string> = {
   setup_app:
     'Opens the app-setup form (a dialog) for the person to complete; the app has none.',
   list_app_setups: 'Only describes what setup_app opens; useless without it.',
-  edit_document_resource:
-    'Runs a second model call through the web app’s own AI settings (model, key); the app’s account AI is not wired into the page.',
   create_skill:
     'Saves a skill in the web view’s local storage, which the app never reads back.',
   discover_integrations:
@@ -74,6 +77,8 @@ export interface AiToolsSource {
    * tool that did is reported as failed (see {@link aiRunTool}).
    */
   uiEffects?(): number;
+  /** The model's edits held for the person to keep or undo. */
+  review?: AiReview;
 }
 
 let source: AiToolsSource | undefined;
@@ -213,6 +218,23 @@ export async function aiRunTool(
   }
 }
 
+/** `changes`, `accept` or `revert`: the edits still held afterwards, as JSON. */
+async function reviewCall(
+  method: 'changes' | 'accept' | 'revert',
+  arg: unknown,
+): Promise<string> {
+  const review = (await ready()).review;
+
+  if (!review) throw new Error('Reviewing edits is not available.');
+
+  const subject = typeof arg === 'string' && arg ? arg : undefined;
+
+  if (method === 'accept') await review.accept(subject);
+  if (method === 'revert') await review.revert(subject);
+
+  return JSON.stringify(await review.list());
+}
+
 /**
  * Answers an async call of the app on its channel: `fn` runs, and its result
  * (or failure) goes back as `{method:'aiResult', callId, ok, payload}`, as
@@ -221,7 +243,7 @@ export async function aiRunTool(
 export async function aiCall(
   post: (message: string) => void,
   callId: number,
-  method: 'tools' | 'prompt' | 'run',
+  method: 'tools' | 'prompt' | 'run' | 'changes' | 'accept' | 'revert',
   args: unknown[] = [],
 ): Promise<void> {
   let ok = true;
@@ -238,6 +260,13 @@ export async function aiCall(
       case 'run':
         payload = await aiRunTool(String(args[0]), String(args[1] ?? ''));
         break;
+
+      case 'changes':
+      case 'accept':
+      case 'revert':
+        payload = await reviewCall(method, args[0]);
+        break;
+
       default:
         throw new Error(`Unknown AI call ${String(method)}`);
     }

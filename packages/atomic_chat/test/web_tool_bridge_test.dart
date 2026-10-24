@@ -378,6 +378,38 @@ void main() {
     });
   });
 
+  group('ChannelToolBridge review', () {
+    test('lists, accepts and reverts through changes/accept/revert', () async {
+      final calls = <String>[];
+      late final AiCallChannel channel;
+      channel = AiCallChannel(runScript: (js) async {
+        calls.add(js);
+        final id = int.parse(RegExp(r'aiCall\((\d+)').firstMatch(js)![1]!);
+        channel.handleMessage(jsonEncode({
+          'method': 'aiResult',
+          'callId': id,
+          'ok': true,
+          'payload': jsonEncode([
+            {'subject': 'did:ad:a', 'title': 'Note', 'summary': 'Changed name'},
+            {'subject': 'did:ad:b'},
+            'junk',
+          ]),
+        }));
+      });
+      final bridge = ChannelToolBridge(channel);
+      final held = await bridge.pendingChanges();
+      expect(held.map((c) => (c.subject, c.title, c.summary)), [
+        ('did:ad:a', 'Note', 'Changed name'),
+        ('did:ad:b', 'did:ad:b', ''),
+      ]);
+      await bridge.acceptChanges('did:ad:a');
+      await bridge.revertChanges();
+      expect(calls[0], contains('"changes",[]'));
+      expect(calls[1], contains('"accept",["did:ad:a"]'));
+      expect(calls[2], contains('"revert",[null]'));
+    });
+  });
+
   group('WebViewToolBridge', () {
     test('loads the page as ?ai=1&drive=… and answers its store calls',
         () async {
