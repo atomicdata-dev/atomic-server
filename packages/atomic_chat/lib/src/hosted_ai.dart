@@ -183,6 +183,10 @@ class HostedAi {
   /// no internet.
   static const webSearchTool = 'web_search_exa';
 
+  /// How long an answer waits for the page to be read again when its tools
+  /// came without [webSearchTool] (the search server connects later).
+  static Duration webRetryGrace = const Duration(seconds: 3);
+
   /// The note shown when the web app's tools or its search are not there.
   static const webUnavailableNotice =
       'Web tools and search are unavailable for this answer.';
@@ -318,13 +322,21 @@ class HostedAi {
         // Not ready: wait a moment at most (a warm page answers at once).
         web = await webState.future.timeout(webGrace, onTimeout: () => null);
       }
+      if (web != null && !_hasSearch(web)) {
+        // The page adds web search once its MCP server connects, which can
+        // be after it was first read: read it again before going without.
+        _refreshWeb(bridge!);
+        final fresh = await webState.future
+            .timeout(webRetryGrace, onTimeout: () => null);
+        if (fresh != null) web = fresh;
+      }
       if (web != null) {
         tools = _mergeTools(web, builtIn);
         webPrompt = web.prompt;
         usedWeb = true;
         webReady = true;
       }
-      if (web == null || !web.tools.any((t) => t.name == webSearchTool)) {
+      if (web == null || !_hasSearch(web)) {
         yield const AiNotice(webUnavailableNotice);
       }
     }
@@ -463,6 +475,9 @@ class HostedAi {
       }
     }
   }
+
+  static bool _hasSearch(_WebSetup web) =>
+      web.tools.any((t) => t.name == webSearchTool);
 
   static List<AiTool> _mergeTools(_WebSetup web, List<AiTool> builtIn) {
     final names = {for (final t in web.tools) t.name};

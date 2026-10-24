@@ -32,8 +32,9 @@ Map<String, dynamic> _call(String name) => {
 
 /// A bridge whose page takes [boot] to come up.
 class _SlowBridge implements WebToolBridge {
-  _SlowBridge(this.boot);
+  _SlowBridge(this.boot, {this.names = const ['web_tool']});
   final Completer<void> boot;
+  List<String> names;
   int listed = 0;
   final ran = <String>[];
 
@@ -41,11 +42,12 @@ class _SlowBridge implements WebToolBridge {
   Future<List<ToolDef>> listTools() async {
     listed++;
     await boot.future;
-    return const [
-      ToolDef(
-          name: 'web_tool',
-          description: 'd',
-          parameters: {'type': 'object', 'properties': {}}),
+    return [
+      for (final n in names)
+        ToolDef(
+            name: n,
+            description: 'd',
+            parameters: const {'type': 'object', 'properties': {}}),
     ];
   }
 
@@ -223,7 +225,8 @@ void main() {
     test('warmWeb reads the page once; the answer then finds it ready',
         () async {
       final boot = Completer<void>()..complete();
-      final bridge = _SlowBridge(boot);
+      final bridge =
+          _SlowBridge(boot, names: ['web_tool', HostedAi.webSearchTool]);
       final seen = <List<String>>[];
       final ai = HostedAi(
         status: {'enabled': true, 'consent': true, 'model': 'm'},
@@ -244,10 +247,34 @@ void main() {
       await ai.run(h, bridge: bridge).toList();
       await ai.run(h, bridge: bridge).toList();
       expect(seen, [
-        ['web_tool'],
-        ['web_tool']
+        ['web_tool', HostedAi.webSearchTool],
+        ['web_tool', HostedAi.webSearchTool]
       ]);
       expect(bridge.listed, 1);
+    });
+
+    test('a page read before its search connected is read again', () async {
+      final boot = Completer<void>()..complete();
+      final bridge = _SlowBridge(boot);
+      final seen = <List<String>>[];
+      final ai = HostedAi(
+        status: {'enabled': true, 'consent': true, 'model': 'm'},
+        completions: (messages, model, tools) {
+          seen.add([for (final t in tools ?? const []) t['function']['name']]);
+          return Stream.value(_text('x'));
+        },
+        enable: () async => {},
+      );
+      ai.warmWeb(bridge);
+      await Future<void>.delayed(Duration.zero);
+      // The search server connected after the first read.
+      bridge.names = ['web_tool', HostedAi.webSearchTool];
+      final events = await ai.run([
+        ChatEntry.text((id: 'u', role: 'user', text: 'a', createdAt: 0))
+      ], bridge: bridge).toList();
+      expect(seen.single, ['web_tool', HostedAi.webSearchTool]);
+      expect(events.whereType<AiNotice>(), isEmpty);
+      expect(bridge.listed, 2);
     });
   });
 }
