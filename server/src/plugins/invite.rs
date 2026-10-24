@@ -3,8 +3,7 @@ use atomic_lib::{
     endpoints::{Endpoint, HandleGetContext, HandlePostContext},
     errors::AtomicResult,
     storelike::ResourceResponse,
-    urls,
-    Resource, Storelike, Value,
+    urls, Resource, Storelike, Value,
 };
 
 use crate::invite_token::{acceptance_lock, InviteToken, InviteTokenExt};

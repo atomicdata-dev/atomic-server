@@ -1257,7 +1257,12 @@ async fn invite_pair(prefix: &str) -> InvitePair {
     }
 }
 
-fn token_for(pair: &InvitePair, signer: &crate::agents::Agent, write: bool, expires: i64) -> String {
+fn token_for(
+    pair: &InvitePair,
+    signer: &crate::agents::Agent,
+    write: bool,
+    expires: i64,
+) -> String {
     crate::invite_token::InviteToken::new(pair.drive.clone(), write, expires, signer, None)
         .unwrap()
         .encode()
@@ -1302,10 +1307,9 @@ async fn e2e_invite_redeemed_at_the_inviters_device_lets_the_invitee_sync() {
         "a read invite grants no write"
     );
 
-    let imported =
-        peer::sync_drive_with_peer_using(&p.ep_b, &p.node_id_a, &p.drive, &p.db_b, true)
-            .await
-            .expect("Bob syncs the drive after the invite");
+    let imported = peer::sync_drive_with_peer_using(&p.ep_b, &p.node_id_a, &p.drive, &p.db_b, true)
+        .await
+        .expect("Bob syncs the drive after the invite");
     assert!(imported > 0);
     let doc = p.db_b.get_resource(&p.doc.as_str().into()).await.unwrap();
     assert_eq!(
@@ -1360,14 +1364,9 @@ async fn e2e_a_tampered_invite_is_refused() {
     let token = token_for(&p, &p.agent_a, false, in_an_hour());
     let mut forged = crate::invite_token::InviteToken::decode(&token).unwrap();
     forged.write = true;
-    let err = invite::redeem_at(
-        &p.ep_b,
-        &p.db_b,
-        &p.node_id_a,
-        &forged.encode().unwrap(),
-    )
-    .await
-    .expect_err("an edited token must not verify");
+    let err = invite::redeem_at(&p.ep_b, &p.db_b, &p.node_id_a, &forged.encode().unwrap())
+        .await
+        .expect_err("an edited token must not verify");
     assert!(err.message.contains("damaged"), "{err}");
     assert!(!lists(&p.db_a, &p.drive, crate::urls::WRITE, &p.agent_b).await);
 }

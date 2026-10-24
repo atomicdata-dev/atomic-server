@@ -60,8 +60,8 @@ pub(crate) async fn serve(payload: &[u8], store: &Db, via: &ForAgent) -> Vec<Vec
         ForAgent::AgentSubject(s) => s.to_string(),
         _ => return refuse("Sign in before you open an invite."),
     };
-    let Some(token) = protocol::decode_invite(payload)
-        .and_then(|raw| InviteToken::decode(&raw).ok())
+    let Some(token) =
+        protocol::decode_invite(payload).and_then(|raw| InviteToken::decode(&raw).ok())
     else {
         return refuse("This invite is damaged. Ask for a new one.");
     };
@@ -203,10 +203,7 @@ pub async fn redeem_at(
     let read = async {
         let mut authed = false;
         loop {
-            let len = recv
-                .read_u32()
-                .await
-                .map_err(|_| unreached(OFFLINE))? as usize;
+            let len = recv.read_u32().await.map_err(|_| unreached(OFFLINE))? as usize;
             let cap = if authed {
                 protocol::IROH_FRAME_MAX_BYTES
             } else {
