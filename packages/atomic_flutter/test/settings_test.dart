@@ -14,6 +14,7 @@ class TestBackend extends AtomicSettingsBackend {
   Completer<List<String>>? pending;
   bool signingIn = false;
   bool inviting = false;
+  bool failInvite = false;
   String? signedInWith;
   @override
   Future<String> Function(String secret)? get signInWithSecret => signingIn
@@ -24,8 +25,10 @@ class TestBackend extends AtomicSettingsBackend {
       : null;
   @override
   Future<String> Function({required bool canEdit})? get inviteLink => inviting
-      ? ({required canEdit}) async =>
-          'https://invite.example/${canEdit ? 'edit' : 'read'}'
+      ? ({required canEdit}) async {
+          if (failInvite) throw StateError('Sharing needs a server.');
+          return 'https://invite.example/${canEdit ? 'edit' : 'read'}';
+        }
       : null;
   @override
   Future<AtomicIdentity?> getActiveAgent() async =>
@@ -192,6 +195,67 @@ void main() {
     await tester.tap(find.text('Copy invite link'));
     await tester.pumpAndSettle();
     expect(find.text('https://invite.example/edit'), findsOneWidget);
+  });
+
+  Future<void> openDialog(WidgetTester tester, TestBackend backend) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showAtomicUserDialog(context, backend: backend),
+            child: const Text('Open'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+  }
+
+  void expectOnceInDialog(WidgetTester tester, String text) {
+    final shown = find.textContaining(text);
+    expect(shown, findsOneWidget);
+    expect(find.descendant(of: find.byType(Dialog), matching: shown),
+        findsOneWidget);
+    expect(find.textContaining('Bad state'), findsNothing);
+  }
+
+  testWidgets('a failed invite shows once, inside the dialog, without prefix',
+      (tester) async {
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final backend = TestBackend()
+      ..inviting = true
+      ..failInvite = true;
+    await openDialog(tester, backend);
+    await tester.tap(find.text('Invite someone'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Copy invite link'));
+    await tester.pumpAndSettle();
+    expectOnceInDialog(tester, 'Could not make the link: Sharing needs');
+  });
+
+  testWidgets('a panel snack in the dialog stays in it, not on the host',
+      (tester) async {
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final backend = TestBackend()..failSwitch = true;
+    await openDialog(tester, backend);
+    await tester.tap(find.text('Workspace'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Drawings'));
+    await tester.pumpAndSettle();
+    expectOnceInDialog(tester, 'Could not switch workspace: Drive switch');
+    expect(find.byType(SnackBar), findsOneWidget);
+  });
+
+  test('cleanError drops Dart exception prefixes', () {
+    expect(cleanError('Bad state: x'), 'x');
+    expect(cleanError('Could not: Exception: x'), 'Could not: x');
   });
 
   testWidgets('closing during load does not update a disposed panel',

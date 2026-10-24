@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'click_cursor.dart';
+import 'error_snack.dart';
 import 'package:flutter/services.dart';
 
 /// Error or diagnostic text a person can select and copy for a bug report:
@@ -42,9 +43,11 @@ class _ErrorTextState extends State<ErrorText> {
   bool _copied = false;
   Timer? _timer;
 
+  String get _text => cleanError(widget.text);
+
   bool get _long =>
-      widget.text.length > 280 ||
-      '\n'.allMatches(widget.text).length >= widget.collapsedLines;
+      _text.length > 280 ||
+      '\n'.allMatches(_text).length >= widget.collapsedLines;
 
   @override
   void dispose() {
@@ -53,7 +56,7 @@ class _ErrorTextState extends State<ErrorText> {
   }
 
   Future<void> _copy() async {
-    await Clipboard.setData(ClipboardData(text: widget.text));
+    await Clipboard.setData(ClipboardData(text: _text));
     if (!mounted) return;
     setState(() => _copied = true);
     _timer?.cancel();
@@ -71,7 +74,7 @@ class _ErrorTextState extends State<ErrorText> {
       mainAxisSize: MainAxisSize.min,
       children: [
         SelectableText(
-          widget.text,
+          _text,
           textAlign: widget.textAlign,
           maxLines: collapsed ? widget.collapsedLines : null,
           style: TextStyle(color: color, fontSize: widget.fontSize)

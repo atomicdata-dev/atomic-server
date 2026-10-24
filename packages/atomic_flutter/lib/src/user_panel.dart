@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'copyable_error.dart';
 import 'device_stats.dart';
 import 'error_snack.dart';
 import 'server_settings_section.dart';
@@ -350,6 +351,7 @@ class _AtomicUserPanelState extends State<AtomicUserPanel> {
       builder: (ctx) {
         var canEdit = false;
         String? copied;
+        String? failed;
         return StatefulBuilder(
           builder: (ctx, setInner) => AlertDialog(
             title: const Text('Invite to this workspace'),
@@ -375,6 +377,11 @@ class _AtomicUserPanelState extends State<AtomicUserPanel> {
                   const Text(
                       'Link copied. Anyone with it can open this workspace.'),
                 ],
+                // Inline: this dialog sits above the panel's own messenger.
+                if (failed != null) ...[
+                  const SizedBox(height: SyncGap.m),
+                  ErrorText('Could not make the link: $failed'),
+                ],
               ],
             ),
             actions: [
@@ -387,9 +394,12 @@ class _AtomicUserPanelState extends State<AtomicUserPanel> {
                     final url = await link(canEdit: canEdit);
                     await Clipboard.setData(ClipboardData(text: url));
                     if (!ctx.mounted) return;
-                    setInner(() => copied = url);
+                    setInner(() {
+                      copied = url;
+                      failed = null;
+                    });
                   } catch (e) {
-                    if (ctx.mounted) _fail('Could not make the link', e);
+                    if (ctx.mounted) setInner(() => failed = '$e');
                   }
                 },
                 child: const Text('Copy invite link'),
@@ -699,16 +709,20 @@ Future<void> showAtomicUserDialog(
   Future<void> Function(BuildContext context, AtomicIdentity agent)?
       openProfile,
 }) {
-  Widget page(BuildContext ctx) => Scaffold(
-        backgroundColor: syncColors(ctx).bgBody,
-        appBar: AppBar(
-          title: const Text('User'),
+  // Its own messenger: the panel's snacks stay in this route, above its
+  // barrier, and never reach the host app's scaffold behind it.
+  Widget page(BuildContext ctx) => ScaffoldMessenger(
+        child: Scaffold(
           backgroundColor: syncColors(ctx).bgBody,
-        ),
-        body: AtomicUserPanel(
-          backend: backend,
-          avatarBuilder: avatarBuilder,
-          openProfile: openProfile,
+          appBar: AppBar(
+            title: const Text('User'),
+            backgroundColor: syncColors(ctx).bgBody,
+          ),
+          body: AtomicUserPanel(
+            backend: backend,
+            avatarBuilder: avatarBuilder,
+            openProfile: openProfile,
+          ),
         ),
       );
   if (MediaQuery.sizeOf(context).width < 700) {
