@@ -70,6 +70,23 @@ pub async fn package_bytes(db: &Db, package: &str) -> AtomicResult<Vec<u8>> {
         .ok_or_else(|| AtomicError::from(format!("package blob {package} is not on this node")))
 }
 
+/// One file of a release's package (`ui.js`, `ui.css`), when it has one.
+pub async fn package_file(db: &Db, release_id: &str, name: &str) -> AtomicResult<Option<Vec<u8>>> {
+    let Some(package) = db.get_plugin_release(release_id)?.package else {
+        return Ok(None);
+    };
+    let bytes = package_bytes(db, &package).await?;
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes))
+        .map_err(|e| AtomicError::from(format!("package is not a zip archive: {e}")))?;
+    let Ok(mut file) = zip.by_name(name) else {
+        return Ok(None);
+    };
+    let mut content = Vec::new();
+    std::io::Read::read_to_end(&mut file, &mut content)
+        .map_err(|e| AtomicError::from(format!("Could not read {name}: {e}")))?;
+    Ok(Some(content))
+}
+
 fn package_hash(package: &str) -> AtomicResult<Vec<u8>> {
     match hex::decode(package) {
         Ok(hash) if hash.len() == 32 => Ok(hash),
