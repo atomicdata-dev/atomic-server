@@ -94,7 +94,9 @@ export function useAppMenuItems(): {
         setSideBarLocked(true);
         requestAnimationFrame(() =>
           document
-            .querySelector<HTMLElement>('button[title="Switch Drive"]')
+            .querySelector<HTMLElement>(
+              '[data-testid="sidebar-drive-switcher"]',
+            )
             ?.click(),
         );
       },

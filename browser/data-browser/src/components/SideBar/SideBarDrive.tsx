@@ -220,6 +220,7 @@ function DriveSwitcherTrigger({
       onClick={onClick}
       ref={ref}
       title='Switch Drive'
+      data-testid='sidebar-drive-switcher'
     >
       {showSidebarIcons && (
         <DriveGlyph aria-hidden>
