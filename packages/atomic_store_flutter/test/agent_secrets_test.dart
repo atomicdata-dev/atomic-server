@@ -13,4 +13,21 @@ void main() {
     await s.delete('k');
     expect(await s.read('k'), isNull);
   });
+
+  test('secret key depends on the path only without a keychain group', () {
+    expect(AtomicFlutter.agentSecretKey('/a'), 'atomic_agent:/a');
+    expect(AtomicFlutter.agentSecretKey('/a', keychainGroup: 'g'),
+        AtomicFlutter.agentSecretKey('/b', keychainGroup: 'g'));
+    expect(AtomicFlutter.agentSecretKey('/a', keychainGroup: 'g'),
+        isNot(AtomicFlutter.agentSecretKey('/a')));
+  });
+
+  test('keychainGroup together with a custom secretStore is refused', () {
+    expect(
+        () => AtomicFlutter.open(
+            path: '/x',
+            secretStore: MemoryAgentSecrets(),
+            keychainGroup: 'g'),
+        throwsArgumentError);
+  });
 }

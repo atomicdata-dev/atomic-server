@@ -18,11 +18,26 @@ abstract interface class AgentSecretStore {
 
 /// The default: the OS keychain / keystore (`flutter_secure_storage`).
 /// On macOS it uses the login keychain, which needs no entitlement.
+///
+/// With a [keychainGroup], iOS and macOS keep the secret in that shared
+/// keychain access group, so every app of the same team that names the same
+/// group reads the same agent. On macOS this switches to the data protection
+/// keychain, which needs the `keychain-access-groups` entitlement and a fixed
+/// signing team. Android and the other platforms have no shared keystore: the
+/// secret stays per app there and [keychainGroup] is ignored.
 class SecureAgentSecrets implements AgentSecretStore {
-  const SecureAgentSecrets();
+  const SecureAgentSecrets({this.keychainGroup});
 
-  static const _storage = FlutterSecureStorage(
-      mOptions: MacOsOptions(useDataProtectionKeyChain: false));
+  /// The keychain access group, for example `ABCDE12345.io.example.shared`
+  /// (team id prefix included), or null for the per-app keychain.
+  final String? keychainGroup;
+
+  FlutterSecureStorage get _storage => FlutterSecureStorage(
+        iOptions: IOSOptions(groupId: keychainGroup),
+        mOptions: MacOsOptions(
+            groupId: keychainGroup,
+            useDataProtectionKeyChain: keychainGroup != null),
+      );
 
   /// A refused or cancelled keychain prompt is a [StoreException]: making a
   /// new agent instead would quietly split the person in two.

@@ -24,6 +24,12 @@ import '../bridge/api/simple/store.dart' as bridge_store;
 /// await doc.save();
 /// ```
 abstract final class AtomicFlutter {
+  /// The key the agent secret is stored under: per [path] normally, one fixed
+  /// key when a [keychainGroup] is used so that apps with different paths
+  /// find the same secret.
+  static String agentSecretKey(String path, {String? keychainGroup}) =>
+      keychainGroup == null ? 'atomic_agent:$path' : 'atomic_agent';
+
   static Future<void>? _init;
 
   /// Loads the native library. Call it once before anything else (after
@@ -64,17 +70,35 @@ abstract final class AtomicFlutter {
   /// `node.peers.start()` yourself to see it. Pass `false` for an app that
   /// stays local until the person asks.
   ///
+  /// With a [keychainGroup] (iOS and macOS), the default secret store keeps the
+  /// agent in that shared keychain access group under the fixed key
+  /// `atomic_agent`, not one derived from [path]. Apps of the same team that
+  /// pass the same group then share ONE agent while each keeps its own [path]
+  /// database. Without it (the default) the secret is per app and per [path],
+  /// as before. The group needs the `keychain-access-groups` entitlement and
+  /// a fixed signing team (see the README). Android has no shared keystore:
+  /// the group is ignored there and each app keeps its own agent. It only
+  /// configures the default store, so passing it together with a custom
+  /// [secretStore] throws an [ArgumentError].
+  ///
   /// A file is opened once per process: call this once and keep the result.
   static Future<AtomicNode> open({
     required String path,
     String? agentSecret,
     String agentName = 'Me',
     String? drive,
-    AgentSecretStore secretStore = const SecureAgentSecrets(),
+    AgentSecretStore? secretStore,
+    String? keychainGroup,
     bool startPeers = true,
   }) async {
+    if (secretStore != null && keychainGroup != null) {
+      throw ArgumentError(
+          'keychainGroup configures the default secret store; pass it to your '
+          'own AgentSecretStore instead of to open.');
+    }
+    secretStore ??= SecureAgentSecrets(keychainGroup: keychainGroup);
     await init();
-    final key = 'atomic_agent:$path';
+    final key = agentSecretKey(path, keychainGroup: keychainGroup);
     agentSecret ??= await secretStore.read(key);
     try {
       final handle = await bridge.AtomicStore.open(

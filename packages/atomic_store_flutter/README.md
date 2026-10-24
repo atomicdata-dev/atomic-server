@@ -147,6 +147,41 @@ final node = await AtomicFlutter.open(path: dir, agentName: 'Alice');
 print(node.drive);
 ```
 
+**One agent for several apps (iOS and macOS).** Pass
+`keychainGroup: 'TEAMID.com.example.shared'` to `open` and the default store
+keeps the secret in that shared keychain access group under the fixed key
+`atomic_agent` (not derived from `path`). Every app of your team that passes
+the same group signs as the same agent, while each keeps its own `path` and
+database. Setup:
+
+- Both apps need the group in their entitlements, in `ios/Runner/Runner.entitlements`
+  and in `macos/Runner/DebugProfile.entitlements` and `Release.entitlements`.
+  The value is the team id prefix plus the group name:
+
+  ```xml
+  <key>keychain-access-groups</key>
+  <array>
+    <string>$(AppIdentifierPrefix)com.example.shared</string>
+  </array>
+  ```
+
+  (in Dart, pass the resolved `TEAMID.com.example.shared`). On iOS, also set
+  the entitlements file in Xcode (Signing & Capabilities, Keychain Sharing).
+- All apps must be signed by the same development team. A group does not work
+  with unsigned or ad-hoc signed builds, because the entitlement is tied to
+  the team.
+- On macOS this uses the data protection keychain instead of the login
+  keychain.
+- Android has no shared keystore, so the group is ignored there: each app
+  keeps its own agent. Share it explicitly (pass the same `agentSecret`, or
+  sign in with it) if you need one identity across Android apps.
+- It only configures the default store; with your own `secretStore` pass the
+  group to that store (`SecureAgentSecrets(keychainGroup: ...)`).
+- Omit `keychainGroup` to keep the old per-app, per-path behaviour. Existing
+  secrets are not moved when you start using a group: the first open with a
+  group makes or finds the secret under the new key, so pass the old
+  `agentSecret` once to carry an identity over.
+
 Pass `secretStore: MemoryAgentSecrets()` to keep nothing, or your own
 `AgentSecretStore` to keep it elsewhere. An explicit `agentSecret` wins and is
 stored. The secrets of agents you signed in as before are archived next to it
