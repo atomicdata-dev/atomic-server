@@ -11,6 +11,12 @@
 
 ## Status
 
+**Product API scope:** the component boundary is the `atomic_lib` crate.
+`AtomicNode` is a convenience facade inside it; the existing `Db` type and
+`from_db` / `db` helpers are documented as internal compatibility paths. These
+labels do not change visibility or migrate any caller. The future architecture
+below must not be read as an already complete public node API.
+
 **Decision (accepted 2026-09-01):** `AtomicNode` in `lib/src/runtime/` is *the*
 binding runtime — #1277/#1241 bind it, no parallel `simple.rs` / `ffi/` node
 surface ([`completed/runtime-boundary-decision.md`](./completed/runtime-boundary-decision.md)).

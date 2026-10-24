@@ -1,14 +1,18 @@
-//! The node runtime boundary: [`AtomicNode`] is the one surface adapters
-//! (HTTP, WebSocket, Iroh, WASM, FFI, Flutter) bind to instead of wrapping
-//! [`crate::Db`] themselves.
+//! Convenience node operations within `atomic_lib`, the component boundary.
 //!
-//! Slice 1 (`planning/atomic-lib-runtime.md`, `planning/completed/runtime-boundary-decision.md`)
-//! is a thin wrapper: every method delegates to code that already existed, so
-//! there is no behaviour change — only a named place for it. The surface is
-//! used by the WASM `ClientDb` and Flutter's per-call node accessor. It includes
+//! [`AtomicNode`](crate::runtime::AtomicNode) groups selected writes, outbox delivery, queries, search,
+//! and commit ingestion policies. It is not a separate product or a mandatory
+//! layer for every operation inside the library. The `Db` implementation and
+//! the facade's `from_db` / `db` helpers are documented as internal, while their
+//! Rust paths remain available for existing first-party adapters.
+//!
+//! The initial slice wrapped existing store operations
+//! (`planning/atomic-lib-runtime.md`, `planning/completed/runtime-boundary-decision.md`).
+//! Current convenience methods also group local writes with outbox bookkeeping.
+//! The surface is used by the WASM `ClientDb` and Flutter's per-call node accessor. It includes
 //! `from_db`, `db`, agent accessors, indexed `query`, full-text `search`, local
 //! writes (`save_locally`, `apply_local_commit`), outbox access and delivery,
-//! and `apply_commit` under an [`IngestPolicy`].
+//! and `apply_commit` under an [`IngestPolicy`](crate::runtime::IngestPolicy).
 
 mod node;
 

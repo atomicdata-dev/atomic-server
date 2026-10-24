@@ -1,10 +1,10 @@
 //! [`AtomicNode`]: a thin, named surface over [`Db`].
 //!
-//! Every method here delegates to a function that already existed before the
-//! runtime module did (the doc comment on each one names it). The point is
-//! not new behaviour but one place for adapters to bind, so that
-//! `wasm/src/lib.rs` and the other bindings stop each re-wrapping `Db` with
-//! their own copy of the commit-validation knobs.
+//! The initial facade delegated to existing store operations. It now also
+//! groups local writes with outbox bookkeeping, so an adapter can save and
+//! queue an edit through one method. Ingestion policies centralize the
+//! commit-validation options used by bindings. These are convenience methods
+//! inside the library; `atomic_lib` remains the component boundary.
 //!
 //! Slice 1 (2026-09-01) shipped this with a wider aspirational API — `open`
 //! with a storage config, `get`, `mutate`, `subscribe`, `sync_with_peer`.
@@ -68,13 +68,13 @@ pub struct AtomicNode {
 }
 
 impl AtomicNode {
-    /// Wrap an already-opened store. Adapters construct `Db` themselves
+    /// **Internal:** wrap an already-opened store. Adapters construct `Db` themselves
     /// (the WASM `ClientDb`, the server's `AppState`) and bind here.
     pub fn from_db(db: Db) -> Self {
         Self { db }
     }
 
-    /// The underlying store, for operations this surface does not name
+    /// **Internal:** the underlying store, for operations this surface does not name
     /// (blobs, version vectors, import/export, drive setup, events).
     pub fn db(&self) -> &Db {
         &self.db
