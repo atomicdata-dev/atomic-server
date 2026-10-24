@@ -287,3 +287,79 @@ class _ToolStepRowState extends State<ToolStepRow> {
     );
   }
 }
+
+/// The text of a reasoning part (the AI SDK's `reasoning`, kept as a
+/// [RawPart]); null for any other part or an empty one.
+String? reasoningText(ChatPart p) {
+  if (p is! RawPart || p.json['type'] != 'reasoning') return null;
+  final text = p.json['text'];
+  return text is String && text.trim().isNotEmpty ? text.trim() : null;
+}
+
+/// What the model thought before it answered, folded away like a tool call;
+/// a tap opens it (the web app's "Thinking").
+class ReasoningRow extends StatefulWidget {
+  final String text;
+
+  const ReasoningRow(this.text, {super.key});
+
+  @override
+  State<ReasoningRow> createState() => _ReasoningRowState();
+}
+
+class _ReasoningRowState extends State<ReasoningRow> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.appColors;
+    final small = ChatTextStyles.of(context).status;
+    return Semantics(
+      button: true,
+      expanded: _open,
+      label: 'Thinking',
+      excludeSemantics: true,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          mouseCursor: WidgetStateMouseCursor.clickable,
+          key: const Key('reasoning-row'),
+          borderRadius: BorderRadius.circular(6),
+          onTap: () => setState(() => _open = !_open),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.psychology_outlined,
+                        size: 15, color: c.textSecondary),
+                    const SizedBox(width: 8),
+                    Text('Thinking', style: small),
+                    Icon(
+                      _open ? Icons.expand_less : Icons.expand_more,
+                      size: 16,
+                      color: c.textSecondary,
+                    ),
+                  ],
+                ),
+                if (_open)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 23, top: 4),
+                    child: Text(
+                      widget.text,
+                      key: const Key('reasoning-text'),
+                      style: small.copyWith(fontStyle: FontStyle.italic),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

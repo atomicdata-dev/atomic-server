@@ -18,6 +18,17 @@ const _toolsPrompt =
     ' When the person asks about their own data, use the tools to search '
     'their drives and read resources; link a resource as [title](subject).';
 
+/// What the model is told to name a chat (the web app's title prompt, without
+/// the emoji).
+const _titlePrompt =
+    'You are a specialized AI system that generates titles for AI '
+    'conversations. You will be given the first part of a conversation '
+    'between the user and an AI assistant. Think of a short title that fits '
+    'the given conversation. This title will be shown in the UI as the title '
+    'of the conversation. ALWAYS write the title in the same natural language '
+    "as the user's own message text. Respond with exactly one line: the title "
+    'text. Do not wrap it in JSON, quotes, markdown, or commentary.';
+
 /// The OpenAI-compatible `chat/completions` stream, chunk by chunk (the
 /// decoded JSON of each `data:` line): [messages] may carry tool calls and
 /// results, [tools] the functions the model may call.
@@ -122,6 +133,7 @@ class HostedAi {
     this.transcribe,
     this.voiceStatus,
     this.acceptsImages = false,
+    this.portal,
   })  : assert(stream != null || completions != null),
         _stream = stream,
         _completions = completions,
@@ -138,6 +150,10 @@ class HostedAi {
   /// Whether images may be sent to the model. The account's included AI
   /// takes text and tools only (it refuses image and file parts).
   final bool acceptsImages;
+
+  /// The account portal's origin, where credits are bought; null when not
+  /// known.
+  final Uri? portal;
 
   /// The most of a chat sent to the model: its latest messages.
   static const maxHistoryMessages = 40;
@@ -193,6 +209,74 @@ class HostedAi {
 
   /// Credits left, in the provider's unit; null when it does not say.
   int? get remaining => (status['remaining_micros'] as num?)?.toInt();
+
+  /// Where more credits are bought (the portal's dashboard, as the web app
+  /// links it); null when the account cannot buy any or the portal is not
+  /// known.
+  Uri? get creditsUrl => status['purchases_enabled'] == true && portal != null
+      ? portal!.replace(path: '/dashboard')
+      : null;
+
+  /// Whether [error] says the account has no credits left (the portal's own
+  /// words, as the web app matches them).
+  static bool isOutOfCredits(String error) =>
+      RegExp('not enough ai credits', caseSensitive: false).hasMatch(error);
+
+  /// Why a request failed, in words for the person: the portal's message
+  /// without Dart's `Bad state:` prefix.
+  static String errorMessage(Object error) {
+    final text = '$error'
+        .replaceFirst(RegExp(r'^(Bad state|Exception|StateError): '), '')
+        .trim();
+    return text.isEmpty ? 'Something went wrong.' : text;
+  }
+
+  /// A short title for a chat that begins with [question] and [answer], from
+  /// the model; null when it gives none.
+  Future<String?> title(String question, String answer) async {
+    String clip(String s) => s.length > 600 ? s.substring(0, 600) : s;
+    final conversation = jsonEncode([
+      {'role': 'user', 'text': clip(question)},
+      {'role': 'assistant', 'text': clip(answer)},
+    ]);
+    final prompt = 'Generate a title for the following conversation:\n'
+        '```json\n$conversation\n```';
+    final text = StringBuffer();
+    final completions = _completions;
+    if (completions != null) {
+      await for (final chunk in completions([
+        {'role': 'system', 'content': _titlePrompt},
+        {'role': 'user', 'content': prompt},
+      ], model, null)) {
+        final choices = chunk['choices'];
+        if (choices is! List || choices.isEmpty) continue;
+        final delta = (choices.first as Map)['delta'];
+        final content = delta is Map ? delta['content'] : null;
+        if (content is String) text.write(content);
+      }
+    } else {
+      await for (final piece in _stream!([
+        {'role': 'system', 'content': _titlePrompt},
+        {'role': 'user', 'content': prompt},
+      ], model)) {
+        text.write(piece);
+      }
+    }
+    final line = text
+        .toString()
+        .replaceAll(
+            RegExp(r'<think>[\s\S]*?</think>', caseSensitive: false), '')
+        .replaceAll(RegExp(r'```\w*'), '')
+        .trim()
+        .replaceAll(RegExp(r'''^["'`]+|["'`]+$'''), '')
+        .trim()
+        .split(RegExp(r'\r?\n'))
+        .first
+        .trim();
+    return line.isEmpty
+        ? null
+        : (line.length > 80 ? line.substring(0, 80) : line);
+  }
 
   /// Accepts the terms; the AI can be used afterwards.
   Future<void> enable() async => status = await _enable();

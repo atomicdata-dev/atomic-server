@@ -36,7 +36,10 @@ class _Api extends UnimplementedApi {
         status: {'enabled': true, 'consent': true, 'model': 'm'},
         acceptsImages: acceptsImages,
         completions: (messages, model, tools) {
-          sent.add([for (final m in messages) Map.of(m)]);
+          // The request that names the chat is not one of the answers.
+          if (!(messages.first['content'] as String).contains('titles')) {
+            sent.add([for (final m in messages) Map.of(m)]);
+          }
           return Stream.value({
             'choices': [
               {

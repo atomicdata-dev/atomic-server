@@ -2,6 +2,7 @@ import 'package:atomic_flutter/atomic_flutter.dart' show ErrorText, ClickCursor;
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColors, AppColorsExt, Perf;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'dart:async';
 import 'dart:io' show Platform;
@@ -182,7 +183,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   double _sentHeight = 0;
   double? _answerHeight;
   bool _settleQueued = false;
-  List<ChatEntry> get _messages => _window.items;
+
+  /// The messages hidden from this screen (see [_hide]).
+  final Set<String> _hidden = {};
+
+  /// The window without what was hidden: what is shown, and what the model
+  /// reads.
+  List<ChatEntry> get _messages => [
+        for (final m in _window.items)
+          if (!_hidden.contains(m.id)) m,
+      ];
   Object? get _loadError => _window.error;
   bool _noChatYet = false;
   bool get _loaded => _window.loaded || _noChatYet;
@@ -226,6 +236,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Timer? _flush;
   bool _sending = false;
   String? _error;
+
+  /// Why the last answer failed, in words; with Try again.
+  String? _runError;
+
+  /// The chat's name: the one it was opened with, or the one made for it.
+  late String _title = widget.title;
+
+  /// The name a chat made here got from its first words, until the AI has
+  /// named it.
+  String? _autoTitle;
 
   /// What the person attached, in the order they picked it; sent to the AI
   /// with every message of this screen, never stored in the chat.
@@ -1025,7 +1045,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       if (mounted) {
         setState(() {
           _aiLooked = true;
-          _error = '$e';
+          _error = HostedAi.errorMessage(e);
         });
       }
     }
@@ -1039,7 +1059,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         widget.voiceMode ? _startVoice() : _focusInput();
       }
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      if (mounted) setState(() => _error = HostedAi.errorMessage(e));
     }
   }
 
@@ -1104,6 +1124,136 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     });
   }
 
+  /// Names the chat after its first exchange with the AI (the web app's
+  /// chat does the same); the first words stay when it gives no title.
+  Future<void> _nameChat(HostedAi ai, String question, String answer) async {
+    _autoTitle = null;
+    try {
+      // The chat exists once its first message is saved.
+      await _persistTail;
+      final title = await ai.title(question, answer);
+      if (title == null) return;
+      await _rename(title);
+    } catch (e) {
+      debugPrint('[chat] naming the chat failed: $e');
+    }
+  }
+
+  /// Gives the chat a new name.
+  Future<void> _rename(String title) async {
+    final chat = _chat;
+    if (chat == null) return;
+    await widget.api.renameResource(chat, title);
+    if (mounted) setState(() => _title = title);
+  }
+
+  /// The title was tapped: ask for a new name.
+  Future<void> _askRename() async {
+    var typed = _title;
+    final title = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rename chat'),
+        content: TextFormField(
+          key: const Key('rename-field'),
+          initialValue: _title,
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          onChanged: (v) => typed = v,
+          onFieldSubmitted: (v) => Navigator.pop(context, v),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, typed),
+              child: const Text('Save')),
+        ],
+      ),
+    );
+    final name = title?.trim() ?? '';
+    if (name.isEmpty || name == _title || !mounted) return;
+    _autoTitle = null;
+    try {
+      await _rename(name);
+    } catch (e) {
+      _toasts?.show('chat-rename', "Couldn't rename the chat",
+          severity: ToastSeverity.error);
+    }
+  }
+
+  /// Ask the question before the failed answer again. A failed answer that
+  /// holds something is carried on from, not thrown away: tools it ran
+  /// would run a second time (the web app's "Try again").
+  void _retry() {
+    final asked = _messages;
+    if (_sending || _ai == null) return;
+    final at = asked.lastIndexWhere((m) => m.role == 'user');
+    if (at < 0) return;
+    _answer(asked[at], asked, saveQuestion: false);
+  }
+
+  /// Drops the last answer and writes another to the question before it.
+  void _regenerate() {
+    final asked = _messages;
+    if (_sending || _ai == null || asked.isEmpty) return;
+    final reply = asked.last;
+    if (reply.role != 'assistant') return;
+    final before = asked.sublist(0, asked.length - 1);
+    if (before.isEmpty || before.last.role != 'user') return;
+    setState(() => _hidden.add(reply.id));
+    _answer(before.last, before, saveQuestion: false);
+  }
+
+  /// Takes a message off this screen. The chat log is append-only (the app
+  /// can add entries, not remove them), so the message stays in the chat and
+  /// is back when the chat is opened again.
+  void _hide(ChatEntry m) => setState(() => _hidden.add(m.id));
+
+  /// The actions of a message, in a sheet.
+  Future<void> _messageMenu(ChatEntry m) async {
+    final c = context.appColors;
+    final last = _messages.isNotEmpty && _messages.last.id == m.id;
+    final text = m.text;
+    Widget tile(String key, IconData icon, String title,
+            {String? subtitle, required VoidCallback onTap}) =>
+        ListTile(
+          key: Key(key),
+          leading: Icon(icon, color: c.main),
+          title: Text(title),
+          subtitle: subtitle == null ? null : Text(subtitle),
+          onTap: () {
+            Navigator.pop(context);
+            onTap();
+          },
+        );
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (text.isNotEmpty)
+              tile('message-copy', Icons.copy_rounded, 'Copy message',
+                  onTap: () async {
+                await Clipboard.setData(ClipboardData(text: text));
+                _toasts?.show('chat-copied', 'Copied');
+              }),
+            if (last && m.role == 'assistant')
+              tile('message-regenerate', Icons.refresh, 'Regenerate response',
+                  onTap: _regenerate),
+            tile('message-hide', Icons.visibility_off_outlined, 'Hide message',
+                subtitle: 'Only on this screen; the chat keeps it',
+                onTap: () => _hide(m)),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   StreamSubscription<AiEvent>? _sub;
   Completer<void>? _streamDone;
 
@@ -1130,9 +1280,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _stopListening();
     _outputInst?.stop();
     _input.clear();
-    final sw = Stopwatch()..start();
-    void lap(String what) =>
-        debugPrint('[ai-perf] +${sw.elapsedMilliseconds}ms $what');
     final userParts = <ChatPart>[
       if (text.isNotEmpty) TextPart(text),
       ..._files,
@@ -1145,17 +1292,35 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       parts: userParts,
       context: List.of(_attached),
     );
-    final name = text.isNotEmpty
-        ? text
-        : (userParts.whereType<FilePart>().first.filename ?? 'Attachment');
     _window.add(userMessage);
     // What the model reads: the window (the newest messages at least); the
     // AI cuts a long one to its latest part.
-    final asked = _window.items;
+    await _answer(userMessage, _messages, saveQuestion: true);
+  }
+
+  /// Writes the answer to [asked] (the chat up to [userMessage], or further
+  /// when carrying on from a half answer). A new question is saved with
+  /// [saveQuestion]; Regenerate and Try again ask the one already there.
+  Future<void> _answer(ChatEntry userMessage, List<ChatEntry> asked,
+      {required bool saveQuestion}) async {
+    final ai = _ai;
+    if (ai == null) return;
+    final userParts = userMessage.parts;
+    final text = ChatEntry.textOf(userParts);
+    final sw = Stopwatch()..start();
+    void lap(String what) =>
+        debugPrint('[ai-perf] +${sw.elapsedMilliseconds}ms $what');
+    final name = text.isNotEmpty
+        ? text
+        : (userParts.whereType<FilePart>().first.filename ?? 'Attachment');
+    final first = name.length > 40 ? '${name.substring(0, 40)}…' : name;
+    // A chat made here is stored under its first words until the AI names it.
+    if (saveQuestion && _chat == null) _autoTitle = first;
     if (_keeper.controller.hasClients) _keeper.controller.jumpTo(0);
     setState(() {
       _sending = true;
       _error = null;
+      _runError = null;
       _partial = [];
       // The question goes to the top, the answer grows below it.
       _sentId = userMessage.id;
@@ -1173,19 +1338,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (_chat != null) _liveRuns[_chat!] = live;
     // The user message is saved in the background; the chat exists from the
     // first message on, named after it.
-    _persist('user message', () async {
-      final isNew = _chat == null;
-      final chat = _chat ??= await widget.api.newChat(
-        name.length > 40 ? '${name.substring(0, 40)}…' : name,
-      );
-      if (isNew) _noLongerNew();
-      _liveRuns[chat] ??= live;
-      await widget.api.addEntry(chat, 'user', userParts);
-    });
+    if (saveQuestion) {
+      _persist('user message', () async {
+        final isNew = _chat == null;
+        final chat = _chat ??= await widget.api.newChat(first);
+        if (isNew) _noLongerNew();
+        _liveRuns[chat] ??= live;
+        await widget.api.addEntry(chat, 'user', userParts);
+      });
+    }
     String? spoken;
     // The answer's parts as they arrive: text, and tool calls in between.
     final parts = <ChatPart>[];
     var stopped = false;
+    var failed = false;
     try {
       final context = await _contextText();
       lap('context ready');
@@ -1238,9 +1404,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       stopped = _sub == null;
       lap(stopped ? 'stopped' : 'stream done');
     } catch (e) {
+      failed = true;
       if (mounted) {
         setState(() {
-          _error = '$e';
+          _runError = HostedAi.errorMessage(e);
           _voiceLoop = false;
         });
       }
@@ -1296,6 +1463,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       });
     }
     final answer = ChatEntry.textOf(parts);
+    if (!failed &&
+        !stopped &&
+        answer.isNotEmpty &&
+        _autoTitle != null &&
+        _messages.length <= 2) {
+      unawaited(_nameChat(ai, text.isEmpty ? name : text, answer));
+    }
     if (stopped || answer.isEmpty) return;
     if (_voiceLoop) {
       spoken = answer;
@@ -1364,11 +1538,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     if (route != null) ShellScope.maybeOf(context)?.setKind(route, null);
   }
 
-  String get _headerTitle => widget.title.isEmpty
+  String get _headerTitle => _title.isEmpty
       ? (_chat == null
           ? (widget.voiceMode ? 'Voice chat' : 'New chat')
           : 'Untitled chat')
-      : widget.title;
+      : _title;
 
   @override
   Widget build(BuildContext context) {
@@ -1390,10 +1564,14 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   appBar: AppTopBar(
                     compact: true,
                     title: _headerTitle,
-                    titleWidget: ChatHeader(
-                      title: _headerTitle,
-                      subtitle: 'AI assistant',
-                      icon: Icons.auto_awesome_outlined,
+                    titleWidget: InkWell(
+                      key: const Key('chat-title'),
+                      onTap: _chat == null ? null : _askRename,
+                      child: ChatHeader(
+                        title: _headerTitle,
+                        subtitle: 'AI assistant',
+                        icon: Icons.auto_awesome_outlined,
+                      ),
                     ),
                   ),
                   body: ListAndField(
@@ -1473,29 +1651,36 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             final room = m.id == _answerId && _sentId != null && _sentHeight > 0
                 ? math.max(0.0, box.maxHeight - 32 - _sentHeight)
                 : 0.0;
-            final bubble = Align(
-              alignment: mine
-                  ? Alignment.centerRight
-                  : room > 0
-                      ? Alignment.topLeft
-                      : Alignment.centerLeft,
-              child: Container(
-                margin: EdgeInsets.only(top: ChatTextStyles.gapAbove(first)),
-                padding: ChatTextStyles.bubblePadding,
-                constraints: BoxConstraints(
-                  // An answer may hold code and tables: a little wider.
-                  maxWidth: ChatTextStyles.bubbleMaxWidth(
-                      box.maxWidth -
-                          2 *
-                              (ChatTextStyles.gutter +
-                                  readableSideInset(box.maxWidth)),
-                      answer: !mine),
-                ),
-                decoration: ChatTextStyles.bubbleDecoration(c,
-                    mine: mine, joinAbove: !first, joinBelow: !last),
-                child: _bubble(c, m, mine),
-              ),
-            );
+            final menu = !_sending && m.id != 'partial';
+            final bubble = GestureDetector(
+                key: Key('message-${m.id}'),
+                behavior: HitTestBehavior.translucent,
+                onLongPress: menu ? () => _messageMenu(m) : null,
+                onSecondaryTap: menu ? () => _messageMenu(m) : null,
+                child: Align(
+                  alignment: mine
+                      ? Alignment.centerRight
+                      : room > 0
+                          ? Alignment.topLeft
+                          : Alignment.centerLeft,
+                  child: Container(
+                    margin:
+                        EdgeInsets.only(top: ChatTextStyles.gapAbove(first)),
+                    padding: ChatTextStyles.bubblePadding,
+                    constraints: BoxConstraints(
+                      // An answer may hold code and tables: a little wider.
+                      maxWidth: ChatTextStyles.bubbleMaxWidth(
+                          box.maxWidth -
+                              2 *
+                                  (ChatTextStyles.gutter +
+                                      readableSideInset(box.maxWidth)),
+                          answer: !mine),
+                    ),
+                    decoration: ChatTextStyles.bubbleDecoration(c,
+                        mine: mine, joinAbove: !first, joinBelow: !last),
+                    child: _bubble(c, m, mine),
+                  ),
+                ));
             final keyed = m.id == _answerId
                 ? KeyedSubtree(
                     key: _answerKey,
@@ -1587,6 +1772,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             text,
             key: partial && last ? const Key('chat-partial') : null,
             streaming: partial && last,
+            // A long press opens the message's menu (see [_messageMenu]).
+            selectable: partial,
             inline: mine,
             style: mine
                 ? ChatTextStyles.of(context).bodyMine
@@ -1596,6 +1783,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           ),
         ToolPart() =>
           ToolStepRow(p, key: ValueKey(p.toolCallId), titles: titles),
+        _ when reasoningText(p) != null => ReasoningRow(reasoningText(p)!),
         _ => null,
       };
       if (w == null) continue;
@@ -1864,6 +2052,65 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ),
       );
 
+  /// Buy AI credits, when the account can.
+  Widget _buyCredits(HostedAi? ai) {
+    final url = ai?.creditsUrl;
+    if (url == null) return const SizedBox.shrink();
+    return TextButton(
+      key: const Key('chat-buy-credits'),
+      onPressed: () => _openLink('$url'),
+      child: const Text('Buy AI credits'),
+    );
+  }
+
+  /// The credits are gone before a question is sent (the web app's notice).
+  Widget _creditsBar(AppColors c, HostedAi ai) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_noCredits,
+                key: const Key('chat-no-credits'),
+                style: TextStyle(
+                    color: c.textSecondary, fontSize: ChatTextStyles.metaSize)),
+            _buyCredits(ai),
+          ],
+        ),
+      );
+
+  static const _noCredits =
+      'Included AI is unavailable or your credits have run out. Check your '
+      'account allowance. There are no automatic extra charges.';
+
+  /// Why the last answer failed, with Try again (and Buy AI credits when the
+  /// account is out of them), as the web app's chat shows it.
+  Widget _runErrorBar(AppColors c, HostedAi? ai) {
+    final error = _runError!;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Column(
+        key: const Key('chat-error'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ErrorText('No answer from Included AI: $error',
+              color: c.alert, fontSize: ChatTextStyles.metaSize),
+          if (HostedAi.isOutOfCredits(error))
+            Text(_noCredits,
+                style: TextStyle(
+                    color: c.textSecondary, fontSize: ChatTextStyles.metaSize)),
+          Row(children: [
+            if (HostedAi.isOutOfCredits(error)) _buyCredits(ai),
+            TextButton(
+              key: const Key('chat-retry'),
+              onPressed: _retry,
+              child: const Text('Try again'),
+            ),
+          ]),
+        ],
+      ),
+    );
+  }
+
   /// The way to write, when there is an AI to write to; otherwise one line
   /// saying so.
   Widget _composer(AppColors c) {
@@ -1928,6 +2175,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     color: c.alert, fontSize: ChatTextStyles.metaSize),
               ),
             ),
+          if (_runError != null) _runErrorBar(c, ai),
+          if (_runError == null && ai != null && ai.remaining == 0)
+            _creditsBar(c, ai),
           if (_files.isNotEmpty ||
               (_attached.isNotEmpty &&
                   (_messages.isNotEmpty ||

@@ -2275,7 +2275,10 @@ void main() {
           ai: HostedAi(
             status: {'enabled': true, 'consent': true, 'model': 'm'},
             stream: (messages, model) {
-              sent.add(messages);
+              // The request that names the chat is not one of the answers.
+              if (!messages.first['content']!.contains('titles')) {
+                sent.add(messages);
+              }
               return Stream.value('ok');
             },
             enable: () async => {},
