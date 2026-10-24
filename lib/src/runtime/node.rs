@@ -12,6 +12,11 @@
 //! WASM binding used four methods. The surface was cut down to those on
 //! 2026-09-04; the seam stays, and grows again when a second adapter binds
 //! to it (`planning/atomic-lib-runtime.md`).
+//!
+//! Since that cutback, local saves, local commit application, outbox access
+//! and delivery, and KV full-text search have been added. The WASM binding
+//! holds an `AtomicNode`; Flutter also constructs one around its shared `Db`
+//! for selected calls.
 
 use crate::{
     agents::Agent,

@@ -1,6 +1,13 @@
 # Atomic Lib Runtime: HTTP-Optional Local Node
 
-> **Status:** Partial. `AtomicNode` in `lib/src/runtime/` is the binding runtime (`from_db`, `db`, the agent accessors, `query`, `apply_commit` under `IngestPolicy::{Hub, Peer, LocalCache}`); the WASM `ClientDb` is its only adapter, and the unused `open` / `get` / `mutate` / `subscribe` / `sync_with_peer` surface was cut back 2026-09-04. Open: binding the remaining adapters (#1277 / #1241).
+> **Status:** Partial. `AtomicNode` in `lib/src/runtime/` exposes store access,
+> agent accessors, indexed queries, local full-text search, local saves and
+> commit application, durable outbox access/delivery, and ingestion under
+> `IngestPolicy::{Hub, Peer, LocalCache}`. WASM holds a node; Flutter constructs
+> a facade around its shared `Db` for selected calls. Desktop still holds a
+> raw `Db`. The unused `open` / `get` / `mutate` / `subscribe` / `sync_with_peer`
+> surface was cut back 2026-09-04; a public node-opening API and the remaining
+> adapter consolidation are still open.
 
 ## Status
 
@@ -14,10 +21,16 @@ and `apply_commit(json, IngestPolicy)`. `IngestPolicy::{Hub, Peer, LocalCache}`
 names the three commit-validation profiles; `Hub` and `Peer` are
 `CommitIngestOpts::hub` / `::peer`, the presets `server/src/handlers/commit.rs`
 and `sync/engine.rs` also use, and `LocalCache` is the WASM cache's no-checks
-apply. The WASM `ClientDb` is the one adapter on it: `applyCommit` is
+apply. The WASM `ClientDb` binds to it: `applyCommit` is
 `node.apply_commit(_, LocalCache)` and `query` is `node.query`. Tests:
 `runtime::node::tests` — a genesis on one in-process node ingested on another
 under `Peer`; `LocalCache` accepts what `Peer` rejects.
+
+**Subsequent additions:** local writes now use `save_locally` or
+`apply_local_commit` to enter the durable outbox, which `outbox` and
+`drain_outbox` expose. `search` runs the local KV full-text index. Flutter's
+`api/simple/state.rs::node()` wraps its shared `Db` for selected calls; this
+is a per-call facade, not a shared `AtomicNode` held by the adapter.
 
 Slice 1 originally also shipped `open(NodeConfig)` over a `NodeStorage` enum,
 `get`, `mutate(ResourceEdit)`, `subscribe` and (behind `iroh`)
@@ -34,9 +47,9 @@ Next:
 
 1. `server/src/handlers/commit.rs` → `node.apply_commit(_, Hub { source_id,
    response_origin })` (Phase 2 below); `AppState` holds an `AtomicNode`.
-2. `ffi/` (#1277) and `python/` bind `AtomicNode`; `flutter/rust/src/api/simple.rs`
-   store group calls it (#1241 follow-up). Grow the surface then, from what
-   those bindings actually call.
+2. `ffi/` (#1277) and `python/` bind `AtomicNode`; consolidate Flutter's
+   per-call facades where needed (#1241 follow-up). Grow the surface from
+   what those bindings actually call.
 3. Shared fixtures for the remaining pure twins
    (`planning/completed/runtime-boundary-decision.md`, sequencing step 3).
 
