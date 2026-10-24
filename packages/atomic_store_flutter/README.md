@@ -71,6 +71,16 @@ its dependencies, about 10 minutes cold.
 
   (see `example/macos/Podfile`). Also set the macOS deployment target to 12.0
   in Xcode (Runner target) if it still says 10.15.
+- macOS: the app sandbox blocks the network unless the app asks for it, and
+  sync (devices and servers) then finds nothing, silently. Add to both
+  `macos/Runner/DebugProfile.entitlements` and `Release.entitlements`:
+
+  ```xml
+  <key>com.apple.security.network.client</key>
+  <true/>
+  <key>com.apple.security.network.server</key>
+  <true/>
+  ```
 - iOS: set `platform :ios, '15.0'` in `ios/Podfile`.
 - Web is not supported: there is no native node in a browser. Use a
   different `StoreBackend` there.
