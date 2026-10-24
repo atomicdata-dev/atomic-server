@@ -1,5 +1,6 @@
 //! Abstract key-value store trait for the Db.
-//! Allows swapping the storage backend (sled, BTreeMap, etc.) without changing query/index logic.
+//! Allows swapping redb backends (native file, memory, browser OPFS) or using
+//! legacy sled storage without changing query/index logic.
 
 use crate::errors::AtomicResult;
 

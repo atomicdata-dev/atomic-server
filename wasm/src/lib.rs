@@ -44,7 +44,8 @@ const WRONG_KEY_MARKER: &str = "ATOMIC_DB_WRONG_KEY";
 /// as a plain degraded-mode sentence rather than a wasm stack trace.
 const STORAGE_BLOCKED_MARKER: &str = "ATOMIC_DB_STORAGE_BLOCKED";
 
-/// A client-side Atomic Data database backed by redb (in-memory, future OPFS).
+/// A client-side Atomic Data database backed by redb with in-memory and
+/// persistent browser OPFS storage.
 /// Provides indexed queries, resource storage, and commit application.
 ///
 /// A JS binding over [`AtomicNode`]: query and commit application go through
