@@ -249,7 +249,7 @@ void main() {
   testWidgets('a connected device reads as up to date, and follows',
       (tester) async {
     final node = newNode();
-    final peers = node.peers as FakePeers;
+    final peers = node.peers;
     peers.status = const PeerSearchStatus('connected');
     const other =
         'aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11aa11';
