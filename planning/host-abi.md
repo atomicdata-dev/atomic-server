@@ -292,9 +292,18 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 ### 4. Schemas as the shared format
 
 - [ ] Enforce datatype, `allowsOnly` and class constraints on incoming commits
-      (#2160), without blocking sync.
+      (#2160). Refuse a new commit a client signs. Do not refuse an
+      already-signed commit that arrives by replication: flag it, so replicas
+      still converge when a class's constraints change.
+- [ ] Integrations park a provider record that doesn't fit its row class,
+      with its identity and the validation error, keep the last valid
+      projection, and allow a retry. Shared classes are not loosened for
+      synced tables; a broader domain gets its own class or version.
 - [ ] One home for shared vocabularies: the embedded `.../v1/` vocabularies
-      (#2247); move atomic-plugins' `ontology-kit` classes there.
+      (#2247); move atomic-plugins' `ontology-kit` row classes there. Agree
+      with atomic-plugins on class subjects, property meanings, template
+      behavior (templates create shared-class rows directly, Q-107) and a
+      migration for existing drive-local tables.
 - [ ] Releases declare the classes they read, write and extend; the host binds
       at install. The scheduler stops looking up vocabulary by shortname
       (`drive_terms`).
@@ -312,9 +321,14 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
       field type; the scheduler still uses `drive_terms`; moving
       `ontology-kit` classes into the vocabularies; `@tomic/lib` has no
       matching type for the manifest `schema` field.
-- [ ] Views match subclasses of the class they declare, so drive classes that
-      extend a shared class get its views (to settle with atomic-plugins, whose
-      views match the exact class).
+- [x] ~~Views match subclasses~~ Dropped (20 Oct, with Michiel): views match
+      the exact class, as atomic-plugins' `pieces.md` decides. Templates create
+      shared-class rows directly, so no subclass is needed to get a view.
+- [ ] Two kinds of lenses stay. Server property lenses (`lib/src/lens.rs`)
+      derive values at materialization. The sync runner consumes the
+      atomic-plugins lens catalog's versioned mapping contract, with its
+      guards, removal and refusal rules for write-back. Share transforms only
+      where the semantics match.
 - [ ] The compat diff (#2239) runs in `ensureOntology`, the ontology editor and
       on release publish, not only in the CLI. Retire `ensureSchema`.
 
@@ -471,5 +485,9 @@ afterCommit hooks and three unrelated webhook proposals. Plugin state
 ## Open
 
 - Whether kernel features beyond the step 7 proof should use the ABI.
-- Settling with atomic-plugins (Michiel): subclass matching, where shared
-  classes live, and how "pieces" (views, integrations, lenses) map onto exports.
+- Mapping atomic-plugins "pieces" onto the ABI (with Michiel): one generic
+  integration runner as an app on the ABI, with providers as syncables and
+  overlays, not a connector app per provider. First proof, end to end: a
+  catalog integration, a pinned lens, a shared-class table, a matching view
+  and a reviewed write-back. Class identity, lenses and validation are
+  settled in step 4 above.
