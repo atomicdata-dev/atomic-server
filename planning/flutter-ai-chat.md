@@ -91,8 +91,18 @@ use, matching the web app's chat (`browser/data-browser/src/chunks/AI/`).
 - [ ] Images for the included AI: needs atomic-saas to accept `image_url`
   parts (and to bill them). Until then photos are off for it.
 - [ ] PDFs and other binary files: no text extraction yet.
-- [ ] Write tools (create/edit resources) and the review step the web has for
-  them; only read tools are given now.
+- [x] Write tools: the web's tools come through WebToolBridge (embed `?ai=1`,
+  `embed/aiTools.ts` denylist). AI edits are held for review like the web
+  (`embed/aiReview.ts` over `AIChangesRuntime`; "N changes by AI" bar, Keep /
+  Undo, asked before leaving). `edit_document_resource` allowed.
+- [x] Message menu (long press): Copy, Regenerate (last reply), Hide (only
+  hides: the chat log is append-only; real delete needs a bridge call).
+  Readable errors with Try again; out of credits shows the web's text and a
+  Buy link (`HostedAi.portal`). AI-generated chat titles, rename by tapping
+  the title. Reasoning parts as a folded "Thinking" row.
+- [ ] Still missing next to the web: model and agent choice, own providers,
+  MCP server settings, /compact, report chat, real message delete, text
+  selection inside a bubble (long press is the menu now).
 - [ ] Checkpointing a long answer while it streams (the web saves every 1 s);
   here it is saved when it ends (or is stopped).
 - [ ] Check on real devices: iOS Files picker (`file_selector_ios`), the system
