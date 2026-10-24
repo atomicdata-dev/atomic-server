@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
+import 'account_store.dart';
 import 'atomic_client.dart';
 import 'own_profile.dart';
 import 'profile_picture_picker.dart';
@@ -186,7 +187,10 @@ class AppSettingsBackend extends shared.AtomicSettingsBackend {
   @override
   shared.AtomicServerBackend get servers => AppServerBackend();
   @override
-  Future<void> Function() get signOut => AtomicSession.clear;
+  Future<void> Function() get signOut => () async {
+        await AccountStore.clear();
+        await AtomicSession.clear();
+      };
 }
 
 class AppServerBackend extends shared.AtomicServerBackend {

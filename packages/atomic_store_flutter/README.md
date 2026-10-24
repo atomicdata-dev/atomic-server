@@ -87,18 +87,22 @@ its dependencies, about 10 minutes cold.
 
 ## Account and sharing
 
-One line in your app bar gives people a sheet to change their name, switch or
-create drives, sign in with a secret, copy their secret, share the drive by
-link, add another device and sign out:
+One line in your app bar opens the shared user panel (the one the Atomic app
+shows as its User page) in a dialog: change your name, switch or create
+workspaces, show your secret or sign in with one, copy an invite link, add
+another device and sign out. The secret and sign-in rows stay closed until
+tapped.
 
 ```dart
 AppBar(title: Text('Notes'), actions: [AtomicAccountButton(node: node)])
 ```
 
-(`showAtomicAccountSheet(context, node)` opens the same sheet from anywhere.)
-Sharing needs a server (`node.connect(origin)`). "Sign in with atomic.place" in
-the browser is not part of the package: it lives in the app in `flutter/`
-together with its account client, so paste-the-secret is the way in here.
+The panel lives in `package:atomic_flutter`; `AtomicNodeSettings(node)` is its
+backend over your node, so `showAtomicUserDialog(context, backend:
+AtomicNodeSettings(node))` opens it from anywhere. Inviting needs a server
+(`node.connect(origin)`). "Sign in with atomic.place" in the browser is not part
+of the package: it lives in the app in `flutter/` together with its account
+client, so paste-the-secret is the way in here.
 
 ## What you get
 

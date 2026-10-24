@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:atomic_flutter/atomic_flutter.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class TestBackend extends AtomicSettingsBackend {
@@ -11,6 +12,21 @@ class TestBackend extends AtomicSettingsBackend {
   int paired = 0;
   final names = {'drive-a': 'Music', 'drive-b': 'Drawings'};
   Completer<List<String>>? pending;
+  bool signingIn = false;
+  bool inviting = false;
+  String? signedInWith;
+  @override
+  Future<String> Function(String secret)? get signInWithSecret => signingIn
+      ? (secret) async {
+          signedInWith = secret;
+          return 'You are signed in.';
+        }
+      : null;
+  @override
+  Future<String> Function({required bool canEdit})? get inviteLink => inviting
+      ? ({required canEdit}) async =>
+          'https://invite.example/${canEdit ? 'edit' : 'read'}'
+      : null;
   @override
   Future<AtomicIdentity?> getActiveAgent() async =>
       const AtomicIdentity(subject: 'did:ad:test', name: 'Musician');
@@ -66,7 +82,7 @@ Future<void> showSettings(WidgetTester tester, TestBackend backend) async {
           body: Builder(
               builder: (context) => TextButton(
                     onPressed: () =>
-                        AgentSettingsDialog.show(context, backend: backend),
+                        showAtomicUserDialog(context, backend: backend),
                     child: const Text('User'),
                   )))));
   await tester.tap(find.text('User'));
@@ -79,7 +95,7 @@ void main() {
     expect(isLiveAtomicPeer('atomic:node:$id', {'did:ad:node:$id'}), isTrue);
   });
 
-  testWidgets('Settings dialog works at phone width and switches/creates drives',
+  testWidgets('the panel works at phone width and switches/creates workspaces',
       (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -87,59 +103,102 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     final backend = TestBackend();
     await showSettings(tester, backend);
-    expect(find.text('Identity'), findsOneWidget);
-    expect(find.text('Drives'), findsOneWidget);
+    expect(find.text('Musician'), findsOneWidget);
+    expect(find.text('Music'), findsOneWidget);
     expect(find.text('Connect by address'), findsNothing);
     expect(find.text('Sign out'), findsNothing);
+    // Closed until asked for: nothing about secrets or signing in.
+    expect(find.text('Sign in with a secret key'), findsNothing);
     expect(backend.exports, 0);
     expect(tester.takeException(), isNull);
     await tester.tap(find.text('Pair with QR code'));
     await tester.pumpAndSettle();
     expect(backend.paired, 1);
-    await tester.ensureVisible(find.text('Drawings'));
+    await tester.tap(find.text('Workspace'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Drawings'));
     await tester.pumpAndSettle();
     expect(backend.active, 'drive-b');
-    await tester.ensureVisible(find.text('New drive'));
-    await tester.tap(find.text('New drive'));
+    expect(find.text('Drawings'), findsOneWidget);
+    await tester.tap(find.text('Workspace'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('New workspace'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'New music');
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
     expect(backend.names.values, contains('New music'));
-    expect(find.text('New music'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets(
-      'failed drive selection preserves the active drive and reports error',
+  testWidgets('a workspace without a name is called Workspace', (tester) async {
+    final backend = TestBackend()..names['drive-a'] = '';
+    await showSettings(tester, backend);
+    expect(find.text('Workspace'), findsNWidgets(2));
+  });
+
+  testWidgets('failed workspace switch keeps the active one and says so',
       (tester) async {
     final backend = TestBackend()..failSwitch = true;
     await showSettings(tester, backend);
-    await tester.ensureVisible(find.text('Drawings'));
+    await tester.tap(find.text('Workspace'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Drawings'));
     await tester.pumpAndSettle();
     expect(backend.active, 'drive-a');
-    expect(find.textContaining('Failed to switch drive'), findsOneWidget);
+    expect(find.textContaining('Could not switch workspace'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('load error offers retry and recovers', (tester) async {
+  testWidgets('a load error is shown', (tester) async {
     final backend = TestBackend()..failLoad = true;
     await showSettings(tester, backend);
     expect(find.textContaining('Drive store unavailable'), findsOneWidget);
-    backend.failLoad = false;
-    await tester.tap(find.text('Retry'));
-    await tester.pumpAndSettle();
-    expect(find.text('Musician'), findsOneWidget);
-    expect(tester.takeException(), isNull);
   });
 
-  testWidgets('closing during load does not update a disposed dialog',
+  testWidgets('secret and sign in stay closed until tapped, then work',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final backend = TestBackend()..signingIn = true;
+    await showSettings(tester, backend);
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text('test-secret'), findsNothing);
+    await tester.tap(find.text('Show secret key'));
+    await tester.pumpAndSettle();
+    expect(find.text('test-secret'), findsOneWidget);
+    await tester.tap(find.text('Sign in with a secret key'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'other');
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+    expect(backend.signedInWith, 'other');
+    expect(find.text('You are signed in.'), findsOneWidget);
+    expect(find.text('test-secret'), findsNothing);
+  });
+
+  testWidgets('the invite row copies a link for the chosen access',
+      (tester) async {
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform, (call) async => null);
+    addTearDown(() => tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null));
+    final backend = TestBackend()..inviting = true;
+    await showSettings(tester, backend);
+    await tester.tap(find.text('Invite someone'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Can edit'));
+    await tester.tap(find.text('Copy invite link'));
+    await tester.pumpAndSettle();
+    expect(find.text('https://invite.example/edit'), findsOneWidget);
+  });
+
+  testWidgets('closing during load does not update a disposed panel',
       (tester) async {
     final backend = TestBackend()..pending = Completer<List<String>>();
-    await tester.pumpWidget(MaterialApp(
-        home: Scaffold(body: AgentSettingsDialog(backend: backend))));
+    await tester.pumpWidget(
+        MaterialApp(home: Scaffold(body: AtomicUserPanel(backend: backend))));
     await tester.pump();
     await tester.pumpWidget(const SizedBox());
     backend.pending!.complete(['drive-a']);

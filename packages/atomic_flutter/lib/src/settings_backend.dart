@@ -68,12 +68,19 @@ abstract class AtomicSettingsBackend {
 
   /// Optional capabilities; unavailable actions are not displayed.
   AtomicServerBackend? get servers => null;
-  Future<void> Function(BuildContext context)? get signInWithAccount => null;
-  Future<void> Function()? get syncAccount => null;
-  Future<void> Function()? get useLocalProjects => null;
-  String? get accountStatus => null;
   Future<void> Function()? get signOut => null;
-  Future<void> Function(BuildContext context)? get signIn => null;
+
+  /// Signs in as the agent of a pasted secret and says what happened, in a
+  /// line to show. Throws for a text that is no secret. Null: no such row.
+  Future<String> Function(String secret)? get signInWithSecret => null;
+
+  /// A link that invites someone to the active workspace. Null: no invite row.
+  Future<String> Function({required bool canEdit})? get inviteLink => null;
+
+  /// The active agent now and after every change of it, here or on another
+  /// device, so a renamed profile shows without a button. Null: no live
+  /// updates. Asked again after every load (a sign-in is a new agent).
+  Stream<AtomicIdentity?>? watchActiveAgent() => null;
 
   /// Saves the agent's own profile (a commit by the agent, synced like any
   /// edit). Without it the profile is only shown, not edited natively.

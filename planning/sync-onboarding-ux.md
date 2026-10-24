@@ -102,7 +102,7 @@ Keep these in step. A change to one is usually a change to its twin.
 | Concern | Browser | Flutter |
 | --- | --- | --- |
 | sync screen | `data-browser/src/routes/SyncRoute.tsx` | `packages/atomic_flutter/lib/src/server_settings_section.dart` |
-| settings shell | (same route) | `packages/atomic_flutter/lib/src/agent_settings_dialog.dart` |
+| settings shell | (same route) | `packages/atomic_flutter/lib/src/user_panel.dart` |
 | onboarding, data elsewhere | `data-browser/src/views/getting-started/ConnectDeviceStep.tsx` | `flutter/lib/screens/login_screen.dart` |
 | pairing code, show / scan | `components/PairingCode.tsx`, `ConnectToDeviceForm.tsx` (`ScanCodeButton`), shown by `ConnectDevice.tsx` | `flutter/lib/screens/pair_screen.dart` |
 | pairing code, format | `browser/lib/src/pairing.ts` | `pair_screen.dart` (`_parsePairingUri`) |

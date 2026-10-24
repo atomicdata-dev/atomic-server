@@ -13,6 +13,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  atomic_flutter:
+    path: ../atomic_flutter
   atomic_store:
     path: ../atomic_store
   http: ^1.3.0

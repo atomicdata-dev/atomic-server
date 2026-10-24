@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:atomic_flutter/atomic_flutter.dart' as shared;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart' show WebViewCookie;
 
@@ -20,9 +19,7 @@ import 'package:atomic_chat/atomic_chat.dart'
 
 import '../assistant/atomic_assistant_api.dart';
 import '../atomic/account_store.dart';
-import '../atomic/atomic_client.dart';
 import '../atomic/settings_backend.dart';
-import '../theme.dart';
 import 'account_link_dialog.dart';
 import 'edit_profile_screen.dart';
 import 'login_screen.dart';
@@ -40,10 +37,9 @@ Widget agentAvatar(shared.AtomicIdentity? agent, {double radius = 16}) =>
 /// Hides the portal's own top bar: the app already has its own.
 const portalChromeCss = 'nav.topbar{display:none!important}';
 
-/// Your agent and everything that syncs, after the web app's Sync page:
-/// who you are, the account that hosts your data (only when one is linked),
-/// this device and the devices it syncs with, and the workspaces. Sync is set
-/// per workspace; the account section speaks about the active one.
+/// The app's User page: the shared [shared.AtomicUserPanel] with what only the
+/// app has: the account that hosts your data (and linking it), AI credits, the
+/// web app's profile, storage and settings pages, and the full device card.
 ///
 /// Pops with true when the person signed out.
 class SyncScreen extends StatefulWidget {
@@ -102,13 +98,180 @@ class _SyncScreenState extends State<SyncScreen> {
   late final shared.AtomicSettingsBackend _backend =
       widget.backend ?? AppSettingsBackend();
 
-  bool _loading = true;
-  String? _error;
-  shared.AtomicIdentity? _agent;
-  String _deviceName = '';
-  String? _peerId;
-  String? _activeDrive;
-  Map<String, String> _drives = {};
+  /// The agent's profile: the native editor when the backend can save it,
+  /// else the agent's own page in the embedded web renderer.
+  Future<void> _openProfile(BuildContext _, shared.AtomicIdentity agent) async {
+    final drive = _backend.getActiveDrive();
+    final save = _backend.saveProfile;
+    if (save != null && widget.profilePage == null) {
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => EditProfileScreen(
+            agent: agent, save: save, pickPicture: _backend.pickProfilePicture),
+      ));
+    } else {
+      if (drive == null) return;
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) =>
+            widget.profilePage?.call(agent.subject) ??
+            openResourceView(
+              api: const AtomicAssistantApi(),
+              drive: drive,
+              subject: agent.subject,
+              title: (agent.name?.isNotEmpty ?? false) ? agent.name! : 'You',
+            ),
+      ));
+    }
+  }
+
+  /// The web app's settings page, like the storage page: in the detail pane
+  /// next to the list, else pushed.
+  void _openSettings() {
+    final drive = _backend.getActiveDrive() ?? '';
+    Widget build(BuildContext _) => ResourceView(
+        api: const AtomicAssistantApi(),
+        drive: drive,
+        title: 'Settings',
+        path: '/app/settings');
+    openFromList<void>(context, build, subject: '$drive#settings');
+  }
+
+  /// The web app's storage page for [drive], in the shell's detail pane next
+  /// to the list, else pushed with the native app bar.
+  void _openStorage(String drive, String name) {
+    final title = 'Storage · $name';
+    Widget build(BuildContext _) =>
+        widget.storagePage?.call(drive, title) ??
+        ResourceView(
+            api: const AtomicAssistantApi(),
+            drive: drive,
+            title: title,
+            path: '/app/storage');
+    openFromList<void>(context, build, subject: '$drive#storage');
+  }
+
+  /// The login screen's sign-in options, on top of this one. It comes back
+  /// with the names of the drives of the account signed in before that came
+  /// along. Resolves true when the panel has to reload.
+  Future<bool> _signInAsOther(BuildContext context) async {
+    final onLoggedIn = widget.onSignedInAsOther ?? () {};
+    // Taken before leaving: showing the app as the other account may rebuild
+    // this screen, and the line still has to be said.
+    final toasts = ToastScope.maybeOf(context);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final brought =
+        await Navigator.of(context).push<List<String>>(MaterialPageRoute(
+      builder: (_) =>
+          widget.signInPage?.call(onLoggedIn) ??
+          LoginScreen(switchAccount: true, onLoggedIn: onLoggedIn),
+    ));
+    if (brought != null && brought.isNotEmpty) {
+      final message = broughtAlongMessage(brought);
+      if (toasts != null) {
+        toasts.show('signed-in-as-other', message, icon: Icons.check);
+      } else {
+        messenger?.showSnackBar(SnackBar(content: Text(message)));
+      }
+    }
+    return brought != null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = shared.syncColors(context);
+    return Scaffold(
+      backgroundColor: c.bgBody,
+      // The user panel: the page is about you and your devices; the web
+      // app's settings are one tap away (and nowhere else in the app).
+      appBar: AppTopBar(
+        title: 'User',
+        actions: [
+          TextButton.icon(
+            key: const ValueKey('sync-open-settings'),
+            onPressed: _openSettings,
+            icon: const Icon(Icons.settings_outlined, size: 20),
+            label: const Text('Settings'),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      // A tablet's detail pane: a readable column, centred.
+      body: LayoutBuilder(
+        builder: (context, box) => Padding(
+          padding: readableHorizontalPadding(box.maxWidth),
+          child: shared.AtomicUserPanel(
+            backend: _backend,
+            avatarBuilder: (agent, radius) =>
+                agentAvatar(agent, radius: radius),
+            openProfile: _openProfile,
+            signInAsOther: _signInAsOther,
+            onSignedOut: () => Navigator.of(context).pop(true),
+            onCopied: _copied,
+            accountBuilder: (context, info) => _AccountSection(
+              backend: _backend,
+              info: info,
+              loadAccount: widget.loadAccount,
+              linkAccount: widget.linkAccount,
+              loadCredits: widget.loadCredits,
+              portalCookie: widget.portalCookie,
+              portalPage: widget.portalPage,
+            ),
+            thisDeviceBuilder: (context, info) => ThisDeviceCard(
+              backend: _backend,
+              deviceName: info.deviceName,
+              peerId: info.peerId,
+              identity: info.agent?.subject,
+              driveNames: info.driveNames,
+              onRename: info.rename,
+              onOpenStorage: _openStorage,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The app's toast, once: a SnackBar shows on every Scaffold of the
+  /// messenger, so on a tablet both the sidebar and the page drew it.
+  void _copied(BuildContext context, String message) {
+    final toasts = ToastScope.maybeOf(context);
+    if (toasts == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+      return;
+    }
+    toasts
+      ..clearCooldown('copied')
+      ..show('copied', message, icon: Icons.check);
+  }
+}
+
+/// The account that hosts your data (only when one is linked, or can be): its
+/// address, Cloud Vault, Cloud Server and AI credits for the active workspace,
+/// and the way to the portal. Reloads when the panel does.
+class _AccountSection extends StatefulWidget {
+  final shared.AtomicSettingsBackend backend;
+  final shared.AtomicUserInfo info;
+  final Future<AccountSummary?> Function(String? drive)? loadAccount;
+  final Future<void> Function(BuildContext context, String portal)? linkAccount;
+  final Future<shared.AtomicAiCredits?> Function()? loadCredits;
+  final Future<String?> Function(Uri portal)? portalCookie;
+  final Widget Function(ResourceWebView page)? portalPage;
+
+  const _AccountSection({
+    required this.backend,
+    required this.info,
+    this.loadAccount,
+    this.linkAccount,
+    this.loadCredits,
+    this.portalCookie,
+    this.portalPage,
+  });
+
+  @override
+  State<_AccountSection> createState() => _AccountSectionState();
+}
+
+class _AccountSectionState extends State<_AccountSection> {
   AccountSummary? _account;
   String? _accountError;
 
@@ -120,63 +283,25 @@ class _SyncScreenState extends State<SyncScreen> {
   /// Where the active server is administered, when it is a managed one: the
   /// only place an account can be linked from.
   String? _portal;
+  bool _openingPortal = false;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadAccount();
   }
 
-  Future<void> _load() async {
-    List<String> drives = const [];
-    try {
-      final agent = await _backend.getActiveAgent();
-      final deviceName = await _backend.getDeviceName();
-      final peerId = await _backend.getPeerId();
-      if (!mounted) return;
-      // Show the screen now; a person with many drives must not wait for
-      // every drive's name before seeing their own devices.
-      setState(() {
-        _agent = agent;
-        _deviceName = deviceName;
-        _peerId = peerId;
-        _activeDrive = _backend.getActiveDrive();
-        _error = null;
-        _loading = false;
-      });
-      // Listing the drives reads each one, which is slow with many: after the
-      // screen is up.
-      drives = await _backend.listDrives();
-      if (!mounted) return;
-      setState(() => _drives = {for (final d in drives) d: _drives[d] ?? ''});
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = '$e';
-          _loading = false;
-        });
-      }
-    }
-    unawaited(_loadAccount());
-    // Names fill in as they arrive, in parallel, each with a deadline.
-    await Future.wait([
-      for (final d in drives)
-        () async {
-          try {
-            final name = await _backend
-                .getDriveName(d)
-                .timeout(const Duration(seconds: 5));
-            if (mounted) setState(() => _drives[d] = name);
-          } catch (_) {}
-        }(),
-    ]);
+  @override
+  void didUpdateWidget(_AccountSection old) {
+    super.didUpdateWidget(old);
+    if (old.info.loads != widget.info.loads) _loadAccount();
   }
 
   /// Where an account can be linked: the portal a known server reports for
   /// itself (the active one first). A self-hosted server names none, so a
   /// person who never used a hosted account is never offered one.
   Future<String?> _findPortal() async {
-    final servers = _backend.servers;
+    final servers = widget.backend.servers;
     if (servers == null) return null;
     try {
       final active = await servers.activeServer();
@@ -204,8 +329,8 @@ class _SyncScreenState extends State<SyncScreen> {
     String? accountError;
     String? portal;
     try {
-      account =
-          await (widget.loadAccount ?? AccountStore.summary)(_activeDrive);
+      account = await (widget.loadAccount ??
+          AccountStore.summary)(widget.info.activeDrive);
     } catch (e) {
       accountError = '$e';
     }
@@ -250,196 +375,8 @@ class _SyncScreenState extends State<SyncScreen> {
     ].join(' · ');
   }
 
-  void _copy(String text, String what) {
-    Clipboard.setData(ClipboardData(text: text));
-    // The app's toast, once: a SnackBar shows on every Scaffold of the
-    // messenger, so on a tablet both the sidebar and the page drew it.
-    final toasts = ToastScope.maybeOf(context);
-    if (toasts == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('$what copied')));
-      return;
-    }
-    toasts
-      ..clearCooldown('copied')
-      ..show('copied', '$what copied', icon: Icons.check);
-  }
-
   void _fail(String what, Object e) =>
       shared.showErrorSnack(context, '$what: $e');
-
-  Future<String?> _ask(String title, String hint, {String initial = ''}) {
-    final controller = TextEditingController(text: initial);
-    return showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(hintText: hint),
-          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-              child: const Text('Save')),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _rename() async {
-    final name =
-        await _ask('Device name', 'Name this device', initial: _deviceName);
-    if (name == null || name.isEmpty) return;
-    try {
-      await _backend.setDeviceName(name);
-      if (mounted) setState(() => _deviceName = name);
-    } catch (e) {
-      if (mounted) _fail('Could not rename the device', e);
-    }
-  }
-
-  /// The agent's profile: the native editor when the backend can save it,
-  /// else the agent's own page in the embedded web renderer.
-  Future<void> _openProfile() async {
-    final agent = _agent;
-    final drive = _activeDrive;
-    if (agent == null) return;
-    final save = _backend.saveProfile;
-    if (save != null && widget.profilePage == null) {
-      await Navigator.of(context).push(MaterialPageRoute<void>(
-        builder: (_) => EditProfileScreen(
-            agent: agent, save: save, pickPicture: _backend.pickProfilePicture),
-      ));
-    } else {
-      if (drive == null) return;
-      await Navigator.of(context).push(MaterialPageRoute<void>(
-        builder: (_) =>
-            widget.profilePage?.call(agent.subject) ??
-            openResourceView(
-              api: const AtomicAssistantApi(),
-              drive: drive,
-              subject: agent.subject,
-              title: (agent.name?.isNotEmpty ?? false) ? agent.name! : 'You',
-            ),
-      ));
-    }
-    if (mounted) await _load();
-  }
-
-  /// The web app's settings page, like the storage page: in the detail pane
-  /// next to the list, else pushed.
-  void _openSettings() {
-    final drive = _activeDrive ?? '';
-    Widget build(BuildContext _) => ResourceView(
-        api: const AtomicAssistantApi(),
-        drive: drive,
-        title: 'Settings',
-        path: '/app/settings');
-    openFromList<void>(context, build, subject: '$drive#settings');
-  }
-
-  /// The web app's storage page for [drive], in the shell's detail pane next
-  /// to the list, else pushed with the native app bar.
-  void _openStorage(String drive, String name) {
-    final title = 'Storage · $name';
-    Widget build(BuildContext _) =>
-        widget.storagePage?.call(drive, title) ??
-        ResourceView(
-            api: const AtomicAssistantApi(),
-            drive: drive,
-            title: title,
-            path: '/app/storage');
-    openFromList<void>(context, build, subject: '$drive#storage');
-  }
-
-  Future<void> _newWorkspace() async {
-    final name = await _ask('New workspace', 'Name');
-    if (name == null || name.isEmpty) return;
-    try {
-      await _backend.createDrive(name);
-      await _load();
-    } catch (e) {
-      if (mounted) _fail('Could not create the workspace', e);
-    }
-  }
-
-  Future<void> _switch(String drive) async {
-    try {
-      await _backend.switchDrive(drive);
-      await _load();
-    } catch (e) {
-      if (mounted) _fail('Could not switch workspace', e);
-    }
-  }
-
-  Future<void> _copySecret() async {
-    try {
-      _copy(await _backend.exportSecret(), 'Secret key');
-    } catch (e) {
-      if (mounted) _fail('Could not copy the secret key', e);
-    }
-  }
-
-  Future<void> _signOut() async {
-    final navigator = Navigator.of(context);
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Sign out?'),
-        content: const Text(
-            "Your data stays on this device, but you'll need your secret key to sign back in."),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Sign out')),
-        ],
-      ),
-    );
-    if (confirm != true) return;
-    try {
-      await AccountStore.clear();
-      await _backend.signOut!();
-      if (navigator.mounted) navigator.pop(true);
-    } catch (e) {
-      if (mounted) _fail('Could not sign out', e);
-    }
-  }
-
-  /// The login screen's sign-in options, on top of this one. It comes back
-  /// with the names of the drives of the account signed in before that came
-  /// along.
-  Future<void> _signInAsOther() async {
-    final onLoggedIn = widget.onSignedInAsOther ?? () {};
-    // Taken before leaving: showing the app as the other account may rebuild
-    // this screen, and the line still has to be said.
-    final toasts = ToastScope.maybeOf(context);
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    final brought =
-        await Navigator.of(context).push<List<String>>(MaterialPageRoute(
-      builder: (_) =>
-          widget.signInPage?.call(onLoggedIn) ??
-          LoginScreen(switchAccount: true, onLoggedIn: onLoggedIn),
-    ));
-    if (brought != null && brought.isNotEmpty) {
-      final message = broughtAlongMessage(brought);
-      if (toasts != null) {
-        toasts.show('signed-in-as-other', message, icon: Icons.check);
-      } else {
-        messenger?.showSnackBar(SnackBar(content: Text(message)));
-      }
-    }
-    if (mounted && brought != null) await _load();
-  }
-
-  bool _openingPortal = false;
 
   /// Opens the portal already signed in as the agent, so the person does not
   /// meet a second login; without a cookie it opens as it always did.
@@ -491,7 +428,9 @@ class _SyncScreenState extends State<SyncScreen> {
           barrierDismissible: false,
           builder: (_) => AccountLinkDialog(
             client: shared.AtomicAccountClient(portal),
-            deviceName: _deviceName.isEmpty ? 'atomic.place' : _deviceName,
+            deviceName: widget.info.deviceName.isEmpty
+                ? 'atomic.place'
+                : widget.info.deviceName,
             save: AccountStore.save,
             openInBrowser: _openInBrowser,
           ),
@@ -508,235 +447,19 @@ class _SyncScreenState extends State<SyncScreen> {
     await _loadAccount();
   }
 
-  String _driveLabel(String drive) =>
-      (_drives[drive]?.isNotEmpty ?? false) ? _drives[drive]! : 'Workspace';
+  String _driveLabel() => widget.info.driveLabel(widget.info.activeDrive ?? '');
 
   @override
   Widget build(BuildContext context) {
     final c = shared.syncColors(context);
-    return Scaffold(
-      backgroundColor: c.bgBody,
-      // The user panel: the page is about you and your devices; the web
-      // app's settings are one tap away (and nowhere else in the app).
-      appBar: AppTopBar(
-        title: 'User',
-        actions: [
-          TextButton.icon(
-            key: const ValueKey('sync-open-settings'),
-            onPressed: _openSettings,
-            icon: const Icon(Icons.settings_outlined, size: 20),
-            label: const Text('Settings'),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          // A tablet's detail pane: a readable column, centred.
-          : LayoutBuilder(
-              builder: (context, box) => ListView(
-                    padding: readableHorizontalPadding(box.maxWidth,
-                            gutter: shared.SyncGap.l)
-                        .copyWith(top: shared.SyncGap.xs, bottom: 32),
-                    children: [
-                      if (_error != null)
-                        Padding(
-                          padding:
-                              const EdgeInsets.only(bottom: shared.SyncGap.m),
-                          child: shared.SyncNote(_error!,
-                              tone: shared.SyncTone.error,
-                              icon: Icons.error_outline),
-                        ),
-                      _identity(c),
-                      _workspaceSwitcher(c),
-                      if (_account != null || _accountError != null)
-                        _account_(c),
-                      if (_account == null && _portal != null)
-                        _linkRow(c, _portal!),
-                      ThisDeviceCard(
-                        backend: _backend,
-                        deviceName: _deviceName,
-                        peerId: _peerId,
-                        identity: _agent?.subject,
-                        driveNames: _drives,
-                        onRename: _rename,
-                        onOpenStorage: _openStorage,
-                      ),
-                      // Servers, paired devices and the pairing code: the browser's
-                      // Devices list.
-                      shared.ServerSettingsSection(
-                        backend: _backend,
-                        onServerChanged: _load,
-                      ),
-                    ],
-                  )),
-    );
-  }
-
-  /// One row: the current workspace. It opens a sheet to switch, so the page
-  /// is not a list of every workspace.
-  Widget _workspaceSwitcher(AppColors c) {
-    final active = _activeDrive;
-    return Padding(
-      padding: const EdgeInsets.only(top: shared.SyncGap.l),
-      child: shared.SyncCard(children: [
-        shared.SyncRow(
-          icon: Icons.folder_outlined,
-          title: active == null ? 'No workspace' : _driveLabel(active),
-          subtitle: 'Workspace',
-          trailing: Icon(Icons.expand_more, size: 24, color: c.textSecondary),
-          onTap: _pickWorkspace,
-        ),
-      ]),
-    );
-  }
-
-  /// The workspaces that are on this device, each once. Listed drives that
-  /// have not been received (no name yet) are one line, not forty.
-  Future<void> _pickWorkspace() async {
-    final seen = <String>{};
-    final shown = <String>[];
-    var elsewhere = 0;
-    for (final d in _drives.keys) {
-      if (!seen.add(AtomicClient.driveKey(d))) continue;
-      final named = (_drives[d] ?? '').isNotEmpty;
-      if (named || d == _activeDrive) {
-        shown.add(d);
-      } else {
-        elsewhere++;
-      }
-    }
-    final c = shared.syncColors(context);
-    final picked = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: c.bgBody,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
-      builder: (ctx) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            for (final d in shown)
-              shared.SyncRow(
-                icon: d == _activeDrive
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_off,
-                title: _driveLabel(d),
-                onTap: () => Navigator.pop(ctx, d),
-              ),
-            if (elsewhere > 0)
-              shared.SyncRow(
-                icon: Icons.cloud_download_outlined,
-                iconColor: c.textSecondary,
-                title:
-                    '$elsewhere more workspace${elsewhere == 1 ? '' : 's'} not on this device yet',
-              ),
-            shared.SyncRow(
-              icon: Icons.add,
-              title: 'New workspace',
-              onTap: () => Navigator.pop(ctx, ''),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (!mounted || picked == null) return;
-    if (picked.isEmpty) {
-      await _newWorkspace();
-    } else if (picked != _activeDrive) {
-      await _switch(picked);
-    }
-  }
-
-  Widget _identity(AppColors c) {
-    final agent = _agent;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        InkWell(
-          mouseCursor: WidgetStateMouseCursor.clickable,
-          onTap: agent == null ? null : _openProfile,
-          borderRadius: BorderRadius.circular(12),
-          child: Row(children: [
-            agentAvatar(agent, radius: 28),
-            const SizedBox(width: shared.SyncGap.l),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    (agent?.name?.isNotEmpty ?? false) ? agent!.name! : 'You',
-                    style: shared.SyncText.title(c),
-                  ),
-                  if (agent != null)
-                    // The ID with a copy mark: a bare line of grey text gave
-                    // no hint that a tap copies it.
-                    Tooltip(
-                      message: 'Copy ID',
-                      child: InkWell(
-                        mouseCursor: WidgetStateMouseCursor.clickable,
-                        key: const Key('copy-agent-id'),
-                        onTap: () => _copy(agent.subject, 'Agent ID'),
-                        borderRadius: BorderRadius.circular(6),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              vertical: shared.SyncGap.s),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            Flexible(
-                              child: Text(shared.shortId(agent.subject),
-                                  overflow: TextOverflow.ellipsis,
-                                  style: shared.SyncText.caption(c)),
-                            ),
-                            const SizedBox(width: shared.SyncGap.s),
-                            Icon(Icons.copy, size: 20, color: c.textSecondary),
-                          ]),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            if (agent != null)
-              Icon(Icons.chevron_right, size: 24, color: c.textSecondary),
-          ]),
-        ),
-        const SizedBox(height: shared.SyncGap.m),
-        Wrap(
-            spacing: shared.SyncGap.s,
-            runSpacing: shared.SyncGap.s,
-            children: [
-              if (agent != null)
-                shared.SyncActionButton(
-                  icon: Icons.edit_outlined,
-                  label: 'Edit profile',
-                  onPressed: _openProfile,
-                ),
-              shared.SyncActionButton(
-                icon: Icons.key,
-                label: 'Copy secret key',
-                onPressed: _copySecret,
-              ),
-              if (_backend.signOut != null)
-                shared.SyncActionButton(
-                  icon: Icons.swap_horiz,
-                  label: 'Sign in to another account',
-                  onPressed: _signInAsOther,
-                ),
-              if (_backend.signOut != null)
-                shared.SyncActionButton(
-                  icon: Icons.logout,
-                  label: 'Sign out',
-                  onPressed: _signOut,
-                ),
-            ]),
-      ],
-    );
+    if (_account != null || _accountError != null) return _account_(c);
+    final portal = _portal;
+    return portal == null ? const SizedBox.shrink() : _linkRow(c, portal);
   }
 
   /// Only for a linked account: address, Cloud Vault and Cloud Server for the
   /// active workspace, and the way to the portal.
-  Widget _account_(AppColors c) {
+  Widget _account_(shared.AppColors c) {
     final account = _account;
     if (account == null) {
       return shared.SyncSection(title: 'Account', children: [
@@ -767,16 +490,14 @@ class _SyncScreenState extends State<SyncScreen> {
       shared.SyncRow(
         icon: Icons.shield_outlined,
         title: 'Cloud Vault',
-        subtitle: vault == null
-            ? 'Off for ${_driveLabel(_activeDrive ?? '')}'
-            : _vaultLine(vault),
+        subtitle:
+            vault == null ? 'Off for ${_driveLabel()}' : _vaultLine(vault),
       ),
       shared.SyncRow(
         icon: Icons.cloud_outlined,
         title: 'Cloud Server',
-        subtitle: server == null
-            ? 'Off for ${_driveLabel(_activeDrive ?? '')}'
-            : _serverLine(server),
+        subtitle:
+            server == null ? 'Off for ${_driveLabel()}' : _serverLine(server),
       ),
       shared.SyncRow(
         icon: Icons.auto_awesome_outlined,
@@ -836,7 +557,7 @@ class _SyncScreenState extends State<SyncScreen> {
     ].join(' · ');
   }
 
-  Widget _linkRow(AppColors c, String portal) =>
+  Widget _linkRow(shared.AppColors c, String portal) =>
       shared.SyncSection(title: 'Account', children: [
         shared.SyncRow(
           icon: Icons.link,

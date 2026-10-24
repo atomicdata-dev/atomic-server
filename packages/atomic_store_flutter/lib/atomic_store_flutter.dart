@@ -4,8 +4,7 @@
 /// See the README for the five-line start.
 library;
 
-export 'src/account_sheet.dart'
-    show AtomicAccountButton, showAtomicAccountSheet;
+export 'src/settings_backend.dart' show AtomicAccountButton, AtomicNodeSettings;
 export 'src/agent_secrets.dart'
     show AgentSecretStore, SecureAgentSecrets, MemoryAgentSecrets;
 export 'src/atomic_flutter.dart' show AtomicFlutter, AtomicNode, AtomicParts;

@@ -1,17 +1,20 @@
 # atomic_flutter
 
-The account, device sync and drive dialog extracted from the Atomic app. Both
-the app and Atomic Audio use `AgentSettingsDialog` with a host backend.
+The user panel (identity, workspaces, devices, servers) extracted from the Atomic app. Both
+the app and Atomic Audio use `AtomicUserPanel` with a host backend.
 
 ```dart
-await AgentSettingsDialog.show(context, backend: settingsBackend);
+await showAtomicUserDialog(context, backend: settingsBackend);
 ```
 
 Implement `AtomicSettingsBackend` using your Atomic client. The host owns
 identity storage, native bindings, pairing, drive persistence and application
-state transitions. The package owns the existing settings dialog and Devices UI.
-Secrets are fetched only when Copy Secret is pressed. `servers`, `signIn` and
-`signOut` are optional capabilities; their actions appear only when supplied.
+state transitions. The package owns the panel and Devices UI: the app shows `AtomicUserPanel` as
+a page, other apps open it with `showAtomicUserDialog`. Secrets are fetched only
+when asked for. `servers`, `signOut`, `signInWithSecret`, `inviteLink` and
+`watchActiveAgent` are optional capabilities; their rows appear only when
+supplied. The app adds what only it has through the panel's builders (account,
+this device, profile page).
 `switchDrive` must persist selection and switch the host's project state before
 returning. Failures must throw, not be swallowed by the host.
 
