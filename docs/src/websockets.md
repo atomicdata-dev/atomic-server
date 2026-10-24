@@ -117,7 +117,7 @@ logged and dropped, not answered.
 | `0x16` | `GET_MANY_RESULT` | responder | client only. |
 | `0x20` | `SUB` | client | WS handler only. **No engine arm**, so an Iroh peer cannot subscribe. |
 | `0x21` | `UNSUB` | client | WS handler only. **No engine arm.** |
-| `0x30` | `SYNC` | Iroh initiator; the browser, as a hash-only probe and then filtered to the differing subjects | engine (both transports) |
+| `0x30` | `SYNC` | Iroh initiator (probe first, with `sync-probe`); the browser, as a hash-only probe and then filtered to the differing subjects | engine (both transports) |
 | `0x31` | `SYNC_OK` | responder | client / initiator only |
 | `0x32` | `SYNC_DIFF` | responder | client / initiator only |
 | `0x33` | `SYNC_PUSH` | either | engine (both transports) |
@@ -125,7 +125,7 @@ logged and dropped, not answered.
 | `0x35` | `BLOB_RESPONSE` | either | engine (both transports) |
 | `0x36` | *reserved* | nobody | nobody. Previously `QUERY_UPDATE`; retired, never reuse. |
 | `0x37` | `HELLO` | both peers on an Iroh stream; a WebSocket client on open | Iroh handshake and live loop; the WS handler records the client's capabilities. The WS server never sends one (its capabilities ride on `AUTH_OK`). |
-| `0x38` | `SYNC_RESEND` | responder, answering a `SYNC` probe whose hash is stale | client only. Tells the client to send its full version-vector `SYNC`. |
+| `0x38` | `SYNC_RESEND` | responder, answering a `SYNC` probe whose hash is stale | client only (browser, Iroh initiator). Tells the client to send its full version-vector `SYNC`. |
 | `0x40` | `EPHEMERAL` | Iroh peers; WS client and server, both ways | Iroh live loop; WS handler (`require_auth`, then the broadcaster). The server relays between the two transports. |
 | `0x41` | `KEEPALIVE` | both sides, on their own schedule | WS server **echoes** it; Iroh **never** echoes it. |
 | `0x42` | `CHALLENGE` | WS server, as its first frame | client only. Never sent on an Iroh stream. |
@@ -761,23 +761,36 @@ Same engine, binary handshake, no text frames:
 <- HELLO (0x37)                accept side introduces itself
 <- AUTH (0x01)                 accept side's auth-back (best effort)
 -> HELLO (0x37)
--> SYNC (0x30)                 drive + hash + full compacted VVs
+-> SYNC (0x30)                 probe: drive + hash, no VVs   (peer has `sync-probe`)
 <- SYNC_OK (0x31)              fast path, hashes match, done
    or
+<- SYNC_RESEND (0x38)          probe missed
+-> SYNC (0x30)                 drive + hash + full VVs (sparse with `sparse-sync`)
 <- SYNC_DIFF (0x32)
 <- SYNC_PUSH (0x33) × n        last chunk flagged LAST
 -> SYNC_PUSH (0x33) × n        the initiator's answer to `pull`
 ```
 
-The initiator sends the full `SYNC` state; there is no probe on this
-transport. If the `SYNC_DIFF` has an empty `push` list the initiator
+When the responder advertises `sync-probe`, the initiator first sends a
+hash-only probe (hash version 2 with `sparse-sync`, else version 1), so a drive
+that did not change costs one hash instead of its version vectors. The
+responder hashes what the identity it authenticated may read; the initiator
+hashes everything it holds, so a drive with subjects the responder may not
+show it misses the probe every time and falls back to the full `SYNC`, which is
+correct. On `SYNC_RESEND` the initiator sends the full `SYNC`, in the sparse
+encoding with hash version 2 when the responder advertises `sparse-sync` and
+otherwise the dense table with hash version 1 (one counter per resource per
+peer in the drive). A responder without `sync-probe` gets the full `SYNC`
+straight away. If the `SYNC_DIFF` has an empty `push` list the initiator
 sends its pushback immediately and stops reading, rather than waiting for
 `SYNC_PUSH` frames that will not come.
 
 Both sides then transition to live mode. On the accept side that happens once
-the bulk exchange completes, including the case of a `SYNC_DIFF` whose `pull`
-list is empty: without that check the accept side stays in handshake mode and
-later live `UPDATE` frames go to the sync engine, which has no arm for them.
+the bulk exchange completes: a probe answered with `SYNC_OK`, a `SYNC_DIFF`
+whose `pull` list is empty, or the initiator's `SYNC_PUSH`. A `SYNC_RESEND` is
+not the end of the exchange; the accept side keeps reading for the full `SYNC`.
+Without these checks the accept side stays in handshake mode and later live
+`UPDATE` frames go to the sync engine, which has no arm for them.
 
 Serving a peer's `pull` list is gated per subject on `check_read` for the
 identity the peer proved, exactly as the accept side's `SYNC_DIFF` is. Dialing

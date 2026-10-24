@@ -171,7 +171,7 @@ pub async fn handle_auth_frame(
 /// through [`WireScheme::subject`]; a peer that listed nothing predates the
 /// rename and gets `did:ad:`, which it can parse. Signed material (commit
 /// JSON, envelopes) is never rewritten: it verifies as stored.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct WireScheme {
     canonical: bool,
 }
@@ -1233,6 +1233,24 @@ pub async fn drive_items_for(
     drive: &str,
     agent: &crate::agents::ForAgent,
 ) -> Result<Vec<DriveItem>, String> {
+    Ok(drive_items_walk(store, drive, agent).await?.0)
+}
+
+/// What a drive walk looked at besides the items, for [`ProbeCache`].
+struct DriveWalk {
+    /// Every subject found under the drive, readable or not.
+    subjects: std::collections::HashSet<String>,
+    /// Subjects outside it that a read decision consults: the drive root's
+    /// ancestors, and the `drive` stamp of each walked resource
+    /// (`hierarchy::check_rights` tries that drive's grants first).
+    externals: std::collections::HashSet<String>,
+}
+
+async fn drive_items_walk(
+    store: &Db,
+    drive: &str,
+    agent: &crate::agents::ForAgent,
+) -> Result<(Vec<DriveItem>, DriveWalk), String> {
     let drive_subject = crate::Subject::from_raw(drive, store.get_base_domain().as_deref());
     let drive_resource = store
         .get_resource(&drive_subject)
@@ -1245,6 +1263,22 @@ pub async fn drive_items_for(
     let drive_subjects = collect_drive_subjects(store, &drive_subject).await;
     let vvs = build_drive_vvs(store, &drive_subjects);
 
+    let mut externals = std::collections::HashSet::new();
+    let mut ancestor = drive_resource.clone();
+    for _ in 0..32 {
+        let Ok(parent) = ancestor.get(crate::urls::PARENT) else {
+            break;
+        };
+        let parent = crate::Subject::from(parent.to_string());
+        if !externals.insert(parent.pure_id()) {
+            break;
+        }
+        match store.get_resource(&parent).await {
+            Ok(r) => ancestor = r,
+            Err(_) => break,
+        }
+    }
+
     let mut items: Vec<DriveItem> = Vec::with_capacity(vvs.len());
     for (subject, vv) in vvs {
         let readable = match store
@@ -1254,7 +1288,12 @@ pub async fn drive_items_for(
             ))
             .await
         {
-            Ok(r) => crate::hierarchy::check_read(store, &r, agent).await.is_ok(),
+            Ok(r) => {
+                if let Ok(stamp) = r.get(crate::urls::DRIVE_PROP) {
+                    externals.insert(crate::Subject::from(stamp.to_string()).pure_id());
+                }
+                crate::hierarchy::check_read(store, &r, agent).await.is_ok()
+            }
             Err(_) => false,
         };
         if readable {
@@ -1262,7 +1301,14 @@ pub async fn drive_items_for(
         }
     }
     items.sort_by(|a, b| a.0.cmp(&b.0));
-    Ok(items)
+    externals.retain(|e| !drive_subjects.contains(e));
+    Ok((
+        items,
+        DriveWalk {
+            subjects: drive_subjects,
+            externals,
+        },
+    ))
 }
 
 /// Sorted inventory in the peer's spelling. Convert before range filtering or
@@ -1309,16 +1355,52 @@ pub async fn drive_sync_hash_for_wire_version(
     wire: WireScheme,
     hash_version: u8,
 ) -> Result<String, String> {
-    let items = drive_items_for_wire(store, drive, agent, wire).await?;
+    // A probe over a drive that did not change is answered from the cache,
+    // validated against the writes since (see `db::write_log`). Only DID
+    // drives: the HTTP-URL walk is a prefix scan the parent test can't mirror.
+    let drive_subject = crate::Subject::from_raw(drive, store.get_base_domain().as_deref());
+    let key = drive_subject
+        .is_did()
+        .then(|| crate::db::write_log::ProbeKey {
+            drive: drive_subject.pure_id(),
+            agent: agent.to_string(),
+            wire,
+            hash_version,
+        });
+    // Read before computing: a write landing mid-walk then counts as newer.
+    let generation = store.write_log().generation();
+    if let Some(key) = &key {
+        let cached = store
+            .probe_cache()
+            .lookup(store.write_log(), key, |subject| {
+                let propvals = store.get_propvals(subject).ok()?;
+                let parent = propvals.get(crate::urls::PARENT)?;
+                Some(crate::Subject::from(parent.to_string()).pure_id())
+            });
+        if let Some(hash) = cached {
+            return Ok(hash);
+        }
+    }
+
+    let (mut items, walk) = drive_items_walk(store, drive, agent).await?;
+    for (subject, _) in &mut items {
+        *subject = wire.subject(subject);
+    }
     let vvs: std::collections::HashMap<String, std::collections::HashMap<String, i32>> = items
         .into_iter()
         .map(|(subject, vv)| (subject, vv.into_iter().collect()))
         .collect();
-    Ok(if hash_version >= 2 {
+    let hash = if hash_version >= 2 {
         compute_drive_hash_v2(&vvs)
     } else {
         compute_drive_hash(&vvs)
-    })
+    };
+    if let Some(key) = key {
+        store
+            .probe_cache()
+            .store(key, generation, hash.clone(), walk.subjects, walk.externals);
+    }
+    Ok(hash)
 }
 
 /// Compare client and server VVs, return binary SYNC_OK/SYNC_DIFF/SYNC_PUSH

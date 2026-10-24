@@ -561,8 +561,9 @@ Two things worth knowing about the runners:
 
 | Flow | Where |
 |---|---|
-| Two Iroh nodes reconcile (bulk + live) | `lib/src/sync/iroh_e2e.rs` (13 tests, real QUIC) |
+| Two Iroh nodes reconcile (bulk + live) | `lib/src/sync/iroh_e2e.rs` (18 tests, real QUIC) |
 | Stroke appended after sync propagates | `lib/src/sync/iroh_e2e.rs` |
+| Iroh initiator probes first: level drives end on `SYNC_OK` (`probe_hit`), a miss falls back to the full sparse `SYNC` and reconciles both ways; both ends reach live mode | `lib/src/sync/iroh_e2e.rs` (`e2e_probe_*`). Not covered: a responder without `sync-probe` / `sparse-sync` (no cheap way to hide a capability) |
 | A peer only receives what its agent may read | `iroh_e2e.rs`, `peer.rs` |
 | A peer cannot forge a third agent's resource | `iroh_e2e.rs` |
 | Relayed write accepted only for a drive we own and dialled | `peer.rs` |
@@ -2767,3 +2768,5 @@ Installation scopes (2026-10-16, host ABI step 2): `server/src/plugins/host_abi/
 ## Agent page
 
 `browser/e2e/tests/agent-page.spec.ts` (full suite, not `@smoke`) opens another agent's page: the conversation started from its Send message button is listed, a private note typed there survives a reload and is not on the other agent's own page, and a resource that agent created in a shared folder shows under Created (as a resource row), and favoriting the agent from its page menu lists it in the sidebar Favorites. Your own agent page has no messages and no notes. `hasMember` is unit tested in `conversations.test.ts`. Not covered: the Created list is by creator, not by last editor (no index of who edited what, see `planning/auditability-loro-history.md` "Secondary indexes"), and the note's `PlainText` also shows in the private drive's resource list.
+
+Sync probe hash cache: Rust unit tests in `lib/src/db/write_log.rs` check that an unchanged drive is served from the cache (hit counter) and equals a cold computation, and that an edit, a new child, a move out of and into the drive, a ring overflow, `clear_tree` and a committed batch each force a recompute, while a write in another drive and an uncommitted batch do not. Agents keep separate entries (Public and a stranger still get an error after the owner is cached). Not covered: a change to a `drive`-stamp resource outside the drive, and the HTTP-URL drive path (never cached).

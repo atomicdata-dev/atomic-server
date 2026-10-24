@@ -138,6 +138,10 @@ pub const CAPABILITIES: &[&str] = &[
     "commit-pace",
 ];
 
+/// Server capability: answers a hash-first `SYNC` probe (`probe: true`) with
+/// `SYNC_OK` or `SYNC_RESEND`.
+pub const CAP_SYNC_PROBE: &str = "sync-probe";
+
 /// Server capability: understands a `SYNC` whose JSON carries `hv: 2` and, in
 /// place of `peers` and `resources`, `vvs` (`subject -> peer -> counter`). The
 /// dense encoding needs one counter per resource per peer in the drive, which

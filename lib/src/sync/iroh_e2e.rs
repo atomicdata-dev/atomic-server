@@ -979,3 +979,101 @@ async fn a_completed_peer_sync_names_the_drive_to_reconnect_to() {
         "after syncing a drive, the device must know to dial back for it"
     );
 }
+
+async fn sync_b_from_a_outcome(pair: &IrohPair) -> crate::sync::peer::PeerSyncOutcome {
+    crate::sync::peer::sync_drive_with_peer_using_outcome(
+        &pair.ep_b,
+        &pair.node_id_a,
+        &pair.drive,
+        &pair.db_b,
+        true,
+    )
+    .await
+    .expect("B→A sync should succeed")
+}
+
+/// Two nodes that hold the same drive: the hash-first probe is answered with
+/// `SYNC_OK`, so the initiator never sends its version vectors, and both
+/// sides still end in live mode.
+#[tokio::test]
+async fn e2e_probe_hit_skips_the_version_vector_table() {
+    use crate::sync::peer;
+
+    let pair = setup_pair("e2e_probe_hit").await;
+    pair.db_a
+        .create_resource(CANVAS_CLASS, &pair.drive, "Seed", None)
+        .await
+        .unwrap();
+
+    // The first sync has to move the seed, so the probe cannot hit.
+    let first = sync_b_from_a_outcome(&pair).await;
+    assert!(!first.probe_hit, "B held nothing: the probe must miss");
+    assert!(first.count > 0);
+
+    // Let both sides settle (the live link of the first sync is replaced).
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    let second = sync_b_from_a_outcome(&pair).await;
+    assert!(second.in_sync, "a level drive is acked in sync");
+    assert!(
+        second.probe_hit,
+        "level drives must be settled by the probe alone"
+    );
+    assert_eq!(second.count, 0);
+    assert_eq!(second.pushed, 0);
+
+    // Both ends reached live mode after a probe-only exchange.
+    wait_for_live_peers(2, std::time::Duration::from_secs(5)).await;
+    assert!(
+        !peer::live_peer_ids().is_empty(),
+        "initiator must be live after a probe hit"
+    );
+    let late = pair
+        .db_a
+        .create_resource(CANVAS_CLASS, &pair.drive, "After probe", None)
+        .await
+        .unwrap();
+    let live_ok = wait_until(std::time::Duration::from_secs(5), || async {
+        pair.db_b.get_resource(&late.as_str().into()).await.is_ok()
+    })
+    .await;
+    assert!(
+        live_ok,
+        "the accept side must stream live updates after a probe hit"
+    );
+}
+
+/// A probe that misses is followed by the full `SYNC`, and the exchange
+/// reconciles both ways.
+#[tokio::test]
+async fn e2e_probe_miss_falls_back_to_full_sync() {
+    let pair = setup_pair("e2e_probe_miss").await;
+    let canvas_a = pair
+        .db_a
+        .create_resource(CANVAS_CLASS, &pair.drive, "Canvas A", None)
+        .await
+        .unwrap();
+    let canvas_b = pair
+        .db_b
+        .create_resource(CANVAS_CLASS, &pair.drive, "Canvas B", None)
+        .await
+        .unwrap();
+
+    let outcome = sync_b_from_a_outcome(&pair).await;
+    assert!(!outcome.probe_hit, "the drives differ: the probe must miss");
+    assert!(!outcome.in_sync);
+    assert!(outcome.count > 0);
+
+    pair.db_b
+        .get_resource(&canvas_a.as_str().into())
+        .await
+        .expect("B should have A's canvas after the fallback");
+    let on_a = wait_until(std::time::Duration::from_secs(5), || async {
+        pair.db_a
+            .get_resource(&canvas_b.as_str().into())
+            .await
+            .is_ok()
+    })
+    .await;
+    assert!(on_a, "A should have B's canvas after the fallback");
+}

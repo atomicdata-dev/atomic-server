@@ -32,6 +32,7 @@ pub(crate) mod prop_val_sub_index;
 mod query_index;
 pub mod redb_store;
 pub mod website;
+pub mod write_log;
 /// The set of drives [`Db::migrate_messages_step`] may write chat log pages
 /// for, from the drives' subjects in any spelling.
 pub fn chat_migration_drive_set(drives: Vec<String>) -> std::collections::HashSet<String> {
@@ -425,6 +426,9 @@ pub struct Db {
     /// The key-value store backend. Abstracted behind a trait so different
     /// backends (sled, BTreeMap, etc.) can be used interchangeably.
     pub kv: Arc<dyn KvStore>,
+    /// Which subjects `kv` wrote, in order; see [`write_log`].
+    write_log: Arc<write_log::WriteLog>,
+    probe_cache: Arc<write_log::ProbeCache>,
     /// Optional remote file storage. Configure before sharing this Db.
     pub blob_backend: Option<Arc<dyn blob_backend::BlobBackend>>,
     default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
@@ -576,13 +580,24 @@ impl Db {
         }
     }
 
+    pub fn write_log(&self) -> &Arc<write_log::WriteLog> {
+        &self.write_log
+    }
+
+    pub fn probe_cache(&self) -> &Arc<write_log::ProbeCache> {
+        &self.probe_cache
+    }
+
     /// A `Db` over `kv` with every other field at its default. Not usable
     /// until [`Db::open`] has run.
     fn from_kv(path: std::path::PathBuf, kv: Arc<dyn KvStore>, base_domain: Option<String>) -> Db {
+        let write_log = Arc::new(write_log::WriteLog::default());
         Db {
             path,
             blob_backend: None,
-            kv: Arc::new(compressed_kv::CompressedKv::new(kv)),
+            kv: Arc::new(compressed_kv::CompressedKv::with_log(kv, write_log.clone())),
+            write_log,
+            probe_cache: Default::default(),
             default_agent: Arc::new(Mutex::new(None)),
             node_key: Arc::new(std::sync::OnceLock::new()),
             endpoints: vec![],
