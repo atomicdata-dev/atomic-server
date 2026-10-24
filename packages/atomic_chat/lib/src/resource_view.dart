@@ -16,6 +16,7 @@ import 'embed_server.dart';
 import 'models.dart';
 import 'native_views.dart';
 import 'page_swipe.dart';
+import 'resource_chrome.dart';
 import 'warm_resource_web_view.dart';
 
 /// A resource as the web app draws it, without the web app around it: the
@@ -695,45 +696,7 @@ class _ResourceViewState extends State<ResourceView>
                       Positioned(
                         top: 0,
                         right: kEmbedNavBarTrailingInset,
-                        child: ListenableBuilder(
-                          listenable: ShellScope.maybeOf(context)!,
-                          builder: (context, _) {
-                            final onMore = ShellScope.maybeOf(context)!.topMenu;
-                            if (onMore == null || _route?.isCurrent != true) {
-                              return const SizedBox.shrink();
-                            }
-                            return Builder(
-                              key: const ValueKey('more'),
-                              builder: (button) => IconButton(
-                                // As big as the web header it sits in
-                                // (36 dp), not the 48 dp default.
-                                iconSize: 20,
-                                padding: EdgeInsets.zero,
-                                visualDensity: VisualDensity.compact,
-                                color: c.textSecondary,
-                                constraints: const BoxConstraints(
-                                    minWidth: kEmbedNavBarHeight,
-                                    minHeight: kEmbedNavBarHeight),
-                                style: IconButton.styleFrom(
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  fixedSize:
-                                      const Size.square(kEmbedNavBarHeight),
-                                  minimumSize:
-                                      const Size.square(kEmbedNavBarHeight),
-                                ),
-                                tooltip: 'More',
-                                onPressed: () {
-                                  final box =
-                                      button.findRenderObject() as RenderBox;
-                                  onMore(box.localToGlobal(Offset.zero) &
-                                      box.size);
-                                },
-                                icon: const Icon(Icons.more_vert),
-                              ),
-                            );
-                          },
-                        ),
+                        child: const ResourceMoreButton(),
                       ),
                     // The swipe back over the web view, which takes the touches.
                     Positioned.fill(

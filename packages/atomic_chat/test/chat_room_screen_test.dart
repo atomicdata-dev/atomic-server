@@ -96,23 +96,6 @@ void main() {
     expect(find.text('Hi'), findsOneWidget);
   });
 
-  testWidgets('the room is renamed from its top bar', (tester) async {
-    final api = _RoomApi([]);
-    await _open(tester, api, title: 'ChatRoom');
-    await tester.tap(find.byTooltip('Rename'));
-    await tester.pumpAndSettle();
-    final field =
-        tester.widget<TextField>(find.byKey(const Key('chat-room-name')));
-    expect(field.controller!.selection,
-        const TextSelection(baseOffset: 0, extentOffset: 8));
-    await tester.enterText(find.byKey(const Key('chat-room-name')), ' Family ');
-    await tester.tap(find.text('Save'));
-    await tester.pumpAndSettle();
-    expect(api.renamed, [('did:ad:room', 'Family')]);
-    expect(find.text('Family'), findsOneWidget);
-    expect(find.text('ChatRoom'), findsNothing);
-  });
-
   testWidgets('parses the host JSON into messages and events', (tester) async {
     final parsed = AssistantJson.parseChatRoomMessages(jsonEncode([
       {
@@ -153,9 +136,13 @@ void main() {
     ]);
     await _open(tester, api);
     expect(
-        find.descendant(
-            of: find.byType(AppBar), matching: find.text('Standup')),
-        findsOneWidget);
+        tester
+            .widget<Text>(
+                find.descendant(
+                    of: find.byType(AppBar),
+                    matching: find.byKey(const Key('chat-header-title'))))
+            .data,
+        'Standup');
 
     final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
     expect(tester.getCenter(find.text('Hi there')).dx, lessThan(width / 2));

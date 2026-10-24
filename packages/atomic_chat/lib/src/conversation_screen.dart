@@ -15,6 +15,7 @@ import 'scroll_to_bottom_button.dart';
 import 'models.dart';
 import 'assistant_api.dart';
 import 'list_and_field.dart';
+import 'resource_chrome.dart';
 
 /// How often the open conversation is read again for messages that arrived
 /// through sync. The read is local (opened messages are cached), so it is cheap.
@@ -32,12 +33,16 @@ class ConversationScreen extends StatefulWidget {
   final AssistantApi api;
   final String subject;
 
+  /// The drive the conversation is in, for the breadcrumbs.
+  final String drive;
+
   /// The other members' names, from the Messages row.
   final String title;
 
   const ConversationScreen({
     super.key,
     required this.api,
+    this.drive = '',
     required this.subject,
     this.title = '',
   });
@@ -193,18 +198,27 @@ class _ConversationScreenState extends State<ConversationScreen>
     return ChatTextScope(
         child: SectionBack(
             section: HomeSection.messages,
-            child: Scaffold(
-              backgroundColor: c.bgBody,
-              appBar: AppTopBar(
-                compact: true,
-                title: widget.title.isEmpty ? 'Conversation' : widget.title,
-                titleWidget: ChatHeader(
+            child: ResourceMenuScope(
+              api: widget.api,
+              subject: widget.subject,
+              child: Scaffold(
+                backgroundColor: c.bgBody,
+                appBar: AppTopBar(
+                  compact: true,
                   title: widget.title.isEmpty ? 'Conversation' : widget.title,
-                  subtitle: _subtitle,
+                  titleWidget: ChatHeader(
+                    title: widget.title.isEmpty ? 'Conversation' : widget.title,
+                    subtitle: _subtitle,
+                  ),
+                  bottom: ResourceBreadcrumbs(
+                      api: widget.api,
+                      drive: widget.drive,
+                      subject: widget.subject),
+                  actions: const [ResourceMoreButton()],
                 ),
+                body: ListAndField(
+                    fullWidthField: true, list: _list(c), field: _composer(c)),
               ),
-              body: ListAndField(
-                  fullWidthField: true, list: _list(c), field: _composer(c)),
             )));
   }
 

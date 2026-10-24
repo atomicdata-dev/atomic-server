@@ -25,9 +25,9 @@ const chatRoomClass = 'https://atomicdata.dev/classes/ChatRoom';
 /// (a meeting's chat is a chat room's).
 final Map<String, NativeViewBuilder> nativeViews = {
   aiChatClass: (api, drive, subject, title) =>
-      ChatScreen(api: api, subject: subject, title: title),
-  conversationClass: (api, drive, subject, title) =>
-      ConversationScreen(api: api, subject: subject, title: title),
+      ChatScreen(api: api, drive: drive, subject: subject, title: title),
+  conversationClass: (api, drive, subject, title) => ConversationScreen(
+      api: api, drive: drive, subject: subject, title: title),
   chatRoomClass: (api, drive, subject, title) =>
       ChatRoomScreen(api: api, drive: drive, subject: subject, title: title),
 };

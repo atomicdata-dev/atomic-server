@@ -34,6 +34,7 @@ import 'hosted_ai.dart';
 import 'hosted_voice.dart';
 import 'voice.dart';
 import 'list_and_field.dart';
+import 'resource_chrome.dart';
 
 /// SharedPreferences key: speak each new answer aloud.
 
@@ -65,6 +66,9 @@ const _maxPills = 5;
 class ChatScreen extends StatefulWidget {
   final AssistantApi api;
   final String? subject;
+
+  /// The drive the chat is in, for the breadcrumbs.
+  final String drive;
   final String title;
 
   /// Speech to text and text to speech; the plugin ones when null, created
@@ -107,6 +111,7 @@ class ChatScreen extends StatefulWidget {
     super.key,
     required this.api,
     this.subject,
+    this.drive = '',
     this.title = '',
     this.speechInput,
     this.speechOutput,
@@ -1559,35 +1564,49 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       },
                       child: scaffold!,
                     ),
-                child: Scaffold(
-                  backgroundColor: c.bgBody,
-                  appBar: AppTopBar(
-                    compact: true,
-                    title: _headerTitle,
-                    titleWidget: InkWell(
-                      key: const Key('chat-title'),
-                      onTap: _chat == null ? null : _askRename,
-                      child: ChatHeader(
+                child: ResourceMenuScope(
+                    api: widget.api,
+                    subject: _chat ?? '',
+                    onRename: _chat == null ? null : _askRename,
+                    child: Scaffold(
+                      backgroundColor: c.bgBody,
+                      appBar: AppTopBar(
+                        compact: true,
                         title: _headerTitle,
-                        subtitle: 'AI assistant',
-                        icon: Icons.auto_awesome_outlined,
+                        // A new chat is not saved yet: no place in the drive.
+                        bottom: _chat == null
+                            ? null
+                            : ResourceBreadcrumbs(
+                                api: widget.api,
+                                drive: widget.drive,
+                                subject: _chat!),
+                        actions: const [ResourceMoreButton()],
+                        titleWidget: InkWell(
+                          key: const Key('chat-title'),
+                          onTap: _chat == null ? null : _askRename,
+                          child: ChatHeader(
+                            title: _headerTitle,
+                            subtitle: 'AI assistant',
+                            icon: Icons.auto_awesome_outlined,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  body: ListAndField(
-                      fullWidthField: true,
-                      list: _list(c),
-                      field: Column(mainAxisSize: MainAxisSize.min, children: [
-                        ValueListenableBuilder<List<PendingChange>>(
-                            valueListenable: _pending,
-                            builder: (context, pending, _) => pending.isEmpty
-                                ? const SizedBox.shrink()
-                                : _ReviewBar(
-                                    count: pending.length,
-                                    onReview: _openReview)),
-                        _composer(c),
-                      ])),
-                ))));
+                      body: ListAndField(
+                          fullWidthField: true,
+                          list: _list(c),
+                          field:
+                              Column(mainAxisSize: MainAxisSize.min, children: [
+                            ValueListenableBuilder<List<PendingChange>>(
+                                valueListenable: _pending,
+                                builder: (context, pending, _) =>
+                                    pending.isEmpty
+                                        ? const SizedBox.shrink()
+                                        : _ReviewBar(
+                                            count: pending.length,
+                                            onReview: _openReview)),
+                            _composer(c),
+                          ])),
+                    )))));
   }
 
   Widget _list(AppColors c) {

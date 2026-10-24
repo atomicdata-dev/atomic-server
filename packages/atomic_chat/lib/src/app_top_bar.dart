@@ -27,6 +27,9 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   /// picture), not after the usual 56 dp of room for it.
   final bool compact;
 
+  /// A strip under the bar (a resource's breadcrumbs).
+  final PreferredSizeWidget? bottom;
+
   const AppTopBar({
     super.key,
     this.title,
@@ -34,10 +37,12 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
     this.actions = const [],
     this.leading,
     this.compact = false,
+    this.bottom,
   }) : assert(title != null || titleWidget != null);
 
   @override
-  Size get preferredSize => const Size.fromHeight(height);
+  Size get preferredSize =>
+      Size.fromHeight(height + (bottom?.preferredSize.height ?? 0));
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +53,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       surfaceTintColor: Colors.transparent,
       scrolledUnderElevation: 0,
       toolbarHeight: height,
+      bottom: bottom,
       centerTitle: false,
       titleSpacing: compact ? 4 : 16,
       leadingWidth: compact ? 48 : null,

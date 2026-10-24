@@ -18,6 +18,7 @@ import 'models.dart';
 import 'native_views.dart';
 import 'slide_back_route.dart';
 import 'list_and_field.dart';
+import 'resource_chrome.dart';
 
 /// Messages of one author closer together than this are one group: the author
 /// is named once above it.
@@ -260,27 +261,31 @@ class _ChatRoomScreenState extends State<ChatRoomScreen>
     return ChatTextScope(
         child: SectionBack(
             section: HomeSection.messages,
-            child: Scaffold(
-              backgroundColor: c.bgBody,
-              appBar: AppTopBar(
-                compact: true,
-                title: _title.isEmpty ? 'Chat' : _title,
-                titleWidget: ChatHeader(
-                  title: _title.isEmpty ? 'Chat' : _title,
-                  subtitle: _subtitle,
-                  icon: Icons.forum_outlined,
-                ),
-                actions: [
-                  IconButton(
-                    tooltip: 'Rename',
-                    icon: const Icon(Icons.edit_outlined),
-                    onPressed: _rename,
+            child: ResourceMenuScope(
+                api: widget.api,
+                subject: widget.subject,
+                onRename: _rename,
+                child: Scaffold(
+                  backgroundColor: c.bgBody,
+                  appBar: AppTopBar(
+                    compact: true,
+                    title: _title.isEmpty ? 'Chat' : _title,
+                    titleWidget: ChatHeader(
+                      title: _title.isEmpty ? 'Chat' : _title,
+                      subtitle: _subtitle,
+                      icon: Icons.forum_outlined,
+                    ),
+                    bottom: ResourceBreadcrumbs(
+                        api: widget.api,
+                        drive: widget.drive,
+                        subject: widget.subject),
+                    actions: const [ResourceMoreButton()],
                   ),
-                ],
-              ),
-              body: ListAndField(
-                  fullWidthField: true, list: _list(c), field: _composer(c)),
-            )));
+                  body: ListAndField(
+                      fullWidthField: true,
+                      list: _list(c),
+                      field: _composer(c)),
+                ))));
   }
 
   /// The room, and how many people have spoken in it.

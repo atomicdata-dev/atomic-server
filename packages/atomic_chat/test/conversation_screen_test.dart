@@ -89,8 +89,12 @@ void main() {
     await _open(tester, api, title: 'Alice');
     expect(api.followed, ['did:ad:convo']);
     expect(
-        find.descendant(of: find.byType(AppBar), matching: find.text('Alice')),
-        findsOneWidget);
+        tester
+            .widget<Text>(find.descendant(
+                of: find.byType(AppBar),
+                matching: find.byKey(const Key('chat-header-title'))))
+            .data,
+        'Alice');
 
     final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
     final theirs = tester.getCenter(find.text('Hi there')).dx;
