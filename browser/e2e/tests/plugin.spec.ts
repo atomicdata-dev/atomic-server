@@ -3,13 +3,12 @@ import {
   before,
   SERVER_URL,
   currentDialog,
-  currentDriveTitle,
   fillSearchBox,
   inDialog,
   newResource,
   openDriveSettings,
   setTitle,
-  sidebarDriveButtonId,
+  openCurrentDrive,
   testFilePath,
   waitForSynced,
 } from './test-utils';
@@ -38,7 +37,7 @@ test.describe('Plugins', () => {
     // (`on_resource_get`) transforms can't satisfy this assertion: WS sends
     // the persisted Loro snapshot (web_sockets.rs:172 KNOWN GAP), so the
     // browser never sees extender-modified propvals.
-    await page.getByTestId(sidebarDriveButtonId).click();
+    await openCurrentDrive(page);
 
     // Plugins live in the Drive settings dialog (its sections start open).
     const settings = await openDriveSettings(page);
@@ -204,7 +203,7 @@ test.describe('Plugins', () => {
     }
 
     // Navigate back to the plugin
-    await currentDriveTitle(page).click();
+    await openCurrentDrive(page);
     const pluginSettings = await openDriveSettings(page);
     await pluginSettings
       .getByRole('link', { name: 'ontola/test-plugin' })
@@ -313,7 +312,7 @@ test.describe('Plugins', () => {
 
     // After uninstall the plugin resource is destroyed, so reloading on its
     // URL would 404. Navigate to the drive page first.
-    await page.getByTestId(sidebarDriveButtonId).click();
+    await openCurrentDrive(page);
 
     // The folder keeps its prefixed name after uninstall: with the
     // after_commit + host.commit model the rename was a real commit, so it

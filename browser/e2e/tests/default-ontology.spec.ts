@@ -2,6 +2,7 @@ import { test, expect } from './fixtures';
 import {
   before,
   createTableFromDialog,
+  openCurrentDrive,
   openDriveSettings,
   openSubject,
 } from './test-utils';
@@ -30,7 +31,7 @@ test.describe('default ontology', () => {
 
     // The drive page's Resources list hides it as well, but it is still the
     // drive's "Default Ontology" setting. Read its subject from there and open it.
-    await page.getByTestId('sidebar-drive-open').click();
+    await openCurrentDrive(page);
     const settings = await openDriveSettings(page);
     await expect(
       settings.getByText('Default Ontology', { exact: true }),

@@ -11,7 +11,6 @@ import {
 import { Fragment, useEffect, useMemo, useState, type JSX } from 'react';
 import { styled } from 'styled-components';
 import { useSettings } from '../../helpers/AppSettings';
-import { constructOpenURL } from '../../helpers/navigation';
 import { Button } from '../Button';
 import { ResourceSideBar } from './ResourceSideBar/ResourceSideBar';
 import { SidebarSelectionProvider } from './ResourceSideBar/SidebarSelection';
@@ -19,14 +18,12 @@ import { SideBarHeader } from './SideBarHeader';
 import { SimpleErrorBlock } from '../ErrorLook';
 import { DriveSwitcher } from './DriveSwitcher';
 import { Row } from '../Row';
-import { IconButton } from '../IconButton/IconButton';
-import { buildDefaultTrigger } from '../Dropdown/DefaultTrigger';
+import type { DropdownTriggerProps } from '../Dropdown/DropdownTrigger';
 import { LuChevronsUpDown } from 'react-icons/lu';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { ScrollArea } from '../ScrollArea';
 import { DropEdge } from './ResourceSideBar/DropEdge';
 import { SIDEBAR_CHILD_LIMIT, SideBarMoreRow } from './SideBarMoreRow';
-import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 import { LoaderInline } from '../Loader';
 import { QuickCreateRow } from '../NewInstanceButton';
 import { ResourceGlyph } from '../ResourceGlyph';
@@ -43,7 +40,7 @@ interface SideBarDriveProps {
  */
 export function SideBarDrive({ onItemClick }: SideBarDriveProps): JSX.Element {
   const store = useStore();
-  const { drive, agent, showSidebarIcons } = useSettings();
+  const { drive, agent } = useSettings();
   const driveResource = useResource(drive);
   const {
     subjects: subResources,
@@ -51,14 +48,6 @@ export function SideBarDrive({ onItemClick }: SideBarDriveProps): JSX.Element {
     loading: childrenLoading,
     total: totalChildren,
   } = useVisibleDriveChildren(drive, { limit: SIDEBAR_CHILD_LIMIT });
-  const [title] = useTitle(driveResource);
-  const isPrivateDrive = useIsPrivateDrive(drive);
-  // A drive with its own emoji or icon shows that; the private drive is
-  // "home" by default, any other drive falls back to the class icon.
-  const [driveEmoji] = useString(driveResource, dataBrowser.properties.emoji);
-  const [driveIcon] = useSubject(driveResource, dataBrowser.properties.icon);
-  const hasCustomGlyph = !!(driveEmoji || driveIcon);
-  const navigate = useNavigateWithTransition();
   const agentCanWrite = useCanWrite(driveResource);
   const [currentSubject] = useCurrentSubject();
   const currentResource = useResource(currentSubject);
@@ -73,35 +62,10 @@ export function SideBarDrive({ onItemClick }: SideBarDriveProps): JSX.Element {
     });
   }, [store, currentResource.stable]);
 
-  const driveName = driveResource.isUnauthorized()
-    ? 'Unauthorized'
-    : driveDisplayName(driveResource.error ? undefined : title, drive);
-
   return (
     <>
       <SideBarHeader>
-        <TitleButton
-          resource={drive}
-          clean
-          current={drive === currentSubject}
-          data-testid='sidebar-drive-open'
-          onClick={() => {
-            onItemClick();
-            navigate(constructOpenURL(drive));
-          }}
-        >
-          {showSidebarIcons && (
-            <DriveGlyph aria-hidden>
-              {!hasCustomGlyph && isPrivateDrive ? (
-                '🏠'
-              ) : (
-                <ResourceGlyph resource={driveResource} />
-              )}
-            </DriveGlyph>
-          )}
-          <DriveTitle data-testid='current-drive-title'>{driveName}</DriveTitle>
-        </TitleButton>
-        <DriveSwitcher Trigger={DriveSwitcherTrigger} />
+        <DriveSwitcher Trigger={DriveSwitcherTrigger} onSwitch={onItemClick} />
       </SideBarHeader>
       <SidebarSelectionProvider current={currentSubject} ancestry={ancestry}>
         <StyledScrollArea>
@@ -194,30 +158,25 @@ const DriveTitle = styled.h2`
   text-overflow: ellipsis;
 `;
 
-/**
- * The title and the drive-switcher caret form one segmented control: a
- * flush inner edges, shared outer rounding, each
- * half highlighting on its own hover.
- */
-const TitleButton = styled(Button)<{ current?: boolean }>`
+const Chevron = styled(LuChevronsUpDown)`
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: ${p => p.theme.colors.textLight};
+`;
+
+/** The whole header is one button: glyph, drive name and a hint chevron. */
+const TriggerButton = styled(Button)<{ current?: boolean }>`
   display: flex;
   align-items: center;
   gap: 0.5rem;
   text-align: left;
-  /* Fill the header so the switcher caret is always pinned to the right;
-     the name truncates when longer than the sidebar. */
   flex: 1;
   min-width: 0;
   padding: 0.35rem 0.5rem;
   border: none;
-  border-radius: ${props => props.theme.radius} 0 0
-    ${props => props.theme.radius};
 
-  ${({ current, theme }) =>
-    current &&
-    `
-    color: ${theme.colors.main};
-  `}
+  ${({ current, theme }) => current && `color: ${theme.colors.main};`}
 
   @media (hover: hover) {
     &:hover {
@@ -229,37 +188,53 @@ const TitleButton = styled(Button)<{ current?: boolean }>`
   }
 `;
 
-const SwitcherButton = styled(IconButton)`
-  align-self: stretch;
-  height: auto;
-  width: auto;
-  padding-inline: 0.35rem;
-  border: none;
-  border-radius: 0 ${p => p.theme.radius} ${p => p.theme.radius} 0;
-  color: ${p => p.theme.colors.textLight};
-  font-size: 0.85rem;
+function DriveSwitcherTrigger({
+  onClick,
+  menuId,
+  isActive,
+  ref,
+  id,
+}: DropdownTriggerProps) {
+  const { drive, showSidebarIcons } = useSettings();
+  const driveResource = useResource(drive);
+  const [title] = useTitle(driveResource);
+  const isPrivateDrive = useIsPrivateDrive(drive);
+  const [currentSubject] = useCurrentSubject();
+  // A drive with its own emoji or icon shows that; the private drive is
+  // "home" by default, any other drive falls back to the class icon.
+  const [driveEmoji] = useString(driveResource, dataBrowser.properties.emoji);
+  const [driveIcon] = useSubject(driveResource, dataBrowser.properties.icon);
+  const hasCustomGlyph = !!(driveEmoji || driveIcon);
+  const driveName = driveResource.isUnauthorized()
+    ? 'Unauthorized'
+    : driveDisplayName(driveResource.error ? undefined : title, drive);
 
-  &:focus-visible {
-    background-color: ${p => p.theme.colors.bg1};
-    color: ${p => p.theme.colors.text};
-  }
-  /* Touch keeps :hover after a tap; only apply it with a real hover. */
-  @media (hover: hover) {
-    &:hover {
-      background-color: ${p => p.theme.colors.bg1};
-      color: ${p => p.theme.colors.text};
-    }
-  }
-  &:active {
-    background-color: ${p => p.theme.colors.bg2};
-  }
-`;
-
-const DriveSwitcherTrigger = buildDefaultTrigger(
-  <LuChevronsUpDown />,
-  'Switch Drive',
-  SwitcherButton,
-);
+  return (
+    <TriggerButton
+      clean
+      current={drive === currentSubject}
+      id={id}
+      aria-controls={menuId}
+      aria-expanded={isActive}
+      aria-haspopup='menu'
+      onClick={onClick}
+      ref={ref}
+      title='Switch Drive'
+    >
+      {showSidebarIcons && (
+        <DriveGlyph aria-hidden>
+          {!hasCustomGlyph && isPrivateDrive ? (
+            '🏠'
+          ) : (
+            <ResourceGlyph resource={driveResource} />
+          )}
+        </DriveGlyph>
+      )}
+      <DriveTitle data-testid='current-drive-title'>{driveName}</DriveTitle>
+      <Chevron aria-hidden />
+    </TriggerButton>
+  );
+}
 
 const SideBarErr = styled(SimpleErrorBlock)`
   margin-inline-end: ${props => props.theme.size()};

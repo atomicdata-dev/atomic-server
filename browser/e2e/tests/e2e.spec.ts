@@ -17,6 +17,7 @@ import {
   contextMenuClick,
   currentDialogOkButton,
   currentDriveTitle,
+  openCurrentDrive,
   editProfileAndCommit,
   editTitle,
   editableTitle,
@@ -116,7 +117,7 @@ test.describe('data-browser', async () => {
 
       await signIn(page);
       const { driveURL, driveTitle } = await newDrive(page);
-      await currentDriveTitle(page).click();
+      await openCurrentDrive(page);
 
       // Initialize unauthorized page for reader. An anonymous user landing on a
       // private drive is redirected to the welcome flow (ErrorPage redirects on

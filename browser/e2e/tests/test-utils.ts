@@ -167,6 +167,21 @@ export const topBarShareButton = (page: Page) =>
 export const editableTitle = (page: Page) => page.getByTestId('editable-title');
 export const currentDriveTitle = (page: Page) =>
   page.getByTestId('current-drive-title');
+/**
+ * Opens the current drive's page. The sidebar header is the drive switcher, so
+ * this opens it and picks the checked (current) drive.
+ */
+export async function openCurrentDrive(page: Page) {
+  const title = ((await currentDriveTitle(page).textContent()) ?? '').trim();
+  await sideBarDriveSwitcher(page).click();
+  const items = page.getByRole('menuitem');
+  const named = items.filter({ hasText: title });
+  // The private drive is labelled "Private drive" in the menu.
+  const item = (await named.count())
+    ? named.first()
+    : items.filter({ hasText: 'Private drive' }).first();
+  await item.click();
+}
 export const contextMenu = '[data-test="context-menu"]';
 /**
  * The search input inside the search overlay (modal). Only visible after the
@@ -275,7 +290,6 @@ export async function typeInAddressBar(page: Page, text: string) {
  */
 export const addressBar = (page: Page) => searchInput(page);
 export const newDriveMenuItem = '[data-test="menu-item-new-drive"]';
-export const sidebarDriveButtonId = 'sidebar-drive-open';
 export const defaultDevServer = 'http://localhost:9883';
 export const currentDialogOkButton = 'dialog[open] >> footer >> text=Ok';
 // Fallback wait for the search index to catch up, for callers that can't
@@ -780,7 +794,7 @@ export async function newDrive(page: Page) {
 }
 
 export async function makeDrivePublic(page: Page) {
-  await currentDriveTitle(page).click();
+  await openCurrentDrive(page);
   await page.click(contextMenu);
   await page.getByRole('menuitem', { name: 'Share', exact: true }).click();
 
@@ -2008,7 +2022,7 @@ export async function changeDrive(
   validate: boolean = true,
 ) {
   try {
-    const driveLink = page.getByTestId(sidebarDriveButtonId);
+    const driveLink = currentDriveTitle(page);
     await expect(driveLink).toBeVisible();
     await openConfigureDrive(page);
     // The input lives behind an "Open" disclosure now — the drives

@@ -15,7 +15,7 @@ import { test, expect, type Page } from './fixtures';
 import {
   before,
   clickAccountMenuItem,
-  currentDriveTitle,
+  openCurrentDrive,
   openAccountMenu,
   editableTitle,
   getCurrentSubject,
@@ -257,7 +257,7 @@ test.describe('notifications', () => {
     });
     // Comments live in the drive's Comments folder, so whoever is to see and
     // add them is invited to the drive, not to the folder alone.
-    await currentDriveTitle(page).click();
+    await openCurrentDrive(page);
     await expect(
       page.getByRole('heading', { name: 'Comment Folder' }),
     ).toHaveCount(0);

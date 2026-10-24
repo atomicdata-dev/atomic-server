@@ -13357,3 +13357,7 @@ msgstr "Add to my account"
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Don't add, keep it in this browser only"
 msgstr "Don't add, keep it in this browser only"
+
+#: src/components/SideBar/SideBarDrive.tsx
+msgid "Switch Drive"
+msgstr "Switch Drive"
