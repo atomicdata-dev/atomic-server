@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'dart:async';
 
 import 'package:atomic_flutter/atomic_flutter.dart'
-    show AppColorsExt, ErrorText, SectionHeaderStyle;
+    show AppColorsExt, ErrorText, HoldFan, HoldFanItem, SectionHeaderStyle;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -49,7 +49,9 @@ class DriveAvatar extends StatelessWidget {
 
 /// The current drive as the home's heading: avatar, bold name and the small
 /// up/down selector of the web sidebar. A tap on the drive opens its page, a
-/// tap on the selector at the right edge opens the drive switcher.
+/// tap on the selector at the right edge opens the drive switcher. Holding
+/// either lists the [recent] drives; dragging onto one and letting go
+/// switches to it ([onPick]).
 class CurrentDriveHeader extends StatelessWidget {
   final DriveInfo? drive;
 
@@ -63,12 +65,70 @@ class CurrentDriveHeader extends StatelessWidget {
   /// root. Null: the header accepts no drops.
   final ValueChanged<DriveDrag>? onDrop;
 
+  /// The drives the hold lists, the most recently visited first; the current
+  /// one is left out. Empty: no hold menu.
+  final List<DriveInfo> recent;
+
+  /// A drive was picked from the hold menu.
+  final ValueChanged<DriveInfo>? onPick;
+
+  /// Most drives the hold menu lists.
+  static const holdDrives = 5;
+
   const CurrentDriveHeader(
       {super.key,
       required this.drive,
       required this.onTap,
       this.onOpen,
-      this.onDrop});
+      this.onDrop,
+      this.recent = const [],
+      this.onPick});
+
+  List<DriveInfo> get _holdDrives {
+    final current = drive == null ? null : driveKeyOf(drive!.subject);
+    return [
+      for (final d in recent)
+        if (driveKeyOf(d.subject) != current) d
+    ].take(holdDrives).toList();
+  }
+
+  /// [child] as the target of [onTap], with the hold menu when there is one.
+  Widget _holdable(
+      {required Key key,
+      required VoidCallback? onTap,
+      required Widget child,
+      double? width,
+      double? height}) {
+    final drives = _holdDrives;
+    final pick = onPick;
+    if (drives.isEmpty || pick == null) {
+      return InkWell(
+        key: key,
+        mouseCursor: WidgetStateMouseCursor.clickable,
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: SizedBox(width: width, height: height, child: child),
+      );
+    }
+    return HoldFan<DriveInfo>(
+      key: key,
+      onTap: onTap,
+      cardMenu: true,
+      defaultIndex: null,
+      menuLabel: 'Recent drives',
+      borderRadius: BorderRadius.circular(8),
+      width: width,
+      size: height ?? 40,
+      items: [
+        for (final d in drives)
+          HoldFanItem(driveTitle(d), d,
+              emoji: d.emoji,
+              icon: d.emoji == null ? Icons.folder_outlined : null),
+      ],
+      onSelected: pick,
+      child: child,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -126,10 +186,8 @@ class CurrentDriveHeader extends StatelessWidget {
                 label: 'Open drive $name',
                 excludeSemantics: true,
                 onTap: open,
-                child: InkWell(
+                child: _holdable(
                   key: const Key('current-drive-open'),
-                  mouseCursor: WidgetStateMouseCursor.clickable,
-                  borderRadius: BorderRadius.circular(8),
                   onTap: open,
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(minHeight: 40),
@@ -169,18 +227,14 @@ class CurrentDriveHeader extends StatelessWidget {
                 label: 'Switch drive',
                 excludeSemantics: true,
                 onTap: onTap,
-                child: InkWell(
+                child: _holdable(
                   key: const Key('current-drive-switch'),
-                  mouseCursor: WidgetStateMouseCursor.clickable,
-                  borderRadius: BorderRadius.circular(8),
                   onTap: onTap,
-                  child: SizedBox(
-                    width: m.chevronSlot,
-                    height: math.max(40, m.chevronSlot),
-                    child: Center(
-                        child: Icon(Icons.unfold_more,
-                            size: m.chevronSize, color: c.textSecondary)),
-                  ),
+                  width: m.chevronSlot,
+                  height: math.max(40, m.chevronSlot),
+                  child: Center(
+                      child: Icon(Icons.unfold_more,
+                          size: m.chevronSize, color: c.textSecondary)),
                 ),
               )),
         ]),

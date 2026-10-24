@@ -379,8 +379,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
     if (!identical(shell, _shell)) {
       _shell?.removeListener(_onShellChanged);
       _shell?.sectionRequest.removeListener(_onSectionRequest);
+      _shell?.drive.removeListener(_onShellDrive);
       shell?.addListener(_onShellChanged);
       shell?.sectionRequest.addListener(_onSectionRequest);
+      shell?.drive.addListener(_onShellDrive);
       _handledRequest = shell?.sectionRequest.value?.n ?? 0;
     }
     _shell = shell;
@@ -420,9 +422,22 @@ class _ChatsScreenState extends State<ChatsScreen> {
     }
   }
 
+  /// Another page made a drive the current one (a resource of it was
+  /// opened): the home follows.
+  void _onShellDrive() {
+    final subject = _shell?.drive.value;
+    if (subject == null || subject.isEmpty) return;
+    if (driveKey(subject) == driveKey(_drive)) return;
+    _selectDrive(_driveList.firstWhere(
+        (d) => driveKey(d.subject) == driveKey(subject),
+        orElse: () =>
+            (subject: subject, name: '', emoji: null, picture: null)));
+  }
+
   @override
   void dispose() {
     widget.api.storeChanges?.removeListener(_storeChanged);
+    _shell?.drive.removeListener(_onShellDrive);
     _shell?.removeListener(_onShellChanged);
     _shell?.sectionRequest.removeListener(_onSectionRequest);
     _shell?.homeSections.value = const [];
@@ -1124,6 +1139,11 @@ class _ChatsScreenState extends State<ChatsScreen> {
                       ? null
                       : () => _openDrivePage(_currentDrive!),
                   onDrop: (d) => _tree.currentState?.moveToRoot(d),
+                  recent: _driveList,
+                  onPick: (d) {
+                    _switcher.value = false;
+                    _selectDrive(d);
+                  },
                 ),
               ),
             ),

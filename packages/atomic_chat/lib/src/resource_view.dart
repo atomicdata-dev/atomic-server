@@ -13,6 +13,7 @@ import 'app_sidebar_icons.dart';
 import 'app_theme.dart';
 import 'assistant_api.dart';
 import 'embed_server.dart';
+import 'models.dart';
 import 'native_views.dart';
 import 'page_swipe.dart';
 import 'warm_resource_web_view.dart';
@@ -478,6 +479,12 @@ class _ResourceViewState extends State<ResourceView>
     }
     final id = request['id'] as int;
     final method = request['method'] as String;
+    if (method == 'opened') {
+      final args = request['args'];
+      if (args is List && args.isNotEmpty) {
+        unawaited(_followDrive('${args[0]}'));
+      }
+    }
     if (method == 'openNative') {
       await _answerOpenNative(id, request['args']);
       return;
@@ -551,6 +558,29 @@ class _ResourceViewState extends State<ResourceView>
       }
     } catch (e) {
       debugPrint('[embed] reply to $method not delivered: $e');
+    }
+  }
+
+  /// The page settled on [subject]: when it is in another of the person's
+  /// drives, that drive becomes the current one (the home follows).
+  Future<void> _followDrive(String subject) async {
+    final shell = ShellScope.maybeOf(context);
+    if (shell == null || subject.isEmpty) return;
+    try {
+      final drive = await driveOfResource(widget.api, subject);
+      if (drive == null || driveKey(drive) == driveKey(shell.drive.value)) {
+        return;
+      }
+      final known = await widget.api.drives();
+      if (!mounted) return;
+      for (final d in known) {
+        if (driveKey(d.subject) == driveKey(drive)) {
+          shell.drive.value = d.subject;
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('[embed] drive of $subject not followed: $e');
     }
   }
 
@@ -641,8 +671,7 @@ class _ResourceViewState extends State<ResourceView>
           body: SafeArea(
             bottom: false,
             child: _error != null
-                ? Center(
-                    child: ErrorText('$_error', color: c.alert))
+                ? Center(child: ErrorText('$_error', color: c.alert))
                 : Stack(children: [
                     if (page != null && _inTree) page.build(),
                     if (!_skeletonGone)
@@ -762,4 +791,20 @@ class ResourceSkeleton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The drive [subject] is in, from its `drive` property (a drive is its own),
+/// or null when the store does not know.
+Future<String?> driveOfResource(AssistantApi api, String subject) async {
+  var res =
+      jsonDecode(await api.embedCall('getResource', jsonEncode([subject])));
+  if (res is String) res = jsonDecode(res);
+  if (res is! Map) return null;
+  final drive = res['https://atomicdata.dev/properties/drive'];
+  if (drive is String && drive.isNotEmpty) return drive;
+  final isA = res['https://atomicdata.dev/properties/isA'];
+  if (isA is List && isA.contains('https://atomicdata.dev/classes/Drive')) {
+    return subject;
+  }
+  return null;
 }
