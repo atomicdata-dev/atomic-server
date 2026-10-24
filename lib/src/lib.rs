@@ -7,7 +7,7 @@ See the [Atomic Data Docs](https://docs.atomicdata.dev) for more information.
 
 - Two stores for Atomic Data:
   - **In-memory** [Store] for getting / setting data. Useful for client applications.
-  - **On disk** [Db], powered by Sled. Useful for applications that persist Atomic Data, such as [`atomic-server`](https://crates.io/crates/atomic-server).
+  - **Indexed database** [Db], powered by redb with native file, in-memory, and browser OPFS backends. Sled is retained for legacy-store compatibility and migration.
 - [serialize] and [parse] tools for [JSON-AD](https://docs.atomicdata.dev/core/json-ad.html), plain JSON, RDF, Turtle, N-Triples and JSON-LD.
 - [Resource] with getters, setters and a `.save` function that creates Commits.
 - [Value] converts Atomic Data to Rust native types

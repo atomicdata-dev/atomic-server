@@ -412,9 +412,10 @@ pub const DURABLE_FLUSH_INTERVAL: std::time::Duration = std::time::Duration::fro
 
 type PendingBlobRequests = HashMap<[u8; 32], (String, web_time::Instant)>;
 
-/// The Db is a persistent on-disk Atomic Data store.
+/// An embedded Atomic Data store with indexed queries and persistence.
 /// It's an implementation of [Storelike].
-/// It uses a [KvStore] backend for key-value storage (sled, BTreeMap, etc.).
+/// It uses a [KvStore] backend: redb over a native file, memory, or browser OPFS;
+/// optional sled support provides legacy-store compatibility and migration.
 /// It stores [Resource]s as [PropVals]s by their subject as key.
 /// It builds a value index for performant [Query]s.
 /// It keeps track of Queries and updates their index when [crate::Commit]s are applied.

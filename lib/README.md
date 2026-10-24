@@ -18,7 +18,7 @@ For code examples, see [`examples/basic.rs`](examples/basic.rs) and the many tes
 
 - Two stores for Atomic Data:
   - In-memory store for getting / setting data (`Store`). Useful for clients.
-  - On disk database (`Db`, uses Sled), which powers `atomic-server`.
+  - Indexed database (`Db`) using redb with native file, in-memory, and browser OPFS backends. Sled is retained for legacy-store compatibility and migration.
 - [JSON-AD Parser & Serializer](https://docs.atomicdata.dev/core/json-ad.html)
 - Serialization of atomic data to JSON-AD, plain JSON, RDF, Turtle, N-Triples and JSON-LD.
 - [Path](https://docs.atomicdata.dev/core/paths.html) traversal
@@ -39,8 +39,10 @@ Some features of this library are optional, to minimize bundle size and compile 
 
 **db**
 
-The db features adds persistence, which means that you can store stuff on an HDD / SSD.
-It uses [Sled], a performant, embedded key-value store.
+The `db` feature enables the redb database and its indexes. Native applications
+can use a file-backed or in-memory store; the WASM bindings can persist in OPFS.
+`db-redb` is a compatibility alias for `db`. The separate `db-sled` feature adds
+Sled compatibility and migrations and is unavailable in WASM.
 
 **rdf**
 
