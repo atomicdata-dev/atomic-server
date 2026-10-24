@@ -1424,7 +1424,7 @@ void main() {
       await _settle(tester);
       expect(tester.widget<FilterChip>(chip).selected, isTrue);
       expect(find.text('My notes'), findsOneWidget);
-      expect(find.textContaining('You '), findsOneWidget);
+      expect(find.text('You'), findsOneWidget);
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getBool('activity_show_mine'), isTrue);
       // A fresh start keeps it.
@@ -1468,7 +1468,7 @@ void main() {
       await _settle(tester);
       expect(chip, findsNothing);
       expect(find.text('My notes'), findsOneWidget);
-      expect(find.textContaining('You '), findsOneWidget);
+      expect(find.text('You'), findsOneWidget);
       await _done(tester);
     });
   });

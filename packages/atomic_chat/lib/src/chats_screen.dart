@@ -772,48 +772,43 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   /// An activity row as the web's Drive Activity: the resource's icon and
-  /// title, and who did it with their avatar and when ("Polle · 16h ago"),
-  /// under a feed across drives also which drive. On a wide pane the who and
-  /// when sit at the right; on a phone they are the caption. A deleted
-  /// resource is gone, so its row is not tappable.
+  /// title, under it who did it with their avatar ("Polle created"), and at
+  /// the right when, after the drive under a feed across drives ("Ontola ·
+  /// 16h ago"). A deleted resource is gone, so its row is not tappable.
   Widget _activityRow(ActivityEntry a) => Builder(builder: (context) {
         final showDrive = ActivityDriveFilter.of(context) == null;
         final wide = MediaQuery.sizeOf(context).width >= 600;
         final c = context.appColors;
         final verb = switch (a.kind) {
-          'created' => 'created ',
-          'deleted' => 'deleted ',
+          'created' => ' created',
+          'deleted' => ' deleted',
           _ => '',
         };
         final who = a.actor ?? 'Unknown member';
         final when = shortTimeAgo(a.at.toInt());
         final lead = leadingOf(a.picture, _icons[a.subject], a.className);
-        final style = TextStyle(color: c.textSecondary, fontSize: 13);
-        Widget avatar(double size) => RowLeading(
-              key: const Key('activity-actor-avatar'),
-              size: size,
-              shape: RowShape.circle,
-              showInitial: true,
-              fallbackLabel: who,
-              fallbackIcon: Icons.person_outline,
-              image: ImageSource.of(a.actorPicture),
-            );
+        final style = TextStyle(color: c.textSecondary, fontSize: 12);
         final driveName = a.driveName ?? '';
         final driveCaption = showDrive && driveName.isNotEmpty
-            ? Row(key: const Key('activity-drive'), children: [
-                SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: RowLeading(
-                        size: 14,
-                        fallbackIcon: Icons.folder_outlined,
-                        fallbackLabel: driveName,
-                        image: ImageSource.of(a.drivePicture))),
-                const SizedBox(width: 6),
-                Flexible(
-                    child: Text(driveName,
-                        maxLines: 1, overflow: TextOverflow.ellipsis)),
-              ])
+            ? Row(
+                key: const Key('activity-drive'),
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                    SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: RowLeading(
+                            size: 14,
+                            fallbackIcon: Icons.folder_outlined,
+                            fallbackLabel: driveName,
+                            image: ImageSource.of(a.drivePicture))),
+                    const SizedBox(width: 6),
+                    Flexible(
+                        child: Text(driveName,
+                            style: style,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis)),
+                  ])
             : null;
         return ResourceRow(
           subject: a.subject,
@@ -822,26 +817,30 @@ class _ChatsScreenState extends State<ChatsScreen> {
           shape: lead.shape,
           showInitial: lead.initial,
           title: a.name.isEmpty ? a.subject : a.name,
-          detailWidget: wide
-              ? driveCaption
-              : Row(children: [
-                  avatar(16),
-                  const SizedBox(width: 6),
-                  Flexible(
-                      child: Text('$who $verb· $when'.replaceAll('  ', ' '),
-                          maxLines: 1, overflow: TextOverflow.ellipsis)),
-                  if (driveCaption != null) ...[
-                    const Text(' · '),
-                    Flexible(child: driveCaption),
-                  ],
-                ]),
-          trailing: wide
-              ? Row(mainAxisSize: MainAxisSize.min, children: [
-                  avatar(22),
-                  const SizedBox(width: 8),
-                  Text('$who $verb· $when'.replaceAll('  ', ' '), style: style),
-                ])
-              : null,
+          detailWidget: Row(children: [
+            RowLeading(
+              key: const Key('activity-actor-avatar'),
+              size: 16,
+              shape: RowShape.circle,
+              showInitial: true,
+              fallbackLabel: who,
+              fallbackIcon: Icons.person_outline,
+              image: ImageSource.of(a.actorPicture),
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+                child: Text('$who$verb',
+                    maxLines: 1, overflow: TextOverflow.ellipsis)),
+          ]),
+          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (driveCaption != null) ...[
+              ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: wide ? 180 : 110),
+                  child: driveCaption),
+              Text(' · ', style: style),
+            ],
+            Text(when, key: const Key('activity-when'), style: style),
+          ]),
           onTap: a.kind == 'deleted'
               ? null
               : () {

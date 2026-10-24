@@ -956,7 +956,7 @@ void main() {
       expect(tester.getTopLeft(find.byKey(const Key('drive-new-row'))).dy,
           lessThan(y('Activity')));
       expect(y('Activity'), lessThan(y('AI chats')));
-      expect(find.text('Ann · 5m ago'), findsOneWidget);
+      expect(find.text('Ann'), findsOneWidget);
     });
 
     testWidgets('says so when there is no activity', (tester) async {
@@ -1034,7 +1034,7 @@ void main() {
       await tester
           .pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
       await tester.pumpAndSettle();
-      expect(find.text('Unknown member deleted · 5m ago'), findsOneWidget);
+      expect(find.text('Unknown member deleted'), findsOneWidget);
       ListTile tile(String title) => tester.widget<ListTile>(
           find.ancestor(of: find.text(title), matching: find.byType(ListTile)));
       expect(tile('Old note').onTap, isNull);

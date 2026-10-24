@@ -109,10 +109,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expectRow(tester, 'Butter Cheese',
-        who: 'Polle Pas 1 · 16h ago', drive: 'Ontola', picture: true);
+        who: 'Polle Pas 1', drive: 'Ontola', picture: true);
     // No picture known: the initial on a colour, not an image.
     expectRow(tester, 'Tekenign',
-        who: 'joep.io · 5d ago', drive: 'Other drive', picture: false);
+        who: 'joep.io', drive: 'Other drive', picture: false);
     final row = find
         .ancestor(of: find.text('Tekenign'), matching: find.byType(ResourceRow))
         .first;
@@ -126,6 +126,17 @@ void main() {
     // The type icon of a document.
     expect(find.descendant(of: row, matching: find.byType(RowLeading)),
         findsWidgets);
+    // Who sits under the title; the drive and when sit at the right.
+    final title = tester.getRect(find.text('Tekenign'));
+    final whoRect = tester
+        .getRect(find.descendant(of: row, matching: find.text('joep.io')));
+    final drive = tester
+        .getRect(find.descendant(of: row, matching: find.text('Other drive')));
+    final when =
+        tester.getRect(find.descendant(of: row, matching: find.text('5d ago')));
+    expect(whoRect.top, greaterThan(title.top));
+    expect(drive.left, greaterThan(whoRect.right));
+    expect(when.left, greaterThan(drive.right));
   });
 
   testWidgets('the full page, and its drive chips limit the feed to a drive',
@@ -136,7 +147,8 @@ void main() {
     final api = _Api(activityList: entries, driveList: drives);
     await tester.pumpWidget(app(ChatsScreen(drive: 'did:ad:drive', api: api)));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const ValueKey('section-show-all-activity')));
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('section-show-all-activity')));
     await tester.pump();
     await tester.tap(find.byKey(const ValueKey('section-show-all-activity')));
     await tester.pumpAndSettle();
@@ -144,7 +156,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expectRow(tester, 'Butter Cheese',
-        who: 'Polle Pas 1 · 16h ago', drive: 'Ontola', picture: true);
+        who: 'Polle Pas 1', drive: 'Ontola', picture: true);
     expect(find.text('Tekenign'), findsOneWidget);
 
     await tester.ensureVisible(find.byKey(const Key('activity-drive-d2')));
@@ -169,7 +181,8 @@ void main() {
     expect(inList('Butter Cheese'), findsOneWidget);
   });
 
-  testWidgets('on a tablet the who and when sit at the right, with the avatar',
+  testWidgets(
+      'on a tablet too: who under the title, drive and when at the right',
       (tester) async {
     tester.view.physicalSize = const Size(1200, 900);
     tester.view.devicePixelRatio = 1;
@@ -180,7 +193,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.pumpAndSettle();
 
-    expect(find.text('Polle Pas 1 · 16h ago'), findsWidgets);
+    expect(find.text('Polle Pas 1'), findsWidgets);
+    expect(find.text('16h ago'), findsWidgets);
     expect(find.text('Ontola'), findsWidgets);
     expect(find.byKey(const Key('activity-actor-avatar')), findsWidgets);
     expect(

@@ -56,10 +56,11 @@ void main() {
     expect(y(find.text('My own edit')), greaterThan(activity));
     expect(find.text('My own edit'), findsOneWidget);
 
-    expect(find.text('Bob · 5m ago'), findsOneWidget);
+    expect(find.text('Bob'), findsOneWidget);
+    expect(find.text('5m ago'), findsWidgets);
     expect(y(find.text('Bobs plan')), greaterThan(activity));
-    expect(find.text('a3f9… created · 5m ago'), findsOneWidget);
-    expect(find.text('Unknown member · 5m ago'), findsOneWidget);
+    expect(find.text('a3f9… created'), findsOneWidget);
+    expect(find.text('Unknown member'), findsOneWidget);
     expect(find.textContaining('Someone'), findsNothing);
     // Only the person's drives.
     expect(find.text('Not my drive'), findsNothing);
