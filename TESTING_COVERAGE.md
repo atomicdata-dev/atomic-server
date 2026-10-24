@@ -561,8 +561,9 @@ Two things worth knowing about the runners:
 
 | Flow | Where |
 |---|---|
-| Two Iroh nodes reconcile (bulk + live) | `lib/src/sync/iroh_e2e.rs` (13 tests, real QUIC) |
+| Two Iroh nodes reconcile (bulk + live) | `lib/src/sync/iroh_e2e.rs` (18 tests, real QUIC) |
 | Stroke appended after sync propagates | `lib/src/sync/iroh_e2e.rs` |
+| Iroh initiator probes first: level drives end on `SYNC_OK` (`probe_hit`), a miss falls back to the full sparse `SYNC` and reconciles both ways; both ends reach live mode | `lib/src/sync/iroh_e2e.rs` (`e2e_probe_*`). Not covered: a responder without `sync-probe` / `sparse-sync` (no cheap way to hide a capability) |
 | A peer only receives what its agent may read | `iroh_e2e.rs`, `peer.rs` |
 | A peer cannot forge a third agent's resource | `iroh_e2e.rs` |
 | Relayed write accepted only for a drive we own and dialled | `peer.rs` |
