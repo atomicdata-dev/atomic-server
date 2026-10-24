@@ -1352,12 +1352,17 @@ void main() {
       Future<List<String>> switcher() async {
         await tester.tap(find.byKey(const Key('current-drive-switch')));
         await _settle(tester);
+        // The current drive is the header, so it is not a row.
         final tops = {
-          for (final d in ['a', 'b'])
-            d: tester
-                .getTopLeft(
-                    find.byKey(ValueKey('drive-switcher-row-did:ad:$d')))
-                .dy
+          for (final d in ['a', 'b', 'c'])
+            if (find
+                .byKey(ValueKey('drive-switcher-row-did:ad:$d'))
+                .evaluate()
+                .isNotEmpty)
+              d: tester
+                  .getTopLeft(
+                      find.byKey(ValueKey('drive-switcher-row-did:ad:$d')))
+                  .dy
         };
         return tops.keys.toList()..sort((x, y) => tops[x]!.compareTo(tops[y]!));
       }
@@ -1367,17 +1372,19 @@ void main() {
         await _settle(tester);
       }
 
-      expect(await switcher(), ['a', 'b']);
-      // Picking Beta makes it the active drive and the first in the list.
+      // Alpha, the first drive, is current: the others in the host's order.
+      expect(await switcher(), ['c', 'b']);
+      // Picking Beta makes it the active drive (out of the list) and, once
+      // another drive is current, the first in it.
       await tester
-          .tap(find.byKey(const ValueKey('drive-switcher-switch-did:ad:b')));
+          .tap(find.byKey(const ValueKey('drive-switcher-open-did:ad:b')));
       await _settle(tester);
       expect(api.activeSet, ['did:ad:b']);
       expect(find.byKey(const Key('drive-switcher')), findsNothing);
       expect(
           tester.widget<Text>(find.byKey(const Key('current-drive-name'))).data,
           'Beta');
-      expect(await switcher(), ['b', 'a']);
+      expect(await switcher(), ['a', 'c']);
       await close();
 
       // A fresh start reads the visits from the device.
@@ -1386,7 +1393,7 @@ void main() {
       await warmDriveVisits();
       await tester.pumpWidget(_shell(_VisitApi()));
       await _settle(tester);
-      expect(await switcher(), ['b', 'a']);
+      expect(await switcher(), ['b', 'c']);
       await close();
       await _done(tester);
     });
@@ -1484,6 +1491,7 @@ class _VisitApi extends FakeApi {
   _VisitApi()
       : super(driveList: const [
           (subject: 'did:ad:a', name: 'Alpha', emoji: null, picture: null),
+          (subject: 'did:ad:c', name: 'Gamma', emoji: null, picture: null),
           (subject: 'did:ad:b', name: 'Beta', emoji: null, picture: null),
         ]);
 }

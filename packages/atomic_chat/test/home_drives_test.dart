@@ -17,12 +17,14 @@ void main() {
       (subject: 'did:ad:current', name: 'Zebra', emoji: null, picture: null),
       (subject: 'did:ad:used', name: 'Mango', emoji: null, picture: null),
       (subject: 'did:ad:never-a', name: 'Apple', emoji: null, picture: null),
+      (subject: 'did:ad:never-b', name: 'Kiwi', emoji: null, picture: null),
     ]);
     await tester
         .pumpWidget(app(ChatsScreen(drive: 'did:ad:current', api: api)));
     await tester.pumpAndSettle();
 
-    // The current drive is the header; the switcher lists them as given.
+    // The current drive is the header; the switcher lists the others as
+    // given.
     expect(find.byKey(const Key('current-drive-name')), findsOneWidget);
     expect(find.text('Zebra'), findsOneWidget);
     await tester.tap(find.byKey(const Key('current-drive-switch')));
@@ -30,7 +32,9 @@ void main() {
     double y(String s) => tester
         .getTopLeft(find.byKey(ValueKey('drive-switcher-row-did:ad:$s')))
         .dy;
-    expect(y('current'), lessThan(y('used')));
+    expect(find.byKey(const ValueKey('drive-switcher-row-did:ad:current')),
+        findsNothing);
     expect(y('used'), lessThan(y('never-a')));
+    expect(y('never-a'), lessThan(y('never-b')));
   });
 }

@@ -4,7 +4,6 @@ import 'dart:async';
 import 'package:atomic_flutter/atomic_flutter.dart'
     show AppColorsExt, ErrorText, SectionHeaderStyle;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'assistant_api.dart';
@@ -190,10 +189,10 @@ class CurrentDriveHeader extends StatelessWidget {
   }
 }
 
-/// The drive switcher: a search field, every listed drive as a full-width
-/// row (the left part opens the drive's page, a "Switch" button on the right
-/// makes it the current drive, the current one shows a "Current" chip) and
-/// "Manage drives…" and "New drive" at the bottom.
+/// The drive switcher: a search field, every other drive as a full-width
+/// row (a tap makes it the current drive and opens it) and "Manage
+/// drives…" and "New drive" at the bottom. The current drive is in the
+/// header above, so it is not listed.
 ///
 /// It is a state of the sidebar, not a layer over it: with [fill] it takes
 /// all the room it is given (the list scrolls, the actions stay at the
@@ -201,10 +200,9 @@ class CurrentDriveHeader extends StatelessWidget {
 class DriveSwitcherContent extends StatefulWidget {
   final List<DriveInfo> drives;
   final String current;
-  final ValueChanged<DriveInfo> onSelect;
 
-  /// The row's left part: open the drive's page, the active drive unchanged.
-  final ValueChanged<DriveInfo> onOpen;
+  /// A drive was tapped: switch to it and open it.
+  final ValueChanged<DriveInfo> onSelect;
   final VoidCallback? onManage;
   final VoidCallback? onNew;
 
@@ -217,7 +215,6 @@ class DriveSwitcherContent extends StatefulWidget {
     required this.drives,
     required this.current,
     required this.onSelect,
-    required this.onOpen,
     this.onManage,
     this.onNew,
   });
@@ -237,10 +234,12 @@ class _DriveSwitcherContentState extends State<DriveSwitcherContent> {
 
   List<DriveInfo> get _shown {
     final q = _query.text.trim().toLowerCase();
-    if (q.isEmpty) return widget.drives;
+    final current = driveKeyOf(widget.current);
     return [
       for (final d in widget.drives)
-        if (driveTitle(d).toLowerCase().contains(q)) d
+        if (driveKeyOf(d.subject) != current &&
+            (q.isEmpty || driveTitle(d).toLowerCase().contains(q)))
+          d
     ];
   }
 
@@ -268,7 +267,6 @@ class _DriveSwitcherContentState extends State<DriveSwitcherContent> {
   Widget build(BuildContext context) {
     final c = context.appColors;
     final shown = _shown;
-    final currentKey = driveKeyOf(widget.current);
     return Column(
       key: const Key('drive-switcher'),
       mainAxisSize: widget.fill ? MainAxisSize.max : MainAxisSize.min,
@@ -300,7 +298,10 @@ class _DriveSwitcherContentState extends State<DriveSwitcherContent> {
               ? Padding(
                   padding: const EdgeInsets.all(24),
                   child: Center(
-                    child: Text('No drives match',
+                    child: Text(
+                        _query.text.trim().isEmpty
+                            ? 'No other drives'
+                            : 'No drives match',
                         key: const Key('drive-switcher-empty'),
                         style: TextStyle(color: c.textSecondary)),
                   ),
@@ -310,13 +311,10 @@ class _DriveSwitcherContentState extends State<DriveSwitcherContent> {
                   itemCount: shown.length,
                   itemBuilder: (context, i) {
                     final d = shown[i];
-                    final current = driveKeyOf(d.subject) == currentKey;
                     return _DriveSwitcherRow(
                       key: ValueKey('drive-switcher-row-${d.subject}'),
                       drive: d,
-                      current: current,
-                      onOpen: () => widget.onOpen(d),
-                      onSwitch: () => widget.onSelect(d),
+                      onTap: () => widget.onSelect(d),
                     );
                   },
                 ),
@@ -333,143 +331,51 @@ class _DriveSwitcherContentState extends State<DriveSwitcherContent> {
   }
 }
 
-/// One drive in the switcher, edge to edge: the left part (avatar and name)
-/// opens the drive's page, the right a compact "Switch" button, or for the
-/// current drive a "Current" chip. Ctrl/Cmd+Enter on the row switches.
-class _DriveSwitcherRow extends StatefulWidget {
+/// One drive in the switcher, edge to edge: its avatar and name. A tap
+/// switches to it and opens it.
+class _DriveSwitcherRow extends StatelessWidget {
   final DriveInfo drive;
-  final bool current;
-  final VoidCallback onOpen;
-  final VoidCallback onSwitch;
+  final VoidCallback onTap;
 
   const _DriveSwitcherRow({
     super.key,
     required this.drive,
-    required this.current,
-    required this.onOpen,
-    required this.onSwitch,
+    required this.onTap,
   });
-
-  @override
-  State<_DriveSwitcherRow> createState() => _DriveSwitcherRowState();
-}
-
-class _DriveSwitcherRowState extends State<_DriveSwitcherRow> {
-  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
-    final d = widget.drive;
-    final name = driveTitle(d);
-    final switchable = !widget.current;
-    Widget trailing;
-    if (switchable) {
-      trailing = Semantics(
+    final name = driveTitle(drive);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: c.sectionDivider)),
+      ),
+      child: Semantics(
         button: true,
         label: 'Switch to $name',
         excludeSemantics: true,
-        onTap: widget.onSwitch,
-        child: SizedBox(
-          height: 34,
-          child: FilledButton.tonal(
-            key: ValueKey('drive-switcher-switch-${d.subject}'),
-            onPressed: widget.onSwitch,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(0, 34),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              backgroundColor: c.mainSelectedBg,
-              foregroundColor: c.mainSelectedFg,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(17)),
-              textStyle:
-                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-            ),
-            child: const Text('Switch'),
-          ),
-        ),
-      );
-    } else {
-      trailing = Container(
-        key: const Key('drive-switcher-current'),
-        height: 28,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          color: c.bg1,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.check, size: 16, color: c.textSecondary),
-          const SizedBox(width: 4),
-          Text('Current',
-              key: const Key('drive-switcher-current-label'),
-              style: TextStyle(
-                  color: c.textSecondary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600)),
-        ]),
-      );
-    }
-    return CallbackShortcuts(
-      bindings: {
-        if (switchable) ...{
-          const SingleActivator(LogicalKeyboardKey.enter, control: true):
-              widget.onSwitch,
-          const SingleActivator(LogicalKeyboardKey.enter, meta: true):
-              widget.onSwitch,
-        },
-      },
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() => _hovered = false),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: _hovered ? c.rowHighlight : Colors.transparent,
-            border: Border(bottom: BorderSide(color: c.sectionDivider)),
-          ),
+        onTap: onTap,
+        child: InkWell(
+          key: ValueKey('drive-switcher-open-${drive.subject}'),
+          mouseCursor: WidgetStateMouseCursor.clickable,
+          hoverColor: c.rowHighlight,
+          onTap: onTap,
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 56),
-            child: Row(children: [
-              Expanded(
-                child: Semantics(
-                  button: true,
-                  label: 'Open $name',
-                  excludeSemantics: true,
-                  onTap: widget.onOpen,
-                  child: InkWell(
-                    key: ValueKey('drive-switcher-open-${d.subject}'),
-                    mouseCursor: WidgetStateMouseCursor.clickable,
-                    onTap: widget.onOpen,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 56),
-                      child: Padding(
-                        padding: const EdgeInsets.only(left: 16, right: 8),
-                        child: Row(children: [
-                          DriveAvatar(drive: d, size: 32),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Text(name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    color: c.textPrimary,
-                                    fontSize: 15,
-                                    fontWeight: widget.current
-                                        ? FontWeight.w600
-                                        : FontWeight.w400)),
-                          ),
-                        ]),
-                      ),
-                    ),
-                  ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(children: [
+                DriveAvatar(drive: drive, size: 32),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: c.textPrimary, fontSize: 15)),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: trailing,
-              ),
-            ]),
+              ]),
+            ),
           ),
         ),
       ),

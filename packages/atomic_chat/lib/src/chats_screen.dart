@@ -1087,8 +1087,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
         fill: true,
         drives: _driveList,
         current: _drive,
-        onSelect: (d) => closing(() => _selectDrive(d)),
-        onOpen: (d) => closing(() => _openDrivePage(d)),
+        onSelect: (d) => closing(() async {
+          await _selectDrive(d);
+          if (mounted) _openDrivePage(d);
+        }),
         onManage: () => closing(() => _openSectionPage(HomeSection.drives)),
         onNew: shell == null
             ? null
