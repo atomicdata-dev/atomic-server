@@ -1,15 +1,14 @@
 # Scalable drive reconciliation & signed state roots
 
-> **Status:** Partial. Algorithm core lives in `lib/src/sync/rbsr.rs` (fingerprint
-> + recursive reconcile, pinned by unit tests) with a TS mirror in
-> `browser/lib/src/rbsr.ts`. **On the WS wire** as the stateless text frames
-> `RBSR_FP` / `RBSR_ITEMS` (verified 2026-09-03): the browser answers `SYNC_RESEND (0x38)` by
-> reconciling ranges against the server and sending version vectors for only the
-> differing subjects, falling back to the full VV on any RBSR failure. Not on the
-> Iroh wire. Range fingerprints are still O(range), not an incrementally
-> maintained tree, and the cross-impl canonical hash is still unspecified.
-> Builds on the drive-scoped VV read and the hash-first probe already landed
-> (see [Foundation](#foundation-already-landed)).
+> **Status:** Follow-up design; the stateless RBSR implementation was removed
+> in September 2026. Its Rust and TypeScript modules no longer exist. Current
+> WebSocket reconnects use a hash-first probe, then send the full per-resource
+> version-vector inventory on `SYNC_RESEND`. `RBSR_FP` returns `unsupported`;
+> `RBSR_ITEMS` remains an inventory operation. Sparse v2 version vectors and
+> their canonical SHA-256 hash are implemented and pinned across Rust and TS.
+> An incrementally maintained range-fingerprint index and signed state roots
+> remain proposals below, not deployed protocol behavior. See the current
+> [wire reference](../docs/src/websockets.md#drive-synchronization-over-websocket).
 > Ties the reconciliation redesign to the signed-state-certificate direction in
 > [`genesis-self-verifying.md`](./genesis-self-verifying.md),
 > [`commit-retention-and-state-certificates.md`](./commit-retention-and-state-certificates.md),
@@ -24,12 +23,11 @@ one root over all leaves. Consequences:
 - **Cost tracks the drive, not the change.** One changed resource flips the
   drive hash, forcing an exchange/diff over the drive's whole VV set to locate
   the single delta. This is O(drive), not O(divergence).
-- **The hash is fragile across implementations.** The client hashes in JS
-  (`crypto.subtle`, `localeCompare` sort) and the server in Rust (`ring` or a
-  `DefaultHasher` fallback, `String::cmp` sort). A sort/format divergence makes
-  the hashes silently never match, degrading to a full diff on every sync. This
-  is the same cross-language byte-identical-hashing problem that caused the
-  genesis-cert `stateHash` to be **deliberately deferred** (see
+- **Future fingerprints must preserve cross-language agreement.** The current
+  sparse v2 hash has a defined SHA-256 encoding and a shared Rust/TS golden
+  vector. A range index must preserve that agreement under updates. Signing a
+  materialized-content root still needs its own canonicalization contract; the
+  existing version-vector hash does not prove document content (see
   [`genesis-self-verifying.md`](./genesis-self-verifying.md) § `stateHash`).
 
 The goal: reconciliation whose cost scales with the **delta**, and — as an
@@ -50,6 +48,16 @@ structure work; they are NOT the redesign:
   on a mismatch. This is the natural hook the structure plugs into: the probe
   becomes "compare root fingerprint," and a mismatch triggers a **range/subtree
   descent** instead of a full resend.
+- **Sparse v2 inventory and hash** (`bedede432`): each resource lists only its
+  non-zero peer counters. `compute_drive_hash_v2` and `canonicalDriveHashV2`
+  hash byte-ordered subjects and peers with SHA-256; a shared golden vector
+  checks agreement. This removes the dense resources-times-peers expansion,
+  while mismatch discovery still compares the drive's resource inventory.
+
+The first stateless RBSR attempt recomputed the whole drive inventory during
+each range round trip and cost more than a full comparison. It was removed in
+`1d7f312a6`. A new implementation needs the maintained fingerprint structure
+described below rather than restoring that descent unchanged.
 
 ## Structure decision: RBSR over a domain-hierarchy Merkle
 
@@ -134,10 +142,10 @@ per-commit certs, it doesn't replace them.
 
 ## Phasing
 
-1. **Canonical hash spec** (prerequisite). One shared, versioned definition of
-   the VV fingerprint (subject ordering, counter encoding, hash function), spec'd
-   and tested TS↔Rust to byte-identical output. Retire the `localeCompare`
-   vs `cmp` / `ring` vs `DefaultHasher` divergence.
+1. **Preserve the canonical hash contract** (foundation implemented). Sparse
+   v2 already defines subject/peer ordering, counter encoding, and SHA-256,
+   with a shared Rust/TS vector. A new range-fingerprint format needs equally
+   explicit versioning and cross-implementation fixtures.
 2. **RBSR over VV leaves.** Fingerprint tree over the sorted keyspace, maintained
    on write; range-exchange protocol behind the hash-first probe (probe = root
    fingerprint; mismatch = range descent, not full resend). Adversarial
